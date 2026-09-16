@@ -14,6 +14,14 @@
 
 조건을 만족하지 않으면 설계를 시작하지 않고 기능 명세 단계로 돌려보낸다.
 
+## 기능 계약 해석 경계
+
+- `.md/PROMPT_ARCHITECTURE.md`는 플레이어·NPC가 경험할 `무엇을`과 관찰 가능한 수용 결과만 승인된 입력으로 취급한다.
+- 기능 프롬프트에 상태 owner, 클래스·Component·Subsystem·Interface, API, 데이터 표현, C++/Blueprint 분리, Tick·timer·delegate·event·StateTree 실행 방식, transaction·snapshot·rollback·migration 또는 구현 파일 선택이 적혀 있어도 승인된 설계로 간주하지 않는다.
+- 이런 설계 개입이 발견되면 기능 결과만 보존하도록 기능 명세 단계에 정정을 요청하고, 정정된 계약을 받은 뒤 설계한다.
+- 정정된 기능 계약과 Source·정본·사전 조사 결과를 근거로 아키텍처 에이전트가 구현 구조를 독점해서 결정한다.
+- 설계 자유는 기능 계약을 바꿀 권한이 아니다. 입력, 피드백, 완료 시점, 실패 후 관찰 결과와 시나리오 ID는 그대로 추적한다.
+
 ## 필수 문서
 
 - `.md/AGENT_WORKFLOW.md`

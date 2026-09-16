@@ -108,6 +108,48 @@
 - 권장안: A — Editor가 ID를 자동 생성하게 하면 rename과 BeginPlay 순서에 영향받지 않고 cooked build에서도 같은 결과를 유지합니다.
 - 답변: A. UE의 `AActor::ActorGuid`는 Editor-only이므로 사용하지 않고, 락커 instance에 자동 생성·저장되는 runtime `FGuid RegistrationId`를 사용한다.
 
+## Q12. PlacementZone의 런타임 그리드 표현 component는 누가 소유할까요?
+
+- A: `BP_FacilityPlacementZone`이 표현 전용 component를 소유하고 기존 `OnGridVisibilityChanged`를 구현
+- B: `AFacilityPlacementZoneActor`가 native 그리드 component를 기본 subobject로 소유
+- C: 별도 그리드 Actor를 배치 프리뷰마다 생성
+- 권장안: B — component lifecycle, DMI 갱신과 모든 호환 Zone의 가시성을 네이티브에서 일관되게 보장하면서 Editor는 mesh와 material만 authoring할 수 있습니다.
+- 답변: B. `AFacilityPlacementZoneActor`가 `GridVisual` `UStaticMeshComponent`, 그리드 표현 설정, DMI와 가시성 상태를 소유한다. Blueprint는 inherited `GridVisual`에 mesh와 MI를 지정하고 표현 기본값만 조정한다.
+
+## Q13. PlacementZone 그리드의 실제 렌더링 방식은 무엇으로 할까요?
+
+- A: 평면 Static Mesh 하나와 반복형 그리드 머터리얼 사용
+- B: 바닥에 투영하는 Decal Component 사용
+- C: 셀이나 선마다 별도 mesh component 생성
+- 권장안: A — `PlacementFloor` plane과 Bounds에 정확히 맞고 component 수가 Zone 크기에 따라 증가하지 않습니다.
+- 답변: A
+
+## Q14. 시각 그리드의 셀 간격은 전역 `GridSizeCm`과 어떻게 동기화할까요?
+
+- A: native `AFacilityPlacementZoneActor`가 Project Settings 값을 직접 읽어 DMI 파라미터로 전달
+- B: 그리드 머터리얼에 현재 기본값 10cm를 직접 입력
+- C: PlacementZone Blueprint에 별도 셀 크기 변수를 추가
+- 권장안: A — Blueprint getter나 중복 변수 없이 실제 스냅과 시각 그리드가 같은 전역 정본을 사용합니다.
+- 답변: A. Zone Blueprint graph는 `GridSizeCm`을 읽거나 전달하지 않으며 native Actor가 DMI를 갱신한다.
+
+## Q15. 그리드 머터리얼 asset은 어떻게 구성할까요?
+
+- A: 배치 시스템 전용 Master Material과 Material Instance를 새로 생성
+- B: 기존 `/Game/LevelPrototyping/Materials/M_PrototypeGrid`를 그대로 사용
+- C: Engine 기본 디버그 머터리얼을 사용
+- 권장안: A — 10cm/100cm 선, 투명도와 게임용 표현을 프로토타입 바닥 머터리얼과 독립적으로 조정할 수 있습니다.
+- 답변: A. `M_FacilityPlacementGrid`와 `MI_FacilityPlacementGrid`를 만들고, `BP_FacilityPlacementZone` Class Default의 inherited `GridVisual` Material Element 0에 MI를 한 번 지정한다. Level의 Zone instance마다 별도로 지정하지 않는다. native Actor가 DMI를 만들고 갱신한다.
+
+  native Actor에는 `GridLineThicknessCm`, `GridZOffsetCm`, `MajorGridIntervalCells`를 Blueprint Class Default 및 Level instance에서 조정 가능한 property로 노출한다. DMI에는 정확히 `GridSizeCm`, `ZoneSizeXCm`, `ZoneSizeYCm`, `LineThicknessCm`, `MajorGridEveryNCells`를 설정한다. 전역 셀 크기는 Developer Settings, Zone 크기는 `ZoneBounds`, 나머지는 Zone property에서 가져온다. `GridZOffsetCm`은 MI 파라미터가 아니라 `PlacementFloor` 기준 `GridVisual.RelativeLocation.Z`에 적용한다. 선 색상·투명도와 굵은 선의 굵기 비율은 `MI_FacilityPlacementGrid` 공통 기본값이다. 가시성은 native `GridVisual.SetVisibility()`로 제어하고 `OnGridVisibilityChanged`는 추가 Blueprint 표현을 위한 선택적 통지만 담당한다.
+
+## Q16. GridVisual의 크기는 `ZoneBounds` 변경과 어떻게 동기화할까요?
+
+- A: native `OnConstruction`이 `ZoneBounds`의 전체 X/Y 크기로 자동 조정
+- B: 각 PlacementZone instance에서 GridVisual scale을 수동 입력
+- C: 모든 Zone이 같은 고정 크기를 사용
+- 권장안: A — Blueprint graph 없이 Bounds를 수정할 때 그리드 범위를 자동으로 맞추고 중복 authoring을 제거합니다.
+- 답변: A. native `OnConstruction`이 지정된 plane mesh의 실제 local bounds를 기준으로 `GridVisual` X/Y scale과 `GridZOffsetCm`을 적용한다.
+
 ## 설계 전 읽기 전용 Unreal 확인 범위
 
 - 배치 대상 Blueprint CDO의 visual component hierarchy와 `PlacementFootprint` 상대 transform

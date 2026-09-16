@@ -41,6 +41,12 @@ public:
 		const FTransform& CandidateTransform,
 		const AFacilityPlacementZoneActor& Zone) const = 0;
 	virtual FFacilityPlacementTransactionResult QueryFacilityRecovery() const = 0;
+	virtual bool TryBeginFacilityRecoveryHold(FText& OutFailureReason)
+	{
+		OutFailureReason = FText::GetEmpty();
+		return true;
+	}
+	virtual void CancelFacilityRecoveryHold() {}
 	virtual bool ExportPlacementPayload(
 		APlaceableFacilityItemActor& PayloadOwner,
 		FFacilityPlacementPayload& OutPayload,

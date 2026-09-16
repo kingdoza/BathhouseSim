@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Customer/CustomerBathLoopLog.h"
 #include "Customer/BathhouseCustomerTypes.h"
 #include "Engine/EngineTypes.h"
 #include "Facility/BathhouseFacilityTypes.h"
@@ -15,6 +16,7 @@ class ABathhouseCounterActor;
 class ABathhouseFacilityActor;
 class ABathhouseKeyActor;
 class UBathhouseFacilitySlotComponent;
+class UBathWaterStateComponent;
 class UCustomerRoutineDefinition;
 class ACleanTowelStackActor;
 class AUsedTowelBinActor;
@@ -70,6 +72,25 @@ public:
 	bool StartBathStay();
 	bool IsBathStayExpired() const { return bBathStayExpired; }
 	float GetRemainingBathStaySeconds() const;
+	bool BeginBathSearchWindow();
+	void CompleteBathSearchWindow();
+	void CancelBathSearchWindow();
+	bool IsBathSearchExpired() const { return bBathSearchExpired; }
+	float GetRemainingBathSearchSeconds() const;
+	float GetBathSearchElapsedSeconds() const;
+	float GetActualBathSeconds() const;
+	bool IsCurrentBathUsable() const;
+	bool HasCurrentBathFacility() const;
+	bool IsCurrentBathExitPending() const { return bCurrentBathExitPending; }
+	TOptional<ECustomerBathLoopReason> GetCurrentBathExitReason() const { return CurrentBathExitReason; }
+	void LogBathLoopStateTreeEvent(
+		ECustomerBathLoopLogLevel Level,
+		const TCHAR* Phase,
+		const TCHAR* Result,
+		TOptional<ECustomerBathLoopReason> Reason = {}) const;
+	void LogBathForcedExitCleanup(bool bApproachReturned) const;
+	bool BeginActualBathSegment();
+	void EndActualBathSegment(ECustomerBathLoopReason Reason);
 	void PauseRoutineTimers();
 	void ResumeRoutineTimers();
 	bool AreRoutineTimersPaused() const { return bRoutineTimersPaused; }
@@ -133,6 +154,7 @@ private:
 	friend class FBathhouseCustomerBathSnapTest;
 	friend class FBathhouseCustomerTowelTest;
 	friend class FBathhouseCheckoutKeyDropTest;
+	friend class FBathhouseBathWaterSessionTest;
 
 	void CacheCurrentFacilityTransforms();
 	void ClearCurrentFacilityTransformCache();
@@ -144,6 +166,16 @@ private:
 	void SetPresentationState(EBathhouseCustomerPresentationState NewState) const;
 	void HandleCheckInTimeout();
 	void HandleBathStayExpired();
+	void HandleBathSearchExpired();
+	void HandleCurrentBathUsabilityChanged(bool bUsable);
+	void BindCurrentBathWater();
+	void UnbindCurrentBathWater();
+	void CommitCurrentBathInvalidation(ECustomerBathLoopReason Reason);
+	FString BuildBathLoopDiagnosticLine(
+		const TCHAR* Phase,
+		const TCHAR* Result,
+		TOptional<ECustomerBathLoopReason> Reason,
+		float SearchElapsed) const;
 	void HandleTowelWaitExpired();
 	void HandleFacilityAvailabilityChanged(EBathhouseFacilityType FacilityType);
 	void HandleQueueChanged(EBathhouseCounterLane ChangedLane);
@@ -173,6 +205,9 @@ private:
 	TObjectPtr<UBathhouseFacilitySlotComponent> CurrentFacilitySlot = nullptr;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UBathWaterStateComponent> BoundBathWaterState = nullptr;
+
+	UPROPERTY(Transient)
 	TObjectPtr<ABathhouseFacilityActor> LastBathActor = nullptr;
 
 	UPROPERTY(Transient)
@@ -194,14 +229,23 @@ private:
 	EBathhouseCustomerActivity CurrentActivity = EBathhouseCustomerActivity::None;
 	EBathhouseCustomerDepartureReason DepartureReason = EBathhouseCustomerDepartureReason::None;
 	double BathStayEndTime = 0.0;
+	double BathSearchEndTime = 0.0;
+	double ActualBathSegmentStartTime = 0.0;
 	FTimerHandle CheckInTimeoutHandle;
 	FTimerHandle BathStayTimerHandle;
+	FTimerHandle BathSearchTimerHandle;
 	FTimerHandle TowelWaitTimerHandle;
 	float PausedCheckInRemainingSeconds = 0.0f;
 	float PausedBathStayRemainingSeconds = 0.0f;
+	float PausedBathSearchRemainingSeconds = 0.0f;
+	float BathSearchResolvedDurationSeconds = 0.0f;
 	float PausedTowelWaitRemainingSeconds = 0.0f;
+	float ActualBathAccumulatedSeconds = 0.0f;
 	FDelegateHandle FacilityAvailabilityHandle;
+	FDelegateHandle CurrentBathUsabilityHandle;
 	FDelegateHandle QueueChangedHandle;
+	uint64 BathSearchSerial = 0;
+	uint64 BathLoopIteration = 0;
 	FTransform CachedFacilityApproachTransform;
 	FTransform CachedFacilityActionTransform;
 	TEnumAsByte<EMovementMode> SavedMovementMode = MOVE_Walking;
@@ -215,6 +259,11 @@ private:
 	bool bCheckoutOfferActive = false;
 	bool bBathStayStarted = false;
 	bool bBathStayExpired = false;
+	bool bBathSearchActive = false;
+	bool bBathSearchExpired = false;
+	bool bActualBathSegmentActive = false;
+	bool bCurrentBathExitPending = false;
+	TOptional<ECustomerBathLoopReason> CurrentBathExitReason;
 	bool bCashClaimed = false;
 	bool bWaitingForCleanTowel = false;
 	bool bTowelWaitExpired = false;
@@ -224,6 +273,7 @@ private:
 	bool bRoutineTimersPaused = false;
 	bool bPausedCheckInTimer = false;
 	bool bPausedBathStayTimer = false;
+	bool bPausedBathSearchTimer = false;
 	bool bPausedTowelWaitTimer = false;
 	bool bFacilityUseSuspendedForKnockdown = false;
 	bool bClothesStored = false;

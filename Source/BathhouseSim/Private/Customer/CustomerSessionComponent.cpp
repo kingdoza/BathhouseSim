@@ -6,6 +6,7 @@
 #include "Components/StateTreeAIComponent.h"
 #include "Customer/BathhouseCustomerAIController.h"
 #include "Customer/BathhouseCustomerCharacter.h"
+#include "Customer/CustomerBathLoopLog.h"
 #include "Customer/CustomerQueueNavigationComponent.h"
 #include "Customer/CustomerRoutineDefinition.h"
 #include "Economy/BathhouseCashPaymentActor.h"
@@ -14,6 +15,8 @@
 #include "Facility/BathhouseFacilityActor.h"
 #include "Facility/BathhouseFacilitySlotComponent.h"
 #include "Facility/BathhouseFacilitySubsystem.h"
+#include "Facility/BathWaterSettings.h"
+#include "Facility/BathWaterStateComponent.h"
 #include "Facility/LockerActionSlotComponent.h"
 #include "Facility/LockerCapacitySubsystem.h"
 #include "GameFramework/Character.h"
@@ -54,12 +57,16 @@ void UCustomerSessionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 	{
 		World->GetTimerManager().ClearTimer(CheckInTimeoutHandle);
 		World->GetTimerManager().ClearTimer(BathStayTimerHandle);
+		World->GetTimerManager().ClearTimer(BathSearchTimerHandle);
 		World->GetTimerManager().ClearTimer(TowelWaitTimerHandle);
 	}
 	CleanupTowelHandle();
+	EndActualBathSegment(ECustomerBathLoopReason::StateTreeExited);
+	CancelBathSearchWindow();
 	ReleaseLockerLease();
 	StopWaitingForFacility();
 	ReleaseCurrentFacility();
+	UnbindCurrentBathWater();
 	LeaveQueue();
 	if (Counter && QueueChangedHandle.IsValid())
 	{
@@ -282,7 +289,8 @@ bool UCustomerSessionComponent::TryReserveFacility(const EBathhouseFacilityType 
 		{
 			CacheCurrentFacilityTransforms();
 		}
-		return CurrentFacilityActor && CurrentFacilityActor->GetFacilityType() == FacilityType;
+		return CurrentFacilityActor && CurrentFacilityActor->GetFacilityType() == FacilityType
+			&& (FacilityType != EBathhouseFacilityType::Bath || IsCurrentBathUsable());
 	}
 	UBathhouseFacilitySubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UBathhouseFacilitySubsystem>() : nullptr;
 	if (!Subsystem)
@@ -318,6 +326,15 @@ bool UCustomerSessionComponent::TryReserveFacility(const EBathhouseFacilityType 
 		bExcludeLastBath ? LastBathActor.Get() : nullptr))
 	{
 		WaitForFacility(FacilityType);
+		if (FacilityType == EBathhouseFacilityType::Bath)
+		{
+			UE_LOG(LogBathhouseCustomerBath, Verbose,
+				TEXT("Customer=%s Iteration=%llu Phase=Search BathActor=None Slot=None WaterPercent=0 ThresholdPercent=%.2f BathStayRemaining=%.2f ActualBathSeconds=%.2f SearchElapsed=0 Result=Retry Reason=%s"),
+				*GetNameSafe(GetOwner()), BathLoopIteration,
+				GetDefault<UBathWaterSettings>()->GetCustomerUsableThresholdPercent(),
+				GetRemainingBathStaySeconds(), GetActualBathSeconds(),
+				LexToString(ECustomerBathLoopReason::NoBathCandidate));
+		}
 		return false;
 	}
 
@@ -325,6 +342,25 @@ bool UCustomerSessionComponent::TryReserveFacility(const EBathhouseFacilityType 
 	CurrentFacilityActor = Facility;
 	CurrentFacilitySlot = Slot;
 	CacheCurrentFacilityTransforms();
+	if (FacilityType == EBathhouseFacilityType::Bath)
+	{
+		BindCurrentBathWater();
+		if (!IsCurrentBathUsable())
+		{
+			CommitCurrentBathInvalidation(ECustomerBathLoopReason::WaterBelowThreshold);
+			ReleaseCurrentFacility();
+			WaitForFacility(FacilityType);
+			return false;
+		}
+		UE_LOG(LogBathhouseCustomerBath, Log,
+			TEXT("Customer=%s Iteration=%llu Phase=Reservation BathActor=%s Slot=%s WaterPercent=%.2f ThresholdPercent=%.2f BathStayRemaining=%.2f ActualBathSeconds=%.2f SearchElapsed=%.2f Result=Reserved Reason=None"),
+			*GetNameSafe(GetOwner()), BathLoopIteration, *GetNameSafe(CurrentFacilityActor), *GetNameSafe(CurrentFacilitySlot),
+			BoundBathWaterState->GetWaterPercent(),
+			GetDefault<UBathWaterSettings>()->GetCustomerUsableThresholdPercent(),
+			GetRemainingBathStaySeconds(), GetActualBathSeconds(),
+			GetBathSearchElapsedSeconds());
+		CompleteBathSearchWindow();
+	}
 	return true;
 }
 
@@ -337,10 +373,15 @@ bool UCustomerSessionComponent::BeginUseCurrentFacility()
 
 	const bool bIsBathTransaction = CurrentFacilityActor
 		&& CurrentFacilityActor->GetFacilityType() == EBathhouseFacilityType::Bath;
+	if (bIsBathTransaction && !IsCurrentBathUsable())
+	{
+		CommitCurrentBathInvalidation(ECustomerBathLoopReason::EntryValidationFailed);
+		return false;
+	}
 	if (bIsBathTransaction && !bHasCachedFacilityTransforms)
 	{
 		UE_LOG(
-			LogTemp,
+			LogBathhouseCustomerBath,
 			Error,
 			TEXT("Bathhouse customer %s cannot begin Bath use without its reservation-time facility transform snapshot."),
 			*GetNameSafe(GetOwner()));
@@ -348,6 +389,12 @@ bool UCustomerSessionComponent::BeginUseCurrentFacility()
 	}
 	if (!CurrentFacilitySlot->BeginUse(GetOwner()))
 	{
+		return false;
+	}
+	if (bIsBathTransaction && !BeginActualBathSegment())
+	{
+		CurrentFacilitySlot->EndUse(GetOwner());
+		CommitCurrentBathInvalidation(ECustomerBathLoopReason::EntryValidationFailed);
 		return false;
 	}
 
@@ -363,6 +410,13 @@ bool UCustomerSessionComponent::BeginUseCurrentFacility()
 
 bool UCustomerSessionComponent::SnapCurrentFacility(const ECustomerFacilitySnapTarget Target)
 {
+	if (Target == ECustomerFacilitySnapTarget::ActionPoint
+		&& CurrentFacilityActor && CurrentFacilityActor->GetFacilityType() == EBathhouseFacilityType::Bath
+		&& !IsCurrentBathUsable())
+	{
+		CommitCurrentBathInvalidation(ECustomerBathLoopReason::EntryValidationFailed);
+		return false;
+	}
 	return Target == ECustomerFacilitySnapTarget::ActionPoint
 		? SnapToCurrentFacilityActionPoint()
 		: ReturnToCurrentFacilityApproachPoint();
@@ -370,6 +424,7 @@ bool UCustomerSessionComponent::SnapCurrentFacility(const ECustomerFacilitySnapT
 
 void UCustomerSessionComponent::ReleaseCurrentFacility()
 {
+	EndActualBathSegment(ECustomerBathLoopReason::StateTreeExited);
 	bFacilityUseSuspendedForKnockdown = false;
 	if (TowelUseHandle.HasToken()
 		&& TowelUseHandle.bUsed
@@ -384,7 +439,7 @@ void UCustomerSessionComponent::ReleaseCurrentFacility()
 	if (bSnappedToFacilityActionPoint && !ReturnToCurrentFacilityApproachPoint())
 	{
 		UE_LOG(
-			LogTemp,
+			LogBathhouseCustomerBath,
 			Error,
 			TEXT("Bathhouse customer %s could not return to the cached facility approach point before release."),
 			*GetNameSafe(GetOwner()));
@@ -398,8 +453,11 @@ void UCustomerSessionComponent::ReleaseCurrentFacility()
 		CurrentFacilitySlot->EndUse(GetOwner());
 		CurrentFacilitySlot->Release(GetOwner());
 	}
+	UnbindCurrentBathWater();
 	CurrentFacilitySlot = nullptr;
 	CurrentFacilityActor = nullptr;
+	bCurrentBathExitPending = false;
+	CurrentBathExitReason.Reset();
 	ClearCurrentFacilityTransformCache();
 }
 
@@ -417,7 +475,7 @@ bool UCustomerSessionComponent::GetCurrentFacilityTransform(const bool bApproach
 		if (!bHasCachedFacilityTransforms)
 		{
 			UE_LOG(
-				LogTemp,
+				LogBathhouseCustomerBath,
 				Error,
 				TEXT("Bathhouse customer %s cannot resolve a Bath target without its reservation-time facility transform snapshot."),
 				*GetNameSafe(GetOwner()));
@@ -464,7 +522,7 @@ bool UCustomerSessionComponent::SnapToCurrentFacilityActionPoint()
 	UCapsuleComponent* Capsule = Character ? Character->GetCapsuleComponent() : nullptr;
 	if (!CurrentFacilitySlot || !bHasCachedFacilityTransforms || !Character || !Movement || !Capsule)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Bathhouse customer %s cannot snap without a cached facility and character movement."), *GetNameSafe(GetOwner()));
+		UE_LOG(LogBathhouseCustomerBath, Error, TEXT("Bathhouse customer %s cannot snap without a cached facility and character movement."), *GetNameSafe(GetOwner()));
 		return false;
 	}
 	const FTransform CharacterActionTransform = MakeCharacterTransformAtFacilityPoint(
@@ -697,7 +755,12 @@ float UCustomerSessionComponent::BeginActivity(const EBathhouseCustomerActivity 
 	SetPresentationState(Activity == EBathhouseCustomerActivity::BathDwell
 		? EBathhouseCustomerPresentationState::Bathing
 		: EBathhouseCustomerPresentationState::UsingFacility);
-	return FMath::Max(0.0f, RoutineDefinition->GetActivityDuration(Activity));
+	float Duration = FMath::Max(0.0f, RoutineDefinition->GetActivityDuration(Activity));
+	if (Activity == EBathhouseCustomerActivity::BathDwell)
+	{
+		Duration = FMath::Min(Duration, GetRemainingBathStaySeconds());
+	}
+	return Duration;
 }
 
 void UCustomerSessionComponent::FinishActivity(const EBathhouseCustomerActivity Activity)
@@ -712,6 +775,7 @@ void UCustomerSessionComponent::FinishActivity(const EBathhouseCustomerActivity 
 	}
 	if (Activity == EBathhouseCustomerActivity::BathDwell)
 	{
+		EndActualBathSegment(ECustomerBathLoopReason::DwellCompleted);
 		LastBathActor = CurrentFacilityActor;
 	}
 	else if (Activity == EBathhouseCustomerActivity::Undress)
@@ -735,42 +799,16 @@ void UCustomerSessionComponent::AbortActivity(
 {
 	if (CurrentActivity == Activity)
 	{
+		if (Activity == EBathhouseCustomerActivity::BathDwell)
+		{
+			EndActualBathSegment(ECustomerBathLoopReason::StateTreeExited);
+		}
 		CurrentActivity = EBathhouseCustomerActivity::None;
 	}
 	if (bReleaseFacility)
 	{
 		ReleaseCurrentFacility();
 	}
-}
-
-bool UCustomerSessionComponent::StartBathStay()
-{
-	if (bBathStayStarted || !RoutineDefinition || !GetWorld())
-	{
-		return bBathStayStarted;
-	}
-	bBathStayStarted = true;
-	bBathStayExpired = false;
-	const float Duration = FMath::Max(RoutineDefinition->BathStayDurationSeconds, 0.1f);
-	BathStayEndTime = GetWorld()->GetTimeSeconds() + Duration;
-	GetWorld()->GetTimerManager().SetTimer(
-		BathStayTimerHandle,
-		this,
-		&UCustomerSessionComponent::HandleBathStayExpired,
-		Duration,
-		false);
-	return true;
-}
-
-float UCustomerSessionComponent::GetRemainingBathStaySeconds() const
-{
-	if (bRoutineTimersPaused && bPausedBathStayTimer)
-	{
-		return PausedBathStayRemainingSeconds;
-	}
-	return bBathStayStarted && !bBathStayExpired && GetWorld()
-		? FMath::Max(0.0, BathStayEndTime - GetWorld()->GetTimeSeconds())
-		: 0.0f;
 }
 
 void UCustomerSessionComponent::PauseRoutineTimers()
@@ -792,7 +830,9 @@ void UCustomerSessionComponent::PauseRoutineTimers()
 	};
 	CaptureAndClear(CheckInTimeoutHandle, bPausedCheckInTimer, PausedCheckInRemainingSeconds);
 	CaptureAndClear(BathStayTimerHandle, bPausedBathStayTimer, PausedBathStayRemainingSeconds);
+	CaptureAndClear(BathSearchTimerHandle, bPausedBathSearchTimer, PausedBathSearchRemainingSeconds);
 	CaptureAndClear(TowelWaitTimerHandle, bPausedTowelWaitTimer, PausedTowelWaitRemainingSeconds);
+	EndActualBathSegment(ECustomerBathLoopReason::KnockdownInterrupted);
 }
 
 void UCustomerSessionComponent::ResumeRoutineTimers()
@@ -818,6 +858,12 @@ void UCustomerSessionComponent::ResumeRoutineTimers()
 		BathStayEndTime = GetWorld()->GetTimeSeconds() + Remaining;
 		Timers.SetTimer(BathStayTimerHandle, this, &UCustomerSessionComponent::HandleBathStayExpired, Remaining, false);
 	}
+	if (bPausedBathSearchTimer && bBathSearchActive && !bBathSearchExpired)
+	{
+		const float Remaining = FMath::Max(0.01f, PausedBathSearchRemainingSeconds);
+		BathSearchEndTime = GetWorld()->GetTimeSeconds() + Remaining;
+		Timers.SetTimer(BathSearchTimerHandle, this, &UCustomerSessionComponent::HandleBathSearchExpired, Remaining, false);
+	}
 	if (bPausedTowelWaitTimer && bWaitingForCleanTowel && !TowelUseHandle.HasToken())
 	{
 		Timers.SetTimer(
@@ -829,9 +875,11 @@ void UCustomerSessionComponent::ResumeRoutineTimers()
 	}
 	bPausedCheckInTimer = false;
 	bPausedBathStayTimer = false;
+	bPausedBathSearchTimer = false;
 	bPausedTowelWaitTimer = false;
 	PausedCheckInRemainingSeconds = 0.0f;
 	PausedBathStayRemainingSeconds = 0.0f;
+	PausedBathSearchRemainingSeconds = 0.0f;
 	PausedTowelWaitRemainingSeconds = 0.0f;
 }
 
@@ -845,6 +893,7 @@ bool UCustomerSessionComponent::SuspendCurrentFacilityUseForKnockdown()
 	{
 		return false;
 	}
+	EndActualBathSegment(ECustomerBathLoopReason::KnockdownInterrupted);
 	if (CurrentFacilitySlot->GetSlotState() != EBathhouseFacilitySlotState::Occupied)
 	{
 		return false;
@@ -877,6 +926,11 @@ bool UCustomerSessionComponent::ResumeCurrentFacilityUseAfterKnockdown()
 	}
 	const bool bIsBath = CurrentFacilityActor
 		&& CurrentFacilityActor->GetFacilityType() == EBathhouseFacilityType::Bath;
+	if (bIsBath && !IsCurrentBathUsable())
+	{
+		CommitCurrentBathInvalidation(ECustomerBathLoopReason::WaterBelowThreshold);
+		return false;
+	}
 	if (bIsBath && !SnapCurrentFacility(ECustomerFacilitySnapTarget::ActionPoint))
 	{
 		return false;
@@ -1015,9 +1069,12 @@ void UCustomerSessionComponent::FinishSession(const EBathhouseCustomerDepartureR
 	{
 		World->GetTimerManager().ClearTimer(CheckInTimeoutHandle);
 		World->GetTimerManager().ClearTimer(BathStayTimerHandle);
+		World->GetTimerManager().ClearTimer(BathSearchTimerHandle);
 		World->GetTimerManager().ClearTimer(TowelWaitTimerHandle);
 	}
 	CleanupTowelHandle();
+	EndActualBathSegment(ECustomerBathLoopReason::StateTreeExited);
+	CancelBathSearchWindow();
 	ReleaseLockerLease();
 	StopWaitingForFacility();
 	ReleaseCurrentFacility();
@@ -1054,9 +1111,12 @@ void UCustomerSessionComponent::TechnicalAbort(const FString& ErrorMessage)
 	{
 		World->GetTimerManager().ClearTimer(CheckInTimeoutHandle);
 		World->GetTimerManager().ClearTimer(BathStayTimerHandle);
+		World->GetTimerManager().ClearTimer(BathSearchTimerHandle);
 		World->GetTimerManager().ClearTimer(TowelWaitTimerHandle);
 	}
 	CleanupTowelHandle();
+	EndActualBathSegment(ECustomerBathLoopReason::TechnicalFailure);
+	CancelBathSearchWindow();
 	ReleaseLockerLease();
 	StopWaitingForFacility();
 	ReleaseCurrentFacility();
@@ -1120,16 +1180,6 @@ void UCustomerSessionComponent::HandleCheckInTimeout()
 	LeaveQueue();
 	SetPresentationState(EBathhouseCustomerPresentationState::Leaving);
 	SendCustomerEvent(TAG_Customer_Event_CheckInTimedOut);
-}
-
-void UCustomerSessionComponent::HandleBathStayExpired()
-{
-	if (bBathStayExpired)
-	{
-		return;
-	}
-	bBathStayExpired = true;
-	SendCustomerEvent(TAG_Customer_Event_BathStayExpired);
 }
 
 void UCustomerSessionComponent::HandleTowelWaitExpired()

@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-배치 설비 Actor와 전용 `APlaceableFacilityItemActor`의 staged 양방향 transaction, 공통 Held 설정, footprint 파생 cell, 명시적 zone floor, 범용 native preview, 기본 collision 기반 Dynamic Navigation 및 pre-placed 락커 reconciliation은 Source와 native automation까지 구현되어 있다. Definition/Blueprint/Level/Project Settings migration과 PIE 검증은 후속 Unreal 단계다.
+배치 설비 Actor와 전용 `APlaceableFacilityItemActor`의 staged 양방향 transaction, 공통 Held 설정, footprint 파생 cell, 명시적 zone floor, 범용 native preview, 기본 collision 기반 Dynamic Navigation, pre-placed 락커 reconciliation 및 호환 PlacementZone 전체의 native 그리드 표현은 Source와 native automation까지 구현되어 있다. 전용 grid Material과 기존 Definition/Blueprint/Level migration의 Editor·PIE 검증이 필요하다.
 
 ## Source Scope
 
@@ -28,11 +28,13 @@ Source/BathhouseSim/Private/Placement/
   FacilityPlacementComponent.cpp
   FacilityPlacementGeometry.cpp
   FacilityPlacementZoneActor.cpp
+  FacilityPlacementZoneGrid.cpp
   FacilityPlacementPreviewActor.cpp
   FacilityPlacementPreviewSource.h/.cpp
   PlaceableFacilityItemActor.cpp
   PlaceableFacilityItemCollision.cpp
   PlayerFacilityPlacementComponent.cpp
+  PlayerFacilityPlacementGrid.cpp
   PlayerFacilityPlacementValidation.cpp
 
 Source/BathhouseSim/Public|Private/Facility/
@@ -55,8 +57,10 @@ Source/BathhouseSim/Private/Tests/
 
 - 배치 설비 Actor와 전용 회수 아이템 Actor의 분리된 lifecycle 및 Definition/payload
 - held 설비 아이템의 preview, zone trace, grid/snap/rotation과 Actor 교체 commit
+- preview 세션 동안 호환되는 모든 PlacementZone의 중립색 grid 표시·정리
 - footprint 기반 크기·바닥 정렬·구역 포함·collision·floor support 검증
 - 설치 설비의 Q Hold 회수 query/progress/cancel/commit
+- domain별 Q Hold begin/end hook과 cancel/실패 시 exact 상태 복원
 - placed Actor collision과 Dynamic Navigation lifecycle 조율
 - 확장 단계별 락커 수용량과 pre-placed 락커의 결정적 초기 등록
 
@@ -66,16 +70,17 @@ Placement는 설비 contents, 목욕탕 물, customer 행동, key 상태와 UI h
 
 | 책임 | Owner |
 |---|---|
-| grid, Yaw 간격, 회수 시간·거리, 공통 Held 위치·회전, preview 머터리얼 | `UFacilityPlacementSettings` |
+| snap grid cell 크기, Yaw 간격, 회수 시간·거리, 공통 Held 위치·회전, 설비 preview 머터리얼 | `UFacilityPlacementSettings` |
 | stable id, facility tag, placed/item class, recovery item mesh, locker slot 수 | `UFacilityPlacementDefinition` |
 | placed Definition, footprint, transition와 Actor collision snapshot | `UFacilityPlacementComponent` |
 | payload, recovery item mesh physics와 lifecycle | `APlaceableFacilityItemActor` |
-| preview session, 누적 Yaw, Q target/경과 시간과 상위 transaction 조율 | `UPlayerFacilityPlacementComponent` |
+| preview session, 호환 Zone grid weak set, 누적 Yaw, Q target/경과 시간과 상위 transaction 조율 | `UPlayerFacilityPlacementComponent` |
 | 범용 preview의 transient mesh 표현과 validity material 교체 | `AFacilityPlacementPreviewActor` |
-| zone bounds, 명시적 floor plane와 allowed tag | `AFacilityPlacementZoneActor` |
+| zone bounds, 명시적 floor plane, allowed tag, native GridVisual/DMI와 Zone별 표현값 | `AFacilityPlacementZoneActor` |
 | expansion readiness, pending locker와 startup reconciliation | `UBathhouseFacilitySubsystem` |
 | 설치 락커 용량, lease, action-slot 후보와 bank 등록 | `ULockerCapacitySubsystem` |
 | 설비별 회수 조건 | `IPlaceableFacility` 구현 Actor와 해당 domain owner |
+| Q Hold 동안의 domain freeze snapshot | 해당 `IPlaceableFacility` 구현 Actor; Bath는 `UBathWaterStateComponent`와 control 표현 snapshot |
 | 실제 held Actor identity | `UPlayerCarryComponent` |
 
 ## Global Settings
@@ -128,9 +133,11 @@ Recovery item collision과 설치 footprint는 서로 대체하지 않는다. `R
 
 ## Placement Zone And Candidate Transform
 
-`AFacilityPlacementZoneActor`는 기존 `ZoneBounds` root를 유지하고 그 아래에 stable native `PlacementFloor` `USceneComponent`를 추가한다. `PlacementFloor`의 world XY plane이 설치 높이의 유일한 정본이며 `ZoneBounds.BoxExtent.Z`와 trace impact Z는 높이에 사용하지 않는다.
+`AFacilityPlacementZoneActor`는 기존 `ZoneBounds` root와 stable native `PlacementFloor` `USceneComponent`를 유지한다. `PlacementFloor`의 world XY plane이 설치 높이의 유일한 정본이며 `ZoneBounds.BoxExtent.Z`와 trace impact Z는 높이에 사용하지 않는다.
 
-grid 표현은 preview 동안 항상 보이고 LCtrl은 위치 quantization만 켠다. LCtrl을 놓아도 기존 누적 Yaw는 유지된다.
+`FacilityPlacementZone`은 `ECC_GameTraceChannel1`에 등록된 placement 전용 Trace Channel이며 Project 기본 응답은 `Ignore`다. `ZoneBounds`만 `QueryOnly`에서 이 채널을 `Block`하고 `Visibility`를 포함한 나머지는 `Ignore`한다. `TracePlacementZone()`만 전용 채널을 사용하며 일반 interaction과 facility recovery는 계속 `Visibility`, floor support는 기존 `WorldStatic/WorldDynamic` object query, 후보 차단은 기존 overlap 계약을 사용한다. 따라서 Zone Bounds는 바닥의 얇은 interaction 대상보다 먼저 generic focus를 차단하지 않는다.
+
+LCtrl은 위치 quantization만 켜고 끈다. LCtrl을 놓아도 기존 누적 Yaw와 호환 Zone 그리드 가시성은 유지된다.
 
 후보 계산은 두 단계만 가진다.
 
@@ -147,6 +154,20 @@ ActorLocation = P - BottomOffsetWorld
 실제 구현은 UE `FTransform` 합성 순서와 non-uniform scale을 보존하고 bottom corner 검증으로 결과를 확인한다. Zone half-height나 footprint half-height를 이후 단계에서 다시 더하지 않는다.
 
 preview root transform, final deferred spawn transform, footprint world transform, containment와 네 모서리 floor-support trace는 모두 이 최종 Actor transform 하나를 사용한다. `ContainsFootprint`의 기존 Zone Bounds X/Y 포함 계약과 wheel rotation은 유지한다.
+
+## Compatible Zone Grid Presentation
+
+`AFacilityPlacementZoneActor`는 `PlacementFloor` 아래 native `GridVisual` `UStaticMeshComponent`를 stable default subobject로 소유한다. component는 기본 hidden이며 collision, overlap, physics, Tick과 Navigation을 사용하지 않는다. Blueprint는 inherited component에 중심 pivot/+Z normal을 가진 plane mesh와 `MI_FacilityPlacementGrid` 하나만 지정한다.
+
+Zone별 authoring 값은 `GridLineThicknessCm`, `GridZOffsetCm`, `MajorGridIntervalCells`다. Class Default와 Level instance override를 허용하되 실제 셀 크기는 계속 `UFacilityPlacementSettings.GridSizeCm` 하나가 정본이다. line thickness는 양수이면서 셀 반폭 미만으로 runtime clamp·validation하고, Z offset은 non-negative, major interval은 2 이상의 cell 수로 제한한다.
+
+native `OnConstruction`은 plane mesh의 local bounds와 `ZoneBounds` unscaled full X/Y를 사용해 `GridVisual` relative scale을 파생하고, XY 중심을 `PlacementFloor` origin에 맞춘 뒤 `GridZOffsetCm`을 relative Z에 적용한다. Actor/Zone world scale을 값에 다시 곱하지 않는다. mesh 없음, 0/non-finite bounds와 floor/Bounds 축 불일치는 authoring 오류다.
+
+각 runtime Zone instance는 source MI를 변경하지 않고 최초 표시 전에 DMI를 한 번 생성한다. DMI에는 정확히 `GridSizeCm`, `ZoneSizeXCm`, `ZoneSizeYCm`, `LineThicknessCm`, `MajorGridEveryNCells`를 설정한다. minor/major 색상, opacity와 major thickness ratio는 MI 기본값이며 native 코드가 덮어쓰지 않는다. 가시성은 opacity가 아니라 component visibility로 전환한다.
+
+`SetGridVisible(bool)`은 실제 상태가 바뀔 때만 component를 전환하고 기존 `OnGridVisibilityChanged`를 그 뒤 한 번 notification한다. DMI/material 준비 실패는 같은 Zone에서 한 번만 진단하며 placement domain 상태를 변경하지 않지만 Editor 통합 완료 조건은 실패한다.
+
+`UPlayerFacilityPlacementComponent`는 설비 preview Actor 초기화 성공 시 world의 level-authored PlacementZone을 한 번 수집하고 `IsDefinitionAllowed()`가 참인 모든 Zone을 표시한다. 조준 중인 `PreviewZone`은 후보 계산만 담당하며 grid 대상 선택에 사용하지 않는다. visible Zone은 weak array로 보관하고 held item 변경, confirm 성공, preview 실패·취소, suppression과 EndPlay에서 모두 숨긴다. tick refresh는 Zone을 다시 검색하거나 visibility event를 반복 발행하지 않는다. active session 중 runtime spawn/retag된 Zone의 hot-add는 이번 범위 밖이다.
 
 ## Generic Native Preview
 
@@ -190,18 +211,20 @@ preview Actor와 생성 component는 collision/overlap/physics/Tick과 Navigatio
 
 placement는 후보를 같은 frame에 재검증하고 새 placed Actor를 collision/domain 비활성 staged 상태로 만든다. payload import와 silent facility/locker 등록 후 held item을 소비하며, 그 뒤 Actor collision을 복원하고 held/facility/capacity event를 한 번 publish한다. `StagePlacedDomainRegistration()`은 collision을 복원하거나 staged flag를 commit하지 않는다. 최종 commit API만 이를 수행한다.
 
-recovery는 staged item 준비와 collision 확인 후 원본 Actor collision/domain을 silent 비활성화한다. item physics 활성화와 원본 파괴가 성공한 뒤 publication한다. 실패하면 원본 domain과 Actor collision snapshot을 복원하고 item을 제거한다.
+recovery hold 시작은 side-effect-free query 성공 뒤 `TryBeginFacilityRecoveryHold()`을 정확히 한 번 호출한다. 일반 설비의 default hook은 no-op이고 Bath는 0% 수위·control motion·Niagara를 snapshot한 뒤 동결한다. Q release, gaze/target 변경, suppression과 조건 변경은 `CancelFacilityRecoveryHold()`로 복원한다.
+
+실제 recovery transaction은 staged item 준비와 collision 확인 후 원본 Actor collision/domain을 silent 비활성화한다. Bath의 domain-unregistration override는 control 닫힘을 commit-pending으로 적용하되 hold snapshot은 유지한다. item physics 활성화와 원본 파괴가 성공하면 EndPlay에서 snapshot을 폐기하고 publication한다. 파괴 전 실패는 원본 domain/collision 뒤 hold snapshot까지 복원하고 item을 제거한다. Player의 후속 cancel과 target EndPlay는 idempotent하다.
 
 Actor collision restore는 실패 가능한 domain rollback 뒤에 수행한다. callback 재진입과 Actor 파괴 보상, held identity/Root scale/payload와 기존 회수 조건은 현재 transaction 계약을 유지한다.
 
 ## Preserved Domain Contracts
 
-- `IPlaceableFacility`은 side-effect-free placement/recovery query, typed payload export/import와 silent domain stage/rollback을 제공한다. `IPhysicalCarryable`은 별도 recovery item만 구현한다.
+- `IPlaceableFacility`은 side-effect-free placement/recovery query, default no-op recovery-hold begin/cancel, typed payload export/import와 silent domain stage/rollback을 제공한다. `IPhysicalCarryable`은 별도 recovery item만 구현한다.
 - `FFacilityPlacementPayload`는 Definition과 item-outer domain instance data만 보관한다. contents, bath water, processing progress, slot/customer와 registry reference는 전달하지 않는다.
 - E는 free-world facility item pickup, LMB는 confirm, LCtrl은 snap, Mouse Wheel은 Yaw, G는 held-position free drop, Q Hold는 placed facility recovery다. LMB 우선순위는 `Computer > Placement > Equipment`다.
-- Washer/Dryer는 inventory 0과 `Waiting`, Bath는 모든 slot `Available`과 water `Empty`, locker bank는 모든 action slot `Available`과 lease-safe capacity일 때만 회수된다.
+- Washer/Dryer는 inventory 0과 `Waiting`, Bath는 모든 slot `Available`과 normalized water amount가 정확히 `0`, locker bank는 모든 action slot `Available`과 lease-safe capacity일 때만 회수된다.
 - recovery item은 footprint world bottom 기준 drop Z offset에 생성되고 원본 facility scale을 복사하지 않는다. free-world physics/CCD/Pawn Ignore와 무충격 생성 계약을 유지한다.
-- `UBathWaterStateComponent`의 `Empty/Filling/Filled/Draining`만 Bath 회수 gate의 정본이며 Blueprint 물 표현은 상태를 소유하지 않는다.
+- Bath 회수 gate와 Q Hold freeze/restore는 [BathWaterSystem.md](BathWaterSystem.md)의 native normalized amount/control snapshot이 정본이며 Blueprint 물 표현은 상태를 소유하지 않는다.
 - `InstalledLockerCapacity`는 등록된 action slot 합계이고 provisional/committed lease는 check-in과 함께 원자적으로 commit/rollback한다. 탈의·착의는 서로 다른 random slot을 사용할 수 있다.
 - Expansion tier의 `KeyPoolSize`와 `MaxInstalledLockerSlots`는 독립 정본이다. locker 변경은 key 수·번호나 이미 배정된 customer key를 바꾸지 않는다.
 - `ACleanTowelStackActor`와 `AUsedTowelBinActor`는 towel token owner라 Actor 변환과 Q recovery에서 제외된다.
@@ -253,14 +276,15 @@ rename이 아니라 property/component 삭제이므로 Core Redirect로 대체�
 
 - Project Settings: 공통 Held Transform과 valid/invalid preview material 지정
 - 공통 설비 아이템 Blueprint: `/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem`, parent `APlaceableFacilityItemActor`; `ItemRoot` scale과 carry 표현 기본값만 authoring
-- PlacementZone: `PlacementFloor`를 실제 바닥 plane에 배치하고 기존 Bounds/tag/grid 표현 유지
+- PlacementZone: `PlacementFloor`를 실제 바닥 plane에 배치하고 inherited `GridVisual`에 중심 pivot Plane과 공통 `MI_FacilityPlacementGrid` 지정
+- PlacementZone Class Default/instance: `GridLineThicknessCm`, `GridZOffsetCm`, `MajorGridIntervalCells`만 authoring; scale/DMI/visibility graph는 만들지 않음
 - placed facility Blueprint: footprint bottom을 Actor local Z=0에 맞추고 실제 body mesh collision/Nav relevance를 검증
 - helper primitive와 모든 Action/Approach Point: Navigation 비관련
 - Level RecastNavMesh: Runtime Generation `Dynamic`
 - 기존 per-facility preview class와 NavModifier authoring 제거
 - locker instance: 자동 생성된 persistent RegistrationId가 유효·고유한지 확인
 
-Blueprint는 preview mesh 복제, material slot 교체, 후보 transform, Dynamic Navigation 전환, pending reconciliation과 publication을 변경하지 않는다.
+Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후보 transform, Dynamic Navigation 전환, pending reconciliation과 publication을 변경하지 않는다.
 
 ## Dependencies
 
@@ -275,6 +299,9 @@ Blueprint는 preview mesh 복제, material slot 교체, 후보 transform, Dynami
 
 - 공통 Held transform이 모든 facility item에 같고 Scale은 보존되는지 확인한다.
 - grid/footprint 변경 시 파생 cell과 non-multiple validation을 확인한다.
+- preview 시작 시 조준과 무관하게 compatible Zone 전체만 grid가 표시되고 종료 경로마다 모두 숨겨지는지 확인한다.
+- GridVisual 한 개가 Bounds 전체를 덮고 전역 cell 간격, Zone별 line thickness/Z offset/major interval을 DMI와 transform에 반영하는지 확인한다.
+- Zone grid가 중립색 하나를 유지하고 normal depth test로 벽·설비 뒤에서 가려지는지 확인한다.
 - bath/washer/dryer/locker footprint bottom이 같은 floor plane에 놓이는지 확인한다.
 - generic preview가 class-default 복합 mesh를 복제하고 valid/invalid material을 모든 slot에 적용하는지 확인한다.
 - preview/stage에서 collision/Nav가 없고 commit/rollback 뒤 Actor collision snapshot이 복원되는지 확인한다.

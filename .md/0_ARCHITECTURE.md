@@ -2,8 +2,8 @@
 
 ## 문서 기준
 
-- 기준일: 2026-09-11(KST) 설비 배치 authoring/Nav/락커 초기화 구현 재작업 기준
-- 상태: 전용 회수 아이템과 공통 설정·floor/preview/Nav/reconciliation Source/native automation 구현 완료, Content/Level/Project Settings migration 및 PIE 대기
+- 기준일: 2026-09-14(KST) 급수·배수와 욕탕 물 수직 구현 Source 기준
+- 상태: PlacementZone grid와 Bath Water는 Source 구현 후 각각 코드 리뷰·Editor 통합 대기
 - 정본 문서: `.md/0_ARCHITECTURE.md`와 `.md/Architecture/*.md`
 - legacy 문서: 현재 별도 legacy architecture 문서는 없다.
 
@@ -36,6 +36,7 @@
 - [InteractionSystem.md](Architecture/InteractionSystem.md): camera trace, primary/secondary intent와 equipment-use routing
 - [PhysicalCarrySystem.md](Architecture/PhysicalCarrySystem.md): exact fixed slot, held-position free drop와 fixed-slot 미지원 설비 아이템
 - [FacilitySystem.md](Architecture/FacilitySystem.md): 다중 facility slot, transform 기반 counter queue assignment, checkout overflow와 key drop point
+- [BathWaterSystem.md](Architecture/BathWaterSystem.md): 욕탕 급수·배수, 평면 수면 표현, 공통 입욕 임계치와 Customer BathLoop 연계
 - [PlacementSystem.md](Architecture/PlacementSystem.md): 배치 설비와 전용 회수 아이템 변환, preview/Q 회수와 locker capacity lease
 - [EconomySystem.md](Architecture/EconomySystem.md): PlayerState wallet과 일회성 cash 획득
 - [CustomerSystem.md](Architecture/CustomerSystem.md): UE 5.8 StateTree customer routine, session과 cleanup
@@ -86,6 +87,7 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
   - Camera: 이동 상태와 착지 상태 기반 camera shake, camera manager 기반 pitch limit 책임
   - Interaction: player focus, equipment use와 single physical carry transaction 책임
   - Facility: facility/action slot, generic lookup와 counter queue 책임
+  - Bath Water: 욕탕 물 양, 조작부, 수면/Niagara 표현과 입욕 가능성 책임
   - Placement: 설비 mode/preview/placement/recovery, 확장 단계와 locker capacity 책임
   - Economy: player money와 cash claim 책임
   - Customer: StateTree routine과 customer session 책임
@@ -110,10 +112,11 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
 - Interaction은 camera trace, equipment/placement/recovery prompt 합성과 held motion 표현을 소유한다. Physical Carry는 key/wet mop/towel basket/monkey wrench/전용 설비 아이템 중 하나의 held state, exact fixed slot과 free-drop transaction을 소유한다.
 - 모든 일반 carryable은 별도 예외가 없으면 G free drop과 exact assigned fixed slot을 지원한다. 전용 설비 아이템은 명시적 `FreeDrop` 전용 예외이며, free drop은 actual held pose에서 질량 무시 약한 velocity change로 시작하고 free-world item은 Pawn을 무시하며 CCD를 사용한다.
 - Facility는 다중 use slot, check-in/checkout 독립 FIFO와 revision을 소유한다. queue point는 Location/Yaw 전체를 사용하고 checkout visible capacity를 넘은 entry는 같은 FIFO 순번을 유지한 채 전용 NavMesh volume assignment를 받는다.
-- Placement는 placed Actor↔전용 item transaction, class-default mesh 기반 공통 preview, 명시적 zone floor/footprint 파생 grid와 Q Hold 회수를 조율한다. 공통 Held transform·valid/invalid material을 포함한 전역 값은 `UFacilityPlacementSettings`가 소유하고 Dynamic Recast는 실제 body mesh collision만 반영한다.
+- Placement는 placed Actor↔전용 item transaction, 설비 preview, 명시적 zone floor/footprint 파생 snap과 Q Hold 회수를 조율한다. preview 세션은 호환 Zone 전체의 native 중립 grid를 표시하며 전역 셀·Held·preview material은 Settings, Zone별 선 두께·Z offset·강조 간격과 DMI는 PlacementZone이 소유한다.
 - Economy는 PlayerState wallet을 소유하고 cash claim을 한 번만 반영한다.
 - Customer StateTree는 routine을 조율하고 session/queue/facility/key/wallet API에 실행을 위임한다. 신발 단계와 key-locker 대응은 제거하고 탈의·착의마다 임의의 unnumbered locker action slot을 잠시 사용한다.
-- Customer bath stay는 pre-shower 완료부터 고정 60초이며 그동안 available bath를 random 이동한다.
+- Customer bath stay는 pre-shower 완료부터 고정 60초다. 각 탐색 구간은 최대 10초이며 전역 설정 임계 수위 이상 Bath만 예약·이동·입욕하고 실제 입욕 시간만 별도 누적한다.
+- Bath Water는 욕탕별 순유량, control mesh 자체 E interaction, 평면 수면의 `Lerp(Empty, Full, Amount)` 위치와 회수 홀드 동결을 소유한다. 수위 임계 하락은 현재 이용 Customer 전원에게 퇴장·재탐색 event를 보낸다.
 - Bath의 `ApproachPoint`와 `ActionPoint`는 모두 캐릭터 발바닥 transform으로 authoring하며, Customer Session이 scaled capsule half height를 한 번 더해 실제 actor/capsule-center transform으로 변환한다. 고객은 NavMesh 위 `ApproachPoint`까지 이동한 뒤 blocking collision 사전 검사 없이 `ActionPoint`로 unswept snap하고, 퇴탕 시 같은 방식으로 `ApproachPoint`에 복귀한 뒤 navigation을 재개한다.
 - Customer 행동 montage는 native StateTree Task가 유효 후보 중 하나를 EnterState에서 선택하며 one-shot 종료 또는 선택된 한 montage의 duration loop를 완료 기준으로 사용한다.
 - UI는 Interaction query를 표시하고 domain 상태를 직접 판단하거나 변경하지 않는다.
@@ -141,6 +144,8 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
 - Combat -> Interaction
 - Economy -> Interaction
 - Customer -> Facility/Interaction/Economy
+- Bath Water -> Facility/Interaction/Placement/Niagara
+- Customer -> Bath Water public query/delegate
 - Customer -> UE GameplayStateTree/AI/Navigation
 - Facility overflow volume -> UE NavigationSystem
 - UI -> Interaction
@@ -157,31 +162,24 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
 - Customer Recovery -> UE GameplayStateTree/AI/Navigation/Physics
 - Core -> Engine module boundary
 
-의존 방향은 Unreal 컴포넌트 조합을 반영한다. 새 기능을 추가할 때는 "상태 오너"와 "입력/표시 라우터"를 먼저 구분한다.
-
 ## Blueprint/API 변경 주의
 
-- Blueprint native parent, BlueprintCallable API, serialized `UPROPERTY`/component 이름은 Content asset 참조와 분리해 판단하지 않는다.
-- `UCLASS`/`USTRUCT`/`UENUM`/`UFUNCTION`/`UPROPERTY` rename 또는 삭제는 Core Redirect 필요 여부, Editor 재시작, Blueprint compile/save, post-migration scan까지 함께 계획한다.
-- 현재 Blueprint/API 계약의 상세 목록은 관련 시스템 문서의 `Blueprint/API Contracts` 또는 `Design Notes`를 우선 확인한다.
-- Core Redirect와 cross-system migration 규칙은 [CoreSystem.md](Architecture/CoreSystem.md)를 따른다.
-- 이전 이식 단계의 클래스명 또는 Blueprint parent 참조가 Content/외부 asset에 남아 있다면 rename 완료 전 redirect 계획을 별도로 세운다.
+- Blueprint native parent, BlueprintCallable API와 serialized reflected/component 이름은 Content 계약이며 rename/delete를 Source와 분리해 판단하지 않는다.
+- rename/delete는 [CoreSystem.md](Architecture/CoreSystem.md)의 Core Redirect, Editor 재시작, compile/save와 post-migration scan을 함께 계획한다.
+- 상세 API와 이전 이식 호환은 관련 시스템 문서의 `Blueprint/API Contracts`를 우선한다.
 
 ## 현재 설계 원칙
 
-- Actor는 composition root에 가깝게 유지하고, 상태와 반복 가능한 기능은 Component 또는 명확한 owner로 분리한다.
-- 입력, 표시, 상태 변경 책임을 구분한다. 입력/표시 계층은 의도를 전달하고, 실제 runtime state mutation은 해당 상태 owner가 수행한다.
-- 새 기능을 추가할 때는 먼저 상태 owner, 실행 주체, 표시/입력 라우터, Blueprint/API 계약을 정의한다.
-- 시스템 간 의존은 필요한 방향으로만 추가하고, 순환 의존이나 임의의 cross-system 직접 참조를 만들기 전에 interface, event, subsystem 경계를 검토한다.
-- Blueprint native parent, BlueprintCallable API, serialized `UPROPERTY` 이름은 Content asset 계약으로 취급한다.
-- UCLASS/USTRUCT/UENUM rename 또는 삭제는 Core Redirect, Editor 재시작, Blueprint compile/save, post-migration scan까지 한 세트로 계획한다.
-- 새 시스템, 새 의존 방향, Blueprint/API 계약 변경은 이 문서와 관련 `.md/Architecture/*System.md`를 함께 갱신한다.
-- Content asset 수정이나 resave가 필요한 변경은 별도 사용자 지시와 Editor 검증 계획 없이는 진행하지 않는다.
+- Actor는 composition root에 가깝게 유지하고 상태·반복 기능은 Component 또는 명확한 owner로 분리한다.
+- 입력·표시는 의도와 결과만 전달하고 runtime mutation은 상태 owner가 수행한다. 새 기능은 상태/실행/표시/authoring owner를 먼저 정한다.
+- 의존은 필요한 방향으로만 추가하고 순환 concrete 참조 전에 interface, event와 subsystem 경계를 검토한다.
+- 새 시스템·Blueprint 계약은 관련 정본을 함께 갱신하고 Content 변경은 승인된 Editor 단계에서만 수행한다.
 - Player carry는 inventory/hotbar가 아닌 key/wet mop/towel basket/monkey wrench/전용 설비 아이템 중 physical actor 하나만 허용한다. key/equipment의 exact slot, 모든 free-world item의 CCD와 cash 비소지 계약을 유지한다.
 - 모든 소지품을 통합하는 공통 Actor/Component는 만들지 않고 `IPhysicalCarryable`을 유지한다. Placement 전용 item과 placed Actor는 새 Actor stage/원본 마지막 제거 transaction을 사용한다. 후보 Z는 explicit zone floor에 footprint bottom offset을 한 번 역산하고, staged/recovery는 Actor collision을 끈 뒤 성공/rollback에서 authored 상태를 복원한다. pre-placed locker는 stable runtime ID 순서의 단일 subsystem reconciliation 후 facility/capacity/Nav를 함께 활성화한다.
 - E는 world primary/fixed slot, F는 world secondary, G는 free drop, Q Hold는 facility recovery, LCtrl/휠/LMB는 placement snap/rotation/confirm이다. Character는 intent만 routing한다.
 - 모든 towel endpoint 이동은 source 감소와 destination 증가를 단일 native transaction으로 commit한다.
 - Customer routine의 gameplay 상태 변경은 native C++ API를 통해 수행하고 StateTree/Blueprint asset에 domain mutation을 두지 않는다.
+- Bath 물 양·조작부 상태와 threshold 판정은 native C++만 변경한다. 임계 수위는 Project Settings 한 곳, 유량과 control/수면 transform은 욕탕 Blueprint 및 허용된 Level override만 정본으로 사용한다.
 - Counter는 FIFO와 assignment만 소유하고 Customer Queue Navigation이 AI request·도착 Yaw·overflow wander·knockdown recovery gate를 소유한다. checkout overflow를 별도 queue로 복제하지 않는다.
 - 컴퓨터 사용은 game을 pause하거나 fullscreen viewport UI를 열지 않는다. Character는 입력 의도만 분기하고 Computer component가 view/input session lifecycle을 소유하며 screen Widget은 domain gameplay 상태를 소유하지 않는다.
 
@@ -197,4 +195,5 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
 - Combat Source, `PrimaryUseAction` 호환 이관, LMB mop use, equipment prompt row, customer knockdown/soft interruption과 restartable MoveTo는 Source와 native automation까지 구현되었다. `IA_PrimaryUse`, `IMC_FirstPerson`, wrench/customer Blueprint, `WBP_InteractionPrompt`와 `ST_CustomerRoutine` 교체는 코드 리뷰 후 Editor 단계로 인계한다.
 - exact equipment slot, key free drop과 actual-held-pose weak release는 Source와 native automation까지 구현되었다. equipment slot Blueprint/instance, exact item/anchor, key physics bounds와 기존 Blueprint release velocity 값은 코드 리뷰 후 Editor 단계로 인계한다.
 - counter queue transform/overflow, shared queue navigation, recovery pose gate와 physical checkout key drop은 Source와 native automation까지 구현되었다. StateTree/Counter/overflow volume/Blueprint authoring과 PIE 통합은 후속 Editor 단계이며 기존 queue target Task와 returned-key reflected symbol은 asset migration 동안 deprecated compatibility로 보존한다.
-- placed facility↔전용 item 교체, global Held/material, derived footprint, explicit floor, generic native preview, Actor collision snapshot과 deterministic locker startup reconciliation은 Source와 native automation까지 구현됐다. Definition/Blueprint/Level의 stale field·component 정리, footprint/floor/body collision authoring, preview material 설정과 Dynamic Recast 전환은 코드 리뷰 뒤 Unreal 단계에서 같은 단위로 수행한다.
+- placed facility↔전용 item 교체, global Held/material, derived footprint, explicit floor, generic preview, collision snapshot, locker reconciliation과 native `GridVisual`/DMI·호환 Zone grid session은 구현됐다. 기존 migration과 전용 grid material·Plane authoring은 Unreal 단계에서 함께 검증한다.
+- Bath Water 수직 구현은 Source와 focused automation까지 구현됐다. `BP_Bath` native parent/분리 control mesh/평면 수면/Niagara, 전역 threshold, routine Data Asset와 `ST_CustomerRoutine` BathLoop 연결은 코드 리뷰 후 Editor 단계에서 통합한다.

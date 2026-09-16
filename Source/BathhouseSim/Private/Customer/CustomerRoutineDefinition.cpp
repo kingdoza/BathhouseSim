@@ -51,6 +51,19 @@ EDataValidationResult UCustomerRoutineDefinition::IsDataValid(FDataValidationCon
 	RequirePositive(QueueFacingRotationSpeedDegrees, TEXT("QueueFacingRotationSpeedDegrees"));
 	RequirePositive(QueueFacingToleranceDegrees, TEXT("QueueFacingToleranceDegrees"));
 	RequirePositive(OverflowWanderAcceptanceRadius, TEXT("OverflowWanderAcceptanceRadius"));
+	RequirePositive(BathStayDurationSeconds, TEXT("BathStayDurationSeconds"));
+	RequirePositive(BathSearchTimeoutSeconds, TEXT("BathSearchTimeoutSeconds"));
+	RequirePositive(BathDwellMinSeconds, TEXT("BathDwellMinSeconds"));
+	RequirePositive(BathDwellMaxSeconds, TEXT("BathDwellMaxSeconds"));
+	if (FMath::IsFinite(BathDwellMinSeconds) && FMath::IsFinite(BathDwellMaxSeconds)
+		&& BathDwellMinSeconds > BathDwellMaxSeconds)
+	{
+		Context.AddError(NSLOCTEXT(
+			"CustomerRoutineDefinition",
+			"BathDwellOrder",
+			"BathDwellMinSeconds cannot exceed BathDwellMaxSeconds."));
+		Result = EDataValidationResult::Invalid;
+	}
 	if (!FMath::IsFinite(OverflowPauseMinSeconds) || !FMath::IsFinite(OverflowPauseMaxSeconds)
 		|| OverflowPauseMinSeconds < 0.0f || OverflowPauseMaxSeconds < 0.0f)
 	{

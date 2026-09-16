@@ -2,8 +2,22 @@
 
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/FacilityPlacementSettings.h"
+#include "Placement/FacilityPlacementTypes.h"
+
+#define LOCTEXT_NAMESPACE "FacilityPlacementZoneActor"
+
+namespace
+{
+	const FName GridSizeParameter(TEXT("GridSizeCm"));
+	const FName ZoneSizeXParameter(TEXT("ZoneSizeXCm"));
+	const FName ZoneSizeYParameter(TEXT("ZoneSizeYCm"));
+	const FName LineThicknessParameter(TEXT("LineThicknessCm"));
+	const FName MajorIntervalParameter(TEXT("MajorGridEveryNCells"));
+}
 
 AFacilityPlacementZoneActor::AFacilityPlacementZoneActor()
 {
@@ -12,11 +26,106 @@ AFacilityPlacementZoneActor::AFacilityPlacementZoneActor()
 	SetRootComponent(ZoneBounds);
 	ZoneBounds->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	ZoneBounds->SetCollisionResponseToAllChannels(ECR_Ignore);
-	ZoneBounds->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	ZoneBounds->SetCollisionResponseToChannel(
+		BathhousePlacementCollision::ZoneTraceChannel,
+		ECR_Block);
 	ZoneBounds->SetCanEverAffectNavigation(false);
 	PlacementFloor = CreateDefaultSubobject<USceneComponent>(TEXT("PlacementFloor"));
 	PlacementFloor->SetupAttachment(ZoneBounds);
 	PlacementFloor->SetCanEverAffectNavigation(false);
+	GridVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("GridVisual"));
+	GridVisual->SetupAttachment(PlacementFloor);
+	GridVisual->SetVisibility(false, true);
+	GridVisual->SetHiddenInGame(true, true);
+	GridVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GridVisual->SetCollisionResponseToAllChannels(ECR_Ignore);
+	GridVisual->SetGenerateOverlapEvents(false);
+	GridVisual->SetSimulatePhysics(false);
+	GridVisual->SetCanEverAffectNavigation(false);
+	GridVisual->PrimaryComponentTick.bCanEverTick = false;
+	GridVisual->SetComponentTickEnabled(false);
+}
+
+bool AFacilityPlacementZoneActor::EnsureGridMaterial(FText& OutFailureReason)
+{
+	if (GridMID)
+	{
+		return true;
+	}
+	if (!GridVisual || GridVisual->GetNumOverrideMaterials() <= 0
+		|| !GridVisual->OverrideMaterials[0])
+	{
+		OutFailureReason = LOCTEXT("MissingGridMaterial", "Placement Zone GridVisual requires a material in element 0.");
+		return false;
+	}
+	GridMID = GridVisual->CreateDynamicMaterialInstance(0);
+	if (!GridMID)
+	{
+		OutFailureReason = LOCTEXT("GridMaterialCreationFailed", "Placement Zone could not create its grid dynamic material instance.");
+		return false;
+	}
+	return true;
+}
+
+bool AFacilityPlacementZoneActor::SetGridVisible(const bool bVisible)
+{
+	if (!bVisible)
+	{
+		if (!bGridVisible)
+		{
+			return true;
+		}
+		GridVisual->SetVisibility(false, true);
+		GridVisual->SetHiddenInGame(true, true);
+		bGridVisible = false;
+		OnGridVisibilityChanged(false);
+		return true;
+	}
+	if (bGridVisible)
+	{
+		return true;
+	}
+
+	float ZoneSizeXCm = 0.0f;
+	float ZoneSizeYCm = 0.0f;
+	FText FailureReason;
+	if (!RefreshGridGeometry(ZoneSizeXCm, ZoneSizeYCm, FailureReason))
+	{
+		DiagnoseGridFailureOnce(false, FailureReason);
+		return false;
+	}
+	if (!EnsureGridMaterial(FailureReason))
+	{
+		DiagnoseGridFailureOnce(true, FailureReason);
+		return false;
+	}
+
+	const float GridSizeCm = GetDefault<UFacilityPlacementSettings>()->GetGridSizeCm();
+	GridMID->SetScalarParameterValue(GridSizeParameter, GridSizeCm);
+	GridMID->SetScalarParameterValue(ZoneSizeXParameter, ZoneSizeXCm);
+	GridMID->SetScalarParameterValue(ZoneSizeYParameter, ZoneSizeYCm);
+	GridMID->SetScalarParameterValue(LineThicknessParameter, GetGridLineThicknessCm());
+	GridMID->SetScalarParameterValue(MajorIntervalParameter,
+		static_cast<float>(GetMajorGridIntervalCells()));
+	GridVisual->SetVisibility(true, true);
+	GridVisual->SetHiddenInGame(false, true);
+	bGridVisible = true;
+	OnGridVisibilityChanged(true);
+	return true;
+}
+
+void AFacilityPlacementZoneActor::DiagnoseGridFailureOnce(
+	const bool bMaterialFailure,
+	const FText& FailureReason)
+{
+	bool& bDiagnosed = bMaterialFailure
+		? bDiagnosedGridMaterialFailure : bDiagnosedGridGeometryFailure;
+	if (bDiagnosed)
+	{
+		return;
+	}
+	bDiagnosed = true;
+	UE_LOG(LogTemp, Warning, TEXT("%s: %s"), *GetPathName(), *FailureReason.ToString());
 }
 
 bool AFacilityPlacementZoneActor::IsDefinitionAllowed(const UFacilityPlacementDefinition& Definition) const
@@ -84,3 +193,5 @@ float AFacilityPlacementZoneActor::NormalizePlacementYaw(const float YawDegrees)
 {
 	return FRotator::NormalizeAxis(YawDegrees);
 }
+
+#undef LOCTEXT_NAMESPACE

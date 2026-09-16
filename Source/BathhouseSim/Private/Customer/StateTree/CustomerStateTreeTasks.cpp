@@ -255,6 +255,20 @@ EStateTreeRunStatus FCustomerFacilityTask::EnterState(
 	{
 		return EStateTreeRunStatus::Failed;
 	}
+	if (Data.FacilityType == EBathhouseFacilityType::Bath
+		&& !Data.Session->BeginBathSearchWindow())
+	{
+		Data.Session->LogBathLoopStateTreeEvent(
+			ECustomerBathLoopLogLevel::Log,
+			TEXT("Advance"),
+			TEXT("LeaveBathLoop"),
+			Data.Session->IsBathStayExpired()
+				? ECustomerBathLoopReason::BathStayExpired
+				: ECustomerBathLoopReason::TechnicalFailure);
+		return Data.Session->IsBathStayExpired()
+			? EStateTreeRunStatus::Succeeded
+			: EStateTreeRunStatus::Failed;
+	}
 	Data.bReservationAcquired = Data.Session->TryReserveFacility(Data.FacilityType, Data.bExcludeLastBath);
 	const UCustomerRoutineDefinition* Definition = Data.Session->GetRoutineDefinition();
 	Data.RetryRemaining = Definition ? Definition->FacilityRetryIntervalSeconds : 0.5f;
@@ -267,6 +281,18 @@ EStateTreeRunStatus FCustomerFacilityTask::Tick(FStateTreeExecutionContext& Cont
 	if (!Data.Session)
 	{
 		return EStateTreeRunStatus::Failed;
+	}
+	if (Data.FacilityType == EBathhouseFacilityType::Bath
+		&& (Data.Session->IsBathStayExpired() || Data.Session->IsBathSearchExpired()))
+	{
+		Data.Session->LogBathLoopStateTreeEvent(
+			ECustomerBathLoopLogLevel::Log,
+			TEXT("Advance"),
+			TEXT("LeaveBathLoop"),
+			Data.Session->IsBathStayExpired()
+				? ECustomerBathLoopReason::BathStayExpired
+				: ECustomerBathLoopReason::SearchExpired);
+		return EStateTreeRunStatus::Succeeded;
 	}
 	if (Data.bReservationAcquired)
 	{
@@ -290,12 +316,22 @@ void FCustomerFacilityTask::ExitState(
 	FInstanceDataType& Data = Context.GetInstanceData(*this);
 	if (Data.Session)
 	{
+		const bool bForcedBathExit = Data.FacilityType == EBathhouseFacilityType::Bath
+			&& Data.Session->IsCurrentBathExitPending();
+		if (Data.FacilityType == EBathhouseFacilityType::Bath)
+		{
+			Data.Session->CancelBathSearchWindow();
+		}
 		const EBathhouseCustomerActivity ActiveActivity = Data.Session->GetCurrentActivity();
 		if (ActiveActivity != EBathhouseCustomerActivity::None)
 		{
 			Data.Session->AbortActivity(ActiveActivity, false);
 		}
-		Data.Session->SnapCurrentFacility(ECustomerFacilitySnapTarget::ApproachPoint);
+		const bool bApproachReturned = Data.Session->SnapCurrentFacility(ECustomerFacilitySnapTarget::ApproachPoint);
+		if (bForcedBathExit)
+		{
+			Data.Session->LogBathForcedExitCleanup(bApproachReturned);
+		}
 		Data.Session->StopWaitingForFacility();
 		Data.Session->ReleaseCurrentFacility();
 	}
@@ -308,12 +344,28 @@ EStateTreeRunStatus FCustomerFacilityTargetTask::EnterState(
 {
 	FInstanceDataType& Data = Context.GetInstanceData(*this);
 	FTransform Transform;
+	const bool bIsBath = Data.Session && Data.Session->HasCurrentBathFacility();
 	if (!Data.Session || !Data.Session->GetCurrentFacilityTransform(Data.bUseApproachPoint, Transform))
 	{
+		if (bIsBath)
+		{
+			Data.Session->LogBathLoopStateTreeEvent(
+				ECustomerBathLoopLogLevel::Verbose,
+				TEXT("MoveTarget"),
+				TEXT("Failed"),
+				ECustomerBathLoopReason::EntryValidationFailed);
+		}
 		return EStateTreeRunStatus::Failed;
 	}
 	Data.Destination = Transform.GetLocation();
 	Data.Facing = Transform.Rotator();
+	if (bIsBath)
+	{
+		Data.Session->LogBathLoopStateTreeEvent(
+			ECustomerBathLoopLogLevel::Verbose,
+			TEXT("MoveTarget"),
+			TEXT("Resolved"));
+	}
 	return EStateTreeRunStatus::Succeeded;
 }
 
@@ -322,9 +374,20 @@ EStateTreeRunStatus FCustomerFacilitySnapTask::EnterState(
 	const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& Data = Context.GetInstanceData(*this);
-	return Data.Session && Data.Session->SnapCurrentFacility(Data.Target)
-		? EStateTreeRunStatus::Succeeded
-		: EStateTreeRunStatus::Failed;
+	const bool bIsBathEntry = Data.Session && Data.Session->HasCurrentBathFacility()
+		&& Data.Target == ECustomerFacilitySnapTarget::ActionPoint;
+	const bool bSucceeded = Data.Session && Data.Session->SnapCurrentFacility(Data.Target);
+	if (bIsBathEntry)
+	{
+		Data.Session->LogBathLoopStateTreeEvent(
+			ECustomerBathLoopLogLevel::Verbose,
+			TEXT("EntrySnapValidation"),
+			bSucceeded ? TEXT("Succeeded") : TEXT("Failed"),
+			bSucceeded
+				? TOptional<ECustomerBathLoopReason>()
+				: TOptional<ECustomerBathLoopReason>(ECustomerBathLoopReason::EntryValidationFailed));
+	}
+	return bSucceeded ? EStateTreeRunStatus::Succeeded : EStateTreeRunStatus::Failed;
 }
 
 EStateTreeRunStatus FCustomerBeginActivityTask::EnterState(
@@ -333,6 +396,17 @@ EStateTreeRunStatus FCustomerBeginActivityTask::EnterState(
 {
 	FInstanceDataType& Data = Context.GetInstanceData(*this);
 	Data.ResolvedDuration = Data.Session ? Data.Session->BeginActivity(Data.Activity) : -1.0f;
+	if (Data.Session && Data.Activity == EBathhouseCustomerActivity::BathDwell)
+	{
+		const bool bSucceeded = Data.ResolvedDuration >= 0.0f;
+		Data.Session->LogBathLoopStateTreeEvent(
+			ECustomerBathLoopLogLevel::Verbose,
+			TEXT("EntryUseValidation"),
+			bSucceeded ? TEXT("Succeeded") : TEXT("Failed"),
+			bSucceeded
+				? TOptional<ECustomerBathLoopReason>()
+				: TOptional<ECustomerBathLoopReason>(ECustomerBathLoopReason::EntryValidationFailed));
+	}
 	return Data.ResolvedDuration >= 0.0f
 		? EStateTreeRunStatus::Succeeded
 		: EStateTreeRunStatus::Failed;
@@ -387,8 +461,16 @@ EStateTreeRunStatus FPlayCustomerMontageOnceTask::Tick(
 		return EStateTreeRunStatus::Failed;
 	}
 	if (const UCustomerSessionComponent* Session = Data.Customer ? Data.Customer->GetCustomerSession() : nullptr;
-		Session && Session->GetCurrentActivity() == EBathhouseCustomerActivity::BathDwell && Session->IsBathStayExpired())
+		Session && Session->GetCurrentActivity() == EBathhouseCustomerActivity::BathDwell
+		&& (Session->IsBathStayExpired() || Session->IsCurrentBathExitPending()))
 	{
+		Session->LogBathLoopStateTreeEvent(
+			ECustomerBathLoopLogLevel::Log,
+			TEXT("Advance"),
+			TEXT("LeaveBathDwell"),
+			Session->IsBathStayExpired()
+				? TOptional<ECustomerBathLoopReason>(ECustomerBathLoopReason::BathStayExpired)
+				: Session->GetCurrentBathExitReason());
 		CancelMontageFacilityRecovery(Data.Customer, Data.RecoveryMoveTask, Data.RecoveryOperationToken);
 		Data.bRecoveringFacilityUse = false;
 		Playback->StopPlayback(Data.PlaybackToken, Data.BlendOutTime);
@@ -525,8 +607,16 @@ EStateTreeRunStatus FPlaySelectedMontageLoopForDurationTask::Tick(
 		return EStateTreeRunStatus::Failed;
 	}
 	if (const UCustomerSessionComponent* Session = Data.Customer ? Data.Customer->GetCustomerSession() : nullptr;
-		Session && Session->GetCurrentActivity() == EBathhouseCustomerActivity::BathDwell && Session->IsBathStayExpired())
+		Session && Session->GetCurrentActivity() == EBathhouseCustomerActivity::BathDwell
+		&& (Session->IsBathStayExpired() || Session->IsCurrentBathExitPending()))
 	{
+		Session->LogBathLoopStateTreeEvent(
+			ECustomerBathLoopLogLevel::Log,
+			TEXT("Advance"),
+			TEXT("LeaveBathDwell"),
+			Session->IsBathStayExpired()
+				? TOptional<ECustomerBathLoopReason>(ECustomerBathLoopReason::BathStayExpired)
+				: Session->GetCurrentBathExitReason());
 		CancelMontageFacilityRecovery(Data.Customer, Data.RecoveryMoveTask, Data.RecoveryOperationToken);
 		Data.bRecoveringFacilityUse = false;
 		Playback->StopPlayback(Data.PlaybackToken, Data.BlendOutTime);
@@ -642,6 +732,14 @@ EStateTreeRunStatus FCustomerFinishActivityTask::EnterState(
 	{
 		return EStateTreeRunStatus::Failed;
 	}
+	if (Data.Activity == EBathhouseCustomerActivity::BathDwell)
+	{
+		Data.Session->LogBathLoopStateTreeEvent(
+			ECustomerBathLoopLogLevel::Log,
+			TEXT("Advance"),
+			TEXT("ContinueBathLoop"),
+			ECustomerBathLoopReason::DwellCompleted);
+	}
 	Data.Session->FinishActivity(Data.Activity);
 	return Data.Session->GetCurrentActivity() == EBathhouseCustomerActivity::None
 		? EStateTreeRunStatus::Succeeded
@@ -671,8 +769,16 @@ EStateTreeRunStatus FCustomerActivityTask::Tick(FStateTreeExecutionContext& Cont
 	{
 		return EStateTreeRunStatus::Failed;
 	}
-	if (Data.Activity == EBathhouseCustomerActivity::BathDwell && Data.Session->IsBathStayExpired())
+	if (Data.Activity == EBathhouseCustomerActivity::BathDwell
+		&& (Data.Session->IsBathStayExpired() || Data.Session->IsCurrentBathExitPending()))
 	{
+		Data.Session->LogBathLoopStateTreeEvent(
+			ECustomerBathLoopLogLevel::Log,
+			TEXT("Advance"),
+			TEXT("LeaveBathDwell"),
+			Data.Session->IsBathStayExpired()
+				? TOptional<ECustomerBathLoopReason>(ECustomerBathLoopReason::BathStayExpired)
+				: Data.Session->GetCurrentBathExitReason());
 		CancelFacilityRecoveryMove(Data);
 		Data.bCompleted = true;
 		return EStateTreeRunStatus::Succeeded;
@@ -732,6 +838,14 @@ EStateTreeRunStatus FCustomerActivityTask::Tick(FStateTreeExecutionContext& Cont
 	Data.RemainingTime -= DeltaTime;
 	if (Data.RemainingTime <= 0.0f)
 	{
+		if (Data.Activity == EBathhouseCustomerActivity::BathDwell)
+		{
+			Data.Session->LogBathLoopStateTreeEvent(
+				ECustomerBathLoopLogLevel::Log,
+				TEXT("Advance"),
+				TEXT("ContinueBathLoop"),
+				ECustomerBathLoopReason::DwellCompleted);
+		}
 		Data.Session->FinishActivity(Data.Activity);
 		Data.Session->ReleaseCurrentFacility();
 		Data.bCompleted = true;
@@ -1029,6 +1143,18 @@ EStateTreeRunStatus FCustomerNavigationResultTask::EnterState(
 	else
 	{
 		Data.bRetriesExhausted = Data.Session->RegisterNavigationFailure();
+	}
+	if (Data.Session->HasCurrentBathFacility())
+	{
+		Data.Session->LogBathLoopStateTreeEvent(
+			Data.bMoveSucceeded
+				? ECustomerBathLoopLogLevel::Verbose
+				: ECustomerBathLoopLogLevel::Warning,
+			TEXT("Navigation"),
+			Data.bMoveSucceeded ? TEXT("Succeeded") : TEXT("Failed"),
+			Data.bMoveSucceeded
+				? TOptional<ECustomerBathLoopReason>()
+				: TOptional<ECustomerBathLoopReason>(ECustomerBathLoopReason::NavigationFailed));
 	}
 	return EStateTreeRunStatus::Succeeded;
 }

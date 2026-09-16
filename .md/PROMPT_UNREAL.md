@@ -1,30 +1,29 @@
-# Unreal 후속 검증 — 설비 설치 Transform 이중 보정 수정
+# Unreal 확인 프롬프트 — 욕탕 수면 가시성과 급수 Niagara 종료
 
-## Editor 작업 여부
+## 상태와 경계
 
-Blueprint, DataAsset, Level과 Project Settings 수정은 필요하지 않다. 이번 변경은 실제 설치 transaction이 프리뷰의 최종 Transform을 그대로 사용하도록 하는 C++ 버그 수정이다.
+- C++ 수정, UE 5.8 Editor 타깃 빌드와 focused `BathhouseSim.BathWater` automation 3건은 완료됐다.
+- 이전 DLL로 열려 있던 Editor는 닫혔으므로 새 Editor 프로세스를 시작해 확인한다.
+- Content, Level, Blueprint, StateTree와 Project Settings 변경은 필요 없다.
+- `BP_Bath`를 Compile/Save하거나 `Save All`을 사용하지 않는다.
 
-## 선행 조건
+## PIE 확인
 
-UE 5.8 `BathhouseSimEditor Win64 Development` 전체 빌드와 `BathhouseSim.Placement` 및 전체 `BathhouseSim` 자동화는 성공했다. 새 DLL로 Editor를 실행한다.
+`/Game/Maps/DefaultMap`에서 기존 `Bath`를 사용한다.
 
-## PIE 검증
+1. 빈 욕탕의 급수밸브를 연다.
+2. `WaterSurfaceMesh`가 즉시 표시되기 시작하고 Empty에서 Full marker 방향으로 약 15초 동안 상승하는지 확인한다.
+3. 만수 전에 급수밸브를 닫는다.
+4. `NS_HoneyBeam` 표현이 닫는 프레임에 즉시 사라지고 수면 높이는 유지되는지 확인한다.
+5. 다시 열어 남은 높이부터 상승하며 만수에서 자동으로 닫히고 flow가 즉시 사라지는지 확인한다.
+6. 배수레버를 열어 약 10초에 0%로 내려가고, 0%에서 수면이 완전히 숨겨지는지 확인한다.
+7. 급수와 배수를 동시에 열면 순유량 `-3.333333%/s`가 적용되는지 확인한다.
 
-같은 `PlacementZone.PlacementFloor`에 다음 설비를 각각 프리뷰하고 설치한다.
+## 수용 조건
 
-- `/Game/Bathhouse/Blueprints/Facility/BP_Bath`
-- `/Game/Bathhouse/Blueprints/Facility/BP_ClothesLocker`
-- `/Game/Bathhouse/Blueprints/Towel/BP_Washer`
-- `/Game/Bathhouse/Blueprints/Towel/BP_Dryer`
+- 급수밸브 open + 배수레버 closed에서 물 양과 수면이 증가한다.
+- 수면은 0%에서만 숨고 양수에서는 Blueprint의 기존 `Hidden In Game` 저장값과 무관하게 보인다.
+- player close, full auto-close와 recovery 시작 시 flow 잔상이 남지 않는다.
+- valve/lever 회전, interaction prompt, 수위 marker, collision, Navigation과 reservation threshold 동작은 변하지 않는다.
 
-각 설비에서 다음을 확인한다.
-
-1. 프리뷰의 footprint bottom이 `PlacementFloor`에 붙는다.
-2. LMB 설치 직후 실제 설비의 footprint bottom이 프리뷰와 같은 높이에 있다.
-3. Actor Z가 footprint 반높이만큼 두 번째로 상승하지 않는다.
-4. 설치 뒤 body collision과 Dynamic NavMesh가 기존 계약대로 복원된다.
-5. 회수 후 재설치해도 같은 결과가 반복된다.
-
-## 저장 정책
-
-이번 검증에서 Content 변경은 필요하지 않으며 `Save All`을 사용하지 않는다. 실제 asset 값이 의도치 않게 dirty가 되면 저장하지 않고 변경 원인을 먼저 확인한다.
+Editor authoring 변경이 없으므로 `.md/Unreal/*`와 `.md/USER_UNREAL.md`는 갱신하지 않는다. PIE 결과만 통합 리뷰에 전달한다.

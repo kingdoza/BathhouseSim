@@ -4,8 +4,24 @@
 #include "Combat/CombatTypes.h"
 #include "Combat/HealthComponent.h"
 #include "Components/SceneComponent.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "HAL/IConsoleManager.h"
 #include "Interaction/HeldEquipmentMotionComponent.h"
+
+#if ENABLE_DRAW_DEBUG
+namespace
+{
+	TAutoConsoleVariable<int32> CVarBathhouseDebugMeleeHit(
+		TEXT("bathhouse.Debug.MeleeHit"),
+		0,
+		TEXT("Draw the melee camera trace, attack sphere, raw hits, and damage targets.\n")
+		TEXT("0: disabled, 1: enabled"),
+		ECVF_Cheat);
+
+	constexpr float MeleeDebugLifetimeSeconds = 2.0f;
+}
+#endif
 
 UMeleeAttackComponent::UMeleeAttackComponent()
 {
@@ -115,17 +131,74 @@ void UMeleeAttackComponent::PerformHit()
 		FCollisionShape::MakeSphere(FMath::Max(1.0f, AttackRadius)),
 		Params);
 
+#if ENABLE_DRAW_DEBUG
+	const bool bDrawMeleeDebug = CVarBathhouseDebugMeleeHit.GetValueOnGameThread() != 0;
+	if (bDrawMeleeDebug)
+	{
+		DrawDebugDirectionalArrow(
+			World,
+			CameraOrigin,
+			Center,
+			12.0f,
+			FColor::Cyan,
+			false,
+			MeleeDebugLifetimeSeconds,
+			0,
+			1.5f);
+		DrawDebugSphere(
+			World,
+			Center,
+			FMath::Max(1.0f, AttackRadius),
+			24,
+			Hits.IsEmpty() ? FColor::Red : FColor::Yellow,
+			false,
+			MeleeDebugLifetimeSeconds,
+			0,
+			1.5f);
+	}
+#endif
+
 	TSet<TObjectPtr<AActor>> DamagedActors;
 	for (const FHitResult& Hit : Hits)
 	{
 		AActor* Target = Hit.GetActor();
 		if (!IsValid(Target) || Target == AttackUser || Target == AttackWeapon || DamagedActors.Contains(Target))
 		{
+		#if ENABLE_DRAW_DEBUG
+			if (bDrawMeleeDebug && IsValid(Target))
+			{
+				const FVector HitLocation = Hit.ImpactPoint.IsNearlyZero() ? Hit.Location : Hit.ImpactPoint;
+				DrawDebugPoint(World, HitLocation, 9.0f, FColor::Orange, false, MeleeDebugLifetimeSeconds);
+				DrawDebugString(
+					World,
+					HitLocation,
+					FString::Printf(TEXT("Raw/Duplicate: %s.%s"), *GetNameSafe(Target), *GetNameSafe(Hit.GetComponent())),
+					nullptr,
+					FColor::Orange,
+					MeleeDebugLifetimeSeconds,
+					true);
+			}
+		#endif
 			continue;
 		}
 		UHealthComponent* Health = Target->FindComponentByClass<UHealthComponent>();
 		if (!Health || !Health->IsHealthActive())
 		{
+		#if ENABLE_DRAW_DEBUG
+			if (bDrawMeleeDebug)
+			{
+				const FVector HitLocation = Hit.ImpactPoint.IsNearlyZero() ? Hit.Location : Hit.ImpactPoint;
+				DrawDebugPoint(World, HitLocation, 9.0f, FColor::Red, false, MeleeDebugLifetimeSeconds);
+				DrawDebugString(
+					World,
+					HitLocation,
+					FString::Printf(TEXT("No active Health: %s.%s"), *GetNameSafe(Target), *GetNameSafe(Hit.GetComponent())),
+					nullptr,
+					FColor::Red,
+					MeleeDebugLifetimeSeconds,
+					true);
+			}
+		#endif
 			continue;
 		}
 		DamagedActors.Add(Target);
@@ -138,6 +211,21 @@ void UMeleeAttackComponent::PerformHit()
 		DamageContext.ImpulseStrength = FMath::Max(0.0f, ImpulseStrength);
 		DamageContext.VerticalImpulse = VerticalImpulse;
 		Health->ApplyDamage(DamageContext);
+	#if ENABLE_DRAW_DEBUG
+		if (bDrawMeleeDebug)
+		{
+			const FVector HitLocation = Hit.ImpactPoint.IsNearlyZero() ? Hit.Location : Hit.ImpactPoint;
+			DrawDebugPoint(World, HitLocation, 12.0f, FColor::Green, false, MeleeDebugLifetimeSeconds);
+			DrawDebugString(
+				World,
+				HitLocation,
+				FString::Printf(TEXT("Damaged: %s | %.1f"), *GetNameSafe(Target), DamageContext.Damage),
+				nullptr,
+				FColor::Green,
+				MeleeDebugLifetimeSeconds,
+				true);
+		}
+	#endif
 	}
 	OnAttackHit.Broadcast();
 }

@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-이 문서는 현재 customer loop와 UE 5.8 StateTree 계약을 정의한다. native session은 신발 단계를 deprecated 처리하고 unnumbered locker 활동과 capacity lease를 구현한다. Facility 경계는 [FacilitySystem.md](FacilitySystem.md), 배치/수용량은 [PlacementSystem.md](PlacementSystem.md), knockdown은 [CustomerRecoverySystem.md](CustomerRecoverySystem.md)를 따른다.
+이 문서는 현재 customer loop와 UE 5.8 StateTree 계약을 정의한다. native session은 신발 단계를 deprecated 처리하고 unnumbered locker 활동, capacity lease와 수위 유효성 기반 BathLoop를 구현한다. Facility 경계는 [FacilitySystem.md](FacilitySystem.md), 물과 조작부는 [BathWaterSystem.md](BathWaterSystem.md), 배치/수용량은 [PlacementSystem.md](PlacementSystem.md), knockdown은 [CustomerRecoverySystem.md](CustomerRecoverySystem.md)를 따른다.
 
 ## Source Scope
 
@@ -13,6 +13,7 @@ Source/BathhouseSim/Public/Customer/
   CustomerSessionComponent.h
   CustomerQueueNavigationComponent.h
   CustomerMontagePlaybackComponent.h
+  CustomerBathLoopLog.h
   BathhouseCustomerCharacter.h
   BathhouseCustomerAIController.h
   BathhouseCustomerSpawner.h
@@ -25,6 +26,8 @@ Source/BathhouseSim/Private/Customer/
   BathhouseCustomerTypes.cpp
   CustomerRoutineDefinition.cpp
   CustomerSessionComponent.cpp
+  CustomerSessionBath.cpp
+  CustomerBathLoopLog.cpp
   CustomerQueueNavigationComponent.cpp
   CustomerMontagePlaybackComponent.cpp
   BathhouseCustomerCharacter.cpp
@@ -46,6 +49,7 @@ Source/BathhouseSim/Private/Tests/
 - StateTree 기반 routine orchestration과 gameplay event 전달
 - check-in 60초 timeout과 미응대 퇴장
 - unnumbered locker, shower, random bath loop, checkout과 정상 퇴장
+- 전역 임계 수위 기반 bath 탐색·예약·강제 퇴장, 탐색 제한시간과 실제 입욕 누적
 - 완료·timeout·기술 실패의 대칭 cleanup
 - clean towel token 획득·사용·반납과 shortage fallback
 - customer session satisfaction와 towel cleanup
@@ -64,6 +68,8 @@ Customer는 towel endpoint count/overflow, facility slot, key actor lifecycle, p
 | queue | `ABathhouseCounterActor` |
 | facility reservation/occupancy | `UBathhouseFacilitySlotComponent` |
 | Bath approach/action snap 상태와 복구 | `UCustomerSessionComponent` |
+| Bath 탐색 window, 실제 입욕 누적과 현재 Bath usability 구독 | `UCustomerSessionComponent` |
+| 욕탕 물·전역 입욕 임계치와 usability event | Bath Water System |
 | montage 재생, playback token과 종료 결과 | `UCustomerMontagePlaybackComponent` |
 | key state | `ABathhouseKeyActor` |
 | money | `UPlayerWalletComponent` |
@@ -80,6 +86,7 @@ Customer는 towel endpoint count/overflow, facility slot, key actor lifecycle, p
 
 - `CheckInTimeoutSeconds = 60`
 - `BathStayDurationSeconds = 60`
+- `BathSearchTimeoutSeconds = 10`
 - `BathDwellMinSeconds = 10`
 - `BathDwellMaxSeconds = 20`
 - undress, pre-shower, main shower, drying, towel return과 dress 시간
@@ -104,6 +111,9 @@ Customer는 towel endpoint count/overflow, facility slot, key actor lifecycle, p
 - current Bath action-point snap 여부, 예약 당시 발바닥 기준 approach/action transform과 collision-independent snap/return
 - last used bath actor
 - bath stay end time와 expiry timer
+- 현재 bath search end time/expiry timer와 반복 retry에 리셋되지 않는 search serial
+- 실제 입욕 누적 초, 활성 입욕 segment 시작시각과 idempotent 종료 guard
+- 현재 예약 Bath의 usability delegate와 forced-exit pending reason
 - current logical activity와 service interaction gate
 - cash claimed, departure reason와 cleanup guard
 - optional `FTowelUseHandle`, towel-use stage와 towel cleanup guard
@@ -112,7 +122,7 @@ Customer는 towel endpoint count/overflow, facility slot, key actor lifecycle, p
 
 Session은 queue lane membership을 보유하지만 index/assignment/배회 위치를 복제하지 않는다. 최신 assignment는 Counter에 위임하고 StateTree Task가 session API를 통해 transaction을 수행한다.
 
-Bath timer가 만료되면 session은 `Customer.Event.BathStayExpired` event를 StateTree에 전달한다.
+전체 Bath timer가 만료되면 session은 `Customer.Event.BathStayExpired`, 현재 탐색 window가 만료되면 `Customer.Event.BathSearchExpired`, 예약·이동·사용 중인 Bath가 임계치 미만이 되면 `Customer.Event.BathBecameUnusable`를 StateTree에 전달한다. event 전송 전 실제 입욕 segment를 중지해 StateTree 반응 frame이 누적시간에 포함되지 않게 한다.
 
 ## `ABathhouseCustomerCharacter`
 
@@ -158,6 +168,7 @@ StateTree asset이 소유하는 것:
 - key received, timeout, facility available, bath expired, cash claimed event 전이
 - towel available과 towel wait expired event 전이
 - Bath approach 이동, action snap, montage 실행과 approach 복귀 순서
+- Bath search-expired/invalidated event의 재탐색·다음 shower 전이와 한번 시작한 퇴장 유지
 
 Native C++이 소유하는 것:
 
@@ -170,6 +181,7 @@ Native C++이 소유하는 것:
 - montage 후보 검증, 단일 선택과 실제 playback 종료 판정
 - soft interruption serial, restartable MoveTo와 기존 Task local restart
 - queue revision 기반 assignment 재조회와 recovery queue-pose gate
+- Bath search timer, current Bath delegate, 실제 입욕 segment와 진단 reason 기록
 
 Blueprint StateTree Task와 Blueprint graph에 domain mutation을 구현하지 않는다.
 
@@ -186,6 +198,7 @@ Blueprint StateTree Task와 Blueprint graph에 domain mutation을 구현하지 �
 - 후보 중 하나를 한 번 선택해 실제 종료를 기다리는 one-shot montage
 - 후보 중 하나를 한 번 선택해 같은 montage만 지정 시간 동안 반복하는 duration-loop montage
 - bath stay timer 시작과 random bath loop
+- Bath 탐색 window 시작/완료, pre-entry 수위 재검증과 임계 하락 exit-pending 처리
 - checkout key 배치와 cash actor 생성·claim 대기
 - normal/timeout/technical cleanup
 - clean towel acquire/wait/fallback, mark-used와 used return Task
@@ -204,13 +217,13 @@ Queue removal은 session membership와 wait/service guard를 먼저 지운 뒤 c
 6. random available locker action slot을 탈의 동안만 reserve/use하고 완료 시 `ClothesStored=true`로 commit한 뒤 release한다.
 7. `TowelShelf` slot에서 clean towel 한 장 획득을 시도한다.
 8. 없으면 authorable limit 동안 availability를 기다리고 만료 시 towel 없이 진행하며 satisfaction을 감소시킨다.
-9. Shower slot에서 pre-shower timed activity를 수행하고 완료 순간 고정 60초 bath stay timer를 시작한다.
-10. Available bath 중 random slot을 예약하고 NavMesh 위 approach point까지 이동한다.
-11. 발바닥 action point를 capsule-center transform으로 변환한 뒤 blocking collision 검사 없이 unswept snap하여 입욕한다.
-12. 탕마다 `10~20초` random dwell 동안 선택 montage 하나만 반복하고 시간이 남으면 다른 available bath를 선택한다.
-13. 다른 bath가 있으면 직전 bath를 제외하고 모두 점유 중이면 reservation 없이 availability event를 기다린다.
-14. dwell 완료 또는 60초 만료 시 montage를 중단하고 approach point 복귀 뒤 slot을 release한다.
-15. Shower slot에서 main-shower activity를 수행한다.
+9. Shower slot의 pre-shower 완료 순간 고정 60초 전체 bath stay timer를 시작한다.
+10. 최대 `min(10초, 남은 전체시간)`인 새 search window를 시작하고 전역 임계 수위 이상인 Bath의 available slot만 random 예약한다. 반복 조회는 같은 window를 리셋하지 않는다.
+11. 예약 성공 시 search window를 끝내고 NavMesh 위 approach point로 이동한다. 이동 중 임계 미달이면 event로 이동을 중단하고 reservation을 정리한 뒤 새 window를 시작한다.
+12. approach 도착 후 수위를 다시 검사하고, 유효할 때만 action point로 unswept snap해 occupancy와 실제 입욕 segment를 시작한다.
+13. 탕마다 `10~20초`와 남은 전체시간 중 짧은 duration 동안 선택 montage 하나만 반복한다. 실제 입욕 segment만 누적한다.
+14. 임계 미달은 segment를 즉시 중지하고 퇴장을 시작한다. dwell/강제퇴장/전체 만료 모두 approach 복귀 뒤 slot을 release하며 이미 시작한 퇴장은 수위 상승으로 취소하지 않는다.
+15. 시간이 남은 정상 dwell 또는 강제퇴장 뒤에는 새 search window로 돌아가고, search/전체 timer 만료 시 만족도 변화 없이 Shower slot의 main-shower로 진행한다.
 16. towel handle이 있으면 Drying에서 Used로 mark하고 기존 `TowelBasket` facility의 used bin에 반환한다.
 17. used bin full이면 주변 floor의 individual used towel, spawn 불가면 PendingSpill ledger로 보존한다.
 18. towel handle이 없으면 towel-dependent drying/return을 건너뛴다.
@@ -220,6 +233,25 @@ Queue removal은 session membership와 wait/service guard를 먼저 지운 뒤 c
 22. Cash claim 성공 시 capacity lease를 release하고 checkout lane을 떠나 exit로 이동한 뒤 소멸한다.
 
 Player의 key pickup/rack 반환은 customer 퇴장 조건이 아니다.
+
+## BathLoop Timer And Invalidation
+
+`UCustomerSessionComponent`는 전체 60초 timer, 현재 search window와 실제 입욕 누적을 서로 다른 값으로 소유한다. `BeginBathSearchWindow()`는 이미 active면 no-op이고 reservation 성공·포기에서 명시적으로 끝난 뒤에만 다음 window가 새 serial로 시작한다. timeout은 Data Asset의 `BathSearchTimeoutSeconds`와 남은 전체시간 중 작은 값이다. search 시작 시 이 resolved duration을 별도로 보존하고 active elapsed는 `resolved duration - remaining`으로 계산하여 10초 기본값, 남은 stay clamp와 pause/resume을 정확히 구분한다.
+
+실제 입욕시간은 Tick 누적이 아니라 segment start/stop의 world-time 차이로 합산한다. action point snap과 `BeginUse`가 성공한 뒤 시작하고 dwell 완료, 임계 하락, 전체 만료, knockdown suspend, abort와 EndPlay에서 idempotent하게 멈춘다. knockdown resume은 현재 Bath가 계속 usable일 때만 새 segment를 시작한다. search/이동/입퇴장과 paused interval은 포함되지 않는다.
+
+Session은 Bath reservation 수명에만 `OnCustomerUsabilityChanged`를 구독한다. 임계 하락 시 이동 전이면 reservation cleanup event, 사용 중이면 실제 segment stop과 exit-pending event를 보낸다. current activity exit은 Bath에서 즉시 slot을 풀지 않고 cached ApproachPoint 복귀 뒤 기존 facility-root cleanup으로 release한다. threshold가 다시 올라와도 pending exit을 되돌리지 않는다.
+
+## BathLoop Diagnostics
+
+`CustomerBathLoopLog.*`의 공유 `LogBathhouseCustomerBath` category를 session과 native StateTree Task가 사용한다. native Task는 Bath navigation 결과, action snap/begin-use validation, search/stay/dwell advance와 forced-exit approach cleanup 결과를 서로 다른 phase/reason으로 남긴다. terminal transition만 기록하고 Tick, water frame update와 Condition 반복 평가는 기본 로그에 남기지 않는다.
+
+- `Log`: loop/search/dwell 시작·완료, reservation 성공, 임계 하락 퇴장, timeout과 다음 단계
+- `Verbose`: 후보 집계/거부, retry, 이동 결과와 입장 직전 재검증
+- `Warning`: navigation/recovery처럼 재시도 가능한 실패
+- `Error`: reservation 없는 dwell, foreign slot release, 중복 timer/segment 같은 invariant 위반
+
+모든 항목은 가능한 범위에서 `Customer`, loop `Iteration`, `Phase`, `BathActor`, `Slot`, `WaterPercent`, `ThresholdPercent`, 전체 남은시간, 실제 누적시간, search elapsed, `Result`와 `Reason`을 포함한다. 공통 reason enum은 `NoBathCandidate`, `WaterBelowThreshold`, `NoAvailableSlot`, `ReservationLost`, `NavigationFailed`, `EntryValidationFailed`, `DwellCompleted`, `BathStayExpired`, `SearchExpired`, `KnockdownInterrupted`, `StateTreeExited`, `TechnicalFailure`를 구분한다. Blueprint `Print String`은 사용하지 않고 graph 자체 추적은 `LogStateTree VeryVerbose`와 StateTree Debugger를 병행한다.
 
 ## Check-In Transaction
 
@@ -275,7 +307,7 @@ ActionPoint에서 나올 때도 cached ApproachPoint로 unswept teleport하고 �
 
 Navigation이 설정된 횟수만큼 반복 실패하면 gameplay 분기가 아니라 technical abort로 처리한다.
 
-- active timer와 StateTree wait 취소
+- active check-in/bath-stay/bath-search/towel timer와 StateTree wait 취소, 실제 입욕 segment 중지
 - Bath action point에 있으면 collision 사전 검사 없이 cached approach point 복귀와 movement mode 복구
 - current slot release
 - locker capacity lease를 idempotent하게 release
@@ -294,6 +326,7 @@ Check-in 외 gameplay timeout은 두지 않는다.
 ## Dependencies
 
 - Customer -> Facility
+- Customer -> Bath Water public query/usability delegate
 - Customer -> Interaction
 - Customer -> Economy
 - Customer -> Towel
@@ -312,9 +345,13 @@ Check-in 외 gameplay timeout은 두지 않는다.
 - check-in key/lease가 함께 commit 또는 rollback되고 checkout/timeout/cleanup에서 lease가 한 번만 반환되는지 확인한다.
 - 탈의/착의가 서로 독립된 random locker action slot을 행동 동안만 사용하고 `ClothesStored`를 session에만 기록하는지 확인한다.
 - bath timer가 pre-shower 완료 시 시작하고 정확히 60초에 current montage를 중단한 뒤 approach 복귀와 release를 수행하는지 확인한다.
+- search window가 retry마다 재시작되지 않고 `10초`와 남은 전체시간 중 작은 값에서 만료되며 진단 elapsed가 각각 실제 약 10초와 clamp된 시간으로 기록되는지 확인한다.
+- 임계치 미만 Bath가 후보/이동/입장/체류에서 제외되고 사용 중 하락 시 실제 입욕 누적을 즉시 멈춘 뒤 approach 복귀 후 release하는지 확인한다.
+- 실제 입욕 누적에 search/이동/입퇴장/knockdown이 들어가지 않고 여러 Bath segment만 합산되는지 확인한다.
 - blocking collision이 action point를 점유해도 snap이 성공하고 정확한 cached transform, `MOVE_None`과 기존 collision enabled 상태를 유지하는지 확인한다.
 - blocked action snap 후 정상 release/technical abort가 cached approach로 복귀하고 movement mode를 복원하는지 확인한다.
-- bath random dwell과 다른 bath 선택이 고정 체류시간 종료를 지연하지 않는지 확인한다.
+- bath random dwell과 다른 bath 선택이 고정 전체 입욕시간 종료를 지연하지 않는지 확인한다.
+- BathLoop 로그가 iteration/phase/reason과 수위·타이머 상관 필드를 제공하면서 Tick spam을 만들지 않는지 확인한다.
 - 모든 StateTree exit/abort에서 queue, slot, timer와 key가 정리되는지 확인한다.
 - 동일한 assigned key가 counter 후보 위치에서 physics `OnCounter`로 전환되고 blocked drop은 key/session을 보존하며, cash claim 뒤 NPC가 key 회수를 기다리지 않고 퇴장하는지 확인한다.
 - montage 후보가 0/1/여러 개인 경우 각각 failure/단일 선택/random 단일 선택으로 동작하는지 확인한다.

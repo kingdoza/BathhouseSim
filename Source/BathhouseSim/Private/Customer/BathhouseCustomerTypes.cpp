@@ -4,6 +4,8 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Customer_Event_KeyReceived, "Customer.Event.KeyReceiv
 UE_DEFINE_GAMEPLAY_TAG(TAG_Customer_Event_CheckInTimedOut, "Customer.Event.CheckInTimedOut");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Customer_Event_FacilityAvailable, "Customer.Event.FacilityAvailable");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Customer_Event_BathStayExpired, "Customer.Event.BathStayExpired");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Customer_Event_BathSearchExpired, "Customer.Event.BathSearchExpired");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Customer_Event_BathBecameUnusable, "Customer.Event.BathBecameUnusable");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Customer_Event_CashClaimed, "Customer.Event.CashClaimed");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Customer_Event_QueueChanged, "Customer.Event.QueueChanged");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Customer_Event_TowelAvailable, "Customer.Event.TowelAvailable");

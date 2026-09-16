@@ -108,6 +108,12 @@ Equipment row 합성은 현재 held Actor가 `IHeldEquipmentUsable`이면 해당
 - `SetInteractionSuppressed(false)`는 즉시 query를 refresh한다. 같은 값의 반복 설정은 lifecycle을 중복 실행하지 않는다.
 - suppression은 generic 외부 focus 계약이며 Computer concrete type이나 computer session 상태를 판별하지 않는다.
 
+### Interaction Trace Debug
+
+개발 빌드에서 `bathhouse.Debug.InteractionTrace 1`은 authoritative camera `Visibility` line trace를 매 frame 표시한다. cyan은 no-hit, green은 component 또는 Actor가 `IPlayerInteractable`인 첫 Hit, red는 상호작용 불가능한 첫 blocker이며 yellow point와 문자열은 실제 impact, Actor, Component와 거리를 나타낸다. 이 기능은 기존 single-hit 선택, query, execute와 collision response를 변경하지 않는다. `0`으로 끄며 shipping debug draw에는 포함되지 않는다.
+
+PlacementZone의 `ZoneBounds`는 placement 전용 Trace Channel만 차단하고 `Visibility`를 무시한다. placement surface 탐색을 위해 generic interaction single-hit 규칙에 예외나 blocker-skip을 추가하지 않는다.
+
 ## `UPlayerCarryComponent`
 
 - generic held `AActor` 하나와 호환 key getter/delegate를 authoritative하게 소유한다.

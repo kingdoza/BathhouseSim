@@ -220,7 +220,7 @@ bool UBathhouseFacilitySubsystem::TryReserveRandomSlot(
 		{
 			ABathhouseFacilityActor* Facility = WeakFacility.Get();
 			if (!IsValid(Facility)
-				|| !Facility->IsFacilityEnabled()
+				|| !Facility->IsAvailableForReservation()
 				|| Facility->GetFacilityType() != FacilityType
 				|| (FacilityNumber != INDEX_NONE && Facility->GetFacilityNumber() != FacilityNumber)
 				|| (bApplyExclusion && Facility == ExcludedFacility))
@@ -257,7 +257,8 @@ bool UBathhouseFacilitySubsystem::TryReserveRandomSlot(
 	for (const FCandidate& Candidate : Candidates)
 	{
 		Choice -= Candidate.Weight;
-		if (Choice <= 0.0f && Candidate.Slot->TryReserve(Requestor))
+		if (Choice <= 0.0f && Candidate.Facility->IsAvailableForReservation()
+			&& Candidate.Slot->TryReserve(Requestor))
 		{
 			OutFacility = Candidate.Facility;
 			OutSlot = Candidate.Slot;
@@ -267,7 +268,8 @@ bool UBathhouseFacilitySubsystem::TryReserveRandomSlot(
 
 	for (const FCandidate& Candidate : Candidates)
 	{
-		if (Candidate.Slot->TryReserve(Requestor))
+		if (Candidate.Facility->IsAvailableForReservation()
+			&& Candidate.Slot->TryReserve(Requestor))
 		{
 			OutFacility = Candidate.Facility;
 			OutSlot = Candidate.Slot;

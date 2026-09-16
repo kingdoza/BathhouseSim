@@ -120,9 +120,10 @@ Knockdown은 StateTree에 stop/restart를 요청하지 않는다. UE 5.8 `UState
 
 - check-in wait
 - total bath stay
+- current bath search window
 - clean towel availability wait
 
-기립 후 남은 시간으로 한 번만 재설정한다. knockdown recovery timer는 routine timer가 아니므로 계속 진행한다. Task instance의 local timed activity/montage duration은 보존하지 않고 재시작 대상이다.
+기립 후 남은 시간으로 한 번만 재설정한다. 활성 actual bath segment는 pause 시점에 누적 종료하고, 같은 Bath의 수위·예약·occupancy가 recovery 뒤 다시 유효해진 경우에만 새 segment로 재개한다. knockdown recovery timer는 routine timer가 아니므로 계속 진행한다. Task instance의 local timed activity/montage duration은 보존하지 않고 재시작 대상이다.
 
 ## Restart Serial And Native Tasks
 

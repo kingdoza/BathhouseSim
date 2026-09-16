@@ -97,6 +97,10 @@ LMB `Started`가 공격을 한 번 시작한다. 공격중 추가 Started와 Hol
 
 무기 mesh, socket, collision overlap과 시각적 타격점은 authoritative 피격 판정이 아니다. player가 의도하지 않은 대상도 동일 범위에 있으면 피격된다.
 
+### Melee Hit Debug
+
+개발 빌드에서 `bathhouse.Debug.MeleeHit 1`은 HitTime의 authoritative camera 방향과 sphere 판정 범위를 2초간 표시한다. cyan arrow는 camera-to-center, sphere는 no-hit일 때 red이고 raw hit가 있으면 yellow다. raw/duplicate component hit는 orange, active Health가 없는 hit는 red, 실제 damage가 commit된 Actor는 green point와 damage 문자열로 표시한다. debug draw는 trace, Actor dedupe, damage 결과와 공격 lifecycle을 변경하지 않으며 `0`으로 끈다.
+
 ## Damage And Health
 
 `FCombatDamageContext`는 다음을 보존한다.

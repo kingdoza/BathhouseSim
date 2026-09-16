@@ -12,7 +12,10 @@
 class UFacilityPlacementDefinition;
 class UBathhouseExpansionDefinition;
 class ULockerCapacitySubsystem;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class UPlayerCarryComponent;
+class UStaticMesh;
 class UStaticMeshComponent;
 
 UCLASS(Transient, NotBlueprintable)
@@ -126,6 +129,19 @@ class AFacilityPlacementZoneAutomationActor final : public AFacilityPlacementZon
 
 public:
 	void AddAllowedTag(const FGameplayTag& Tag) { AllowedFacilityTags.AddTag(Tag); }
+	void ConfigureGridForTest(
+		UStaticMesh* Mesh,
+		UMaterialInterface* Material,
+		float LineThicknessCm = 1.0f,
+		float ZOffsetCm = 0.5f,
+		int32 MajorIntervalCells = 10);
+	void MarkLevelAuthoredForTest() { bNetStartup = true; }
+	UMaterialInstanceDynamic* GetGridMIDForTest() const { return GridMID; }
+	int32 GetGridVisibilityChangeCount() const { return GridVisibilityChangeCount; }
+	virtual void ProcessEvent(UFunction* Function, void* Parameters) override;
+
+private:
+	int32 GridVisibilityChangeCount = 0;
 };
 
 UCLASS(Transient, NotBlueprintable)

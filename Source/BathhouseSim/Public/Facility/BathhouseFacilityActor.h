@@ -50,6 +50,8 @@ public:
 	virtual UFacilityPlacementComponent* GetFacilityPlacementComponent() const override { return FacilityPlacement; }
 	virtual FFacilityPlacementTransactionResult QueryFacilityPlacement(const FTransform& CandidateTransform, const class AFacilityPlacementZoneActor& Zone) const override;
 	virtual FFacilityPlacementTransactionResult QueryFacilityRecovery() const override;
+	virtual bool TryBeginFacilityRecoveryHold(FText& OutFailureReason) override { OutFailureReason = FText::GetEmpty(); return true; }
+	virtual void CancelFacilityRecoveryHold() override {}
 	virtual bool ExportPlacementPayload(APlaceableFacilityItemActor& Item, FFacilityPlacementPayload& OutPayload, FText& OutFailureReason) const override;
 	virtual bool ImportPlacementPayload(const APlaceableFacilityItemActor& Item, const FFacilityPlacementPayload& Payload, FText& OutFailureReason) override;
 	virtual bool StagePlacedDomainRegistration(FText& OutFailureReason) override;
@@ -92,6 +94,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Bathhouse Facility")
 	bool IsFacilityEnabled() const { return bEnabled; }
+	virtual bool IsAvailableForReservation() const;
 
 	const TArray<TObjectPtr<UBathhouseFacilitySlotComponent>>& GetFacilitySlots() const { return FacilitySlots; }
 	UBathWaterStateComponent* GetBathWaterState() const { return BathWaterState; }

@@ -51,8 +51,22 @@
 
 - `/Game/Bathhouse/Blueprints/Placement/BP_FacilityPlacementZone`
 - Parent Class: `/Script/BathhouseSim.FacilityPlacementZoneActor`
-- inherited `ZoneBounds`와 `PlacementFloor`를 사용한다.
+- inherited `ZoneBounds`, `PlacementFloor`, `GridVisual`을 사용한다.
 - `PlacementFloor`의 ZoneBounds 상대 transform은 identity이며 Navigation 비활성이다.
 - 실제 Level instance의 floor plane은 world `Z=0`이다. Zone Bounds의 두께는 설치 높이 계산의 기준이 아니다.
+- `GridVisual`은 `PlacementFloor`의 child다. Static Mesh는 `/Engine/BasicShapes/Plane.Plane`, Material Element 0은 `/Game/Bathhouse/Materials/Placement/MI_FacilityPlacementGrid`다.
+- `GridVisual`은 기본 hidden, Collision `NoCollision`, overlap/physics/Tick/Navigation 비활성이다. transform과 visibility는 native가 파생·관리하며 Blueprint graph는 관여하지 않는다.
+- Class Default는 `GridLineThicknessCm=1.0`, `GridZOffsetCm=0.5`, `MajorGridIntervalCells=10`이다.
+
+### Native grid Material
+
+- `/Game/Bathhouse/Materials/Placement/M_FacilityPlacementGrid`: Surface, Translucent, Unlit, normal depth test, one-sided plane Material
+- `/Game/Bathhouse/Materials/Placement/MI_FacilityPlacementGrid`: 위 Material의 공통 표현 instance
+- Material graph는 plane UV에 `ZoneSizeXCm/Ycm ÷ GridSizeCm` cell 수를 적용한다. `LineThicknessCm ÷ GridSizeCm`의 절반 폭으로 minor line을 만들고, `MajorGridEveryNCells` 주기와 `MajorLineThicknessMultiplier`로 major line을 합성한다. 두 line mask의 역영역에는 별도 cell fill 색과 opacity를 적용한다.
+- native DMI 입력은 `GridSizeCm`, `ZoneSizeXCm`, `ZoneSizeYCm`, `LineThicknessCm`, `MajorGridEveryNCells` 다섯 scalar다. MI는 이 다섯 값을 override하지 않는다.
+- MI 표현 parameter는 `MinorLineColor`, `MajorLineColor`, `GridOpacity`, `MajorLineThicknessMultiplier`, `CellFillColor`, `CellFillOpacity`다.
+- MI 표현값은 `MinorLineColor=(0.35,0.38,0.40,1)`, `MajorLineColor=(0.75,0.78,0.80,1)`, `GridOpacity=0.35`, `MajorLineThicknessMultiplier=2.0`, `CellFillColor=(0.08,0.10,0.12,1)`, `CellFillOpacity=0.08`이다.
+
+`DefaultMap`의 exact PlacementZone actor는 `BP_FacilityPlacementZone_C_UAID_F02F7433CA36D1FF02_1155169559`다. `ZoneBounds` Extent는 `(1400,900,10)`이고 `PlacementFloor`는 identity다. 별도 instance override 없이 native construction 결과 `GridVisual`은 Relative Location `(0,0,0.5)`, Scale `(28,18,1)`로 Zone 전체 2800×1800cm를 덮는다. 이번 authoring에서는 Map/external actor 값을 바꾸거나 저장하지 않았다.
 
 Recast와 Project Settings의 미저장 전역값, 실제 입력 기반 preview/배치/회수 판정은 [USER_UNREAL.md](../USER_UNREAL.md)를 따른다.

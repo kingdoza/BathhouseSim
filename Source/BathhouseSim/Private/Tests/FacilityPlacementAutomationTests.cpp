@@ -31,6 +31,8 @@
 #include "Interaction/PlayerInteractionComponent.h"
 #include "Misc/DataValidation.h"
 #include "Materials/Material.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialParameters.h"
 #include "PhysicsEngine/AggregateGeom.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "Placement/FacilityPlacementSettings.h"
@@ -47,6 +49,8 @@
 #include "Towel/TowelProcessingMachineActor.h"
 #include "Towel/UsedTowelBinActor.h"
 #include "Tests/FacilityPlacementAutomationTestProbe.h"
+
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FBathhouseFacilityPlacementMathTest,
@@ -93,12 +97,124 @@ bool FBathhouseFacilityPlacementMathTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Scaled zone containment rejects a corner beyond the scaled boundary"),
 		Zone->ContainsFootprint(FTransform(FVector(190.0f, 0.0f, 0.0f)), FVector(20.0f, 20.0f, 5.0f)));
 
-	UBathWaterStateComponent* Water = NewObject<UBathWaterStateComponent>();
-	TestTrue(TEXT("Bath water begins empty"), Water->IsEmpty());
-	TestTrue(TEXT("Bath water state commits natively"), Water->SetWaterState(EBathWaterState::Filling));
-	TestFalse(TEXT("Filling water blocks the empty query"), Water->IsEmpty());
-	Water->SetNormalizedAmount(2.0f);
-	TestEqual(TEXT("Optional water presentation amount is clamped"), Water->GetNormalizedAmount(), 1.0f);
+	AFacilityPlacementZoneAutomationActor* GridZone = NewObject<AFacilityPlacementZoneAutomationActor>();
+	UStaticMesh* PlaneMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane.Plane"));
+	UMaterial* GridMaterial = NewObject<UMaterial>();
+	TestNotNull(TEXT("Native grid test resolves the centered Engine plane"), PlaneMesh);
+	GridZone->GetZoneBounds()->SetBoxExtent(FVector(125.0f, 80.0f, 15.0f));
+	GridZone->SetActorScale3D(FVector(2.0f, 0.5f, 3.0f));
+	GridZone->ConfigureGridForTest(PlaneMesh, GridMaterial, 1.25f, 0.75f, 8);
+	UStaticMeshComponent* GridVisual = GridZone->GetGridVisual();
+	TestTrue(TEXT("GridVisual is a stable child of PlacementFloor"),
+		GridVisual && GridVisual->GetAttachParent() == GridZone->GetPlacementFloor());
+	TestTrue(TEXT("GridVisual starts hidden"),
+		GridVisual && !GridVisual->IsVisible() && GridVisual->bHiddenInGame && !GridZone->IsGridVisible());
+	TestTrue(TEXT("GridVisual never participates in collision, overlap, physics, Tick, or Navigation"),
+		GridVisual
+		&& GridVisual->GetCollisionEnabled() == ECollisionEnabled::NoCollision
+		&& !GridVisual->GetGenerateOverlapEvents()
+		&& !GridVisual->IsSimulatingPhysics()
+		&& !GridVisual->PrimaryComponentTick.bCanEverTick
+		&& !GridVisual->IsComponentTickEnabled()
+		&& !GridVisual->CanEverAffectNavigation());
+	if (PlaneMesh && GridVisual)
+	{
+		GridZone->GetZoneBounds()->UpdateComponentToWorld();
+		GridZone->GetPlacementFloor()->UpdateComponentToWorld();
+		GridVisual->UpdateComponentToWorld();
+		const FVector MeshFullSize = PlaneMesh->GetBounds().BoxExtent * 2.0f;
+		const FVector GridRelativeScale = GridVisual->GetRelativeScale3D().GetAbs();
+		const FVector ActorWorldScale = GridZone->GetActorScale3D().GetAbs();
+		const float GridWorldSizeX = MeshFullSize.X * GridRelativeScale.X * ActorWorldScale.X;
+		const float GridWorldSizeY = MeshFullSize.Y * GridRelativeScale.Y * ActorWorldScale.Y;
+		const float BoundsWorldSizeX = 250.0f * ActorWorldScale.X;
+		const float BoundsWorldSizeY = 160.0f * ActorWorldScale.Y;
+		TestTrue(FString::Printf(
+			TEXT("Non-unit Actor scale preserves exact ZoneBounds world X/Y coverage: grid=(%.3f, %.3f) bounds=(%.3f, %.3f)"),
+			GridWorldSizeX, GridWorldSizeY, BoundsWorldSizeX, BoundsWorldSizeY),
+			FMath::IsNearlyEqual(
+				GridWorldSizeX,
+				BoundsWorldSizeX,
+				0.01f)
+			&& FMath::IsNearlyEqual(
+				GridWorldSizeY,
+				BoundsWorldSizeY,
+				0.01f));
+		TestTrue(TEXT("Native construction owns grid identity rotation, centered XY, and Z offset"),
+			GridVisual->GetRelativeRotation().IsNearlyZero()
+			&& FMath::IsNearlyZero(GridVisual->GetRelativeLocation().X)
+			&& FMath::IsNearlyZero(GridVisual->GetRelativeLocation().Y)
+			&& FMath::IsNearlyEqual(GridVisual->GetRelativeLocation().Z, 0.75f));
+	}
+	TestTrue(TEXT("First grid show succeeds"), GridZone->SetGridVisible(true));
+	UMaterialInstanceDynamic* FirstGridMID = GridZone->GetGridMIDForTest();
+	TestNotNull(TEXT("First grid show creates one per-instance MID"), FirstGridMID);
+	auto TestGridScalar = [&](const TCHAR* Name, const float Expected)
+	{
+		float Actual = 0.0f;
+		const bool bFound = FirstGridMID
+			&& FirstGridMID->GetScalarParameterValue(FMaterialParameterInfo(Name), Actual);
+		TestTrue(FString::Printf(TEXT("Grid MID writes exact scalar %s"), Name),
+			bFound && FMath::IsNearlyEqual(Actual, Expected));
+	};
+	TestGridScalar(TEXT("GridSizeCm"), GetDefault<UFacilityPlacementSettings>()->GetGridSizeCm());
+	TestGridScalar(TEXT("ZoneSizeXCm"), 250.0f);
+	TestGridScalar(TEXT("ZoneSizeYCm"), 160.0f);
+	TestGridScalar(TEXT("LineThicknessCm"), 1.25f);
+	TestGridScalar(TEXT("MajorGridEveryNCells"), 8.0f);
+	TestEqual(TEXT("First show publishes one visibility transition"), GridZone->GetGridVisibilityChangeCount(), 1);
+	TestTrue(TEXT("Repeated show is idempotent"), GridZone->SetGridVisible(true));
+	TestTrue(TEXT("Repeated show reuses the same MID and emits no transition"),
+		GridZone->GetGridMIDForTest() == FirstGridMID
+		&& GridZone->GetGridVisibilityChangeCount() == 1);
+	TestTrue(TEXT("First hide succeeds"), GridZone->SetGridVisible(false));
+	TestTrue(TEXT("Repeated hide is idempotent and retains the reusable MID"),
+		GridZone->SetGridVisible(false)
+		&& GridZone->GetGridMIDForTest() == FirstGridMID
+		&& GridZone->GetGridVisibilityChangeCount() == 2
+		&& !GridZone->IsGridVisible());
+
+	AFacilityPlacementZoneAutomationActor* InvalidGridZone = NewObject<AFacilityPlacementZoneAutomationActor>();
+	InvalidGridZone->GetZoneBounds()->SetBoxExtent(FVector(50.0f));
+	InvalidGridZone->ConfigureGridForTest(
+		PlaneMesh,
+		GridMaterial,
+		std::numeric_limits<float>::quiet_NaN(),
+		-10.0f,
+		1);
+	TestTrue(TEXT("Invalid grid authoring is sanitized without rewriting properties"),
+		FMath::IsNearlyEqual(InvalidGridZone->GetGridLineThicknessCm(), 1.0f)
+		&& FMath::IsNearlyZero(InvalidGridZone->GetGridZOffsetCm())
+		&& InvalidGridZone->GetMajorGridIntervalCells() == 2);
+	FDataValidationContext InvalidGridValidation;
+	TestEqual(TEXT("Invalid raw grid authoring fails Data Validation"),
+		InvalidGridZone->IsDataValid(InvalidGridValidation), EDataValidationResult::Invalid);
+	FDataValidationContext BaseZoneValidation;
+	TestEqual(TEXT("Native base Zone CDO permits Editor-stage missing mesh and material"),
+		GetDefault<AFacilityPlacementZoneActor>()->IsDataValid(BaseZoneValidation),
+		EDataValidationResult::Valid);
+	UStaticMesh* InvalidPlaneMesh = NewObject<UStaticMesh>();
+	InvalidPlaneMesh->SetExtendedBounds(FBoxSphereBounds(FVector::ZeroVector, FVector(50.0f, 0.0f, 0.0f), 50.0f));
+	AFacilityPlacementZoneAutomationActor* InvalidGeometryZone = NewObject<AFacilityPlacementZoneAutomationActor>();
+	InvalidGeometryZone->GetZoneBounds()->SetBoxExtent(FVector(50.0f));
+	InvalidGeometryZone->ConfigureGridForTest(InvalidPlaneMesh, GridMaterial);
+	TestFalse(TEXT("Invalid plane bounds fail closed without a visibility transition"),
+		InvalidGeometryZone->SetGridVisible(true));
+	TestFalse(TEXT("Repeated invalid geometry remains hidden"), InvalidGeometryZone->SetGridVisible(true));
+	TestTrue(TEXT("Grid geometry failure never commits presentation state"),
+		!InvalidGeometryZone->IsGridVisible()
+		&& InvalidGeometryZone->GetGridMIDForTest() == nullptr
+		&& InvalidGeometryZone->GetGridVisibilityChangeCount() == 0);
+	AFacilityPlacementZoneAutomationActor* MissingMaterialZone = NewObject<AFacilityPlacementZoneAutomationActor>();
+	MissingMaterialZone->GetZoneBounds()->SetBoxExtent(FVector(50.0f));
+	MissingMaterialZone->ConfigureGridForTest(PlaneMesh, nullptr);
+	TestFalse(TEXT("Missing grid material fails closed"), MissingMaterialZone->SetGridVisible(true));
+	TestFalse(TEXT("Repeated missing material remains a presentation-only failure"),
+		MissingMaterialZone->SetGridVisible(true));
+	TestTrue(TEXT("Material failure creates no MID and emits no visibility notification"),
+		!MissingMaterialZone->IsGridVisible()
+		&& MissingMaterialZone->GetGridMIDForTest() == nullptr
+		&& MissingMaterialZone->GetGridVisibilityChangeCount() == 0);
 
 	for (const int32 Capacity : { 1, 4, 8 })
 	{
@@ -618,9 +734,28 @@ bool FBathhouseFacilityPlacementRuntimeTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Expansion tier can advance"), Authority->TryAdvanceToTier(1, FailureReason));
 	TestEqual(TEXT("Tier advance appends expansion-owned keys"), Rack->GetMaterializedPairCount(), 8);
 
-	AFacilityPlacementZoneActor* PlacementZone = World->SpawnActor<AFacilityPlacementZoneActor>(
-		AFacilityPlacementZoneActor::StaticClass(), FVector(5000.0f, 1000.0f, 0.0f), FRotator::ZeroRotator);
+	UStaticMesh* GridPlaneMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane.Plane"));
+	UMaterial* GridPresentationMaterial = NewObject<UMaterial>();
+	AFacilityPlacementZoneAutomationActor* PlacementZone = World->SpawnActor<AFacilityPlacementZoneAutomationActor>(
+		AFacilityPlacementZoneAutomationActor::StaticClass(), FVector(5000.0f, 1000.0f, 0.0f), FRotator::ZeroRotator);
 	PlacementZone->GetZoneBounds()->SetBoxExtent(FVector(100.0f, 100.0f, 5.0f));
+	PlacementZone->MarkLevelAuthoredForTest();
+	PlacementZone->ConfigureGridForTest(GridPlaneMesh, GridPresentationMaterial);
+	AFacilityPlacementZoneAutomationActor* CompatibleGridZone =
+		World->SpawnActor<AFacilityPlacementZoneAutomationActor>(
+			AFacilityPlacementZoneAutomationActor::StaticClass(),
+			FVector(5500.0f, 1000.0f, 0.0f), FRotator::ZeroRotator);
+	CompatibleGridZone->GetZoneBounds()->SetBoxExtent(FVector(80.0f, 60.0f, 5.0f));
+	CompatibleGridZone->MarkLevelAuthoredForTest();
+	CompatibleGridZone->ConfigureGridForTest(GridPlaneMesh, GridPresentationMaterial, 0.8f, 0.25f, 5);
+	AFacilityPlacementZoneAutomationActor* IncompatibleGridZone =
+		World->SpawnActor<AFacilityPlacementZoneAutomationActor>(
+			AFacilityPlacementZoneAutomationActor::StaticClass(),
+			FVector(6000.0f, 1000.0f, 0.0f), FRotator::ZeroRotator);
+	IncompatibleGridZone->GetZoneBounds()->SetBoxExtent(FVector(80.0f, 60.0f, 5.0f));
+	IncompatibleGridZone->MarkLevelAuthoredForTest();
+	IncompatibleGridZone->ConfigureGridForTest(GridPlaneMesh, GridPresentationMaterial);
+	IncompatibleGridZone->AddAllowedTag(PlacementTag);
 	AActor* PlacementFloor = World->SpawnActor<AActor>();
 	UBoxComponent* FloorBox = NewObject<UBoxComponent>(PlacementFloor, TEXT("PlacementFloor"));
 	PlacementFloor->AddInstanceComponent(FloorBox);
@@ -633,8 +768,83 @@ bool FBathhouseFacilityPlacementRuntimeTest::RunTest(const FString& Parameters)
 	PlacementFloor->SetActorLocation(FVector(5000.0f, 1000.0f, -5.0f));
 	Player->SetActorLocationAndRotation(FVector(5000.0f, 1000.0f, 150.0f), FRotator(-90.0f, 0.0f, 0.0f));
 	Camera->SetWorldLocationAndRotation(FVector(5000.0f, 1000.0f, 150.0f), FRotator(-90.0f, 0.0f, 0.0f));
-	PlacementInput->Configure(Camera, Carry, nullptr);
+	const FGameplayTag FacilityRootTag = FGameplayTag::RequestGameplayTag(TEXT("Facility"));
+	ShowerDefinition->FacilityTags.Reset();
+	ShowerDefinition->FacilityTags.AddTag(FacilityRootTag);
+	PlacementInput->Configure(Camera, Carry, FocusedInteraction);
 	PlacementInput->RefreshPreview();
+	TestTrue(TEXT("Preview start shows every compatible level-authored Zone and excludes the incompatible Zone"),
+		PlacementZone->IsGridVisible()
+		&& CompatibleGridZone->IsGridVisible()
+		&& !IncompatibleGridZone->IsGridVisible()
+		&& PlacementInput->VisibleGridZones.Num() == 2);
+	const int32 PrimaryGridTransitions = PlacementZone->GetGridVisibilityChangeCount();
+	const int32 CompatibleGridTransitions = CompatibleGridZone->GetGridVisibilityChangeCount();
+	Camera->SetWorldLocationAndRotation(FVector(5500.0f, 1000.0f, 150.0f), FRotator(-90.0f, 0.0f, 0.0f));
+	PlacementInput->RefreshPreview();
+	TestTrue(TEXT("Camera target changes without changing the compatible grid set"),
+		PlacementInput->PreviewZone.Get() == CompatibleGridZone
+		&& PlacementZone->IsGridVisible()
+		&& CompatibleGridZone->IsGridVisible()
+		&& PlacementZone->GetGridVisibilityChangeCount() == PrimaryGridTransitions
+		&& CompatibleGridZone->GetGridVisibilityChangeCount() == CompatibleGridTransitions);
+	PlacementInput->SetSnapHeld(true);
+	PlacementInput->SetSnapHeld(false);
+	TestTrue(TEXT("LCtrl press and release leave compatible grid visibility unchanged"),
+		PlacementZone->IsGridVisible()
+		&& CompatibleGridZone->IsGridVisible()
+		&& PlacementZone->GetGridVisibilityChangeCount() == PrimaryGridTransitions
+		&& CompatibleGridZone->GetGridVisibilityChangeCount() == CompatibleGridTransitions);
+	PlacementInput->CancelAllSessions();
+	TestTrue(TEXT("Explicit cancel hides all grids and clears session references"),
+		!PlacementZone->IsGridVisible()
+		&& !CompatibleGridZone->IsGridVisible()
+		&& PlacementInput->VisibleGridZones.IsEmpty());
+	Camera->SetWorldLocationAndRotation(FVector(5000.0f, 1000.0f, 150.0f), FRotator(-90.0f, 0.0f, 0.0f));
+	PlacementInput->Configure(Camera, Carry, FocusedInteraction);
+	TestTrue(TEXT("A new preview session recollects compatible Zones once"),
+		PlacementZone->IsGridVisible()
+		&& CompatibleGridZone->IsGridVisible()
+		&& PlacementInput->VisibleGridZones.Num() == 2);
+	TWeakObjectPtr<AFacilityPlacementZoneAutomationActor> DestroyedGridZone(CompatibleGridZone);
+	CompatibleGridZone->Destroy();
+	PlacementInput->CancelAllSessions();
+	TestTrue(TEXT("Cleanup skips a destroyed visible Zone and clears its invalid weak reference"),
+		!DestroyedGridZone.IsValid()
+		&& !PlacementZone->IsGridVisible()
+		&& PlacementInput->VisibleGridZones.IsEmpty());
+	PlacementInput->Configure(Camera, Carry, FocusedInteraction);
+	FocusedInteraction->SetInteractionSuppressed(true);
+	PlacementInput->TickComponent(0.0f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("Interaction suppression clears every compatible grid"),
+		!PlacementZone->IsGridVisible() && PlacementInput->VisibleGridZones.IsEmpty());
+	FocusedInteraction->SetInteractionSuppressed(false);
+	PlacementInput->Configure(Camera, Carry, FocusedInteraction);
+	RuntimeSettings->ValidPreviewMaterial = nullptr;
+	PlacementInput->HandleHeldObjectChanged(Carry->GetHeldObject());
+	TestTrue(TEXT("Preview initialization failure never exposes Zone grids"),
+		!PlacementZone->IsGridVisible() && PlacementInput->VisibleGridZones.IsEmpty());
+	RuntimeSettings->ValidPreviewMaterial = ValidPreviewMaterial;
+	PlacementInput->HandleHeldObjectChanged(Carry->GetHeldObject());
+	PlacementInput->HandleHeldObjectChanged(nullptr);
+	TestTrue(TEXT("Held-object replacement callback clears every visible grid"),
+		!PlacementZone->IsGridVisible() && PlacementInput->VisibleGridZones.IsEmpty());
+	PlacementInput->HandleHeldObjectChanged(Carry->GetHeldObject());
+	PlacementInput->DestroyComponent();
+	TestTrue(TEXT("Placement component EndPlay hides grids and clears session references"),
+		!PlacementZone->IsGridVisible() && PlacementInput->VisibleGridZones.IsEmpty());
+	PlacementInput = NewObject<UPlayerFacilityPlacementComponent>(Player);
+	Player->AddInstanceComponent(PlacementInput);
+	PlacementInput->RegisterComponent();
+	PlacementInput->Configure(Camera, Carry, FocusedInteraction);
+	FocusedInteraction->ConfigureSupplementalIntentSource(PlacementInput);
+	ShowerDefinition->FacilityTags.Reset();
+	ShowerDefinition->FacilityTags.AddTag(PlacementTag);
+	PlacementInput->RefreshPreview();
+	TestTrue(TEXT("Retagging during an active session does not hot-add the previously incompatible Zone"),
+		PlacementZone->IsGridVisible()
+		&& !IncompatibleGridZone->IsGridVisible()
+		&& PlacementInput->VisibleGridZones.Num() == 1);
 	TestTrue(FString::Printf(TEXT("Held item produces valid placement preview: %s"),
 		*PlacementInput->CurrentPlacementQuery.FailureReason.ToString()),
 		PlacementInput->CurrentPlacementQuery.bSucceeded);
@@ -763,6 +973,8 @@ bool FBathhouseFacilityPlacementRuntimeTest::RunTest(const FString& Parameters)
 		&& !ShowerItem->GetItemRoot()->IsSimulatingPhysics());
 	TestTrue(TEXT("Failed placement preserves preview"),
 		PreviewBeforeFailure.IsValid() && PlacementInput->PreviewActor == PreviewBeforeFailure);
+	TestTrue(TEXT("Failed confirm keeps the compatible grid session visible"),
+		PlacementZone->IsGridVisible() && PlacementInput->VisibleGridZones.Num() == 1);
 	ShowerDefinition->PlacedFacilityClass = AFacilityPlacementAutomationActor::StaticClass();
 	PlacementInput->RefreshPreview();
 
@@ -797,6 +1009,8 @@ bool FBathhouseFacilityPlacementRuntimeTest::RunTest(const FString& Parameters)
 		*PlacementResult.FailureReason.ToString()), PlacementResult.bSucceeded);
 	TestFalse(TEXT("Successful placement removes original item"), ShowerItemWeak.IsValid());
 	TestTrue(TEXT("Successful placement clears hand"), Carry->IsHandEmpty());
+	TestTrue(TEXT("Successful placement callback hides compatible grids and clears the session set"),
+		!PlacementZone->IsGridVisible() && PlacementInput->VisibleGridZones.IsEmpty());
 	TestEqual(TEXT("Successful placement publishes once"), PlacementNotifications, 1);
 	TestTrue(TEXT("Observer sees empty hand and final registry"), bObserverSawEmptyHand && bObserverSawRegistry);
 	TestTrue(TEXT("Reentrant recovery is rejected"), bReentrantRecoveryRejected);
@@ -833,7 +1047,14 @@ bool FBathhouseFacilityPlacementRuntimeTest::RunTest(const FString& Parameters)
 	Bath->FinishSpawning(FTransform(FVector(8000.0f, 0.0f, 100.0f)));
 	if (!Bath->HasActorBegunPlay()) Bath->DispatchBeginPlay();
 	TestTrue(TEXT("Empty bath passes recovery gate"), Bath->QueryFacilityRecovery().bSucceeded);
-	Bath->BathWaterState->SetWaterState(EBathWaterState::Filled);
+	Bath->BathWaterState->FillRatePercentPerSecond = 100.0f;
+	FText BathWaterFailure;
+	TestTrue(TEXT("Bath recovery gate fixture opens native fill"), Bath->BathWaterState->RequestSetControlOpen(
+		EBathWaterControlType::FillValve,
+		true,
+		EBathWaterControlChangeReason::PlayerInteraction,
+		BathWaterFailure));
+	Bath->BathWaterState->TickComponent(0.1f, LEVELTICK_All, nullptr);
 	TestFalse(TEXT("Bath water blocks recovery"), Bath->QueryFacilityRecovery().bSucceeded);
 
 	UFacilityPlacementDefinition* MachineDefinition = NewObject<UFacilityPlacementDefinition>();

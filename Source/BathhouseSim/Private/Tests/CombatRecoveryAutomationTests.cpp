@@ -27,6 +27,7 @@
 #include "EnhancedInputComponent.h"
 #include "Facility/BathhouseFacilityActor.h"
 #include "Facility/BathhouseFacilitySlotComponent.h"
+#include "Facility/BathWaterStateComponent.h"
 #include "Facility/BathhouseCounterActor.h"
 #include "GameFramework/DamageType.h"
 #include "InputAction.h"
@@ -631,6 +632,16 @@ bool FBathhouseCustomerRecoveryFacilityAndOperationTest::RunTest(const FString& 
 	BeginCombatTestActor(Facility);
 	TestTrue(TEXT("Deferred facility discovers its authored recovery slot"),
 		Facility && Facility->GetFacilitySlots().Contains(Slot));
+	UBathWaterStateComponent* BathWater = Facility->GetBathWaterState();
+	BathWater->FillRatePercentPerSecond = 100.0f;
+	FText BathWaterFailure;
+	TestTrue(TEXT("Recovery fixture opens the native Bath fill valve"), BathWater->RequestSetControlOpen(
+		EBathWaterControlType::FillValve,
+		true,
+		EBathWaterControlChangeReason::PlayerInteraction,
+		BathWaterFailure));
+	BathWater->TickComponent(1.0f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("Recovery fixture Bath is customer usable"), BathWater->IsCustomerUsable());
 
 	TestTrue(TEXT("The production session reserves the Bath facility"),
 		Session->TryReserveFacility(EBathhouseFacilityType::Bath));

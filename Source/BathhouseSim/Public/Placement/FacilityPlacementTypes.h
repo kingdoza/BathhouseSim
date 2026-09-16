@@ -3,6 +3,12 @@
 #include "CoreMinimal.h"
 #include "FacilityPlacementTypes.generated.h"
 
+namespace BathhousePlacementCollision
+{
+	// Must match the FacilityPlacementZone trace channel declared in DefaultEngine.ini.
+	inline constexpr ECollisionChannel ZoneTraceChannel = ECC_GameTraceChannel1;
+}
+
 UENUM(BlueprintType)
 enum class EPlaceableFacilityMode : uint8
 {

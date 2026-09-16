@@ -24,6 +24,9 @@ public:
 	float BathStayDurationSeconds = 60.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bath", meta = (ClampMin = "0.1"))
+	float BathSearchTimeoutSeconds = 10.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bath", meta = (ClampMin = "0.1"))
 	float BathDwellMinSeconds = 10.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bath", meta = (ClampMin = "0.1"))

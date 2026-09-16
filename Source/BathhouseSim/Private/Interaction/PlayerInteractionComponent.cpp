@@ -1,11 +1,25 @@
 #include "Interaction/PlayerInteractionComponent.h"
 
 #include "Camera/CameraComponent.h"
+#include "DrawDebugHelpers.h"
 #include "GameFramework/Pawn.h"
+#include "HAL/IConsoleManager.h"
 #include "Interaction/PlayerCarryComponent.h"
 #include "Interaction/PlayerEquipmentUseComponent.h"
 #include "Interaction/PlayerInteractable.h"
 #include "Interaction/SupplementalInteractionIntentSource.h"
+
+#if ENABLE_DRAW_DEBUG
+namespace
+{
+	TAutoConsoleVariable<int32> CVarBathhouseDebugInteractionTrace(
+		TEXT("bathhouse.Debug.InteractionTrace"),
+		0,
+		TEXT("Draw the local player's interaction trace and first blocking hit.\n")
+		TEXT("0: disabled, 1: enabled"),
+		ECVF_Cheat);
+}
+#endif
 
 UPlayerInteractionComponent::UPlayerInteractionComponent()
 {
@@ -368,7 +382,44 @@ bool UPlayerInteractionComponent::TraceFocus(FHitResult& OutHit) const
 	const FVector Start = Camera->GetComponentLocation();
 	const FVector End = Start + Camera->GetForwardVector() * TraceDistance;
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(PlayerInteraction), true, GetOwner());
-	return GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, TraceChannel, QueryParams);
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, TraceChannel, QueryParams);
+#if ENABLE_DRAW_DEBUG
+	if (CVarBathhouseDebugInteractionTrace.GetValueOnGameThread() != 0)
+	{
+		const UObject* HitComponent = bHit ? OutHit.GetComponent() : nullptr;
+		const AActor* HitActor = bHit ? OutHit.GetActor() : nullptr;
+		const bool bComponentInteractable = HitComponent
+			&& HitComponent->GetClass()->ImplementsInterface(UPlayerInteractable::StaticClass());
+		const bool bActorInteractable = HitActor
+			&& HitActor->GetClass()->ImplementsInterface(UPlayerInteractable::StaticClass());
+		const bool bInteractable = bComponentInteractable || bActorInteractable;
+		const FVector DebugEnd = bHit ? OutHit.ImpactPoint : End;
+		const FColor TraceColor = !bHit
+			? FColor::Cyan
+			: (bInteractable ? FColor::Green : FColor::Red);
+		DrawDebugLine(GetWorld(), Start, DebugEnd, TraceColor, false, 0.0f, 0, 1.5f);
+		if (bHit)
+		{
+			DrawDebugLine(GetWorld(), DebugEnd, End, FColor(48, 48, 48), false, 0.0f, 0, 0.5f);
+			DrawDebugPoint(GetWorld(), DebugEnd, 10.0f, FColor::Yellow, false, 0.0f);
+			const FString HitLabel = FString::Printf(
+				TEXT("Interaction %s | %s.%s | %.1f cm"),
+				bInteractable ? TEXT("Target") : TEXT("Blocker"),
+				*GetNameSafe(HitActor),
+				*GetNameSafe(HitComponent),
+				OutHit.Distance);
+			DrawDebugString(
+				GetWorld(),
+				DebugEnd + FVector(0.0f, 0.0f, 8.0f),
+				HitLabel,
+				nullptr,
+				TraceColor,
+				0.0f,
+				true);
+		}
+	}
+#endif
+	return bHit;
 }
 
 bool UPlayerInteractionComponent::GetCurrentFocusHit(FHitResult& OutHit) const

@@ -48,7 +48,12 @@ bool UPlayerFacilityPlacementComponent::TracePlacementZone(
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(FacilityPlacementZoneTrace), true, GetOwner());
 	const FVector Start = Camera->GetComponentLocation();
 	const FVector End = Start + Camera->GetForwardVector() * GetDefault<UFacilityPlacementSettings>()->GetPlacementTraceDistance();
-	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params)) return false;
+	if (!GetWorld()->LineTraceSingleByChannel(
+		Hit,
+		Start,
+		End,
+		BathhousePlacementCollision::ZoneTraceChannel,
+		Params)) return false;
 	OutZone = Cast<AFacilityPlacementZoneActor>(Hit.GetActor());
 	OutPoint = Hit.ImpactPoint;
 	return OutZone != nullptr;

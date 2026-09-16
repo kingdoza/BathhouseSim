@@ -11,6 +11,7 @@ class AFacilityPlacementZoneActor;
 class APlaceableFacilityItemActor;
 class IPlaceableFacility;
 class UCameraComponent;
+class UFacilityPlacementDefinition;
 class UPlayerCarryComponent;
 class UPlayerInteractionComponent;
 
@@ -61,6 +62,8 @@ private:
 	void CancelRecovery();
 	void SetPreviewFailure(EFacilityPlacementFailureCode FailureCode, const FText& FailureReason);
 	void ClearPreviewVisual();
+	void ShowCompatibleZoneGrids(const UFacilityPlacementDefinition& Definition);
+	void HideVisibleZoneGrids();
 	void UpdateTickState();
 	bool IsLocalSessionOwner() const;
 	bool CanProcessSession() const;
@@ -87,6 +90,9 @@ private:
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AFacilityPlacementZoneActor> PreviewZone;
+
+	UPROPERTY(Transient)
+	TArray<TWeakObjectPtr<AFacilityPlacementZoneActor>> VisibleGridZones;
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AFacilityPlacementPreviewActor> PreviewActor;

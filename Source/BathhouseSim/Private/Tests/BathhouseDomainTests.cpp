@@ -9,6 +9,7 @@
 #include "Facility/BathhouseCounterActor.h"
 #include "Facility/BathhouseFacilityActor.h"
 #include "Facility/BathhouseFacilitySlotComponent.h"
+#include "Facility/BathWaterStateComponent.h"
 #include "Facility/CustomerQueueOverflowWanderVolume.h"
 #include "Interaction/BathhouseKeyActor.h"
 #include "Interaction/BathhouseKeyHookActor.h"
@@ -153,6 +154,16 @@ bool FBathhouseCustomerBathSnapTest::RunTest(const FString& Parameters)
 	Customer->AutoPossessAI = EAutoPossessAI::Disabled;
 	UGameplayStatics::FinishSpawningActor(Customer, SpawnTransform);
 	ABathhouseFacilityActor* Facility = World->SpawnActor<ABathhouseFacilityActor>();
+	UBathWaterStateComponent* BathWater = Facility->GetBathWaterState();
+	BathWater->FillRatePercentPerSecond = 100.0f;
+	FText BathWaterFailure;
+	TestTrue(TEXT("Bath snap fixture opens the native fill valve"), BathWater->RequestSetControlOpen(
+		EBathWaterControlType::FillValve,
+		true,
+		EBathWaterControlChangeReason::PlayerInteraction,
+		BathWaterFailure));
+	BathWater->TickComponent(1.0f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("Bath snap fixture is customer usable"), BathWater->IsCustomerUsable());
 	UBathhouseFacilitySlotComponent* Slot = NewObject<UBathhouseFacilitySlotComponent>(Facility, TEXT("BathSnapTestSlot"));
 	Facility->AddInstanceComponent(Slot);
 	Slot->RegisterComponent();
@@ -177,6 +188,7 @@ bool FBathhouseCustomerBathSnapTest::RunTest(const FString& Parameters)
 		Session->CurrentFacilityActor = Facility;
 		Session->CurrentFacilitySlot = Slot;
 		Session->CacheCurrentFacilityTransforms();
+		Session->BindCurrentBathWater();
 		const FFacilitySnapshot Snapshot{
 			Session->CachedFacilityApproachTransform,
 			Session->CachedFacilityActionTransform};

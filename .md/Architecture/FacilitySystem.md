@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-이 문서는 facility slot, transform 기반 counter queue assignment, checkout overflow 배회 범위와 단일 physical key drop point를 정의한다. 번호 기반 신발장/락커 topology는 deprecated compatibility로만 남는다. facility Actor의 staged 변환과 2026-09-10 승인된 pre-placed locker reconciliation, collision/Navigation activation은 [PlacementSystem.md](PlacementSystem.md)를 따른다.
+이 문서는 facility slot, transform 기반 counter queue assignment, checkout overflow 배회 범위와 단일 physical key drop point를 정의한다. 번호 기반 신발장/락커 topology는 deprecated compatibility로만 남는다. facility Actor의 staged 변환과 collision/Navigation activation은 [PlacementSystem.md](PlacementSystem.md), Bath의 물 기반 사용 가능성은 [BathWaterSystem.md](BathWaterSystem.md)를 따른다.
 
 ## Source Scope
 
@@ -79,6 +79,7 @@ Facility는 Montage, AnimNotify, Motion Warping과 prop socket 계약을 소유�
 - 시설 Blueprint의 native base다.
 - `FacilityType`과 `SelectionWeight`를 소유한다. `FacilityNumber`는 asset migration용 deprecated compatibility로만 보존한다.
 - 소유한 모든 `UBathhouseFacilitySlotComponent`를 등록·검증한다.
+- side-effect-free virtual `IsAvailableForReservation()`은 기본 enabled/domain 조건을 제공하고 욕탕 전용 파생 Actor가 물 임계치와 회수 동결 조건을 추가한다.
 - 시설의 domain state는 slot component가 소유하고 Blueprint는 표현 event만 받는다.
 - pre-placed locker instance는 cooked build에도 저장되는 자동 생성 `RegistrationId`를 가진다. UE Editor-only Actor GUID를 runtime 순서에 사용하지 않는다.
 - pre-placed locker는 개별 Authority 변경 delegate로 재시도하지 않고 subsystem reconciliation에 제출한다.
@@ -103,7 +104,7 @@ Blueprint event:
 - type/tag 기반 facility와 available slot 후보 조회
 - legacy numbered lookup/topology API는 migration wrapper로만 보존하고 신규 customer/key flow에서는 사용하지 않음
 - 예약 가능한 slot 중 random 선택
-- Bath 선택 시 다른 빈 탕이 있으면 직전 bath actor를 제외
+- Bath 선택 시 물 시스템의 `IsAvailableForReservation()`을 candidate 수집과 실제 reserve 직전에 모두 검사하고, 다른 적격 탕이 있으면 직전 bath actor를 제외
 - 모든 slot이 점유 중이면 availability delegate 기반 재시도 지원
 
 Customer와 key hook이 반복적인 world actor scan을 하지 않게 한다.
@@ -128,7 +129,7 @@ invalid/duplicate ID, 잘못된 slot topology와 실제 tier 초과는 actor별 
 ## Reservation Flow
 
 1. Customer StateTree Task가 subsystem에 facility type/tag 조건을 전달한다.
-2. Subsystem이 등록되고 enabled된 actor와 available slot 후보를 찾는다.
+2. Subsystem이 등록되고 `IsAvailableForReservation()`이 true인 actor와 available slot 후보를 찾는다. Bath의 전역 수위 임계치 미만과 recovery-hold 동결은 이 단계에서 제외된다.
 3. 후보가 있으면 weight random 선택 후 `TryReserve`한다.
 4. 일반 facility는 authored navigation target으로 이동하고 Bath는 NavMesh 위 approach point로 이동한다.
 5. Bath는 approach 도착 후 customer가 action point로 snap하고, 그 뒤 `BeginUse`로 occupancy를 확정한다.
@@ -214,6 +215,7 @@ Editor authoring 값:
 - pre-placed locker instance의 자동 생성 persistent registration ID. 사용자가 수동으로 순서를 authoring하지 않는다.
 - 시설별 slot component transform과 facing
 - Bath slot별 발바닥 기준의 NavMesh 위 `ApproachOffset`과 NavMesh 밖일 수 있는 정확한 action transform
+- Bath의 유량, control mesh collision/회전과 평면 수면 authoring은 [BathWaterSystem.md](BathWaterSystem.md)의 단일 정본을 따른다.
 - check-in/checkout service point
 - 두 lane의 `FComponentReference` queue point 목록. 배열 순서가 queue 순서이며 component의 Location/Yaw를 모두 사용한다.
 - checkout overflow wander volume 목록과 각 volume의 NavMesh sample 설정
@@ -242,6 +244,7 @@ Blueprint 조회·표현 API:
 - Towel -> Facility actor/slot contract
 - Interaction -> Facility의 generic facility/key-hook validation
 - Facility -> Placement의 placed-facility query, typed payload와 Actor 변환 계약
+- Bath 전용 Facility -> Bath Water 상태/표현 계약
 - Facility Subsystem -> Locker Capacity Subsystem의 startup bank 검증·silent 등록·batch publication 계약
 - Facility는 Customer, Interaction과 UI concrete class에 의존하지 않는다.
 
@@ -263,6 +266,7 @@ Blueprint 조회·표현 API:
 - 이동 실패, timeout, StateTree 중단과 actor destruction에서 slot/queue가 정리되는지 확인한다.
 - Bath approach point만 NavMesh 위에 있고 action point가 NavMesh 밖이어도 입·퇴탕과 다음 MoveTo가 성공하는지 확인한다.
 - BathStay 만료와 technical abort가 action point에서 slot을 먼저 풀지 않고 approach point 복귀를 시도하는지 확인한다.
+- Bath 임계 수위 하락도 current user가 approach point로 복귀하기 전에 slot을 다른 customer에게 노출하지 않는지 확인한다.
 - customer knockdown이 occupancy만 reservation으로 낮추고 다른 customer에게 slot을 노출하지 않으며 recovery 후 같은 slot을 다시 사용하는지 확인한다.
 - `TowelShelf` 추가가 기존 reflected enum ordinal을 바꾸지 않고 `TowelBasket` asset을 유지하는지 확인한다.
 - towel actor의 slot reservation과 towel inventory mutation이 서로 다른 owner에 남는지 확인한다.

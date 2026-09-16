@@ -35,6 +35,15 @@ bool FCustomerSessionStateCondition::TestCondition(FStateTreeExecutionContext& C
 		case ECustomerSessionCondition::TowelWaitExpired:
 			bResult = Data.Session->IsTowelWaitExpired();
 			break;
+		case ECustomerSessionCondition::BathSearchExpired:
+			bResult = Data.Session->IsBathSearchExpired();
+			break;
+		case ECustomerSessionCondition::CurrentBathUsable:
+			bResult = Data.Session->IsCurrentBathUsable();
+			break;
+		case ECustomerSessionCondition::CurrentBathExitPending:
+			bResult = Data.Session->IsCurrentBathExitPending();
+			break;
 		case ECustomerSessionCondition::TechnicalAbort:
 			bResult = Data.Session->IsTechnicalAbort();
 			break;

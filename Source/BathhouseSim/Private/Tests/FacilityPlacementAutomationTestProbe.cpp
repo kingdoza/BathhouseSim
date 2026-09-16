@@ -2,6 +2,7 @@
 
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Facility/LockerCapacitySubsystem.h"
 #include "Interaction/PlayerCarryComponent.h"
@@ -102,6 +103,34 @@ void AFacilityPlacementLockerAutomationActor::ConfigureStartupForTest(
 		Slot->SetupAttachment(GetRootComponent());
 		AddInstanceComponent(Slot);
 	}
+}
+
+void AFacilityPlacementZoneAutomationActor::ConfigureGridForTest(
+	UStaticMesh* Mesh,
+	UMaterialInterface* Material,
+	const float LineThicknessCm,
+	const float ZOffsetCm,
+	const int32 MajorIntervalCells)
+{
+	GridVisual->SetStaticMesh(Mesh);
+	GridVisual->SetMaterial(0, Material);
+	GridLineThicknessCm = LineThicknessCm;
+	GridZOffsetCm = ZOffsetCm;
+	MajorGridIntervalCells = MajorIntervalCells;
+	OnConstruction(GetActorTransform());
+}
+
+void AFacilityPlacementZoneAutomationActor::ProcessEvent(
+	UFunction* Function,
+	void* Parameters)
+{
+	if (Function
+		&& Function->GetFName() == GET_FUNCTION_NAME_CHECKED(
+			AFacilityPlacementZoneActor, OnGridVisibilityChanged))
+	{
+		++GridVisibilityChangeCount;
+	}
+	Super::ProcessEvent(Function, Parameters);
 }
 
 void UFacilityPlacementEventAutomationProbe::Bind(

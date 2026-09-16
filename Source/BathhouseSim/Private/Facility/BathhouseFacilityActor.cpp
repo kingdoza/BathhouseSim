@@ -178,6 +178,14 @@ FPlayerInteractionResult ABathhouseFacilityActor::ExecuteInteraction(const FPlay
 	return FPlayerInteractionResult::Failed(LOCTEXT("LegacyPlacedCarryDisabled", "배치 설비 Actor는 직접 들 수 없습니다."));
 }
 
+bool ABathhouseFacilityActor::IsAvailableForReservation() const
+{
+	return bEnabled && FacilityPlacement
+		&& FacilityPlacement->GetMode() == EPlaceableFacilityMode::Placed
+		&& !FacilityPlacement->IsStagedPlacement()
+		&& FacilityPlacement->IsPlacedDomainActive();
+}
+
 FPlayerInteractionQuery ABathhouseFacilityActor::MergeSupplementalInteractionQuery(
 	const FPlayerInteractionQuery& BaseQuery) const
 {

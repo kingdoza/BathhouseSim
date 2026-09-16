@@ -4,7 +4,7 @@
 
 | Asset | Parent Class | 역할 |
 |---|---|---|
-| `/Game/Bathhouse/Blueprints/Facility/BP_Bath` | `/Script/BathhouseSim.BathhouseFacilityActor` | Bath 시설과 3개 Facility Slot |
+| `/Game/Bathhouse/Blueprints/Facility/BP_Bath` | `/Script/BathhouseSim.BathhouseBathFacilityActor` | Bath 시설, 3개 Facility Slot과 물 표현 composition root |
 | `/Game/Bathhouse/Blueprints/Facility/BP_Shower` | `/Script/BathhouseSim.BathhouseFacilityActor` | Shower 시설과 2개 Facility Slot |
 | `/Game/Bathhouse/Blueprints/Facility/BP_ClothesLocker` | `/Script/BathhouseSim.BathhouseFacilityActor` | 1칸 Clothes Locker |
 | `/Game/Bathhouse/Blueprints/Facility/BP_ClothesLocker_4` | `/Script/BathhouseSim.BathhouseFacilityActor` | 4칸 Clothes Locker |
@@ -14,7 +14,7 @@
 | `/Game/Bathhouse/Blueprints/Towel/BP_CleanTowelStack` | `/Script/BathhouseSim.CleanTowelStackActor` | placement opt-out 수건 공급대 |
 | `/Game/Bathhouse/Blueprints/Towel/BP_UsedTowelBin` | `/Script/BathhouseSim.UsedTowelBinActor` | placement opt-out 사용 수건함 |
 
-설비 Blueprint 9개는 삭제된 inherited `PlacementNavModifier`를 보유하지 않는다. 배치 대상 7개의 body Static Mesh만 collision과 Navigation을 담당하고, `PlacementFootprint`, `PackagePhysicalRoot`, slot, water/contents/presentation helper는 Navigation 비활성이다. 상세 extent와 body 설정은 [PlacementSystem.md](PlacementSystem.md)에 있다.
+설비 Blueprint 9개는 삭제된 inherited `PlacementNavModifier`를 보유하지 않는다. 배치 대상 7개의 body Static Mesh만 collision과 Navigation을 담당하고, `PlacementFootprint`, `PackagePhysicalRoot`, slot, water/contents/presentation helper는 Navigation 비활성이다. 상세 extent와 body 설정은 [PlacementSystem.md](PlacementSystem.md)에 있고, `BP_Bath`의 물·조작부 표현은 [BathWaterSystem.md](BathWaterSystem.md)가 정본이다.
 
 ## Clothes Locker authoring
 

@@ -152,6 +152,7 @@ void UPlayerFacilityPlacementComponent::HandleHeldObjectChanged(AActor* NewHeldO
 		}
 		SpawnedPreview->SetActorEnableCollision(false);
 		SpawnedPreview->OnDestroyed.AddUniqueDynamic(this, &UPlayerFacilityPlacementComponent::HandlePreviewDestroyed);
+		ShowCompatibleZoneGrids(*Definition);
 		RefreshPreview();
 		UpdateTickState();
 		return;
@@ -177,19 +178,11 @@ void UPlayerFacilityPlacementComponent::RefreshPreview()
 	}
 	AFacilityPlacementZoneActor* Zone = nullptr;
 	CurrentPlacementQuery = ValidateCurrentPlacement(CurrentCandidate, Zone);
-	if (PreviewZone.IsValid() && PreviewZone.Get() != Zone)
-	{
-		PreviewZone->OnGridVisibilityChanged(false);
-	}
 	PreviewZone = Zone;
 	if (AFacilityPlacementPreviewActor* LivePreview = PreviewActor.Get())
 	{
 		LivePreview->SetActorTransform(CurrentCandidate);
 		LivePreview->SetPlacementValidity(CurrentPlacementQuery.bSucceeded, CurrentPlacementQuery.FailureReason);
-	}
-	if (Zone)
-	{
-		Zone->OnGridVisibilityChanged(true);
 	}
 }
 
@@ -204,16 +197,13 @@ void UPlayerFacilityPlacementComponent::CancelPreview()
 
 void UPlayerFacilityPlacementComponent::ClearPreviewVisual()
 {
+	HideVisibleZoneGrids();
 	if (AFacilityPlacementPreviewActor* LivePreview = PreviewActor.Get())
 	{
 		LivePreview->OnDestroyed.RemoveDynamic(this, &UPlayerFacilityPlacementComponent::HandlePreviewDestroyed);
 		LivePreview->Destroy();
 	}
 	PreviewActor.Reset();
-	if (PreviewZone.IsValid())
-	{
-		PreviewZone->OnGridVisibilityChanged(false);
-	}
 	PreviewZone.Reset();
 }
 
@@ -313,6 +303,14 @@ bool UPlayerFacilityPlacementComponent::BeginRecoveryHold()
 		ReportResult(FPlayerInteractionResult::Failed(CurrentRecoveryQuery.FailureReason, EPlayerInteractionIntent::FacilityRecovery));
 		return false;
 	}
+	FText HoldFailureReason;
+	if (!Placeable->TryBeginFacilityRecoveryHold(HoldFailureReason))
+	{
+		ReportResult(FPlayerInteractionResult::Failed(
+			HoldFailureReason.IsEmpty() ? LOCTEXT("RecoveryHoldBeginFailed", "설비 회수 준비를 시작할 수 없습니다.") : HoldFailureReason,
+			EPlayerInteractionIntent::FacilityRecovery));
+		return false;
+	}
 	RecoveryTarget = Candidate;
 	Candidate->OnDestroyed.AddUniqueDynamic(this, &UPlayerFacilityPlacementComponent::HandleRecoveryTargetDestroyed);
 	RecoveryElapsed = 0.0f;
@@ -385,6 +383,10 @@ void UPlayerFacilityPlacementComponent::CancelRecovery()
 	if (AActor* Target = RecoveryTarget.Get())
 	{
 		Target->OnDestroyed.RemoveDynamic(this, &UPlayerFacilityPlacementComponent::HandleRecoveryTargetDestroyed);
+		if (IPlaceableFacility* Placeable = Cast<IPlaceableFacility>(Target))
+		{
+			Placeable->CancelFacilityRecoveryHold();
+		}
 	}
 	RecoveryTarget.Reset();
 	RecoveryElapsed = 0.0f;
