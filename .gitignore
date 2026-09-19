@@ -35,7 +35,6 @@
 *.xcodeproj
 *.xcworkspace
 *.sln
-*.slnx
 *.suo
 *.opensdf
 *.sdf
@@ -76,3 +75,18 @@ DerivedDataCache/*
 
 # JetBrains Rider / IntelliJ user-specific files
 .idea/
+
+# ----------------------------------------------------------------------
+# Wwise SDK files required for Unreal Wwise plugin linking/runtime
+# The project still ignores generic *.lib / *.dll above, but Wwise's
+# ThirdParty SDK libraries must be committed for other team members to build.
+# ----------------------------------------------------------------------
+!Plugins/WwiseSoundEngine/ThirdParty/**/*.lib
+!Plugins/WwiseSoundEngine/ThirdParty/**/*.dll
+!Plugins/WwiseSoundEngine/ThirdParty/**/*.pdb
+!Plugins/WwiseSoundEngine/ThirdParty/**/*.exp
+
+# Do not commit Audiokinetic SDK sample/demo projects and generated sample banks.
+# These can cause unnecessary large Git LFS objects and are not required to build BathhouseSim.
+Plugins/WwiseSoundEngine/ThirdParty/samples/
+Plugins/WwiseSoundEngine/ThirdParty/**/samples/
