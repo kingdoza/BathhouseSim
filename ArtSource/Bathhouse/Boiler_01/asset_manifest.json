@@ -1,0 +1,36 @@
+{
+  "SM_Boiler_01_Body": {
+    "vertices": 3072,
+    "triangles": 6040,
+    "materials": [
+      "M_Boiler_Body",
+      "M_Boiler_CastIron"
+    ],
+    "uv_channels": [
+      "UV0",
+      "UV1_Lightmap"
+    ]
+  },
+  "SM_Boiler_01_Hardware": {
+    "vertices": 7656,
+    "triangles": 15048,
+    "materials": [
+      "M_Boiler_CastIron",
+      "M_Boiler_Gauge",
+      "M_Boiler_ValveRed",
+      "M_Boiler_Brass",
+      "M_Boiler_ValveBlue",
+      "M_Boiler_Body"
+    ],
+    "uv_channels": [
+      "UV0",
+      "UV1_Lightmap"
+    ]
+  },
+  "collision_hulls": 8,
+  "nominal_dimensions_m": [
+    0.8,
+    0.5,
+    1.51
+  ]
+}

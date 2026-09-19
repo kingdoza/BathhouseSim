@@ -1,0 +1,54 @@
+{
+  "M_Boiler_Body": {
+    "base_color_texture": "textures/T_Boiler_RedPaint_BaseColor.png",
+    "roughness": 0.55,
+    "metallic": 0.15,
+    "notes": "Vintage chipped red enamel with exposed dark iron underlayer"
+  },
+  "M_Boiler_CastIron": {
+    "base_color": [
+      0.09,
+      0.085,
+      0.085
+    ],
+    "roughness": 0.72,
+    "metallic": 0.82,
+    "notes": "Weathered cast iron for furnace door, chimney, base plate, and legs"
+  },
+  "M_Boiler_Brass": {
+    "base_color": [
+      0.65,
+      0.46,
+      0.16
+    ],
+    "roughness": 0.32,
+    "metallic": 0.9,
+    "notes": "Aged industrial brass for pipe fittings and hex collars"
+  },
+  "M_Boiler_ValveRed": {
+    "base_color": [
+      0.65,
+      0.07,
+      0.06
+    ],
+    "roughness": 0.38,
+    "metallic": 0.25,
+    "notes": "Top valve wheel handle enamel"
+  },
+  "M_Boiler_ValveBlue": {
+    "base_color": [
+      0.06,
+      0.28,
+      0.68
+    ],
+    "roughness": 0.38,
+    "metallic": 0.25,
+    "notes": "Bottom valve wheel handle enamel"
+  },
+  "M_Boiler_Gauge": {
+    "base_color_texture": "textures/T_Boiler_Gauge_BaseColor.png",
+    "roughness": 0.3,
+    "metallic": 0.0,
+    "notes": "Analog 0-4 bar pressure gauge dial"
+  }
+}

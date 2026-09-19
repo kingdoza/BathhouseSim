@@ -1,0 +1,211 @@
+{
+  "source_reload": true,
+  "checks": [
+    {
+      "check": "SM_Boiler_01_Body exists",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Body finite vertices",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Body 2 UV channels",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Body applied scale is 1.0",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Body origin at floor center",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Body valid material indices",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Hardware exists",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Hardware finite vertices",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Hardware 2 UV channels",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Hardware applied scale is 1.0",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Hardware origin at floor center",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Hardware valid material indices",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "Boiler_01_Hero.png exists and non-empty",
+      "passed": true,
+      "detail": 2184586
+    },
+    {
+      "check": "Boiler_01_Turnaround.png exists and non-empty",
+      "passed": true,
+      "detail": 4535147
+    },
+    {
+      "check": "Boiler_01.glb exists and non-empty",
+      "passed": true,
+      "detail": 1797856
+    },
+    {
+      "check": "SM_Boiler_01.fbx exists and non-empty",
+      "passed": true,
+      "detail": 644620
+    },
+    {
+      "check": "SM_Boiler_01.fbx imported mesh count",
+      "passed": true,
+      "detail": 10
+    },
+    {
+      "check": "SM_Boiler_01_Hardware.001 recognized asset mesh",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Hardware FBX bounds accurate (<0.2mm)",
+      "passed": true,
+      "detail": 5.960464477539063e-08
+    },
+    {
+      "check": "SM_Boiler_01_Hardware FBX UV channels intact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "UCX_SM_Boiler_01_04.001 closed manifold collision",
+      "passed": true,
+      "detail": "vol=0.00169"
+    },
+    {
+      "check": "SM_Boiler_01_Body.001 recognized asset mesh",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "SM_Boiler_01_Body FBX bounds accurate (<0.2mm)",
+      "passed": true,
+      "detail": 2.9802322387695312e-08
+    },
+    {
+      "check": "SM_Boiler_01_Body FBX UV channels intact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "UCX_SM_Boiler_01_02.001 closed manifold collision",
+      "passed": true,
+      "detail": "vol=0.01152"
+    },
+    {
+      "check": "UCX_SM_Boiler_01_05.001 closed manifold collision",
+      "passed": true,
+      "detail": "vol=0.00169"
+    },
+    {
+      "check": "UCX_SM_Boiler_01_03.001 closed manifold collision",
+      "passed": true,
+      "detail": "vol=0.00169"
+    },
+    {
+      "check": "UCX_SM_Boiler_01_06.001 closed manifold collision",
+      "passed": true,
+      "detail": "vol=0.00169"
+    },
+    {
+      "check": "UCX_SM_Boiler_01_01.001 closed manifold collision",
+      "passed": true,
+      "detail": "vol=0.55339"
+    },
+    {
+      "check": "UCX_SM_Boiler_01_08.001 closed manifold collision",
+      "passed": true,
+      "detail": "vol=0.00950"
+    },
+    {
+      "check": "UCX_SM_Boiler_01_07.001 closed manifold collision",
+      "passed": true,
+      "detail": "vol=0.02160"
+    }
+  ],
+  "components": {
+    "SM_Boiler_01_Body": {
+      "vertices": 3072,
+      "triangles": 2732,
+      "materials": [
+        "M_Boiler_Body",
+        "M_Boiler_CastIron"
+      ],
+      "bounds_m": [
+        [
+          -0.4000000059604645,
+          -0.25,
+          0.0
+        ],
+        [
+          0.4000000059604645,
+          0.25,
+          1.5099999904632568
+        ]
+      ]
+    },
+    "SM_Boiler_01_Hardware": {
+      "vertices": 7656,
+      "triangles": 6976,
+      "materials": [
+        "M_Boiler_CastIron",
+        "M_Boiler_Gauge",
+        "M_Boiler_ValveRed",
+        "M_Boiler_Brass",
+        "M_Boiler_ValveBlue",
+        "M_Boiler_Body"
+      ],
+      "bounds_m": [
+        [
+          -0.2800000011920929,
+          -0.3020000159740448,
+          0.21699999272823334
+        ],
+        [
+          0.5509999990463257,
+          0.2709999680519104,
+          1.1500000953674316
+        ]
+      ]
+    }
+  },
+  "summary": {
+    "passed": 31,
+    "total": 31,
+    "all_passed": true
+  }
+}
