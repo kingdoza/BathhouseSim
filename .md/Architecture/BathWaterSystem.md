@@ -4,7 +4,7 @@
 
 이 문서는 승인된 `BH-WATER-001`~`BH-WATER-029`의 첫 욕탕 타입 수직 구현 아키텍처를 정의한다. 연속 수위, 실제 mesh 조작부, 욕탕 전용 표현 Actor, Facility 가용성, 회수 동결과 Customer BathLoop timer/delegate/log는 Source와 focused native automation까지 구현됐다. `BP_Bath`, Project Settings, Data Asset와 `ST_CustomerRoutine` 연결은 코드 리뷰 뒤 Editor 통합 대기 상태다.
 
-Facility slot과 등록은 [FacilitySystem.md](FacilitySystem.md), Q Hold 회수 transaction은 [PlacementSystem.md](PlacementSystem.md), 손님 timer·StateTree·knockdown은 [CustomerSystem.md](CustomerSystem.md)와 [CustomerRecoverySystem.md](CustomerRecoverySystem.md)를 따른다.
+Facility slot과 등록은 [FacilitySystem.md](FacilitySystem.md), Q Hold 회수 transaction은 [PlacementSystem.md](PlacementSystem.md), 손님 timer·StateTree·knockdown은 [CustomerSystem.md](CustomerSystem.md)와 [CustomerRecoverySystem.md](CustomerRecoverySystem.md)를 따른다. 순환·가열·냉각 용량과 수온·오염도는 [BathWaterOperationsSystem.md](BathWaterOperationsSystem.md), 컴퓨터 화면은 [BathWaterManagementUISystem.md](BathWaterManagementUISystem.md)가 소유한다.
 
 ## Target Source Scope
 
@@ -53,7 +53,7 @@ Source/BathhouseSim/Private/Tests/
 - Q Hold 회수 중 물·조작부 동결과 cancel/실패 시 정확 복원
 - 물 관련 C++ 상태를 위한 Blueprint 표현 event와 authoring 검증
 
-Bath Water는 facility slot reservation, StateTree hierarchy, Customer 전체 입욕 timer, satisfaction, placement Actor 교체와 UI hierarchy를 소유하지 않는다.
+Bath Water는 facility slot reservation, StateTree hierarchy, Customer 전체 입욕 timer, satisfaction, placement Actor 교체, 수온·오염도·utility 용량 원장과 UI hierarchy를 소유하지 않는다.
 
 ## State And Execution Owners
 
@@ -158,11 +158,13 @@ NewAmount
 ```
 
 - endpoint 도달 시 값을 정확히 `0` 또는 `1`로 snap한다.
-- 두 장치가 모두 열리고 순유량이 0이면 현재 수위를 유지한다.
+- 두 장치가 모두 열리고 순유량이 0이면 현재 수위를 유지한다. 다만 순환·수온 시스템이 실제 물 교환을 계산할 수 있도록 실제 accepted inflow/outflow sample은 발행한다.
 - 0%에서 배수만 열려 있으면 레버 논리 상태를 유지하되 불필요한 Tick은 중지한다. 급수 상태 변경이 Tick을 다시 깨운다.
 - 100% 도달 frame에 급수 논리 상태를 즉시 닫고 Niagara를 끈다.
 - 급수밸브가 열리는 중이었다면 현재 보이는 회전에서 닫힌 자세로 방향을 바꾼다.
 - amount 변경 delegate는 실제 값 변경에만, usability delegate는 전역 threshold를 횡단할 때만 한 번 발생한다.
+- 신규 flow-step delegate는 previous/current amount와 실제 accepted incoming/outgoing amount를 전달한다. 기존 amount delegate 의미를 확장하지 않는다.
+- 순유량이 0이어도 유입과 유출이 동시에 존재하면 혼합 계산을 위해 Tick을 중지하지 않는다.
 
 ## `UBathWaterControlComponent`
 
@@ -311,6 +313,7 @@ Snapshot 범위:
 - 각 control의 현재 relative rotation, motion 방향과 남은 시간
 - Niagara 활성 여부
 - 이전 usability/facility availability 상태
+- 별도 condition component의 실제 수온, 오염도와 Tick/freeze 상태
 
 Hold begin commit 뒤에는 water Tick과 control rotation Tick을 멈추고 Niagara를 숨긴다. Bath reservation query도 false가 되어 threshold가 0으로 설정돼 있어도 새 Customer가 들어오지 않는다.
 
@@ -324,9 +327,9 @@ Hold begin commit 뒤에는 water Tick과 control rotation Tick을 멈추고 Nia
 
 - 선배치 Bath BeginPlay와 새 staged placement import는 모두 `0`, 두 control 닫힘, 수면/Niagara 숨김으로 초기화한다.
 - 기존 CDO/instance에 저장된 `WaterState`와 `NormalizedAmount` override는 시작 상태 정본이 아니며 migration 후 제거한다.
-- placement staged/domain inactive 상태에서는 water/control Tick과 interaction을 사용하지 않는다.
+- placement staged/domain inactive 상태에서는 water/control/condition Tick과 interaction을 사용하지 않는다.
 - placement commit으로 domain이 활성화된 뒤 빈 상태 publication을 허용한다.
-- 회수 payload는 water/control snapshot을 저장하지 않는다.
+- 회수 payload는 water/control/condition snapshot을 저장하지 않는다. 재설치는 empty/ambient/clean 상태로 시작한다.
 - EndPlay는 water/control Tick, delegates, Niagara와 recovery snapshot을 idempotent하게 정리한다.
 - 이번 범위에서 SaveGame persistence를 추가하지 않는다.
 
@@ -363,6 +366,7 @@ Hold begin commit 뒤에는 water Tick과 control rotation Tick을 멈추고 Nia
 - Bath Water -> Placement recovery-hold lifecycle 계약
 - Bath Water -> `Niagara` runtime module
 - Customer -> Bath Water public query/delegate
+- Bath Water Operations -> Bath Water flow-step와 recovery-freeze lifecycle
 - StateTree/Blueprint는 Bath Water 상태를 직접 mutate하지 않는다.
 
 ## Verification

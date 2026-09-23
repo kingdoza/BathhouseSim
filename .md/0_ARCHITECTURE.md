@@ -2,8 +2,8 @@
 
 ## 문서 기준
 
-- 기준일: 2026-09-14(KST) 급수·배수와 욕탕 물 수직 구현 Source 기준
-- 상태: PlacementZone grid와 Bath Water는 Source 구현 후 각각 코드 리뷰·Editor 통합 대기
+- 기준일: 2026-09-22(KST) 욕탕 물 순환·가열·냉각과 컴퓨터 제어 설계 기준
+- 상태: 기존 PlacementZone grid와 Bath Water/Operations/Management UI Source 및 focused automation 구현 완료, Editor asset authoring 대기
 - 정본 문서: `.md/0_ARCHITECTURE.md`와 `.md/Architecture/*.md`
 - legacy 문서: 현재 별도 legacy architecture 문서는 없다.
 
@@ -37,6 +37,7 @@
 - [PhysicalCarrySystem.md](Architecture/PhysicalCarrySystem.md): exact fixed slot, held-position free drop와 fixed-slot 미지원 설비 아이템
 - [FacilitySystem.md](Architecture/FacilitySystem.md): 다중 facility slot, transform 기반 counter queue assignment, checkout overflow와 key drop point
 - [BathWaterSystem.md](Architecture/BathWaterSystem.md): 욕탕 급수·배수, 평면 수면 표현, 공통 입욕 임계치와 Customer BathLoop 연계
+- [BathWaterOperationsSystem.md](Architecture/BathWaterOperationsSystem.md) / [BathWaterManagementUISystem.md](Architecture/BathWaterManagementUISystem.md): 순환·가열·냉각 용량과 욕탕 condition domain / world-space 관리 화면
 - [PlacementSystem.md](Architecture/PlacementSystem.md): 배치 설비와 전용 회수 아이템 변환, preview/Q 회수와 locker capacity lease
 - [EconomySystem.md](Architecture/EconomySystem.md): PlayerState wallet과 일회성 cash 획득
 - [CustomerSystem.md](Architecture/CustomerSystem.md): UE 5.8 StateTree customer routine, session과 cleanup
@@ -87,7 +88,7 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
   - Camera: 이동 상태와 착지 상태 기반 camera shake, camera manager 기반 pitch limit 책임
   - Interaction: player focus, equipment use와 single physical carry transaction 책임
   - Facility: facility/action slot, generic lookup와 counter queue 책임
-  - Bath Water: 욕탕 물 양, 조작부, 수면/Niagara 표현과 입욕 가능성 책임
+  - Bath Water / Operations: 물 양·조작부·수면/Niagara·입욕 가능성과 utility 용량·욕탕 condition·관리 snapshot 책임
   - Placement: 설비 mode/preview/placement/recovery, 확장 단계와 locker capacity 책임
   - Economy: player money와 cash claim 책임
   - Customer: StateTree routine과 customer session 책임
@@ -116,7 +117,7 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
 - Economy는 PlayerState wallet을 소유하고 cash claim을 한 번만 반영한다.
 - Customer StateTree는 routine을 조율하고 session/queue/facility/key/wallet API에 실행을 위임한다. 신발 단계와 key-locker 대응은 제거하고 탈의·착의마다 임의의 unnumbered locker action slot을 잠시 사용한다.
 - Customer bath stay는 pre-shower 완료부터 고정 60초다. 각 탐색 구간은 최대 10초이며 전역 설정 임계 수위 이상 Bath만 예약·이동·입욕하고 실제 입욕 시간만 별도 누적한다.
-- Bath Water는 욕탕별 순유량, control mesh 자체 E interaction, 평면 수면의 `Lerp(Empty, Full, Amount)` 위치와 회수 홀드 동결을 소유한다. 수위 임계 하락은 현재 이용 Customer 전원에게 퇴장·재탐색 event를 보낸다.
+- Bath Water는 욕탕별 순유량, control mesh E interaction, 수면 위치와 회수 동결을 소유하고 임계 하락을 이용 Customer에게 알린다. Operations는 utility 공용 용량과 욕탕 예약 요구량을 원자적으로 관리하며 condition은 수온·오염도·실제 입욕자 identity, UI는 snapshot/request만 사용한다.
 - Bath의 `ApproachPoint`와 `ActionPoint`는 모두 캐릭터 발바닥 transform으로 authoring하며, Customer Session이 scaled capsule half height를 한 번 더해 실제 actor/capsule-center transform으로 변환한다. 고객은 NavMesh 위 `ApproachPoint`까지 이동한 뒤 blocking collision 사전 검사 없이 `ActionPoint`로 unswept snap하고, 퇴탕 시 같은 방식으로 `ApproachPoint`에 복귀한 뒤 navigation을 재개한다.
 - Customer 행동 montage는 native StateTree Task가 유효 후보 중 하나를 EnterState에서 선택하며 one-shot 종료 또는 선택된 한 montage의 duration loop를 완료 기준으로 사용한다.
 - UI는 Interaction query를 표시하고 domain 상태를 직접 판단하거나 변경하지 않는다.
@@ -144,12 +145,12 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
 - Combat -> Interaction
 - Economy -> Interaction
 - Customer -> Facility/Interaction/Economy
-- Bath Water -> Facility/Interaction/Placement/Niagara
-- Customer -> Bath Water public query/delegate
+- Bath Water/Operations -> Facility/Interaction/Placement/Niagara/UI
+- Customer -> Bath Water public query/delegate와 Operations actual-bather registration API
 - Customer -> UE GameplayStateTree/AI/Navigation
 - Facility overflow volume -> UE NavigationSystem
 - UI -> Interaction
-- Computer -> Interaction
+- Computer/UI -> Interaction과 Bath Water Operations snapshot/request API
 - Computer -> UMG/Engine Camera/PlayerController
 - Cleaning -> Interaction
 - Towel -> Interaction
@@ -179,7 +180,7 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
 - E는 world primary/fixed slot, F는 world secondary, G는 free drop, Q Hold는 facility recovery, LCtrl/휠/LMB는 placement snap/rotation/confirm이다. Character는 intent만 routing한다.
 - 모든 towel endpoint 이동은 source 감소와 destination 증가를 단일 native transaction으로 commit한다.
 - Customer routine의 gameplay 상태 변경은 native C++ API를 통해 수행하고 StateTree/Blueprint asset에 domain mutation을 두지 않는다.
-- Bath 물 양·조작부 상태와 threshold 판정은 native C++만 변경한다. 임계 수위는 Project Settings 한 곳, 유량과 control/수면 transform은 욕탕 Blueprint 및 허용된 Level override만 정본으로 사용한다.
+- Bath 물 양·조작부·threshold는 native C++만 변경하고 임계 수위는 Project Settings, 유량/control/수면 transform은 Bath authoring이 정본이다. 순환·목표 수온과 utility 회수는 Operations candidate transaction만 commit하며 UI/Actor가 전역 합계나 다른 Bath를 직접 변경하지 않는다.
 - Counter는 FIFO와 assignment만 소유하고 Customer Queue Navigation이 AI request·도착 Yaw·overflow wander·knockdown recovery gate를 소유한다. checkout overflow를 별도 queue로 복제하지 않는다.
 - 컴퓨터 사용은 game을 pause하거나 fullscreen viewport UI를 열지 않는다. Character는 입력 의도만 분기하고 Computer component가 view/input session lifecycle을 소유하며 screen Widget은 domain gameplay 상태를 소유하지 않는다.
 
@@ -196,4 +197,4 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
 - exact equipment slot, key free drop과 actual-held-pose weak release는 Source와 native automation까지 구현되었다. equipment slot Blueprint/instance, exact item/anchor, key physics bounds와 기존 Blueprint release velocity 값은 코드 리뷰 후 Editor 단계로 인계한다.
 - counter queue transform/overflow, shared queue navigation, recovery pose gate와 physical checkout key drop은 Source와 native automation까지 구현되었다. StateTree/Counter/overflow volume/Blueprint authoring과 PIE 통합은 후속 Editor 단계이며 기존 queue target Task와 returned-key reflected symbol은 asset migration 동안 deprecated compatibility로 보존한다.
 - placed facility↔전용 item 교체, global Held/material, derived footprint, explicit floor, generic preview, collision snapshot, locker reconciliation과 native `GridVisual`/DMI·호환 Zone grid session은 구현됐다. 기존 migration과 전용 grid material·Plane authoring은 Unreal 단계에서 함께 검증한다.
-- Bath Water 수직 구현은 Source와 focused automation까지 구현됐다. `BP_Bath` native parent/분리 control mesh/평면 수면/Niagara, 전역 threshold, routine Data Asset와 `ST_CustomerRoutine` BathLoop 연결은 코드 리뷰 후 Editor 단계에서 통합한다.
+- Bath Water 수직과 Operations 용량 설비, condition, flow mixing, actual-bather 연계, management Widget은 Source/focused automation까지 구현돼 Editor 통합 대기다. deficit no-op transaction, 실제 네-corner 지도 투영, child presentation cache와 utility/bath actor transaction 회귀는 `.md/PROMPT_IMPLEMENTATION_R.md` 기준으로 보강됐다.

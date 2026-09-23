@@ -17,6 +17,14 @@ Current classes:
 - `UInteractionPromptWidget`: primary/secondary query/result lifecycle, hold progress, transient failure timer와 필수 `BindWidget` 표시 갱신
 - `UComputerSampleScreenWidget`: world monitor의 sample button lifecycle과 클릭 확인 표시
 
+구현 완료·Editor WBP authoring 완료 classes (직접 PIE 수용 검증 대기):
+
+- `UBathWaterManagementScreenWidget`: 욕탕 관리 화면 context, 선택과 child 조립
+- `UBathWaterCapacitySummaryWidget`: 종류별 used/total/deficit 표시
+- `UBathWaterMapWidget`: Zone 투영과 동적 욕탕 tile lifecycle
+- `UBathWaterBathTileWidget`: 욕탕 요약과 선택 의도
+- `UBathWaterDetailWidget`: 선택 욕탕 상태와 slider 의도
+
 `Content/`의 Widget Blueprint와 UI asset은 serialized project data다. 명시적인 Editor 작업 없이 수정하거나 resave하지 않는다.
 
 ## Responsibilities
@@ -30,6 +38,7 @@ Current classes:
 - primary E, secondary F, equipment/placement LMB와 recovery Q의 분리 표시
 - held equipment LMB action, failure와 hold progress의 별도 표시
 - world-space monitor sample click과 actor lifetime 화면 상태 유지 계약
+- world-space 욕탕 관리 화면의 snapshot 표시, Zone 지도와 setting request routing
 
 UI는 gameplay domain 상태를 소유하거나 domain mutation 규칙을 다시 구현하지 않는다. UI는 사용자 의도를 전달하고 결과를 표현하며, 실제 상태 변경은 해당 domain의 상태 owner가 수행한다.
 
@@ -142,6 +151,23 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - focus-out은 widget을 remove/recreate하지 않는다. 같은 computer Actor lifetime 동안 마지막 화면 상태를 유지하고 재진입 시 그대로 표시한다.
 - sample 클릭 여부는 표현 확인용 local widget state다. 실제 gameplay computer 데이터가 생기면 별도 Computer domain owner가 소유하고 Widget에는 표시값만 전달한다.
 
+## Bath Water Management Screen
+
+- 화면 구조와 refresh 계약은 [BathWaterManagementUISystem.md](BathWaterManagementUISystem.md), 상세 도메인 수치와 mutation은 [BathWaterOperationsSystem.md](BathWaterOperationsSystem.md)가 정본이다.
+- root widget은 computer Actor가 주입한 `UBathWaterOperationsSubsystem`과 `ManagedBathPlacementZone`만 사용한다.
+- root는 capacity summary, map와 detail 세 필수 child를 `BindWidget`으로 조립한다. 각 child가 다시 필요한 최소 leaf만 binding한다.
+- map tile은 C++이 class와 bath snapshot을 사용해 동적으로 생성·제거한다. Blueprint Event Graph가 actor를 검색하거나 tile 수명을 소유하지 않는다.
+- world `+X`를 화면 위, world `+Y`를 화면 오른쪽으로 투영하며 bath footprint 크기와 yaw를 함께 표시한다.
+- tile은 이름·실제 수온·오염도·상태색, detail은 수위·실제/목표 수온·오염도·순환도·요구량·임계치와 용량 부족 상태를 표시한다.
+- slider callback은 subsystem request API에 intent를 전달하고 committed/limited result만 presentation에 반영한다.
+- UI는 `10%`를 상수로 저장하지 않고 condition snapshot의 파생 임계치를 표시한다.
+- 구조 revision이 바뀔 때만 map을 rebuild하고, 연속 값은 presentation cache가 달라질 때만 갱신한다.
+- 지도는 Zone world 종횡비를 보존한 중앙 letterbox content rect와 네 world corner의 단일 투영 결과로 위치·크기·yaw를 계산한다.
+- 종류별 capacity는 text/progress/status를 함께 표시하고, 욕탕별 circulation/heating/cooling deficit은 독립 flag로 동시에 표현한다.
+- 선택 대상이 사라지거나 Zone이 invalid면 detail을 비우고 mutation을 차단한다.
+- focus-out은 widget을 파괴하지 않아 같은 computer Actor lifetime 동안 선택과 표시 상태를 유지한다.
+- 기존 `UComputerSampleScreenWidget`과 WBP는 rename/delete하지 않는다. 관리 WBP assignment는 Editor 단계에서 수행한다.
+
 ## Blueprint/API Contracts
 
 - Blueprint가 사용해야 하는 API와 event만 `BlueprintCallable`, `BlueprintPure` 또는 `BlueprintImplementableEvent`로 노출한다.
@@ -151,6 +177,7 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - 신규 equipment action/failure/progress widget도 runtime 정확성에 필요하므로 필수 `BindWidget`으로 요구하고 구현 후 WBP migration에서 함께 구성한다.
 - placement 두 widget과 recovery 세 widget도 필수 `BindWidget`으로 요구한다.
 - computer sample의 button/text도 native 동작에 필요하므로 필수 `BindWidget`이며 정확한 이름과 타입으로 WBP에 구성한다.
+- 욕탕 관리 root/child의 정확한 필수 `BindWidget` 이름과 타입은 구현 Source 및 `.md/PROMPT_UNREAL.md` 표를 정본으로 사용한다.
 - Blueprint event는 domain object 전체보다 표현에 필요한 data를 전달한다.
 - native parent, reflected type, function, property 또는 component 이름은 Content asset 계약으로 취급한다.
 - 공개 Blueprint 계약을 rename하거나 제거할 때는 asset migration, Core Redirect 필요 여부, Blueprint compile/save와 post-migration scan을 함께 계획한다.
@@ -161,6 +188,7 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - UI System은 필요한 gameplay domain의 public API에 의존할 수 있다.
 - interaction prompt는 Interaction의 combined query/result에만 의존하고 Placement concrete class를 판별하지 않는다.
 - computer sample widget은 UMG에만 의존하고 gameplay domain mutation을 수행하지 않는다.
+- bath water management widget은 Bath Water Operations의 snapshot/result 계약에만 의존하고 condition property를 직접 변경하지 않는다.
 - UI는 Cleaning/Towel concrete class를 판별하지 않고 확장된 Interaction query/result만 소비한다.
 - gameplay domain은 구체 Widget class에 의존하지 않는다. 필요하면 event, interface 또는 presentation data 경계를 사용한다.
 - `UMG`, `Slate`, `SlateCore` 같은 모듈 의존성은 실제 Source include와 사용처가 생길 때만 `BathhouseSim.Build.cs`에 추가한다.
@@ -189,3 +217,5 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - placement validity와 Q target/hold/cancel/회수 실패가 domain 상태를 복제하지 않고 즉시 갱신되는지 확인한다.
 - computer sample WBP의 `TestButton`, `ClickResultText` 이름/타입과 Event Graph 부재를 확인한다.
 - focus-out/re-entry에서 widget instance와 `클릭 확인` 상태가 유지되고 actor/level 종료에서만 수명이 끝나는지 확인한다.
+- 관리 화면 tile rebuild가 topology revision에만 반응하고 연속 상태 갱신이 delegate 중복/전체 rebuild를 만들지 않는지 확인한다.
+- slider 제한·실패가 committed domain 결과와 일치하고 다른 욕탕 설정을 바꾸지 않는지 확인한다.

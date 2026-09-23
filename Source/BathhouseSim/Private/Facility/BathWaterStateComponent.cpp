@@ -26,11 +26,16 @@ void UBathWaterStateComponent::TickComponent(
 		return;
 	}
 
-	const float NetPercentPerSecond = GetNetPercentPerSecond();
-	float NewAmount = FMath::Clamp(
-		NormalizedAmount + NetPercentPerSecond * 0.01f * DeltaTime,
-		0.0f,
-		1.0f);
+	const float PreviousAmount = NormalizedAmount;
+	const float RequestedOutgoing = bDrainLeverOpen
+		? GetDrainRatePercentPerSecond() * 0.01f * DeltaTime
+		: 0.0f;
+	const float OutgoingAmount = FMath::Min(PreviousAmount, RequestedOutgoing);
+	const float RequestedIncoming = bFillValveOpen
+		? GetFillRatePercentPerSecond() * 0.01f * DeltaTime
+		: 0.0f;
+	const float IncomingAmount = FMath::Min(1.0f - (PreviousAmount - OutgoingAmount), RequestedIncoming);
+	float NewAmount = FMath::Clamp(PreviousAmount - OutgoingAmount + IncomingAmount, 0.0f, 1.0f);
 	if (NewAmount <= KINDA_SMALL_NUMBER)
 	{
 		NewAmount = 0.0f;
@@ -40,6 +45,15 @@ void UBathWaterStateComponent::TickComponent(
 		NewAmount = 1.0f;
 	}
 	CommitAmount(NewAmount);
+	if (IncomingAmount > 0.0f || OutgoingAmount > 0.0f)
+	{
+		OnFlowStepNative.Broadcast(FBathWaterFlowStep{
+			PreviousAmount,
+			IncomingAmount,
+			OutgoingAmount,
+			NormalizedAmount,
+			DeltaTime });
+	}
 
 	if (NormalizedAmount == 1.0f && bFillValveOpen)
 	{
@@ -62,6 +76,7 @@ void UBathWaterStateComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	OnCustomerUsabilityChangedNative.Clear();
 	OnControlChangedNative.Clear();
 	OnRecoveryFreezeChangedNative.Clear();
+	OnFlowStepNative.Clear();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -353,9 +368,8 @@ void UBathWaterStateComponent::RefreshTickState()
 		SetComponentTickEnabled(false);
 		return;
 	}
-	const float NetRate = GetNetPercentPerSecond();
-	const bool bCanChange = (NetRate > 0.0f && NormalizedAmount < 1.0f)
-		|| (NetRate < 0.0f && NormalizedAmount > 0.0f);
+	const bool bCanChange = (bFillValveOpen && NormalizedAmount < 1.0f)
+		|| (bDrainLeverOpen && NormalizedAmount > 0.0f);
 	SetComponentTickEnabled(bCanChange);
 }
 

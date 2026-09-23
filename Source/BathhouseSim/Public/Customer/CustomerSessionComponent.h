@@ -17,6 +17,7 @@ class ABathhouseFacilityActor;
 class ABathhouseKeyActor;
 class UBathhouseFacilitySlotComponent;
 class UBathWaterStateComponent;
+class UBathWaterConditionComponent;
 class UCustomerRoutineDefinition;
 class ACleanTowelStackActor;
 class AUsedTowelBinActor;
@@ -206,6 +207,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UBathWaterStateComponent> BoundBathWaterState = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBathWaterConditionComponent> ActiveBathCondition = nullptr;
 
 	UPROPERTY(Transient)
 	TObjectPtr<ABathhouseFacilityActor> LastBathActor = nullptr;

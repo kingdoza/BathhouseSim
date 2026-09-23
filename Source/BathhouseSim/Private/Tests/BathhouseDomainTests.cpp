@@ -8,6 +8,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Facility/BathhouseCounterActor.h"
 #include "Facility/BathhouseFacilityActor.h"
+#include "Facility/BathhouseBathFacilityActor.h"
 #include "Facility/BathhouseFacilitySlotComponent.h"
 #include "Facility/BathWaterStateComponent.h"
 #include "Facility/CustomerQueueOverflowWanderVolume.h"
@@ -153,7 +154,7 @@ bool FBathhouseCustomerBathSnapTest::RunTest(const FString& Parameters)
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	Customer->AutoPossessAI = EAutoPossessAI::Disabled;
 	UGameplayStatics::FinishSpawningActor(Customer, SpawnTransform);
-	ABathhouseFacilityActor* Facility = World->SpawnActor<ABathhouseFacilityActor>();
+	ABathhouseFacilityActor* Facility = World->SpawnActor<ABathhouseBathFacilityActor>();
 	UBathWaterStateComponent* BathWater = Facility->GetBathWaterState();
 	BathWater->FillRatePercentPerSecond = 100.0f;
 	FText BathWaterFailure;

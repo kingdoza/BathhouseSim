@@ -113,6 +113,7 @@ Customer는 towel endpoint count/overflow, facility slot, key actor lifecycle, p
 - bath stay end time와 expiry timer
 - 현재 bath search end time/expiry timer와 반복 retry에 리셋되지 않는 search serial
 - 실제 입욕 누적 초, 활성 입욕 segment 시작시각과 idempotent 종료 guard
+- 활성 입욕 segment 동안 현재 Bath condition에 등록한 자기 session identity
 - 현재 예약 Bath의 usability delegate와 forced-exit pending reason
 - current logical activity와 service interaction gate
 - cash claimed, departure reason와 cleanup guard
@@ -238,7 +239,7 @@ Player의 key pickup/rack 반환은 customer 퇴장 조건이 아니다.
 
 `UCustomerSessionComponent`는 전체 60초 timer, 현재 search window와 실제 입욕 누적을 서로 다른 값으로 소유한다. `BeginBathSearchWindow()`는 이미 active면 no-op이고 reservation 성공·포기에서 명시적으로 끝난 뒤에만 다음 window가 새 serial로 시작한다. timeout은 Data Asset의 `BathSearchTimeoutSeconds`와 남은 전체시간 중 작은 값이다. search 시작 시 이 resolved duration을 별도로 보존하고 active elapsed는 `resolved duration - remaining`으로 계산하여 10초 기본값, 남은 stay clamp와 pause/resume을 정확히 구분한다.
 
-실제 입욕시간은 Tick 누적이 아니라 segment start/stop의 world-time 차이로 합산한다. action point snap과 `BeginUse`가 성공한 뒤 시작하고 dwell 완료, 임계 하락, 전체 만료, knockdown suspend, abort와 EndPlay에서 idempotent하게 멈춘다. knockdown resume은 현재 Bath가 계속 usable일 때만 새 segment를 시작한다. search/이동/입퇴장과 paused interval은 포함되지 않는다.
+실제 입욕시간은 Tick 누적이 아니라 segment start/stop의 world-time 차이로 합산한다. action point snap과 `BeginUse`가 성공한 뒤 시작하고 dwell 완료, 임계 하락, 전체 만료, knockdown suspend, abort와 EndPlay에서 idempotent하게 멈춘다. 시작/종료 API는 같은 경계에서 현재 Bath의 `UBathWaterConditionComponent`에 session weak identity를 등록/해제한다. raw count를 직접 증감하지 않으므로 중복 begin/end와 비정상 cleanup이 오염 인원을 복제하지 않는다. knockdown resume은 현재 Bath가 계속 usable일 때만 새 segment를 시작한다. search/이동/입퇴장과 paused interval은 포함되지 않는다.
 
 Session은 Bath reservation 수명에만 `OnCustomerUsabilityChanged`를 구독한다. 임계 하락 시 이동 전이면 reservation cleanup event, 사용 중이면 실제 segment stop과 exit-pending event를 보낸다. current activity exit은 Bath에서 즉시 slot을 풀지 않고 cached ApproachPoint 복귀 뒤 기존 facility-root cleanup으로 release한다. threshold가 다시 올라와도 pending exit을 되돌리지 않는다.
 
@@ -327,6 +328,7 @@ Check-in 외 gameplay timeout은 두지 않는다.
 
 - Customer -> Facility
 - Customer -> Bath Water public query/usability delegate
+- Customer -> Bath Water Operations actual-bather identity registration API
 - Customer -> Interaction
 - Customer -> Economy
 - Customer -> Towel
@@ -348,6 +350,7 @@ Check-in 외 gameplay timeout은 두지 않는다.
 - search window가 retry마다 재시작되지 않고 `10초`와 남은 전체시간 중 작은 값에서 만료되며 진단 elapsed가 각각 실제 약 10초와 clamp된 시간으로 기록되는지 확인한다.
 - 임계치 미만 Bath가 후보/이동/입장/체류에서 제외되고 사용 중 하락 시 실제 입욕 누적을 즉시 멈춘 뒤 approach 복귀 후 release하는지 확인한다.
 - 실제 입욕 누적에 search/이동/입퇴장/knockdown이 들어가지 않고 여러 Bath segment만 합산되는지 확인한다.
+- actual-bather set도 같은 segment 경계에서만 변하며 knockdown, abort와 EndPlay 뒤 stale session이 남지 않는지 확인한다.
 - blocking collision이 action point를 점유해도 snap이 성공하고 정확한 cached transform, `MOVE_None`과 기존 collision enabled 상태를 유지하는지 확인한다.
 - blocked action snap 후 정상 release/technical abort가 cached approach로 복귀하고 movement mode를 복원하는지 확인한다.
 - bath random dwell과 다른 bath 선택이 고정 전체 입욕시간 종료를 지연하지 않는지 확인한다.

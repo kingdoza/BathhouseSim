@@ -16,7 +16,7 @@
 | Facility | [FacilitySystem.md](FacilitySystem.md) | 설비 Blueprint, slot, counter, locker와 expansion authoring |
 | Bath Water | [BathWaterSystem.md](BathWaterSystem.md) | 욕탕 물, 밸브·레버, 수면 marker와 Niagara authoring |
 | Customer AI | [CustomerSystem.md](CustomerSystem.md) | Customer routine Data Asset, Character/AIController Blueprint, StateTree schema/state/task/binding |
-| Interaction/UI | `InteractionUISystem.md` | Input Mapping, Widget hierarchy, BindWidget와 표시 asset |
+| Interaction/UI | [InteractionUISystem.md](InteractionUISystem.md) | Input Mapping, Widget hierarchy, BindWidget와 표시 asset |
 | Towel | `TowelSystem.md` | 수건 설비·표현 Blueprint, mesh/material과 presentation 설정 |
 | World | [WorldSystem.md](WorldSystem.md) | map actor, World Settings, RecastNavMesh와 유일 Authority |
 

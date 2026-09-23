@@ -26,6 +26,7 @@
 #include "Engine/StaticMesh.h"
 #include "EnhancedInputComponent.h"
 #include "Facility/BathhouseFacilityActor.h"
+#include "Facility/BathhouseBathFacilityActor.h"
 #include "Facility/BathhouseFacilitySlotComponent.h"
 #include "Facility/BathWaterStateComponent.h"
 #include "Facility/BathhouseCounterActor.h"
@@ -610,8 +611,8 @@ bool FBathhouseCustomerRecoveryFacilityAndOperationTest::RunTest(const FString& 
 	Session->InitializeSession(Definition, nullptr);
 
 	const FTransform FacilityTransform(FRotator(0.0f, 25.0f, 0.0f), FVector(600.0f, 0.0f, 0.0f));
-	ABathhouseFacilityActor* DeferredFacility = World->SpawnActorDeferred<ABathhouseFacilityActor>(
-		ABathhouseFacilityActor::StaticClass(),
+	ABathhouseFacilityActor* DeferredFacility = World->SpawnActorDeferred<ABathhouseBathFacilityActor>(
+		ABathhouseBathFacilityActor::StaticClass(),
 		FacilityTransform);
 	if (!DeferredFacility)
 	{

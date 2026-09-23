@@ -81,6 +81,7 @@ public:
 
 protected:
 	friend class FBathhouseFacilityPlacementRuntimeTest;
+	friend class FBathWaterOperationsFacilityTransactionTest;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Facility Placement")
 	TObjectPtr<UFacilityPlacementDefinition> Definition = nullptr;
 

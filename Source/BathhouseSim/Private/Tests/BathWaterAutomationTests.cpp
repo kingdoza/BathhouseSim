@@ -155,20 +155,20 @@ bool FBathhouseBathWaterStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Fill can open while drain remains open"), Water->RequestSetControlOpen(
 		EBathWaterControlType::FillValve, true, EBathWaterControlChangeReason::PlayerInteraction, FailureReason));
 	Water->TickComponent(1.0f, LEVELTICK_All, nullptr);
-	TestEqual(TEXT("Equal simultaneous rates commit one zero net delta"), Water->GetNormalizedAmount(), 0.0f);
-	TestFalse(TEXT("Zero net flow disables the water tick"), Water->IsComponentTickEnabled());
+	TestEqual(TEXT("At empty, simultaneous flow accepts fill while drain has no water to remove"), Water->GetNormalizedAmount(), 0.1f);
+	TestTrue(TEXT("Simultaneous flow keeps ticking for condition mixing"), Water->IsComponentTickEnabled());
 
 	TestTrue(TEXT("Recovery freeze snapshots the running logical state"), Water->BeginRecoveryFreeze(FailureReason));
 	Water->TickComponent(5.0f, LEVELTICK_All, nullptr);
-	TestEqual(TEXT("Frozen water does not advance"), Water->GetNormalizedAmount(), 0.0f);
+	TestEqual(TEXT("Frozen water does not advance"), Water->GetNormalizedAmount(), 0.1f);
 	Water->PrepareRecoveryCommit();
 	TestFalse(TEXT("Recovery commit-pending closes fill"), Water->IsControlOpen(EBathWaterControlType::FillValve));
 	TestFalse(TEXT("Recovery commit-pending closes drain"), Water->IsControlOpen(EBathWaterControlType::DrainLever));
 	Water->CancelRecoveryFreeze();
 	TestTrue(TEXT("Recovery rollback restores fill"), Water->IsControlOpen(EBathWaterControlType::FillValve));
 	TestTrue(TEXT("Recovery rollback restores drain"), Water->IsControlOpen(EBathWaterControlType::DrainLever));
-	TestEqual(TEXT("Amount delegate fires once for each actual delta"), AmountTransitions, 4);
-	TestEqual(TEXT("Derived state delegate fires once for each actual state transition"), StateTransitions, 3);
+	TestEqual(TEXT("Amount delegate fires once for each actual delta"), AmountTransitions, 5);
+	TestEqual(TEXT("Derived state delegate fires once for each actual state transition"), StateTransitions, 4);
 	TestEqual(TEXT("Usability delegate fires once per threshold direction"), UsabilityTransitions, 2);
 	Water->ResetEmptyForPlacement();
 	TestTrue(TEXT("Placement reset atomically restores exact empty state"),

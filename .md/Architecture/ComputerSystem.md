@@ -2,9 +2,9 @@
 
 ## Implementation Status
 
-이 문서는 월드 모니터 기반 컴퓨터 상호작용의 현재 native 구현을 정의한다. Computer Actor, player session component, interaction suppression, sample widget과 focused automation은 Source에 구현되었고 Blueprint/Editor 연결은 후속 단계다.
+이 문서는 월드 모니터 기반 컴퓨터 상호작용의 현재 native 구현을 정의한다. Computer Actor, player session component, interaction suppression, sample widget과 욕탕 관리 native Widget은 Source에 구현되었고 Blueprint/Editor 연결은 후속 단계다. 욕탕 관리 화면의 상세 계약은 [BathWaterManagementUISystem.md](BathWaterManagementUISystem.md)를 따른다.
 
-이번 범위는 컴퓨터 한 대의 포커스 진입/이탈과 월드 `UWidgetComponent`에 표시되는 클릭 확인용 샘플 화면이다. 범용 운영체제, 프로그램 목록과 저장 시스템은 포함하지 않는다.
+기존 수직 범위는 컴퓨터 한 대의 포커스 진입/이탈과 클릭 확인용 샘플 화면이다. 다음 구현은 같은 session 계약 위에 욕탕 관리 화면을 연결한다. 범용 운영체제, 프로그램 목록과 저장 시스템은 포함하지 않는다.
 
 ## Source Scope
 
@@ -36,7 +36,7 @@ focused native automation은 `Source/BathhouseSim/Private/Tests`에 둔다.
 - 포커스아웃 뒤 actor lifetime 동안 screen widget instance와 표시 상태 유지
 - 컴퓨터 또는 player EndPlay와 focus transition 중단 시 안전한 복구
 
-Computer는 physical carry state, 기존 interaction target 선정, 일반 이동/sprint 상태와 sample widget hierarchy를 소유하지 않는다.
+Computer는 physical carry state, 기존 interaction target 선정, 일반 이동/sprint 상태, 욕탕 condition·용량 원장과 concrete WBP hierarchy를 소유하지 않는다.
 
 ## Responsibility Change
 
@@ -47,6 +47,8 @@ Computer는 physical carry state, 기존 interaction target 선정, 일반 이�
 | `ABathhouseComputerActor` | 없음 | 월드 표현, focus camera, use reservation | 신규 Actor가 컴퓨터 한 대의 composition root |
 | `UPlayerComputerUseComponent` | 없음 | player별 focus/input/view session | lifecycle과 임시 상태가 응집되므로 신규 Component |
 | `UComputerSampleScreenWidget` | 없음 | 클릭 연결과 표시용 클릭 확인 상태 | Native Widget policy에 따라 신규 C++ base |
+| `ABathhouseComputerActor.ManagedBathPlacementZone` | 없음 | 관리 화면 context인 Zone instance reference | Actor가 context를 resolve해 root widget에 주입 |
+| 욕탕 관리 Widget 계층 | 없음 | snapshot 표시와 setting intent 전달 | UI 계층만 소유하고 domain mutation은 subsystem에 위임 |
 
 범용 program manager, computer app base와 별도 screen state UObject는 현재 단일 샘플 화면에 필요하지 않아 만들지 않는다. 실제 gameplay 데이터가 추가되면 Widget 밖의 Computer domain owner로 분리한다.
 
@@ -67,6 +69,7 @@ Actor는 `IPlayerInteractable`을 직접 구현한다.
 - Actor reservation과 player session 시작은 한 transaction처럼 처리한다. session 시작 실패 시 reservation을 원복한다.
 - current user identity를 검증한 release만 허용해 중복 종료나 다른 player의 해제를 막는다.
 - `EndPlay`는 current user component에 actor unavailable을 통지하고 reservation을 지운다.
+- `ManagedBathPlacementZone`은 `EditInstanceOnly`로 authoring하며 management root에는 이 Zone과 `UBathWaterOperationsSubsystem`을 명시적으로 주입한다. Widget이 world scan으로 대상을 정하지 않는다.
 
 `FocusBlendInSeconds`, `FocusBlendOutSeconds`는 음수가 아닌 Editor authoring 값이며 native 기본값은 각각 `0.35`, `0.25`초다. `FocusCamera`의 relative transform과 FOV는 monitor를 정면 중앙에 두되 주변 world가 보이도록 Blueprint class/instance에서 조정한다.
 
@@ -102,10 +105,11 @@ focus-in 중 E를 다시 누르면 focus-out으로 전환할 수 있다. pointer
 
 - E Started: computer phase가 `Inactive`가 아니면 focus-out intent로 소비하고, 아니면 기존 primary begin으로 전달한다.
 - E Completed/Canceled: computer가 현재 press를 소유하면 소비한다. 진입에 사용한 E release가 즉시 focus-out을 일으키지 않는다.
-- `ComputerClickAction` Started/Completed/Canceled: `Active`일 때만 left pointer press/release로 전달한다.
+- `PrimaryUseAction` Started/Triggered/Completed/Canceled: input owner priority `Computer > Placement > Equipment`를 유지한다. Computer가 `Active`일 때 left pointer press/release를 소유한다.
+- deprecated `ComputerClickAction`은 `PrimaryUseAction`이 비어 있는 기존 Blueprint를 위한 fallback으로만 유지한다.
 - Move/Look/Jump/Sprint/F/G: computer session이 input을 capture하는 동안 Character의 input-facing handler와 공개 `DoMove`/`DoLook`/`DoJumpStart` 경로에서 domain 호출 전에 차단한다.
 
-전체 `DisableInput()`은 종료 E와 pointer 입력까지 막으므로 사용하지 않는다. 기존 mapping context는 교체하지 않으며 `ComputerClickAction`을 같은 `IMC_FirstPerson`에 연결한다.
+전체 `DisableInput()`은 종료 E와 pointer 입력까지 막으므로 사용하지 않는다. 기존 mapping context는 교체하지 않으며 새 computer 전용 Input Action을 추가하지 않는다.
 
 ## Interaction Suppression
 
@@ -131,6 +135,8 @@ native C++은 construct/destruct의 대칭 delegate 연결, 클릭 여부와 tex
 
 focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다. 따라서 마지막 클릭 상태는 같은 computer Actor lifetime 동안 유지되고 재진입 시 그대로 보인다. Actor 파괴 또는 level reload 뒤의 영속 저장은 현재 범위 밖이다.
 
+욕탕 관리 화면의 native hierarchy, 지도 투영, slider request와 refresh 정책은 [BathWaterManagementUISystem.md](BathWaterManagementUISystem.md)가 정본이다. 기존 sample widget은 삭제하지 않고 회귀와 asset 호환을 위해 보존한다.
+
 ## Dependencies
 
 - Character -> Computer
@@ -138,6 +144,7 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
 - Computer -> Engine Camera/CharacterMovement/PlayerController
 - Computer -> UMG `UWidgetComponent`, `UWidgetInteractionComponent`
 - UI sample widget -> UMG
+- Computer/UI management screen -> Bath Water Operations snapshot/request API
 - Interaction은 Computer concrete type에 의존하지 않는다.
 
 현재 `UMG`, `InputCore`와 `EnhancedInput` module dependency로 구현한다. direct Slate API 사용처가 없으므로 `Slate`, `SlateCore`를 추가하지 않는다.
@@ -148,10 +155,12 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
 
 - `ABathhouseComputerActor` native parent와 `ComputerMesh`, `ScreenWidget`, `FocusCamera`
 - `AFirstPersonCharacter::PlayerComputerUse`, `ComputerWidgetInteraction`, `ComputerClickAction`
+- `AFirstPersonCharacter::PrimaryUseAction`을 canonical LMB로 사용하고 `ComputerClickAction`은 deprecated fallback으로 유지
+- `ABathhouseComputerActor::ManagedBathPlacementZone` instance reference
 - `UComputerSampleScreenWidget` native parent와 `TestButton`, `ClickResultText` BindWidget
 - computer focus camera/blend와 widget interaction distance/debug authoring 값
 
-기존 reflected symbol을 rename/delete하지 않으므로 Core Redirect는 필요하지 않다. Content asset 생성과 assignment는 Unreal 단계에서 수행한다. 현재 Content scan에는 computer/monitor asset과 `IA_ComputerClick`이 없고 기존 player/input asset만 존재한다.
+기존 reflected symbol을 rename/delete하지 않으므로 Core Redirect는 필요하지 않다. Content asset 생성과 assignment는 Unreal 단계에서 수행한다. 읽기 전용 조사상 `IA_ComputerClick`은 없고 `IA_PrimaryUse`가 LMB canonical mapping이다.
 
 ## Out Of Scope
 
@@ -174,3 +183,4 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
 - active focus에서는 FXAA가 적용되고 정상 종료와 강제 cleanup 뒤에는 진입 전 AA method가 복구되는지 확인한다.
 - computer/player EndPlay 뒤 view target, cursor, input mode, movement와 interaction prompt가 복구되는지 확인한다.
 - world/NPC simulation이 computer 사용 중 pause되지 않는지 확인한다.
+- 여러 computer가 같은 `ManagedBathPlacementZone`을 참조할 때 같은 욕탕 설정/용량을 표시하고, Zone 누락 시 안전한 unavailable 화면을 표시하는지 확인한다.

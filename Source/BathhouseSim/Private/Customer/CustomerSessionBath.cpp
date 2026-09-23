@@ -4,8 +4,10 @@
 #include "Customer/CustomerRoutineDefinition.h"
 #include "Engine/World.h"
 #include "Facility/BathWaterSettings.h"
+#include "Facility/BathWaterConditionComponent.h"
 #include "Facility/BathWaterStateComponent.h"
 #include "Facility/BathhouseFacilityActor.h"
+#include "Facility/BathhouseBathFacilityActor.h"
 #include "Facility/BathhouseFacilitySlotComponent.h"
 #include "TimerManager.h"
 
@@ -241,6 +243,13 @@ bool UCustomerSessionComponent::BeginActualBathSegment()
 	{
 		return false;
 	}
+	ABathhouseBathFacilityActor* Bath = Cast<ABathhouseBathFacilityActor>(CurrentFacilityActor);
+	UBathWaterConditionComponent* Condition = Bath ? Bath->GetBathWaterCondition() : nullptr;
+	if (!Condition || !Condition->RegisterActiveBather(this))
+	{
+		return false;
+	}
+	ActiveBathCondition = Condition;
 	ActualBathSegmentStartTime = GetWorld()->GetTimeSeconds();
 	bActualBathSegmentActive = true;
 	UE_LOG(LogBathhouseCustomerBath, Log,
@@ -253,6 +262,11 @@ bool UCustomerSessionComponent::BeginActualBathSegment()
 
 void UCustomerSessionComponent::EndActualBathSegment(const ECustomerBathLoopReason Reason)
 {
+	if (ActiveBathCondition)
+	{
+		ActiveBathCondition->UnregisterActiveBather(this);
+		ActiveBathCondition = nullptr;
+	}
 	if (!bActualBathSegmentActive)
 	{
 		return;

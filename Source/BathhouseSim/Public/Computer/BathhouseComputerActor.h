@@ -9,6 +9,7 @@ class UCameraComponent;
 class UPlayerComputerUseComponent;
 class UStaticMeshComponent;
 class UWidgetComponent;
+class AFacilityPlacementZoneActor;
 
 UCLASS()
 class BATHHOUSESIM_API ABathhouseComputerActor : public AActor, public IPlayerInteractable
@@ -43,6 +44,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Computer")
 	TObjectPtr<UCameraComponent> FocusCamera;
+
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Computer|Bath Water")
+	TObjectPtr<AFacilityPlacementZoneActor> ManagedBathPlacementZone;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Computer|Focus", meta = (ClampMin = "0.0"))
 	float FocusBlendInSeconds = 0.35f;

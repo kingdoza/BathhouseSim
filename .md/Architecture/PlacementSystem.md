@@ -228,6 +228,9 @@ Actor collision restore는 실패 가능한 domain rollback 뒤에 수행한다.
 - `InstalledLockerCapacity`는 등록된 action slot 합계이고 provisional/committed lease는 check-in과 함께 원자적으로 commit/rollback한다. 탈의·착의는 서로 다른 random slot을 사용할 수 있다.
 - Expansion tier의 `KeyPoolSize`와 `MaxInstalledLockerSlots`는 독립 정본이다. locker 변경은 key 수·번호나 이미 배정된 customer key를 바꾸지 않는다.
 - `ACleanTowelStackActor`와 `AUsedTowelBinActor`는 towel token owner라 Actor 변환과 Q recovery에서 제외된다.
+- 순환기·보일러·쿨러는 독립 `ABathWaterUtilityFacilityActor`가 같은 placeable/carry/recovery transaction을 구현한다. utility 용량과 종류는 typed `UBathWaterUtilityPlacementInstanceData`로 round-trip하며 총용량 원장은 [BathWaterOperationsSystem.md](BathWaterOperationsSystem.md)가 소유한다.
+- utility recovery query는 물리 item 후보 생성 전에 post-removal capacity를 검증한다. stage에서는 provider를 silent unregister하고 rollback은 같은 identity를 한 번 복원하며 최종 publication은 transaction 종료에 한 번만 발생한다.
+- 욕탕 회수 hold는 물 양뿐 아니라 condition Tick도 freeze하지만 예약 demand는 hold 동안 유지한다. 실제 domain-unregistration stage에서만 demand를 제거하고 rollback에서 condition snapshot과 registry를 함께 복원한다.
 
 ## Locker Startup Reconciliation
 
@@ -271,6 +274,7 @@ rename이 아니라 property/component 삭제이므로 Core Redirect로 대체�
 - placed/item class 분리, payload와 Root scale 계약
 - zone tag, input, 회수 gate와 atomic Actor 교체 rollback
 - Clean Towel Stack/Used Towel Bin placement opt-out
+- 기존 utility 설비가 없으므로 신규 actor/payload는 rename migration 없이 추가한다. 기존 facility payload와 recovery item 계약은 변경하지 않는다.
 
 ## Blueprint/API And Editor Contracts
 
@@ -290,6 +294,7 @@ Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후�
 
 - Placement -> Interaction carry/query/result contract
 - Facility/Towel -> Placement placeable-facility contract
+- Bath Water Operations utility -> Placement placeable-facility/typed-payload contract
 - Facility -> Placement collision/domain activation API
 - Customer -> Facility locker capacity/slot API
 - Placement/Facility -> Engine NavigationSystem과 GameplayTags
@@ -308,4 +313,5 @@ Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후�
 - PIE 전후 대형 `NavArea_Null`이 없고 recovery/replacement 위치의 Dynamic NavMesh가 갱신되는지 확인한다.
 - Facility/Queue Approach Point가 agent radius를 고려한 생성 NavMesh 위에 남는지 확인한다.
 - Authority/locker BeginPlay 순서 permutation에서 accepted set, capacity와 publication 횟수가 같은지 확인한다.
+- utility 회수 거부가 provider/actor/item 상태를 바꾸지 않고, stage rollback과 placement commit이 capacity를 정확히 한 번 변경하는지 확인한다.
 - total slot 초과 시 stable ID 순서로 fitting bank만 등록되고 오류가 한 번만 발생하는지 확인한다.

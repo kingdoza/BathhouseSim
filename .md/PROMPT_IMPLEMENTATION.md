@@ -1,683 +1,611 @@
-# 구현 프롬프트 — 급수·배수 시스템과 욕탕 물 수직 구현
+# 구현 프롬프트 — 욕탕 물 순환·가열·냉각과 컴퓨터 제어
 
 ## 입력과 현재 단계
 
-- 승인 기능 계약: `.md/PROMPT_ARCHITECTURE.md`의 `BH-WATER-001`~`BH-WATER-029`
-- 기능 답변: `.md/QNA_FEATURE_SPEC.md` Q1~Q27
-- Unreal 사전 조사: `.md/REPORT_UNREAL_DISCOVERY.md`
-- 기술 정본: `.md/Architecture/BathWaterSystem.md`
-- 연계 정본: `.md/Architecture/FacilitySystem.md`, `CustomerSystem.md`, `PlacementSystem.md`, `InteractionSystem.md`, `CustomerRecoverySystem.md`, `CoreSystem.md`
-- 현재 단계는 `/Game/Bathhouse/Blueprints/Facility/BP_Bath` 첫 욕탕 타입 하나의 C++ 수직 구현이다.
-- 이번 단계는 Source, 필요한 runtime module dependency와 native automation만 변경한다.
-- Content, Level, StateTree asset, Project Settings 저장값과 `.md/Unreal/*`은 수정하지 않는다.
+이 프롬프트는 다음 승인·설계 정본을 Source에 구현하기 위한 지시다.
 
-사용자가 기능 명세 이후 확정한 다음 사항도 승인 입력으로 포함한다.
+- 기능 계약: `.md/PROMPT_ARCHITECTURE.md`
+- 중심 설계: `.md/Architecture/BathWaterOperationsSystem.md`
+- 관리 화면 설계: `.md/Architecture/BathWaterManagementUISystem.md`
+- 기존 물 시스템: `.md/Architecture/BathWaterSystem.md`
+- 관련 경계:
+  - `.md/Architecture/PlacementSystem.md`
+  - `.md/Architecture/ComputerSystem.md`
+  - `.md/Architecture/UISystem.md`
+  - `.md/Architecture/CustomerSystem.md`
+  - `.md/Architecture/FacilitySystem.md`
+  - `.md/Architecture/CoreSystem.md`
+- Editor 사실: `.md/REPORT_UNREAL_DISCOVERY.md`
+- 구현 규칙: `.md/AGENT_WORKFLOW.md`, `.md/AGENT_IMPLEMENTATION.md`
 
-- 입욕 임계 수위는 모든 욕탕이 공유하되 Project Settings에서 조정 가능하고 기본값은 `80%`다.
-- 급수/배수 속도는 각각 `6.666667%/s`, `10%/s`를 native 기본값으로 하며 욕탕 Blueprint 기본값과 Level instance override를 허용한다.
-- 밸브·레버 interaction은 별도 collision component 없이 각각의 실제 Static Mesh collision만 사용한다.
-- local rotation axis는 음수 벡터를 포함하며 정규화 시 부호를 보존한다.
-- 수면은 cube/volume이 아닌 평면 Static Mesh이고 normalized amount를 alpha로 Empty/Full 위치 사이에서 선형 보간한다.
-- 첫 욕탕 수면 기준 asset은 `SM_Bath_01_Water`지만 C++에서 asset 경로를 hard reference하지 않는다.
-- `ST_CustomerRoutine` BathLoop는 버그 분석을 위한 공통 native category와 phase/reason/correlation 로그를 제공한다.
+아키텍처 단계는 완료됐다. 이 단계는 C++ Source와 native automation만 구현한다. `Content/`, Level, Blueprint, Widget Blueprint, StateTree asset과 실제 Editor property assignment는 수정하지 않는다.
 
 ## 목표
 
-1. 기존 `UBathWaterStateComponent`를 욕탕 물 양, 두 control 논리 상태, 유량과 recovery freeze의 authoritative owner로 확장한다.
-2. 실제 Static Mesh collision로 E interaction하고 local axis 기준으로 회전하는 범용 `UBathWaterControlComponent`를 구현한다.
-3. 범용 Facility Actor를 비대하게 만들지 않고 새 `ABathhouseBathFacilityActor`에서 물 control, 평면 수면과 Niagara 표현을 조립한다.
-4. 전역 입욕 threshold를 `UBathWaterSettings` 하나에 노출한다.
-5. Facility reservation, Customer search/move/entry/dwell과 현재 사용자 전부에 동일한 수위 유효성을 적용한다.
-6. 전체 60초 timer, 각 10초 search window와 실제 입욕 누적시간을 분리한다.
-7. Q Hold 동안 물·control 표현을 동결하고 모든 cancel/failure 경로에서 정확히 복원한다.
-8. 기존 placement, facility slot, physical carry, interaction prompt와 knockdown soft-interruption 계약을 보존한다.
+1. 설치된 순환기·보일러·쿨러의 종류별 총용량과 설치 욕탕의 요구량을 authoritative하게 관리한다.
+2. 욕탕별 순환도, 목표/실제 수온, 오염도와 실제 입욕자 수를 native 상태로 구현한다.
+3. 기존 급수·배수의 실제 유입량을 사용해 ambient/clean water mixing을 구현한다.
+4. 정상 회수, staged rollback과 예기치 않은 소실에서 용량·요구량이 손실·중복되지 않게 한다.
+5. world-space computer에 연결할 native 욕탕 관리 Widget 계층과 request/snapshot 경계를 구현한다.
+6. 기존 interaction, single physical carry, placement, customer routine, bath water threshold와 computer focus 계약을 회귀 없이 보존한다.
 
-## 비목표와 변경 금지
+## 변경 금지와 비목표
 
-- Content/Blueprint/StateTree/DataAsset/Level/Material/Niagara asset 저장 또는 resave
-- 실제 밸브·레버 mesh 생성·분리와 pivot 편집
-- `NS_HoneyBeam`을 물줄기로 자동 선택
-- 물 온도, 오염, 수질, 넘침, 누수, 증발과 fluid simulation
-- 수위 숫자 HUD와 신규 입력
-- 손님 수에 따른 물 감소와 만족도 변경
-- gameplay SaveGame persistence와 replication
-- Bath 이외 시설로 물 시스템 일반화
-- generic interaction trace, E/F/G/Q/LMB key와 우선순위 변경
-- 기존 Facility slot transform/snap, queue, key, towel와 placement 후보 계산 변경
-- 물 표현이나 StateTree Blueprint graph에서 domain state mutation
-- 수면 scale/WPO/volume 표현 또는 별도 water collision
-- control용 Box/proxy collision과 actor bounds fallback
+- `Content/`, `Config/`, Level과 serialized asset을 생성·수정·resave하지 않는다.
+- `ST_CustomerRoutine` graph를 변경하지 않는다.
+- 새로운 Input Action이나 Mapping Context를 만들지 않는다.
+- 기존 reflected type/property/component를 rename/delete하지 않는다.
+- `UComputerSampleScreenWidget`, `WBP_ComputerSampleScreen` 호환 경로와 deprecated `ComputerClickAction` fallback을 제거하지 않는다.
+- 기존 물 양, 밸브·레버 상호작용, 수면 보간, 임계 수위와 BathLoop 시간을 다시 설계하지 않는다.
+- SaveGame, replication, 연료·전원·고장, utility On/Off, 오염도 customer 효과와 최종 art를 추가하지 않는다.
+- utility를 `EBathhouseFacilityType` 또는 customer facility registry에 억지로 추가하지 않는다.
+- `ABathhouseFacilityActor`에 utility 종류 분기와 전역 원장을 누적하지 않는다.
+- `UBathWaterStateComponent`에 수온·오염도·utility capacity를 누적하지 않는다.
+- UI, Character와 Blueprint event가 domain 상태를 직접 set하게 하지 않는다.
+- 하드코딩된 `10%` thermal threshold를 gameplay 판정에 사용하지 않는다.
 
-## Module과 파일 경계
+## 구현 전 확인
 
-`BathhouseSim.Build.cs`에 native `UNiagaraComponent` 사용을 위한 `Niagara` runtime dependency만 추가한다. 기존 `DeveloperSettings`, StateTree, GameplayStateTree와 Engine dependency를 재사용한다. `.uproject` plugin, Config와 신규 module을 추가하지 않는다.
+실제 Source를 다시 읽고 설계와 이름이 충돌하면 기존 public/reflected 계약을 우선 보존한다. 특히 다음을 확인한다.
+
+- `UBathWaterStateComponent` Tick gate와 amount/usability delegate
+- `ABathhouseBathFacilityActor` recovery freeze/stage/rollback/EndPlay 순서
+- `IPlaceableFacility`, `UFacilityPlacementComponent`, `FFacilityPlacementPayload`와 typed instance data
+- `ATowelProcessingMachineActor`의 독립 placeable actor 패턴
+- `ABathhouseComputerActor::BeginPlay()`의 `InitWidget()`과 focus 계약
+- `AFirstPersonCharacter`의 `PrimaryUseAction` 및 `Computer > Placement > Equipment` owner 우선순위
+- `UCustomerSessionComponent::BeginActualBathSegment()`와 `EndActualBathSegment()`의 모든 호출 경로
+
+사용자 변경이 섞여 있으면 관련되지 않은 diff를 되돌리거나 포맷하지 않는다.
+
+## 파일 계획
 
 신규 파일:
 
 ```text
-Source/BathhouseSim/Public/Facility/BathWaterSettings.h
-Source/BathhouseSim/Private/Facility/BathWaterSettings.cpp
-Source/BathhouseSim/Public/Facility/BathWaterControlComponent.h
-Source/BathhouseSim/Private/Facility/BathWaterControlComponent.cpp
-Source/BathhouseSim/Public/Facility/BathhouseBathFacilityActor.h
-Source/BathhouseSim/Private/Facility/BathhouseBathFacilityActor.cpp
-Source/BathhouseSim/Public/Customer/CustomerBathLoopLog.h
-Source/BathhouseSim/Private/Customer/CustomerBathLoopLog.cpp
-Source/BathhouseSim/Private/Customer/CustomerSessionBath.cpp
-Source/BathhouseSim/Private/Tests/BathWaterAutomationTests.cpp
+Source/BathhouseSim/Public/Facility/BathWaterOperationsTypes.h
+Source/BathhouseSim/Public/Facility/BathWaterOperationsSubsystem.h
+Source/BathhouseSim/Private/Facility/BathWaterOperationsSubsystem.cpp
+Source/BathhouseSim/Public/Facility/BathWaterUtilityCapacityComponent.h
+Source/BathhouseSim/Private/Facility/BathWaterUtilityCapacityComponent.cpp
+Source/BathhouseSim/Public/Facility/BathWaterUtilityFacilityActor.h
+Source/BathhouseSim/Private/Facility/BathWaterUtilityFacilityActor.cpp
+Source/BathhouseSim/Public/Facility/BathWaterUtilityPlacementInstanceData.h
+Source/BathhouseSim/Private/Facility/BathWaterUtilityPlacementInstanceData.cpp
+Source/BathhouseSim/Public/Facility/BathWaterConditionComponent.h
+Source/BathhouseSim/Private/Facility/BathWaterConditionComponent.cpp
+
+Source/BathhouseSim/Public/UI/BathWaterManagementScreenWidget.h
+Source/BathhouseSim/Private/UI/BathWaterManagementScreenWidget.cpp
+Source/BathhouseSim/Public/UI/BathWaterCapacitySummaryWidget.h
+Source/BathhouseSim/Private/UI/BathWaterCapacitySummaryWidget.cpp
+Source/BathhouseSim/Public/UI/BathWaterMapWidget.h
+Source/BathhouseSim/Private/UI/BathWaterMapWidget.cpp
+Source/BathhouseSim/Public/UI/BathWaterBathTileWidget.h
+Source/BathhouseSim/Private/UI/BathWaterBathTileWidget.cpp
+Source/BathhouseSim/Public/UI/BathWaterDetailWidget.h
+Source/BathhouseSim/Private/UI/BathWaterDetailWidget.cpp
+
+Source/BathhouseSim/Private/Tests/BathWaterOperationsAutomationTests.cpp
 ```
 
-기존 변경 후보:
+기존 파일 수정은 아키텍처 문서에 적힌 연결 지점에 한정한다. 실제 응집도를 위해 private helper cpp를 추가할 수 있지만 새 subsystem이나 범용 framework를 임의로 만들지 않는다.
+
+## 공용 타입
+
+`BathWaterOperationsTypes.h`에 필요한 reflected/native 타입을 정의한다.
+
+필수 의미:
+
+- `EBathWaterCapacityKind`: Circulation, Heating, Cooling
+- `EBathWaterThermalStatus`: Empty, ReturningToAmbient, Stalled, MovingToTarget, MaintainingTarget, SuspendedByCapacity
+- setting request failure/reason enum
+- 종류별 used/total/deficit snapshot
+- 욕탕 표시 snapshot
+- setting request result
+
+조건:
+
+- snapshot은 UI가 domain object 내부 상태를 재계산하지 않게 필요한 수치를 포함한다.
+- bath identity는 weak object reference를 사용한다.
+- FText/한국어 문구는 domain 타입에 넣지 않는다.
+- float는 외부 입력 경계에서 finite 검증한다.
+- 종류 enum ordinal은 처음 추가되는 값이므로 명시적으로 안정적인 순서를 사용한다.
+
+## `UBathWaterSettings` 확장
+
+기존 Developer Settings에 다음 값을 추가한다.
 
 ```text
-Source/BathhouseSim/BathhouseSim.Build.cs
-Source/BathhouseSim/Public|Private/Facility/BathWaterStateComponent.*
-Source/BathhouseSim/Public|Private/Facility/BathhouseFacilityActor.*
-Source/BathhouseSim/Public|Private/Facility/BathhouseFacilitySubsystem.*
-Source/BathhouseSim/Public/Placement/PlaceableFacility.h
-Source/BathhouseSim/Public|Private/Placement/PlayerFacilityPlacementComponent.*
-Source/BathhouseSim/Public|Private/Customer/CustomerRoutineDefinition.*
-Source/BathhouseSim/Public|Private/Customer/CustomerSessionComponent.*
-Source/BathhouseSim/Public|Private/Customer/BathhouseCustomerTypes.*
-Source/BathhouseSim/Public|Private/Customer/StateTree/CustomerStateTreeTasks.*
-Source/BathhouseSim/Public|Private/Customer/StateTree/CustomerStateTreeConditions.*
-Source/BathhouseSim/Private/Tests/BathhouseDomainTests.cpp
+AmbientTemperatureC = 20.0
+MinTargetTemperatureC = 10.0
+MaxTargetTemperatureC = 50.0
+TargetTemperatureStepC = 1.0
 ```
-
-Bath 관련 session 구현은 이미 큰 `CustomerSessionComponent.cpp`에 누적하지 않고 같은 class의 `CustomerSessionBath.cpp`로 분리한다. Bath 진단 helper/category도 montage 로그와 분리한다. 단순 파일 분리를 위해 새 UObject owner를 만들지 않는다.
-
-## `UBathWaterSettings`
-
-`UDeveloperSettings`, `Config=Game`, `DefaultConfig`, DisplayName `Bath Water`로 구현한다. Project Settings의 Game/Bath Water section에 다음 값 하나만 둔다.
-
-```cpp
-UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Customer Use",
-    meta=(ClampMin="0.0", ClampMax="100.0"))
-float CustomerUsableThresholdPercent = 80.0f;
-```
-
-`GetCategoryName()`은 `Game`, `GetSectionName()`은 `Bath Water`를 반환해 노출 경로를 구현 기본값에 맡기지 않는다.
 
 요구사항:
 
-- 모든 Bath가 `GetDefault<UBathWaterSettings>()`의 동일 값을 읽는다.
-- finite가 아니면 default 80으로 방어하고 getter 결과를 `0~100`으로 clamp한다.
-- normalized getter는 percent에 `0.01`을 곱한다.
-- 욕탕 Actor/component에 threshold 복사본을 만들지 않는다.
-- runtime 변경·delegate hot reload 기능은 추가하지 않는다.
+- `Config`, `EditAnywhere`, 적절한 category/meta와 Blueprint read-only getter를 제공한다.
+- 기존 bath usability threshold property와 config key를 유지한다.
+- finite, min<=ambient<=max, step>0을 검증한다.
+- invalid config는 안전한 기본값으로 정규화하고 로그/ensure를 남기되 gameplay state에 NaN을 넣지 않는다.
+- target quantization은 ambient를 anchor로 한다.
+- runtime hot reload는 구현하지 않는다.
 
-## Water Type과 reflected compatibility
+## `UBathWaterOperationsSubsystem`
 
-필요한 enum은 기존 ordinal을 보존하며 신규 항목은 끝에 추가한다.
+`UWorldSubsystem`으로 구현하고 Tick하지 않는다.
 
-```text
-EBathWaterState: Empty, Filling, Filled, Draining, Holding(new last)
-EBathWaterControlType: FillValve, DrainLever
-EBathWaterControlChangeReason: PlayerInteraction, FullAutoClose, RecoveryCommit, Reset
-```
+### Registry
 
-control change reason은 로그/표현용이고 gameplay 결과를 별도 owner에 복제하지 않는다.
+- utility capacity component와 bath condition component를 weak identity로 등록한다.
+- 같은 object의 중복 register/unregister가 합계나 revision을 중복 변경하지 않게 한다.
+- invalid weak entries를 안전하게 prune한다.
+- capacity total, bath demand와 topology/capacity revision을 제공한다.
+- silent stage/rollback과 최종 publication을 구분해 placement transaction에서 delegate storm이 생기지 않게 한다.
+- delegate callback 재진입을 고려해 publication 중 registry 변경이 유실되지 않게 한다.
 
-기존 reflected 이름과 signature를 rename/delete하지 않는다.
+### Demand
 
-- `BathWaterState` default subobject
-- `WaterState`, `NormalizedAmount`
-- `GetWaterState`, `GetNormalizedAmount`, `IsEmpty`
-- `SetWaterState`, `SetNormalizedAmount`
-- `OnWaterStateChanged`
-
-`WaterState`, `NormalizedAmount`는 runtime-owned `VisibleInstanceOnly, BlueprintReadOnly, Transient`로 전환한다. 기존 두 public setter는 `DeprecatedFunction` metadata를 붙여 한 migration cycle 보존하되 canonical runtime과 신규 tests에서는 사용하지 않는다. Core Redirect는 추가하지 않는다.
-
-## `UBathWaterStateComponent`
-
-Authoring 값:
-
-```cpp
-UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Bath Water|Flow",
-    meta=(ClampMin="0.0"))
-float FillRatePercentPerSecond = 6.666667f;
-
-UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Bath Water|Flow",
-    meta=(ClampMin="0.0"))
-float DrainRatePercentPerSecond = 10.0f;
-```
-
-두 값은 Class Default와 instance override를 허용한다. runtime getter는 finite/non-negative를 방어하며 invalid authoring은 `IsDataValid()` 실패다.
-
-State owner가 제공할 최소 query:
+각 bath의 수요는 component authoring 값을 사용한다.
 
 ```text
-GetNormalizedAmount()
-GetWaterPercent()
-GetWaterState()
-IsEmpty()
-IsCustomerUsable()
-IsControlOpen(ControlType)
-IsRecoveryFrozen()
-CanSetControlOpen(ControlType, bOpen, OutFailure)
+Circulation = MaxCirculationDemandPoints * CirculationPercent / 100
+Heating = max(TargetC - AmbientC, 0) * HeatingDemandPointsPerC
+Cooling = max(AmbientC - TargetC, 0) * CoolingDemandPointsPerC
 ```
 
-Mutation API는 native only로 유지한다.
+- water amount와 actual temperature는 demand에 영향을 주지 않는다.
+- heating과 cooling을 동시에 예약하지 않는다.
+- aggregate는 bath identity별 정확히 한 항목을 가진다.
+
+### Setting Request
+
+순환도/목표 온도 변경은 subsystem request 하나를 통해 처리한다.
+
+1. target bath와 proposed 값을 검증한다.
+2. 범위/step으로 정규화한다.
+3. 현재 bath demand를 빼고 candidate demand를 더한 aggregate를 계산한다.
+4. capacity 이하인 최대 committed 값을 결정한다.
+5. bath component state와 ledger를 한 commit 경계에서 갱신한다.
+6. result에 requested, committed, 제한 종류와 부족 포인트를 반환한다.
+
+필수 정책:
+
+- 값을 낮추는 방향은 world가 이미 deficit이어도 허용한다.
+- target이 ambient를 건너면 기존 종류 수요를 0으로 만든 뒤 반대 종류 capacity로 제한한다.
+- 다른 bath 설정을 변경하거나 비례 배분하지 않는다.
+- 실패 시 bath/ledger를 원상 유지한다.
+- total이 0이면 circulation은 0을 넘지 못하고 target은 해당 방향으로 ambient를 벗어나지 못한다.
+
+### Availability And Removal
+
+- kind별 `IsDemandSatisfied`와 bath effect availability를 제공한다.
+- circulation deficit은 해당 circulation을 요구하는 bath의 cleaning과 thermal을 모두 중지한다.
+- heating/cooling deficit은 해당 thermal 방향만 중지한다.
+- 정상 provider 회수 전 post-removal total이 current used 이상인지 검사한다.
+- 부족하면 kind, 부족 포인트와 interaction 실패 이유를 반환한다.
+- 예상치 않은 provider 소실은 bath 설정을 바꾸지 않고 deficit을 publish한다.
+- provider가 돌아와 aggregate가 다시 충분하면 effect가 자동 재개된다.
+
+## `UBathWaterUtilityCapacityComponent`
+
+필수 property:
 
 ```text
-RequestSetControlOpen(ControlType, bOpen, Reason, OutFailure)
-ResetEmptyForPlacement()
-BeginRecoveryFreeze(OutFailure)
-CancelRecoveryFreeze()
-PrepareRecoveryCommit()
+CapacityKind: EditDefaultsOnly
+CapacityPoints: EditAnywhere, default 100
 ```
 
-필요 delegate:
+- 종류는 Blueprint class 단위로 고정하고 instance에서 바꾸지 않는다.
+- 용량은 Blueprint default/Level instance override를 허용한다.
+- 음수·NaN을 등록하지 않는다.
+- registration state를 idempotent하게 추적하되 aggregate 정본은 subsystem이다.
+- component가 임의 BeginPlay world scan이나 Tick을 하지 않는다.
 
-- amount previous/current normalized
-- derived water state previous/current
-- customer usability changed
-- control type/open state/change reason
-- recovery freeze changed
+## `ABathWaterUtilityFacilityActor`
 
-Blueprint는 delegate를 읽어 표현할 수 있지만 mutation API를 호출하지 않는다.
+독립 actor로 구현한다. `ATowelProcessingMachineActor`와 기존 placeable actors의 계약을 실제 Source에서 대조해 필요한 interface를 동일하게 구현한다.
 
-### 물 계산
+필수 composition:
 
-Actor Tick을 사용하지 않고 state component Tick만 필요할 때 활성화한다.
+- scene root
+- package/free-world physics primitive
+- `VisualMesh`
+- `PlacementFootprint`
+- `UFacilityPlacementComponent`
+- `UBathWaterUtilityCapacityComponent`
+
+필수 동작:
+
+- placed 상태에서만 provider를 등록한다.
+- packaged item/preview/staged 상태는 total에 포함하지 않는다.
+- customer facility subsystem과 use slot에 등록하지 않는다.
+- primary direct action이나 On/Off를 제공하지 않는다.
+- 기존 supplemental Q recovery prompt/hold/transaction을 사용한다.
+- recovery query는 post-removal capacity를 먼저 확인한다.
+- staged unregister, rollback re-register, commit publication이 정확히 한 번 일어난다.
+- pre-placed BeginPlay와 unexpected EndPlay를 idempotent하게 처리한다.
+- collision/navigation/held/drop/preview는 Placement와 Physical Carry 계약을 그대로 사용한다.
+
+세 설비 종류를 native subclass 세 개로 만들 필요는 없다. Editor에서 같은 native parent의 세 Blueprint가 `CapacityKind`와 visuals/definition을 authoring할 수 있게 한다.
+
+## Utility Typed Payload
+
+`UBathWaterUtilityPlacementInstanceData`를 `UFacilityPlacementInstanceData`에서 파생한다.
+
+- per-instance capacity를 export/import한다.
+- payload kind와 target class-default kind가 다르면 fail closed한다.
+- invalid capacity는 restore하지 않는다.
+- install transaction이 실패하면 item/payload를 보존한다.
+- placed actor domain/collision commit 뒤에만 held item을 제거한다.
+- actual temperature, contamination이나 bath setting은 이 payload에 넣지 않는다.
+
+## `UBathWaterConditionComponent`
+
+`ABathhouseBathFacilityActor`의 native default subobject로 생성한다.
+
+### Authoring Properties
 
 ```text
-NetPercentPerSecond
-  = (FillOpen ? FillRatePercentPerSecond : 0)
-  - (DrainOpen ? DrainRatePercentPerSecond : 0)
-
-NewNormalized
-  = Clamp(CurrentNormalized
-          + NetPercentPerSecond * 0.01 * DeltaSeconds,
-          0, 1)
+MaxCirculationDemandPoints = 100
+HeatingDemandPointsPerC = 5
+CoolingDemandPointsPerC = 5
+CleaningRateAtFullCirculationPercentPointsPerSecond = 1
+ContaminationPerBatherPercentPointsPerSecond = 0.1
+MaxTargetControlRateCPerSecond = 0.5
+NaturalReturnRateCPerSecond = 0.05
+TemperatureEpsilonC = small positive default
 ```
 
-- endpoint에 도달하면 exact `0.0f`/`1.0f`로 snap한다.
-- `IsEmpty()`는 derived enum이 아니라 exact normalized endpoint를 사용한다.
-- 순유량 양수/음수는 `Filling/Draining`, 중간에서 0이면 `Holding`, endpoint는 `Empty/Filled`다.
-- 실제 amount가 변하지 않으면 amount delegate를 발행하지 않는다.
-- global threshold의 이전/현재 usable 결과가 다를 때만 usability delegate를 한 번 발행한다.
-- 두 control이 닫히거나 endpoint에서 현재 open 조합으로 변할 수 없으면 Tick을 끈다. control state change가 다시 평가해 Tick을 켠다.
-- drain은 0%에서 open을 유지할 수 있다.
-- fill이 100%에 도달하면 같은 update에서 논리적으로 닫고 `FullAutoClose` control event를 보낸다.
-- fill과 drain이 동시에 열리면 한 번의 net delta만 commit한다.
+- balance 값은 `EditAnywhere`로 bath Blueprint default와 Level instance override를 허용한다.
+- epsilon은 `EditDefaultsOnly`로 둔다.
+- 모든 demand/rate는 finite, nonnegative validation을 한다.
+- thermal threshold percent는 저장 property가 아니라 `NaturalReturnRate / MaxTargetControlRate * 100` 파생 getter다.
+- max rate가 0인 경우 divide-by-zero 없이 target movement impossible 상태를 반환한다.
 
-### 초기화와 freeze snapshot
+### Runtime State
 
-`ResetEmptyForPlacement()`는 amount 0, control 둘 closed, derived Empty와 cached usability를 한 transaction으로 만든다. stale serialized state를 읽지 않는다.
+- circulation 0%
+- target ambient
+- actual ambient
+- contamination 0%
+- weak active-bather identity set
+- recovery freeze snapshot/guard
 
-recovery snapshot은 amount, 두 logical open 상태, derived/cached usability와 freeze 이전 Tick 상태를 가진다. control visual motion과 Niagara snapshot은 Bath Actor가 같은 hold lifecycle에서 보완한다.
+초기화 규칙:
 
-- begin은 snapshot 하나만 허용하고 water Tick을 멈춘다.
-- cancel은 exact state를 복원하고 필요한 Tick/delegate/publication을 복구한다.
-- prepare commit은 control을 closed로 만들되 source Actor destroy가 확정될 때까지 snapshot을 보존한다.
-- conversion rollback은 snapshot을 복원하고 source Actor destroy 성공은 EndPlay에서 snapshot을 폐기한다.
-- repeated begin/end는 fail 또는 no-op로 명확히 처리하며 snapshot을 덮어쓰지 않는다.
-- EndPlay는 callback 없이 snapshot을 버린다.
+- pre-placed bath와 새 placement 모두 global ambient/0/clean으로 시작한다.
+- 완전 배수 시 actual ambient, contamination 0으로 reset한다.
+- 회수 payload에 runtime condition state를 저장하지 않는다.
+- preview/staged/domain-inactive bath는 register/Tick하지 않는다.
 
-## `UBathWaterControlComponent`
+### Tick
 
-다음 상속을 사용한다.
+- water amount>0이고 recovery freeze가 아닐 때만 Tick한다.
+- `UBathWaterStateComponent` 뒤에 실행되도록 tick prerequisite를 설정한다.
+- flow mixing을 먼저 반영한 뒤 contamination과 thermal update를 수행한다.
+- snapshot/result delegate는 값이 실제 변할 때만 발생시킨다.
+- Actor Tick을 새로 켜지 않는다.
 
-```cpp
-UCLASS(ClassGroup=(Bathhouse), meta=(BlueprintSpawnableComponent))
-class UBathWaterControlComponent
-    : public UStaticMeshComponent
-    , public IPlayerInteractable
-```
+## `UBathWaterStateComponent` Flow Sample
 
-별도 Box/Shape collision을 만들지 않는다. `FPlayerInteractionContext.HitComponent` 자체가 이 component이고 기존 `UPlayerInteractionComponent::BuildInteraction()`의 component-first 경로를 그대로 사용한다.
+기존 water amount owner를 유지하고 새 native flow-step delegate만 추가한다.
 
-Constructor default:
-
-- query collision 활성
-- `Visibility=Block`
-- overlap/physics 불필요
-- `CanEverAffectNavigation=false`
-- Tick capability는 true지만 시작 disabled이며 회전 중에만 enabled
-
-Blueprint/instance가 collision profile을 바꿀 수 있으므로 runtime과 Data Validation에서 Static Mesh 존재, 실제 query collision과 Visibility Block을 확인한다. 기존 Player Interaction은 complex trace를 허용하므로 asset triangle collision을 그대로 사용할 수 있고 Simple Collision은 선택적인 성능 최적화다. usable collision geometry가 없으면 query를 숨기거나 실행 실패시키고 임의 proxy collision을 생성하지 않는다.
-
-Authoring property:
+sample 최소 필드:
 
 ```text
-ControlType              Visible/read-only; native Actor가 고정
-LocalRotationAxis        EditAnywhere, BlueprintReadOnly
-OpenAngleDegrees         EditAnywhere, BlueprintReadOnly
-RotationDurationSeconds  EditAnywhere, BlueprintReadOnly, > 0
+PreviousAmount
+IncomingAmount
+OutgoingAmount
+CurrentAmount
+DeltaSeconds
 ```
 
-component Relative Transform이 닫힌 authored pose이며 BeginPlay/PostInitialize 시 closed quaternion을 저장한다. Static Mesh pivot이 실제 회전 중심이다.
+정확성 조건:
 
-축 처리:
+- incoming은 1.0 clamp 뒤 실제로 받아들인 normalized water amount다.
+- outgoing은 0 clamp 뒤 실제로 제거된 amount다.
+- fill/drain이 동시에 같아 net amount가 0이어도 두 값과 sample을 보존한다.
+- 이 경우 mixing을 위해 water Tick을 중지하지 않는다.
+- 기존 amount-changed delegate는 amount가 실제 달라질 때만 발생한다.
+- endpoint auto-close와 control/Niagara 의미를 바꾸지 않는다.
+- freeze 중에는 flow sample과 변화가 없다.
 
-- local vector를 `GetSafeNormal()`로 정규화하되 음수 부호를 보존한다.
-- `(1,0,0), +90`과 `(-1,0,0), +90`은 반대 회전이다.
-- `(-1,0,0), +90`과 `(1,0,0), -90`은 같은 회전이다.
-- zero/non-finite vector는 validation/runtime failure다.
-- signed angle은 제한하지 않되 finite여야 한다.
-- open target은 authored closed basis에 local-axis delta quaternion을 합성한다.
+## Mixing
 
-회전 runtime:
+급수는 global ambient, contamination 0인 물이다.
 
-- logical toggle 승인 즉시 open state는 state component에서 바뀐다.
-- visual은 current quaternion을 start, open/closed를 target으로 저장하고 fixed ease-in/out alpha + quaternion slerp로 이동한다.
-- `RotationDurationSeconds`는 full traversal duration이다.
-- full auto-close가 opening 중 발생하면 current quaternion에서 closed로 즉시 반전하고 남은 angle/full angle 비율로 duration을 줄인다.
-- player가 회전 중 같은 component에 E를 누르면 `작동 중입니다`로 거부한다.
-- 다른 control component는 독립적으로 사용할 수 있다.
-- recovery freeze는 current quaternion, motion direction, elapsed/remaining duration과 tick state를 snapshot하고 정지한다. cancel은 그 위치와 남은 시간부터 복원한다.
-
-Interaction query/action:
-
-- owner가 `ABathhouseBathFacilityActor`이고 placed domain active일 때만 표시
-- current closed/open에 따라 열기/닫기 ActionName 구분
-- 100%의 closed fill은 `이미 물이 가득 차 있습니다`
-- 0%의 closed drain은 정상 open 허용
-- motion 중 `작동 중입니다`
-- recovery freeze 중 `설비 회수 중입니다`
-- carry 상태와 customer reservation/use는 거부 조건이 아님
-- execute에서 같은 조건을 재검증한 뒤 owner/state API에 intent 전달
-
-## `ABathhouseBathFacilityActor`
-
-`ABathhouseFacilityActor`의 파생 native class로 구현한다. 범용 base에 신규 water visual/control component를 넣지 않는다. 기존 base가 생성하는 stable `BathWaterState`를 그대로 사용한다.
-
-Native default subobject:
+flow step에서 retained old amount와 accepted incoming amount로 mass-weighted mixture를 계산한다.
 
 ```text
-SceneRoot
-├─ FillValveControl        UBathWaterControlComponent
-├─ DrainLeverControl       UBathWaterControlComponent
-├─ FillFlowNiagara         UNiagaraComponent
-└─ WaterPresentationRoot   USceneComponent
-   ├─ WaterSurfaceMover    USceneComponent
-   │  └─ WaterSurfaceMesh  UStaticMeshComponent
-   ├─ WaterLevelEmptyPoint USceneComponent
-   └─ WaterLevelFullPoint  USceneComponent
+RetainedOld = max(PreviousAmount - OutgoingAmount, 0)
+NewAmount = RetainedOld + IncomingAmount
+Temperature =
+  (RetainedOld * OldTemperature + IncomingAmount * Ambient) / NewAmount
+Contamination =
+  (RetainedOld * OldContamination) / NewAmount
 ```
 
-고정값:
+- 실제 state component의 simultaneous integration order와 clamp 결과에 맞춰 amount conservation을 보장한다.
+- drain-only는 remaining water의 temperature/concentration을 바꾸지 않는다.
+- empty 결과는 ambient/0으로 reset한다.
+- net-zero exchange도 incoming>0이면 temperature/contamination이 ambient/clean 방향으로 변한다.
+- 0 division, negative retained amount와 accumulated float drift를 방어한다.
 
-- FillValveControl kind = FillValve
-- DrainLeverControl kind = DrainLever
-- WaterSurfaceMesh collision/overlap/physics/navigation off
-- FillFlowNiagara AutoActivate false
-- Actor Tick off
+## Temperature Solver
 
-`PostInitializeComponents()` 또는 registration 이전 lifecycle에서 delegate를 idempotent하게 연결하고 empty/closed/hidden 초기 상태를 만든다. staged import와 선배치 BeginPlay 순서 모두 기존 Facility registration이 stale water usability를 publish하지 않게 한다. duplicate initialization은 no-op다.
+### Effect Gate
 
-수면 표현:
+active target force는 다음이 모두 참일 때만 계산한다.
+
+- water amount>0
+- circulation percent>0
+- aggregate circulation capacity가 circulation demand를 충족
+- target>ambient이면 aggregate heating capacity가 heating demand를 충족
+- target<ambient이면 aggregate cooling capacity가 cooling demand를 충족
+
+natural return은 water amount>0, not frozen이면 항상 존재한다.
+
+### Force Rules
 
 ```text
-Alpha = Clamp(BathWaterState.NormalizedAmount, 0, 1)
-Mover.RelativeLocation = Lerp(EmptyPoint.RelativeLocation,
-                              FullPoint.RelativeLocation,
-                              Alpha)
-WaterSurfaceMesh.Visible = Alpha > 0
+ActiveRate = MaxTargetControlRateCPerSecond * CirculationPercent / 100
+NaturalRate = NaturalReturnRateCPerSecond
 ```
 
-- 세 SceneComponent는 같은 `WaterPresentationRoot` local space여야 한다.
-- runtime은 mover location만 변경하고 mesh local rotation/scale/material은 건드리지 않는다.
-- 0에서도 mover는 EmptyPoint에 두되 mesh만 숨긴다.
-- future water asset도 평면 SM 계약이며 cube/volume 검사나 scale 표현을 만들지 않는다.
-- C++은 `/Game/Bathhouse/Meshes/Bath/Bath_01/StaticMeshes/SM_Bath_01_Water`를 load하지 않는다. Editor가 WaterSurfaceMesh에 연결한다.
+- active는 target 방향, natural은 ambient 방향이다.
+- 같은 방향이면 합하고 반대면 뺀다.
+- exact ambient에서 natural alone은 위치를 바꾸지 않지만 ambient 밖으로 출발하는 active에 저항한다.
+- exact ambient에서 active<=natural이면 ambient에 고정하고, active>natural일 때 차이만큼 target 방향으로 이동한다.
+- exact target에서 active>=natural이면 target을 유지하고, 부족하면 ambient 쪽으로 이탈한다.
+- target==ambient이면 active demand 0, natural로 actual을 ambient에 수렴시킨다.
+- active가 capacity 때문에 suspended면 natural만 적용한다.
 
-Niagara 표현:
+### Numeric Integration
 
-- fill logical open이고 recovery freeze가 아니며 auto-close 전일 때만 active
-- player close/full auto-close/recovery begin에서 즉시 deactivate
-- recovery cancel에서 snapshot이 fill open이면 다시 activate
-- drain state는 직접 Niagara를 바꾸지 않음
+- target/ambient 경계를 overshoot하지 않는다.
+- 한 frame에 경계를 통과할 수 있으면 경계까지 소비한 시간과 남은 시간을 나눠 힘 방향을 다시 계산한다.
+- epsilon 안에서는 해당 경계에 snap한다.
+- exact boundary에서 frame마다 부호가 반전하는 jitter를 만들지 않는다.
+- 큰 DeltaSeconds에서도 bounded loop 또는 닫힌 형태로 안정적으로 끝낸다. 무한 while을 만들지 않는다.
+- 기본값의 파생 threshold가 10%인지 test하되 판정식은 authoring 값을 사용한다.
 
-BlueprintImplementableEvent는 amount/usability/fill-flow 결과를 notification할 수 있지만 C++ 기본 표현을 대체하지 않는다.
+thermal status를 snapshot에 계산해 UI가 같은 규칙을 재구현하지 않게 한다.
 
-Actor는 `IsAvailableForReservation()`을 override해 enabled/placed-domain, global threshold와 recovery freeze를 모두 확인한다. usability crossing마다 Facility Subsystem에 Bath availability를 정확히 한 번 publish한다.
-
-`IsDataValid()`은 component 존재/종류, control axis/angle/duration/query collision, shared presentation parent, finite marker 위치, Empty/Full 구분, water plane collision/Nav off와 Niagara auto-activate off를 검사한다. mesh/Niagara asset 자체는 Source CDO에서 비어 있을 수 있지만 concrete `BP_Bath` Editor 통합에서는 필수다.
-
-## Facility Reservation 변경
-
-`ABathhouseFacilityActor`에 side-effect-free virtual `IsAvailableForReservation() const`를 추가한다. base는 기존 enabled/operational 조건만 반환하고 Bath subclass는 water 조건을 추가한다.
-
-`UBathhouseFacilitySubsystem::TryReserveRandomSlot()`은 다음 두 시점에 query한다.
-
-1. weighted candidate 수집
-2. `TryReserve()` 직전
-
-Bath의 last-used exclusion/fallback 양쪽이 같은 filter를 사용한다. `GetFacilitiesOfType()`처럼 topology 조회용 API 의미를 불필요하게 변경하지 않는다.
-
-water threshold crossing은 existing `NotifyFacilityAvailabilityChanged(Bath)`를 사용한다. 새 Subsystem과 반복 world scan을 만들지 않는다.
-
-## Placement Recovery Hold 확장
-
-`IPlaceableFacility`에 default no-op인 native begin/cancel hook을 추가한다.
+## Contamination Solver
 
 ```text
-TryBeginFacilityRecoveryHold(FText& OutFailureReason) -> bool
-CancelFacilityRecoveryHold()
+IncreaseRate = ActiveBatherCount * ContaminationPerBatherPercentPointsPerSecond
+CleaningRate = CleaningRateAtFullCirculationPercentPointsPerSecond * CirculationPercent / 100
+Delta = (IncreaseRate - EffectiveCleaningRate) * DeltaSeconds
 ```
 
-`UPlayerFacilityPlacementComponent` lifecycle:
+- 0~100으로 clamp한다.
+- circulation deficit이면 effective cleaning은 0이다.
+- heating/cooling deficit은 cleaning에 영향이 없다.
+- active-bather weak set에서 invalid entries를 prune한다.
+- 예약, 이동, 입장/퇴장, 탐색, knockdown은 active count에 포함하지 않는다.
+- contamination이 customer behavior를 바꾸지 않는다.
 
-1. `BeginRecoveryHold()`의 side-effect-free query 성공
-2. target hook begin 성공
-3. target/elapsed를 commit하고 Tick 시작
-4. 기존처럼 매 Tick trace와 recovery query 재검증
-5. release/gaze/condition/suppression에서 cancel exactly once
-6. full hold에서 conversion transaction 실행
-7. Bath domain-unregistration stage가 closed/flow-off commit-pending을 적용하되 snapshot 유지
-8. source destroy 성공이면 EndPlay에서 snapshot 폐기
-9. conversion 실패는 Bath rollback이 domain/collision과 snapshot을 복원하고 Player의 후속 cancel은 no-op
+## Customer Actual-Bather Integration
 
-Bath begin은 모든 slot Available/normalized 0을 다시 확인하고 water, control motion, Niagara를 한 snapshot으로 묶어 동결한다. hold 동안 `IsAvailableForReservation=false`로 새 reservation을 막는다. cancel은 원래 water/control/flow/tick과 availability를 복원한다. Bath의 `StagePlacedDomainUnregistration`/rollback override가 success-pending/복원을 기존 Actor conversion과 원자적으로 연결하고 water state는 payload에 넣지 않는다.
+기존 `UCustomerSessionComponent` actual segment 경계만 확장한다.
 
-generic placement transform, item spawn, collision/domain rollback과 publication 순서는 변경하지 않는다. hold hook 실패는 item/Actor mutation 전에 사용자 실패 결과를 반환한다.
+- `BeginActualBathSegment()`가 성공하는 transaction 안에서 현재 bath condition에 session identity를 등록한다.
+- condition 등록 실패 시 actual segment를 active로 commit하지 않는다.
+- `EndActualBathSegment()`는 reason과 관계없이 identity를 idempotent하게 unregister한다.
+- dwell complete, threshold invalidation, stay timeout, knockdown, StateTree exit, technical abort와 EndPlay 모든 기존 경로를 보존한다.
+- 중복 begin/end가 active count를 복제하거나 음수로 만들지 않는다.
+- StateTree asset과 task topology는 변경하지 않는다.
 
-## Customer Routine Data
+## Bath Actor Placement/Recovery Integration
 
-`UCustomerRoutineDefinition`에 다음 값을 추가한다.
+`ABathhouseBathFacilityActor`가 condition component를 조립한다.
 
-```cpp
-UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Bath",
-    meta=(ClampMin="0.1"))
-float BathSearchTimeoutSeconds = 10.0f;
-```
+- placed domain 활성화 시 condition/demand를 subsystem에 등록한다.
+- recovery hold begin은 water/control freeze와 condition freeze를 같은 guard로 commit한다.
+- hold 동안 demand reservation은 제거하지 않는다.
+- cancel은 water/control/condition snapshot과 Tick을 정확히 복원한다.
+- actual recovery stage에서 condition registry/demand를 silent unregister한다.
+- rollback은 condition registry와 snapshot을 정확히 한 번 복원한다.
+- success/EndPlay는 stale delegate, Tick과 active-bather reference를 정리한다.
+- recovery 조건 자체는 기존 all slots available + exact water 0을 유지한다.
 
-기존 Source default `BathStayDurationSeconds=60`, `BathDwellMinSeconds=10`, `BathDwellMaxSeconds=20`을 유지한다. Data Validation은 stay/search/dwell 값의 finite/positive와 min<=max를 확인한다.
+## Computer Actor Integration
 
-Editor 단계에서 현재 `DA_CustomerRoutine_Default.BathStayDurationSeconds=10`을 60으로 migration해야 하지만 이번 C++ 단계에서 asset을 수정하지 않는다.
+`ABathhouseComputerActor`에 다음을 추가한다.
 
-## `UCustomerSessionComponent` Bath 확장
+- `ManagedBathPlacementZone`: `EditInstanceOnly`, Blueprint read-only reference
+- management root context initialization helper
 
-새 상태:
+`BeginPlay()`에서 `ScreenWidget->InitWidget()` 뒤 실제 widget이 management root인지 검사하고 world subsystem과 Zone을 주입한다. sample widget이면 기존 동작을 그대로 유지한다.
 
-- bath search active/expired, end time, timer handle, paused remaining과 serial/iteration
-- actual bath accumulated seconds
-- active actual segment start world time와 guard
-- current Bath usability delegate handle
-- forced-exit pending/reason
+- Widget이 world를 검색해 Zone을 고르지 않는다.
+- invalid Zone이면 crash하지 않고 unavailable presentation을 설정한다.
+- focus/session/pointer/view/AA lifecycle은 변경하지 않는다.
+- `PrimaryUseAction` canonical LMB와 owner priority를 변경하지 않는다.
+- `ComputerClickAction` fallback을 제거하지 않는다.
 
-최소 API:
+## Native Management Widget Hierarchy
+
+다음 native base를 구현한다.
 
 ```text
-BeginBathSearchWindow()
-CompleteBathSearchWindow()
-CancelBathSearchWindow()
-IsBathSearchExpired()
-GetRemainingBathSearchSeconds()
-GetActualBathSeconds()
-IsCurrentBathUsable()
-IsCurrentBathExitPending()
-BeginActualBathSegment()
-EndActualBathSegment(Reason)
+UBathWaterManagementScreenWidget
+  UBathWaterCapacitySummaryWidget
+  UBathWaterMapWidget
+    dynamic UBathWaterBathTileWidget
+  UBathWaterDetailWidget
 ```
 
-Search window:
+### Root
 
-- 새 Bath가 필요한 logical 구간마다 한 번 시작
-- 이미 active면 retry/StateTree reselect가 호출해도 reset하지 않음
-- duration은 `min(BathSearchTimeoutSeconds, GetRemainingBathStaySeconds())`
-- reservation 성공 시 complete
-- timeout은 expired flag를 먼저 commit하고 `Customer.Event.BathSearchExpired`를 한 번 전송
-- 새 invalidation으로 다음 search가 필요하면 이전 window를 끝낸 뒤 새 serial로 시작
-- pause/resume timer 목록에 포함
+- subsystem/Zone context를 명시적으로 받는다.
+- child Widget을 최소 필수 `BindWidget`으로 가진다.
+- selected bath는 weak reference다.
+- construct/destruct/context 교체에서 delegate를 대칭 구독/해제한다.
+- lightweight snapshot은 `NativeTick` 또는 기존 lifecycle에 맞는 polling으로 갱신할 수 있다.
+- topology revision이 바뀔 때만 map tile set을 rebuild한다.
+- 연속 값은 cached presentation과 다를 때만 child에 적용한다.
+- selected bath가 제거되면 selection/detail을 지운다.
+- focus-out은 widget을 파괴하지 않으므로 state를 유지한다.
 
-Actual segment:
+### Capacity Summary
 
-- valid Bath action snap + `BeginUseCurrentFacility()` 이후에만 시작
-- world-time timestamp 차이를 accumulated 값에 한 번 합산
-- threshold 하락, dwell/전체 stay 종료, knockdown suspend, StateTree abort, technical abort와 EndPlay에서 즉시/idempotent 종료
-- movement/search/entry/exit/reservation-only와 paused knockdown 구간 제외
-- 여러 Bath의 segment를 합산
-- HUD/satisfaction/SaveGame에 연결하지 않음
+- circulation/heating/cooling별 used, total, deficit만 표시한다.
+- formatting/visibility는 C++이 적용하고 WBP는 layout/style만 담당한다.
 
-Current Bath delegate:
+### Map
 
-- reservation 성공 시 해당 `UBathWaterStateComponent` usability delegate bind
-- release/switch/cleanup/EndPlay에서 exact handle unbind
-- moving/reserved 상태에서 false면 actual segment 없이 invalid event
-- occupied/BathDwell에서 false면 segment를 즉시 중지하고 exit-pending commit 후 event
-- same invalid state 반복 broadcast/event 방지
-- approach 복귀/release 완료 전 slot은 유지
-- threshold 상승은 exit-pending을 해제하지 않음
+- injected PlacementZone world bounds를 지도 rect로 사용한다.
+- world +X -> screen up, world +Y -> screen right다.
+- Zone 안에 있는 registered bath만 표시한다.
+- bath footprint 네 모서리를 투영해 size와 yaw를 표시한다.
+- utility와 다른 facility는 표시하지 않는다.
+- dynamic tile class를 Editor에서 지정할 수 있게 하되 invalid class를 안전 처리한다.
 
-`SnapCurrentFacility(ActionPoint)`와 `BeginUseCurrentFacility()`는 Bath일 때 바로 직전 usability를 재검증한다. knockdown resume도 같은 query를 사용하며 invalid면 기존 slot을 다른 customer에게 노출하기 전에 exit/cleanup 경로로 넘긴다.
+### Tile
 
-전체 BathStay expiry handler는 actual segment와 search window를 먼저 중지하고 기존 event를 보낸다. `PauseRoutineTimers/ResumeRoutineTimers`는 BathStay와 search timer를 함께 다루고 active actual segment는 pause에서 합산 종료, valid resume 후 재시작한다.
+- bath 이름, actual temperature, contamination, thermal status를 표시한다.
+- click은 bath selection intent를 root에 전달한다.
+- actor를 직접 mutate하거나 subsystem을 world에서 찾지 않는다.
 
-## StateTree와 BathLoop
+### Detail
 
-`BathhouseCustomerTypes`에 native gameplay tag를 추가한다.
+- water amount, actual/target temperature, contamination, circulation, kind별 demand, thermal status와 derived threshold를 표시한다.
+- circulation slider와 target slider intent를 root/subsystem request로 전달한다.
+- committed value와 failure/limited result를 화면에 반영한다.
+- slider가 condition property를 직접 set하지 않는다.
+- target slider는 global min/max/step, circulation은 0~100 연속 범위를 사용한다.
 
-```text
-Customer.Event.BathSearchExpired
-Customer.Event.BathBecameUnusable
-```
+### BindWidget Naming
 
-기존 `Customer.Event.BathStayExpired`는 유지한다. 기존 generic task 이름을 불필요하게 rename/delete하지 않는다.
+명확하고 안정적인 필수 이름을 header에 정의한다. 기존 sample widget의 `TestButton`, `ClickResultText`는 변경하지 않는다. 구현 완료 뒤 정확한 새 이름·타입을 결과 보고와 `.md/USER_UNREAL.md`에 넘길 수 있게 목록화한다.
 
-Native Task 변경:
+Widget Blueprint event 없이 native 로직이 동작해야 한다. Blueprint hook은 선택적 시각 효과만 허용한다.
 
-- Bath `FCustomerFacilityTask` 진입은 search window를 idempotent하게 시작하고 usable Bath만 예약한다.
-- reservation 성공 시 search window를 complete한다.
-- Tick은 search/전체 expiry를 검사해 더 이상 retry하지 않는다.
-- task exit은 active Bath activity를 actual segment 종료 후 approach 복귀, release 순으로 정리한다.
-- `FCustomerFacilityTargetTask`, move 결과와 snap/begin-use 경로는 pre-entry usability failure를 구분한다.
-- BathDwell duration은 기존 random `10~20초`와 남은 전체시간 중 작은 값이다.
-- generic montage task는 current activity가 BathDwell일 때 bath-stay expiry와 usability invalidation에 안전하게 종료되며 다른 activity 의미는 유지한다.
-- Condition은 query-only이고 timer, reservation, actual segment를 변경하지 않는다.
+## Logging
 
-Editor 인계를 위한 기대 StateTree 흐름을 `.md/PROMPT_UNREAL.md`에 기록하되 이번 단계에서 asset을 열거나 저장하지 않는다.
+새 log category를 하나 두거나 기존 bath log 체계와 충돌하지 않는 category를 사용한다.
 
-```text
-Start Bath Stay
-→ BathLoop
-   → Start/Continue Search
-   → Reserve Usable Bath
-   → Move To Approach
-   → Revalidate / Snap / Begin Use
-   → BathDwell
-   → Return Approach / Release
-   → 남은 시간: 새 Search
-   → SearchExpired 또는 BathStayExpired: Main Shower
-```
+- Log: provider/bath structural register/unregister, unexpected capacity deficit/resume
+- Verbose: setting request 제한, demand/total 변화, selection/topology refresh
+- Warning: invalid authoring, missing Zone, recoverable registration/import failure
+- Error: duplicate identity invariant, mismatched payload kind, rollback 실패
 
-`BathBecameUnusable`는 Move/PreEntry/Dwell에서 각각 cleanup/exit branch로 전이한다. Dwell exit은 actual segment가 handler에서 이미 멈췄더라도 idempotent하다. 수위가 다시 오르는 event로 진행 중 exit을 역전하지 않는다.
-
-## BathLoop 로그
-
-공유 category:
-
-```cpp
-DECLARE_LOG_CATEGORY_EXTERN(LogBathhouseCustomerBath, Log, All);
-```
-
-`CustomerBathLoopLog.cpp`에서 한 번 define한다. Blueprint Print String과 `LogTemp`를 신규 BathLoop 경로에 사용하지 않는다.
-
-internal diagnostic reason은 최소 다음을 구분한다.
-
-```text
-NoBathCandidate
-WaterBelowThreshold
-NoAvailableSlot
-ReservationLost
-NavigationFailed
-EntryValidationFailed
-DwellCompleted
-BathStayExpired
-SearchExpired
-KnockdownInterrupted
-StateTreeExited
-TechnicalFailure
-```
-
-로그 수준:
-
-- Log: loop/search/dwell begin/end, reservation success, forced exit, timeout, final advance
-- Verbose: candidate/rejection aggregate, retry, move/pre-entry validation
-- Warning: recoverable navigation/recovery failure
-- Error: invariant violation only
-
-공통 필드는 가능한 경우 한 줄에 다음 순서로 쓴다.
-
-```text
-Customer Iteration Phase BathActor Slot WaterPercent ThresholdPercent
-BathStayRemaining ActualBathSeconds SearchElapsed Result Reason
-```
-
-매 Tick, amount frame update, 같은 condition 반복 평가를 Log/Warning으로 출력하지 않는다. normal no-candidate retry는 Verbose다. `ST_CustomerRoutine` graph transition 자체 문제는 Editor에서 `LogStateTree VeryVerbose`와 StateTree Debugger를 함께 사용한다.
-
-## Presentation과 Blueprint API
-
-새 native component는 `VisibleAnywhere, BlueprintReadOnly`와 stable 이름으로 파생 Blueprint에 보인다. 조정값만 `EditAnywhere, BlueprintReadOnly`다. runtime state setter를 BlueprintCallable로 추가하지 않는다.
-
-Editor authoring 경로:
-
-```text
-Project Settings → Game → Bath Water
-  CustomerUsableThresholdPercent = 80
-
-BP_Bath Class Defaults / Level instance
-  BathWaterState.FillRatePercentPerSecond = 6.666667
-  BathWaterState.DrainRatePercentPerSecond = 10
-  FillValveControl.LocalRotationAxis/OpenAngleDegrees/RotationDurationSeconds
-  DrainLeverControl.LocalRotationAxis/OpenAngleDegrees/RotationDurationSeconds
-  WaterLevelEmptyPoint / WaterLevelFullPoint Relative Location
-```
-
-asset 연결은 후속 Unreal 단계다.
-
-- `WaterSurfaceMesh`: `/Game/Bathhouse/Meshes/Bath/Bath_01/StaticMeshes/SM_Bath_01_Water`
-- control: 서로 분리되고 올바른 pivot/query collision geometry를 가진 valve/lever SM
-- `FillFlowNiagara`: 사용자가 확정한 물줄기 System, AutoActivate false
-
-현재 분리 control mesh가 없으므로 구현자가 임의 Engine Cube, combined Hardware, proxy Box 또는 `NS_HoneyBeam`으로 기능 완료를 주장하지 않는다.
-
-## Lifecycle과 rollback 순서
-
-### 선배치/신규 Bath
-
-1. native/BP components 등록
-2. control authored closed pose capture와 delegate bind
-3. water empty/closed, surface/flow hidden 초기화
-4. existing Facility registration/placement domain 활성화
-5. threshold default 기준 availability publication
-
-### Water threshold 하락
-
-1. amount commit
-2. usability crossing commit
-3. Bath Facility availability publication
-4. bound session actual segment stop/exit-pending commit
-5. customer gameplay event
-6. StateTree approach 복귀
-7. slot release와 next search/next shower
-
-### Recovery hold cancel/failure
-
-1. placement hold 종료 결정
-2. conversion이 시작됐다면 기존 domain/collision rollback 완료
-3. Bath rollback 또는 cancel hook으로 water/control/Niagara snapshot 복원
-4. reservation availability 재활성화/publication
-5. target/query/result refresh
-
-### Recovery success
-
-1. hold snapshot 유지한 채 existing conversion transaction
-2. Bath domain-unregistration stage에서 controls closed/flow off를 적용하되 snapshot 유지
-3. payload에 water 미포함, domain/collision 비활성 원본 마지막 제거
-4. source EndPlay에서 snapshot 폐기
-5. recovery item physics/publication
+매 Tick 수온/오염도와 UI polling을 기본 Log에 출력하지 않는다. 테스트가 로그 문자열 자체에 의존하지 않게 한다.
 
 ## Native Automation
 
-새 focused automation은 최소 다음을 포함한다.
+기존 test helper 패턴을 재사용하고 가능한 순수 계산은 world 없는 testable helper로 분리한다. 최소 검증 목록:
 
-### Water state
+### Settings And Demand
 
-- default global threshold 80%, exact boundary `0.7999` false/`0.8` true
-- settings getter clamp/finite defense와 모든 Bath 동일값
-- fill-only, drain-only, both-open net rate, both-closed hold
-- `6.666667%/s` 약 15초 fill, `10%/s` 약 10초 drain
-- exact 0/1 endpoint, drain-open-at-zero, full auto-close
-- amount/state/usability/control delegate actual transition once
-- staged/pre-placed reset empty and deprecated setter not used by canonical test
+- default ambient/range/step와 invalid 값 방어
+- target step quantization이 ambient anchor를 사용
+- circulation/heating/cooling demand 공식
+- empty bath도 demand를 예약
+- heating/cooling 상호 배제
 
-### Control/interaction
+### Registry And Requests
 
-- hit component가 직접 `IPlayerInteractable`이고 separate Box가 없음
-- component collision query/Visibility/nav defaults
-- open/close action/failure, full fill rejection와 empty drain allowance
-- moving re-input rejection and other control independence
-- `(1,0,0)`/`(-1,0,0)` opposite, negative-axis+positive-angle equivalence
-- zero/non-finite axis and duration validation
-- opening 중 full auto-close current angle reversal
-- authored closed pose exact return and tick disable
+- provider 중복 등록/해제 no-op
+- 종류별 total 독립 합산
+- selected bath replacement aggregate
+- capacity 이하 request commit
+- 초과 request 최대 허용값 clamp와 failure details
+- decrease always allowed
+- ambient cross-over에서 old kind release 후 new kind 제한
+- invalid/NaN request rollback
 
-### Presentation
+### Recovery And Payload
 
-- amount `0/0.25/0.5/0.8/1`에서 exact vector Lerp
-- 0 hidden, positive visible, full point exact
-- WaterSurfaceMesh rotation/scale/material 불변
-- collision/physics/navigation off
-- fill Niagara state and recovery freeze/cancel restore
+- post-removal capacity 허용/거부
+- 거부 시 actor/provider/item 상태 불변
+- silent stage + rollback exact once
+- unexpected provider loss preserves settings and suspends effects
+- capacity restore auto resumes
+- payload capacity round trip
+- mismatched kind/invalid capacity fail closed
 
-### Facility/customer
+### Water Mixing
 
-- threshold 미만 Bath/slot candidate 제외와 exact threshold 포함
-- last-bath fallback도 usability filter 유지
-- threshold crossing facility notification once
-- movement/pre-entry invalidation cleanup
-- multiple occupied sessions의 threshold 하락 event와 approach-before-release
-- rising threshold가 exit-pending을 취소하지 않음
-- search timer 10초/remaining-total clamp, retry no reset와 new cause new window
-- actual dwell excludes search/move/entry/exit/knockdown and sums multiple segments
-- total expiry/search expiry event exactly once and no satisfaction mutation
-- knockdown pause/resume current water revalidation
+- fill only ambient/clean weighted mixture
+- drain only temperature/concentration preservation
+- simultaneous equal fill/drain에서 amount 불변 + mixing 발생
+- endpoint accepted inflow/outflow clamp
+- complete drain ambient/clean reset
+- recovery freeze 동안 no flow/no condition change
 
-### Recovery
+### Temperature
 
-- Q Hold begin at empty/open-fill state freezes amount/control motion and hides flow
-- hold 동안 threshold 0 설정에서도 reservation 불가
-- release/gaze/suppression/condition cancel exactly once; successful or unexpected EndPlay discards snapshot without restore callback
-- cancel and injected conversion failures restore exact amount/logical state/quaternion/remaining motion/flow
-- success closes controls, discards state and new placement starts empty
-- repeated hook calls do not overwrite snapshot or duplicate publication
+- 기본 derived threshold 10%
+- exact ambient에서 10% 이하 유지, 초과 출발
+- ambient와 target 사이에서 below/at/above threshold 방향
+- exact target에서 충분/부족 active force 유지/이탈
+- target==ambient natural return
+- same-direction active+natural 합산
+- circulation/heating/cooling deficit gate
+- 큰 DeltaSeconds 경계 통과와 epsilon non-jitter
+- max active rate 0과 natural rate 0 경계
+
+### Contamination And Customer
+
+- active-bather 수만 증가율에 포함
+- weak identity 중복 begin/end no-op
+- cleaning rate circulation 비례
+- circulation deficit은 cleaning 0, heat/cool deficit은 cleaning 유지
+- 0~100 clamp
+- knockdown/abort/EndPlay cleanup
+
+### Computer UI Contract
+
+- computer management root context injection
+- sample widget compatibility
+- missing Zone unavailable state
+- world +X up/+Y right projection
+- footprint size/yaw projection
+- non-bath filtering
+- topology revision에서만 tile rebuild
+- removed selected bath clears detail
+- slider가 subsystem transaction 결과만 반영
+- focus-out/re-entry가 widget instance state를 유지
 
 ### Regression
 
-- generic Facility reservation/slot, placement conversion/collision rollback tests
-- washer/dryer/locker recovery unaffected by default no-op hook
-- Interaction E/F/G/Q/LMB routing and prompt result unaffected
-- existing Bath snap and customer knockdown automation
+- 기존 Bath Water automation
+- Placement/recovery automation
+- Computer automation
+- Combat/PrimaryUse routing automation
+- Customer BathLoop automation
 
-테스트 helper가 settings CDO를 일시 변경하면 scope 종료 시 원래 값을 반드시 복원해 다른 test에 누출하지 않는다. UObject lifecycle이 필요한 검증은 실제 World/component registration을 사용하고 단순 setter만 검사해 성공을 과장하지 않는다.
+새 테스트를 통과시키기 위해 기존 테스트의 유효 계약을 약화하거나 삭제하지 않는다.
 
-## 빌드와 결과물
+## 빌드와 검증 순서
 
-1. `git diff --check`
-2. UE 5.8 정책의 `Build.bat BathhouseSimEditor Win64 Development`
-3. focused `BathhouseSim.BathWater` automation
-4. 관련 Facility/Placement/Customer/Interaction/Recovery automation
-5. 가능하면 전체 `BathhouseSim` automation
+1. 신규/수정 Source를 정적 검토한다.
+2. Unreal Editor가 실행 중인지 확인하고 실행 중이면 Live Coding/파일 잠금 위험을 보고한 뒤 안전한 경로를 사용한다.
+3. 프로젝트가 정한 `Build.bat`/UBT 경로로 `BathhouseSimEditor Win64 Development`를 빌드한다.
+4. 새 `BathWaterOperations` focused automation을 실행한다.
+5. 관련 BathWater, Placement, Computer, Customer와 PrimaryUse regression automation을 실행한다.
+6. 실패는 로그와 source cause를 분석해 수정하고 재실행한다.
+7. Source 구현 뒤 `.md/USER_UNREAL.md`의 기존 관련 지시를 삭제하지 말고, Editor 단계에 필요한 신규 Blueprint/WBP/Level authoring과 정확한 reflected 이름을 추가한다.
 
-구현자는 사용자 소유의 기존 dirty 파일과 asset을 되돌리거나 덮어쓰지 않는다. 특히 현재 Placement grid 후속 작업을 bath 작업으로 재작성하지 않는다.
+문서-only architecture diff를 구현 단계에서 임의로 되돌리지 않는다. 구현으로 설계의 실제 이름이나 경계가 달라졌다면 관련 architecture 문서와 구현 프롬프트를 최소 범위에서 동기화한다.
 
-완료 후 현재 Bath Water 작업만 담은 다음 결과물을 작성한다.
+## 완료 보고
 
-- `.md/PROMPT_REVIEW.md`: 변경 파일, 설계 준수, tests/build 결과와 남은 위험
-- `.md/PROMPT_UNREAL.md`: `BP_Bath` reparent, components/assets/collision/transforms, Project Settings, DataAsset와 `ST_CustomerRoutine` migration/검증
+다음을 간결하게 보고한다.
 
-Unreal 인계에는 최소 다음을 명시한다.
+- 추가·수정한 Source 파일과 책임
+- capacity/setting/recovery transaction의 실제 구현 경계
+- temperature exact-ambient 저항과 파생 threshold 구현 방식
+- net-zero exchange mixing 처리
+- actual-bather cleanup 처리
+- management Widget의 정확한 `BindWidget` 이름·타입
+- 실행한 build/test 명령과 결과
+- 남은 코드 위험 또는 미검증 사항
+- Unreal Editor 단계에서 필요한 asset, Blueprint parent/component/값, WBP hierarchy와 Level reference
 
-- `BP_Bath` parent를 `ABathhouseBathFacilityActor`로 변경하고 compile/resave
-- inherited control component에 분리 valve/lever mesh, query collision, Visibility Block, local axis/signed angle/duration 지정
-- `WaterSurfaceMesh`에 `SM_Bath_01_Water`, Empty/Full marker와 plane local transform 지정
-- 최종 물줄기 Niagara와 transform 지정; `NS_HoneyBeam`을 근거 없이 재사용하지 않음
-- global threshold 80, rates 6.666667/10 확인
-- `DA_CustomerRoutine_Default` BathStay 60, BathSearch 10, dwell 10~20 저장
-- 실제 `ST_CustomerRoutine.BathLoop` hierarchy/task/binding을 열어 두 신규 event와 search/revalidation/exit flow 연결
-- BathLoop category와 `LogStateTree VeryVerbose`를 사용한 PIE 로그 검증
-- `Bath`, `Bath2` instance의 missing visual/Approach override를 의도와 migration 오류로 구분
-- 분리 control mesh나 StateTree 편집이 MCP로 불가능하면 우회하지 않고 `.md/USER_UNREAL.md`에 exact blocker 기록
+Source, build와 native automation이 끝났더라도 Content 작업은 완료로 간주하지 않는다. Editor 변경은 별도 코드 리뷰와 Unreal 단계에서 수행한다.

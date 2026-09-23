@@ -1,5 +1,35 @@
 # 사용자 Unreal 후속 작업
 
+# 욕탕 물 순환·가열·냉각과 컴퓨터 제어
+
+## 관리 화면 직접 플레이 검증
+
+관리 WBP 5개의 대비·배치와 지도 `GridCanvas`, 중첩 `BathMap.BathTileWidgetClass`가 저장됐다. native 격자·욕탕명과 종료 중 갱신 방지 코드는 UE 5.8 Editor DLL로 링크됐다. 자동 PIE의 1024×576 RenderTarget에서 Zone 격자·경계와 욕탕 타일 2개, 전체 폭 capacity summary, detail 패널이 보였다. 타일 Button `OnClicked` 이벤트 호출로 Bath 선택과 두 slider 활성화도 확인했다. 이는 실제 마우스 hit test를 대신하지 않는다.
+
+사용자 Editor를 새로 열고 PIE에서 컴퓨터 Focus 후 두 타일을 각각 **실제 LMB로** 클릭해 선택 강조, 상세 패널, 두 slider가 갱신되는지 확인한다. 이어 slider를 움직여 feedback과 욕탕 값 변화를 확인한다. 클릭되지 않으면 조준 위치와 타일 hit test를 보고한다. 기존 sample 화면에서 LMB 클릭이 성공했으므로 입력 매핑은 임의 변경하지 않았다.
+
+## 현재 상태
+
+C++ Source와 코드 단계 검증은 완료됐다. Unreal Editor API/Python으로 다음 Content/Level 저장 상태를 확인했다.
+
+- `BP_Circulator`, `BP_Boiler`, `BP_Cooler`와 대응 Placement Definition 3개, 관리 WBP 5개는 생성·Compile·개별 Save됐다.
+- utility visual은 모두 `/Game/Bathhouse/Meshes/SM_Facility_sample`, recovery mesh는 `None`으로 native Cube fallback을 사용한다. Boiler/Cooler footprint는 100×60cm, Circulator는 120×80cm이며 높이는 모두 120cm다.
+- `BP_Bath`에는 inherited `BathWaterCondition`이 정확히 하나 있으며 demand/rate 7개가 모두 native 기본값과 일치한다.
+- Bath Water Project Settings는 ambient `20°C`, target `10~50°C`, step `1°C`로 일치하므로 Config 변경이 필요 없다.
+- `BP_BathhouseComputer.ScreenWidget.WidgetClass`는 `/Game/Bathhouse/UI/WBP_BathWaterManagementScreen`을 사용하며 World Space, Draw Size `1024×576`, Hardware Input `false`를 유지한다.
+- DefaultMap exact computer instance의 `ManagedBathPlacementZone`은 지정된 `BP_FacilityPlacementZone` actor를 참조한다. 해당 World Partition external actor package만 저장하고 재로드로 참조 유지 확인했다.
+- WBP 5개는 native parent, 필수 `BindWidget` 이름·타입, Map CDO와 중첩 템플릿의 tile class, Canvas clipping을 검사했다. 여섯 Blueprint의 Data Validation은 `VALID`다. PIE에서 타일 2개 생성과 Button 이벤트 이후 상세·slider 갱신을 확인했다.
+
+## 남은 Editor 작업
+
+1. `.md/PROMPT_UNREAL.md`의 PIE 14개 시나리오로 capacity/demand clamp, 지도 projection, 실제 LMB 선택, slider/feedback, deficit, utility와 Bath recovery transaction을 직접 검증한다. 자동 PIE는 RenderTarget과 Button 이벤트까지만 확인했으며 물 제어 전체 수용을 선언하지 않는다.
+
+Utility Definition 3개는 새 Editor에서 Data Validation `VALID`였다. 각각 recovery mesh `None`에 대한 native Cube fallback 경고만 있다. 새 Editor에서 컴퓨터의 Level Zone 참조와 화면 Widget 연결도 재확인했다.
+
+## 유틸리티 임시 표현 결정
+
+사용자 승인에 따라 세 utility 모두 `/Game/Bathhouse/Meshes/SM_Facility_sample`을 임시 visual로 사용하고, recovery mesh는 비워 native Cube fallback을 사용한다. Boiler/Cooler는 100×60×120cm, Circulator는 120×80×120cm로 저장했다. 최종 art 교체 시 Blueprint 클래스·Capacity 종류·StableId는 유지하고 VisualMesh scale과 PlacementFootprint만 실제 mesh에 맞춰 다시 authoring한다.
+
 # 급수·배수 시스템과 욕탕 물 수직 구현
 
 ## 현재 상태

@@ -6,6 +6,7 @@
 #include "BathhouseBathFacilityActor.generated.h"
 
 class UBathWaterControlComponent;
+class UBathWaterConditionComponent;
 class UNiagaraComponent;
 class UStaticMeshComponent;
 
@@ -21,10 +22,13 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual bool IsAvailableForReservation() const override;
+	virtual bool StagePlacedDomainRegistration(FText& OutFailureReason) override;
+	virtual void RollbackPlacedDomainRegistration() override;
 	virtual bool TryBeginFacilityRecoveryHold(FText& OutFailureReason) override;
 	virtual void CancelFacilityRecoveryHold() override;
 	virtual bool StagePlacedDomainUnregistration(FFacilityPlacementPublication& OutPublication, FText& OutFailureReason) override;
 	virtual bool RollbackPlacedDomainUnregistration(FText& OutFailureReason) override;
+	virtual void PublishPlacedDomainRegistration() override;
 #if WITH_EDITOR
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
@@ -40,6 +44,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Bath Water|Components")
 	UStaticMeshComponent* GetWaterSurfaceMesh() const { return WaterSurfaceMesh; }
+
+	UFUNCTION(BlueprintPure, Category = "Bath Water|Components")
+	UBathWaterConditionComponent* GetBathWaterCondition() const { return BathWaterCondition; }
 
 	UFUNCTION(BlueprintPure, Category = "Bath Water|Components")
 	USceneComponent* GetWaterLevelEmptyPoint() const { return WaterLevelEmptyPoint; }
@@ -81,6 +88,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Bath Water|Presentation")
 	TObjectPtr<USceneComponent> WaterLevelFullPoint;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Bath Water|Condition")
+	TObjectPtr<UBathWaterConditionComponent> BathWaterCondition;
+
 private:
 	void InitializeBathWaterRuntime();
 	void UnbindBathWaterDelegates();
@@ -101,4 +111,5 @@ private:
 	bool bRecoveryHoldActive = false;
 	bool bRecoveryCommitPending = false;
 	bool bRecoveryFlowWasActive = false;
+	bool bConditionDomainRegistered = false;
 };

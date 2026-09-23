@@ -8,6 +8,18 @@
 
 기존 `FacilityVisual`, `PlacementFootprint`, `FacilityPlacement`, `FacilitySlotA~C`와 슬롯 transform은 유지한다. Level instance에는 이번 작업의 별도 override를 저장하지 않았으며 `/Game/Maps/DefaultMap`은 재로드 뒤 clean 상태다.
 
+## 유틸리티 Blueprint
+
+세 Blueprint는 `/Script/BathhouseSim.BathWaterUtilityFacilityActor`를 상속하며 inherited component만 사용한다. 공통 시각 mesh는 바닥 pivot 100cm cube인 `/Game/Bathhouse/Meshes/SM_Facility_sample`이고, 별도 Blueprint graph나 중복 component는 없다.
+
+| Asset | Capacity | Visual scale | PlacementFootprint Extent / Relative Z |
+|---|---|---|---|
+| `/Game/Bathhouse/Blueprints/Facility/BP_Circulator` | Circulation `100` | `(1.2,0.8,1.2)` | `(60,40,60)` / `60` |
+| `/Game/Bathhouse/Blueprints/Facility/BP_Boiler` | Heating `100` | `(1.0,0.6,1.2)` | `(50,30,60)` / `60` |
+| `/Game/Bathhouse/Blueprints/Facility/BP_Cooler` | Cooling `100` | `(1.0,0.6,1.2)` | `(50,30,60)` / `60` |
+
+대응 `DA_FacilityPlacement_*`의 StableId는 `Facility.Circulator`, `Facility.Boiler`, `Facility.Cooler`이며 모두 `Facility.Placeable` 태그와 공통 `BP_PlaceableFacilityItem` recovery class를 사용한다. `RecoveryItemMesh=None`으로 기존 설비와 같은 native Cube fallback을 사용한다. 세 Blueprint는 warnings-as-errors Compile, 여섯 target asset은 개별 Save와 dirty 해제를 확인했다. 현재 사용자 Editor를 재시작하지 않았으므로 새 프로세스 디스크 재로드와 PIE 수용 검증은 별도다.
+
 ## Native component hierarchy
 
 ```text
@@ -20,15 +32,21 @@ SceneRoot
    │  └─ WaterSurfaceMesh
    ├─ WaterLevelEmptyPoint
    └─ WaterLevelFullPoint
+
+Actor Components
+├─ BathWaterState
+└─ BathWaterCondition
 ```
 
-`BathWaterState`는 Actor component이며 하나만 존재한다. `WaterSurfaceMesh`는 `NoCollision`, overlap·physics·Navigation off 계약을 따르고, 두 control component는 query-only interaction 대상으로 `Visibility=Block`, overlap·physics·Navigation off인 native 기본 계약을 따른다.
+`BathWaterState`와 `BathWaterCondition`은 각각 하나만 존재한다. `WaterSurfaceMesh`는 `NoCollision`, overlap·physics·Navigation off 계약을 따르고, 두 control component는 query-only interaction 대상으로 `Visibility=Block`, overlap·physics·Navigation off인 native 기본 계약을 따른다.
 
 ## 저장된 Class Default
 
 | 대상 | 값 |
 |---|---|
 | `BathWaterState` | `FillRatePercentPerSecond=6.666667`, `DrainRatePercentPerSecond=10.0` |
+| `BathWaterCondition` capacity | Max circulation `100`, Heating/Cooling `5 points/°C` |
+| `BathWaterCondition` rates | Cleaning `1 point/s`, contamination `0.1 point/s/actual bather`, target control `0.5°C/s`, natural return `0.05°C/s` |
 | `WaterSurfaceMesh.StaticMesh` | `/Game/Bathhouse/Meshes/Bath/Bath_01/StaticMeshes/SM_Bath_01_Water` |
 | `WaterSurfaceMesh` transform | Location `(0,0,0)`, Rotation `(0,0,0)`, Scale `(0.65,0.65,1)` |
 | 수위 marker | Empty `(0,0,-70)`, Full `(0,0,-15)`; `WaterPresentationRoot` local space |

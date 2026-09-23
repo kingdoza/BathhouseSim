@@ -30,6 +30,23 @@ enum class EBathWaterControlChangeReason : uint8
 	Reset
 };
 
+USTRUCT(BlueprintType)
+struct BATHHOUSESIM_API FBathWaterFlowStep
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Bath Water")
+	float PreviousAmount = 0.0f;
+	UPROPERTY(BlueprintReadOnly, Category = "Bath Water")
+	float IncomingAmount = 0.0f;
+	UPROPERTY(BlueprintReadOnly, Category = "Bath Water")
+	float OutgoingAmount = 0.0f;
+	UPROPERTY(BlueprintReadOnly, Category = "Bath Water")
+	float CurrentAmount = 0.0f;
+	UPROPERTY(BlueprintReadOnly, Category = "Bath Water")
+	float DeltaSeconds = 0.0f;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FOnBathWaterStateChanged,
 	EBathWaterState, PreviousState,
@@ -55,6 +72,7 @@ DECLARE_MULTICAST_DELEGATE_ThreeParams(
 	bool,
 	EBathWaterControlChangeReason);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnBathWaterRecoveryFreezeChangedNative, bool);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnBathWaterFlowStepNative, const FBathWaterFlowStep&);
 
 UCLASS(ClassGroup = (Bathhouse), meta = (BlueprintSpawnableComponent))
 class BATHHOUSESIM_API UBathWaterStateComponent : public UActorComponent
@@ -128,6 +146,7 @@ public:
 	FOnBathCustomerUsabilityChangedNative OnCustomerUsabilityChangedNative;
 	FOnBathWaterControlChangedNative OnControlChangedNative;
 	FOnBathWaterRecoveryFreezeChangedNative OnRecoveryFreezeChangedNative;
+	FOnBathWaterFlowStepNative OnFlowStepNative;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bath Water|Flow", meta = (ClampMin = "0.0"))
 	float FillRatePercentPerSecond = 6.666667f;

@@ -5,6 +5,8 @@
 #include "Components/WidgetComponent.h"
 #include "Computer/PlayerComputerUseComponent.h"
 #include "Interaction/PlayerCarryComponent.h"
+#include "Facility/BathWaterOperationsSubsystem.h"
+#include "UI/BathWaterManagementScreenWidget.h"
 
 #define LOCTEXT_NAMESPACE "BathhouseComputerActor"
 
@@ -31,6 +33,13 @@ void ABathhouseComputerActor::BeginPlay()
 	if (ScreenWidget)
 	{
 		ScreenWidget->InitWidget();
+		if (UBathWaterManagementScreenWidget* Management =
+			Cast<UBathWaterManagementScreenWidget>(ScreenWidget->GetUserWidgetObject()))
+		{
+			Management->InitializeManagementContext(
+				GetWorld() ? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr,
+				ManagedBathPlacementZone);
+		}
 	}
 }
 

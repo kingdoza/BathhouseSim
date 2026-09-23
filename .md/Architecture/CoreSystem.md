@@ -84,6 +84,8 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 - `PhysicalCarrySystem.md`: Interaction Source 안의 fixed slot, free-drop transaction과 physical item recovery 경계
 - `FacilitySystem.md`: facility slot과 counter queue 경계
 - `BathWaterSystem.md`: 욕탕 급수·배수 상태, control/수면 표현과 Customer 입욕 가능성 경계
+- `BathWaterOperationsSystem.md`: utility 용량 원장과 욕탕 수온·오염도 domain 경계
+- `BathWaterManagementUISystem.md`: computer management context, Zone 지도와 native Widget 계층
 - `PlacementSystem.md`: 설비 mode/preview/placement/recovery, 확장 단계와 락커 capacity lease 경계
 - `EconomySystem.md`: wallet과 cash claim 경계
 - `CustomerSystem.md`: StateTree routine과 customer session 경계
@@ -100,7 +102,7 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 
 새 Source 하위 디렉터리를 추가하면 같은 이름의 `*System.md`를 추가하고 책임, 핵심 클래스, runtime flow, 의존성, Blueprint/API 계약, 수동 검토 지점을 문서화한다.
 
-Cleaning/Towel/Computer, Combat/Customer Recovery와 Physical Carry는 현재 runtime module dependency 안에서 구현한다. physics, curve, collision, AI/Navigation과 StateTree는 이미 선언된 Engine/AIModule/GameplayStateTree dependency를 사용하며 새 dependency는 실제 include/use site가 확인되지 않는 한 추가하지 않는다.
+Cleaning/Towel/Computer, Combat/Customer Recovery, Physical Carry와 Bath Water Operations는 현재 runtime module dependency 안에서 구현한다. physics, curve, collision, AI/Navigation, StateTree, UMG와 DeveloperSettings는 이미 선언된 dependency를 사용하며 새 dependency는 실제 include/use site가 확인되지 않는 한 추가하지 않는다.
 
 ## Class Growth Policy
 
@@ -114,6 +116,8 @@ Cleaning/Towel/Computer, Combat/Customer Recovery와 Physical Carry는 현재 ru
 - 재사용 가능한 held motion은 carry 소유권과 분리된 표현 Component로 유지한다.
 - 설비 placement/recovery의 session·preview·rollback은 `UPlayerFacilityPlacementComponent`에 두고 contents/water/slot 조건은 원래 domain owner가 판정한다.
 - 범용 Facility Actor에 물 control·표현을 누적하지 않는다. 기존 `UBathWaterStateComponent`는 authoritative water owner로 확장하고 욕탕 전용 Actor가 control, 수면과 Niagara를 조립한다.
+- 300줄을 넘은 `UBathWaterStateComponent`에는 수온·오염도·용량 원장을 누적하지 않는다. 이 component는 실제 유입·유출 flow sample만 추가하고, 물 condition은 `UBathWaterConditionComponent`, world aggregate는 `UBathWaterOperationsSubsystem`으로 분리한다.
+- 순환기·보일러·쿨러는 customer slot을 가진 범용 `ABathhouseFacilityActor`에 조건 분기를 추가하지 않고 placement/recovery 계약을 구현한 독립 utility Actor로 둔다.
 - 설치 락커 용량, customer lease와 임시 action-slot 후보는 `ULockerCapacitySubsystem`에 두며 Customer Session이나 설비 Actor에 전역 합계를 복제하지 않는다.
 
 ## Manual Review Points
@@ -122,6 +126,7 @@ Cleaning/Towel/Computer, Combat/Customer Recovery와 Physical Carry는 현재 ru
 - StateTree/GameplayStateTree plugin과 runtime module을 UE 5.8 기준으로 확인한다.
 - `DeveloperSettings`가 `UFacilityPlacementSettings` 실제 사용과 일치하고 placement payload가 불필요한 신규 module/plugin을 추가하지 않는지 확인한다.
 - `UBathWaterSettings`가 기존 `DeveloperSettings`를 재사용하고 `Niagara` dependency가 실제 native component 사용에만 추가되는지 확인한다.
+- Bath Water Operations가 기존 `UMG`, `DeveloperSettings`와 placement payload 경계만 사용하며 새 module을 불필요하게 추가하지 않는지 확인한다.
 - UCLASS/USTRUCT/UENUM rename/delete 시 Blueprint 참조와 Core Redirect 필요 여부를 확인한다.
 - Config 변경은 실제 gameplay 연결 또는 migration 목적이 분명할 때만 수행한다.
 - 문서가 Source 구조와 어긋나면 Source 재대조 후 시스템 문서를 갱신한다.

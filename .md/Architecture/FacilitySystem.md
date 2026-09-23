@@ -39,7 +39,9 @@ Source/BathhouseSim/Private/Tests/
 - checkout key의 단일 physical drop 기준점과 탐색 설정 제공
 - clean towel stack과 used towel bin의 customer navigation/reservation 위치 제공
 
-Facility는 towel 수량/overflow/machine, customer phase, key actor state·물리 transaction, player interaction과 money를 소유하지 않는다.
+Facility는 towel 수량/overflow/machine, customer phase, key actor state·물리 transaction, player interaction, money와 순환·가열·냉각 utility 용량을 소유하지 않는다.
+
+순환기·보일러·쿨러는 customer가 예약하는 facility slot이 없으므로 `EBathhouseFacilityType`이나 `UBathhouseFacilitySubsystem` registry에 추가하지 않는다. 이들은 Placement 계약을 구현한 독립 utility Actor이며 종류별 용량 registry는 [BathWaterOperationsSystem.md](BathWaterOperationsSystem.md)가 소유한다.
 
 ## Facility Types
 
@@ -245,6 +247,7 @@ Blueprint 조회·표현 API:
 - Interaction -> Facility의 generic facility/key-hook validation
 - Facility -> Placement의 placed-facility query, typed payload와 Actor 변환 계약
 - Bath 전용 Facility -> Bath Water 상태/표현 계약
+- Bath condition/utility -> Bath Water Operations 계약; generic Facility registry에는 utility를 등록하지 않음
 - Facility Subsystem -> Locker Capacity Subsystem의 startup bank 검증·silent 등록·batch publication 계약
 - Facility는 Customer, Interaction과 UI concrete class에 의존하지 않는다.
 

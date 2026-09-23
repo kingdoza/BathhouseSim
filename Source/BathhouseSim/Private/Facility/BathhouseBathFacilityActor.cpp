@@ -3,6 +3,8 @@
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Facility/BathWaterControlComponent.h"
+#include "Facility/BathWaterConditionComponent.h"
+#include "Facility/BathWaterOperationsSubsystem.h"
 #include "Facility/BathWaterStateComponent.h"
 #include "Facility/BathhouseFacilitySubsystem.h"
 #include "NiagaraComponent.h"
@@ -45,6 +47,7 @@ ABathhouseBathFacilityActor::ABathhouseBathFacilityActor()
 	WaterLevelEmptyPoint->SetupAttachment(WaterPresentationRoot);
 	WaterLevelFullPoint = CreateDefaultSubobject<USceneComponent>(TEXT("WaterLevelFullPoint"));
 	WaterLevelFullPoint->SetupAttachment(WaterPresentationRoot);
+	BathWaterCondition = CreateDefaultSubobject<UBathWaterConditionComponent>(TEXT("BathWaterCondition"));
 }
 
 void ABathhouseBathFacilityActor::PostInitializeComponents()
@@ -57,6 +60,13 @@ void ABathhouseBathFacilityActor::BeginPlay()
 {
 	InitializeBathWaterRuntime();
 	Super::BeginPlay();
+	if (FacilityPlacement && FacilityPlacement->IsPlacedDomainActive() && BathWaterCondition)
+	{
+		if (UBathWaterOperationsSubsystem* Operations = GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>())
+		{
+			bConditionDomainRegistered = Operations->RegisterBath(BathWaterCondition);
+		}
+	}
 	bCachedReservationAvailability = IsAvailableForReservation();
 	UpdateWaterSurface();
 	UpdateFillFlow();
@@ -66,12 +76,53 @@ void ABathhouseBathFacilityActor::EndPlay(const EEndPlayReason::Type EndPlayReas
 {
 	bRecoveryCommitPending = true;
 	bRecoveryHoldActive = false;
+	if (bConditionDomainRegistered)
+	{
+		if (UBathWaterOperationsSubsystem* Operations = GetWorld()
+			? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr)
+		{
+			Operations->UnregisterBath(BathWaterCondition, true);
+		}
+		bConditionDomainRegistered = false;
+	}
 	UnbindBathWaterDelegates();
 	if (FillFlowNiagara)
 	{
 		FillFlowNiagara->DeactivateImmediate();
 	}
 	Super::EndPlay(EndPlayReason);
+}
+
+bool ABathhouseBathFacilityActor::StagePlacedDomainRegistration(FText& OutFailureReason)
+{
+	if (!Super::StagePlacedDomainRegistration(OutFailureReason))
+	{
+		return false;
+	}
+	UBathWaterOperationsSubsystem* Operations = GetWorld()
+		? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr;
+	if (!Operations || !BathWaterCondition || !Operations->RegisterBath(BathWaterCondition, false))
+	{
+		Super::RollbackPlacedDomainRegistration();
+		OutFailureReason = LOCTEXT("ConditionRegistrationFailed", "욕탕 수질·수온 상태를 등록할 수 없습니다.");
+		return false;
+	}
+	bConditionDomainRegistered = true;
+	return true;
+}
+
+void ABathhouseBathFacilityActor::RollbackPlacedDomainRegistration()
+{
+	if (bConditionDomainRegistered)
+	{
+		if (UBathWaterOperationsSubsystem* Operations = GetWorld()
+			? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr)
+		{
+			Operations->UnregisterBath(BathWaterCondition, false);
+		}
+		bConditionDomainRegistered = false;
+	}
+	Super::RollbackPlacedDomainRegistration();
 }
 
 bool ABathhouseBathFacilityActor::IsAvailableForReservation() const
@@ -102,6 +153,13 @@ bool ABathhouseBathFacilityActor::TryBeginFacilityRecoveryHold(FText& OutFailure
 		DrainLeverControl->CancelRecoveryFreeze();
 		return false;
 	}
+	if (!BathWaterCondition || !BathWaterCondition->BeginRecoveryFreeze(OutFailureReason))
+	{
+		BathWaterState->CancelRecoveryFreeze();
+		FillValveControl->CancelRecoveryFreeze();
+		DrainLeverControl->CancelRecoveryFreeze();
+		return false;
+	}
 	bRecoveryHoldActive = true;
 	UpdateFillFlow();
 	RefreshReservationAvailability(true);
@@ -115,6 +173,7 @@ void ABathhouseBathFacilityActor::CancelFacilityRecoveryHold()
 		return;
 	}
 	bRecoveryHoldActive = false;
+	BathWaterCondition->CancelRecoveryFreeze();
 	BathWaterState->CancelRecoveryFreeze();
 	FillValveControl->CancelRecoveryFreeze();
 	DrainLeverControl->CancelRecoveryFreeze();
@@ -136,8 +195,7 @@ bool ABathhouseBathFacilityActor::StagePlacedDomainUnregistration(
 	FFacilityPlacementPublication& OutPublication,
 	FText& OutFailureReason)
 {
-	if (!bRecoveryHoldActive || bRecoveryCommitPending
-		|| !Super::StagePlacedDomainUnregistration(OutPublication, OutFailureReason))
+	if (!bRecoveryHoldActive || bRecoveryCommitPending)
 	{
 		if (OutFailureReason.IsEmpty())
 		{
@@ -145,7 +203,35 @@ bool ABathhouseBathFacilityActor::StagePlacedDomainUnregistration(
 		}
 		return false;
 	}
+	UBathWaterOperationsSubsystem* Operations = GetWorld()
+		? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr;
+	if (!Operations || !bConditionDomainRegistered
+		|| !Operations->UnregisterBath(BathWaterCondition, false))
+	{
+		OutFailureReason = LOCTEXT("ConditionUnregistrationFailed", "욕탕 수질·수온 상태 등록을 해제할 수 없습니다.");
+		return false;
+	}
+	bConditionDomainRegistered = false;
+	if (!Super::StagePlacedDomainUnregistration(OutPublication, OutFailureReason))
+	{
+		bConditionDomainRegistered = Operations->RegisterBath(BathWaterCondition, false);
+		return false;
+	}
+	const TFunction<void()> BasePublication = MoveTemp(OutPublication.Callback);
+	TWeakObjectPtr<UBathWaterOperationsSubsystem> WeakOperations(Operations);
+	OutPublication.Callback = [BasePublication, WeakOperations]()
+	{
+		if (BasePublication)
+		{
+			BasePublication();
+		}
+		if (WeakOperations.IsValid())
+		{
+			WeakOperations->PublishMutation();
+		}
+	};
 	bRecoveryCommitPending = true;
+	BathWaterCondition->PrepareRecoveryCommit();
 	BathWaterState->PrepareRecoveryCommit();
 	FillValveControl->PrepareRecoveryCommit();
 	DrainLeverControl->PrepareRecoveryCommit();
@@ -160,9 +246,29 @@ bool ABathhouseBathFacilityActor::RollbackPlacedDomainUnregistration(FText& OutF
 	{
 		return false;
 	}
+	if (UBathWaterOperationsSubsystem* Operations = GetWorld()
+		? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr)
+	{
+		bConditionDomainRegistered = Operations->RegisterBath(BathWaterCondition, false);
+	}
+	if (!bConditionDomainRegistered)
+	{
+		OutFailureReason = LOCTEXT("ConditionRollbackFailed", "욕탕 수질·수온 상태를 복구할 수 없습니다.");
+		return false;
+	}
 	bRecoveryCommitPending = false;
 	CancelFacilityRecoveryHold();
 	return true;
+}
+
+void ABathhouseBathFacilityActor::PublishPlacedDomainRegistration()
+{
+	Super::PublishPlacedDomainRegistration();
+	if (UBathWaterOperationsSubsystem* Operations = GetWorld()
+		? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr)
+	{
+		Operations->PublishMutation();
+	}
 }
 
 #if WITH_EDITOR
@@ -174,7 +280,7 @@ EDataValidationResult ABathhouseBathFacilityActor::IsDataValid(FDataValidationCo
 		Context.AddError(Error);
 		Result = EDataValidationResult::Invalid;
 	};
-	if (!FillValveControl || !DrainLeverControl || !WaterPresentationRoot || !WaterSurfaceMover
+	if (!FillValveControl || !DrainLeverControl || !BathWaterCondition || !WaterPresentationRoot || !WaterSurfaceMover
 		|| !WaterSurfaceMesh || !WaterLevelEmptyPoint || !WaterLevelFullPoint || !FillFlowNiagara)
 	{
 		AddError(LOCTEXT("MissingComponents", "Bath water native components are incomplete."));
@@ -235,6 +341,7 @@ void ABathhouseBathFacilityActor::InitializeBathWaterRuntime()
 	FillValveControl->InitializeClosedPose();
 	DrainLeverControl->InitializeClosedPose();
 	BathWaterState->ResetEmptyForPlacement();
+	BathWaterCondition->ResetForPlacement();
 	FillValveControl->ApplyLogicalState(false, EBathWaterControlChangeReason::Reset);
 	DrainLeverControl->ApplyLogicalState(false, EBathWaterControlChangeReason::Reset);
 	AmountChangedHandle = BathWaterState->OnWaterAmountChangedNative.AddUObject(
