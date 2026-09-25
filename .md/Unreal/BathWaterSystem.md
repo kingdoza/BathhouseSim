@@ -10,7 +10,9 @@
 
 ## 유틸리티 Blueprint
 
-세 Blueprint는 `/Script/BathhouseSim.BathWaterUtilityFacilityActor`를 상속하며 inherited component만 사용한다. 공통 시각 mesh는 바닥 pivot 100cm cube인 `/Game/Bathhouse/Meshes/SM_Facility_sample`이고, 별도 Blueprint graph나 중복 component는 없다.
+`BP_Circulator`와 `BP_Cooler`는 `/Script/BathhouseSim.BathWaterUtilityFacilityActor`를, `BP_Boiler`는 그 native 자식 `/Script/BathhouseSim.BathWaterBoilerFacilityActor`를 상속한다. 공통 본체 시각 mesh는 바닥 pivot 100cm cube인 `/Game/Bathhouse/Meshes/SM_Facility_sample`이다. Blueprint graph나 중복 gameplay component는 없다.
+
+`BP_Boiler`의 `FacilityPlacement.Definition`은 `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler`다. Reparent와 아래 임시 Cube 표현을 개별 저장하고 새 Editor에서 재로드했다. 기존 `DefaultMap` 보일러 인스턴스도 재시작 후 투입구 mesh와 transform을 상속했으며, 그 외부 액터의 별도 override는 저장하지 않았다.
 
 | Asset | Capacity | Visual scale | PlacementFootprint Extent / Relative Z |
 |---|---|---|---|
@@ -18,7 +20,18 @@
 | `/Game/Bathhouse/Blueprints/Facility/BP_Boiler` | Heating `100` | `(1.0,0.6,1.2)` | `(50,30,60)` / `60` |
 | `/Game/Bathhouse/Blueprints/Facility/BP_Cooler` | Cooling `100` | `(1.0,0.6,1.2)` | `(50,30,60)` / `60` |
 
-대응 `DA_FacilityPlacement_*`의 StableId는 `Facility.Circulator`, `Facility.Boiler`, `Facility.Cooler`이며 모두 `Facility.Placeable` 태그와 공통 `BP_PlaceableFacilityItem` recovery class를 사용한다. `RecoveryItemMesh=None`으로 기존 설비와 같은 native Cube fallback을 사용한다. 세 Blueprint는 warnings-as-errors Compile, 여섯 target asset은 개별 Save와 dirty 해제를 확인했다. 현재 사용자 Editor를 재시작하지 않았으므로 새 프로세스 디스크 재로드와 PIE 수용 검증은 별도다.
+대응 `DA_FacilityPlacement_*`의 StableId는 `Facility.Circulator`, `Facility.Boiler`, `Facility.Cooler`이며 모두 `Facility.Placeable` 태그와 공통 `BP_PlaceableFacilityItem` recovery class를 사용한다. `RecoveryItemMesh=None`으로 기존 설비와 같은 native Cube fallback을 사용한다. `BP_Boiler`의 warnings-as-errors Compile·개별 Save·새 Editor 재로드를 확인했다. 새 세션 기본 PIE에서 보일러 필수 투입구 누락 경고는 재발하지 않았다. 실제 연료 투입과 바늘 회전의 입력·시각 수용 검증은 [USER_UNREAL.md](../USER_UNREAL.md)에 남아 있다.
+
+### Boiler 노동 가동 임시 표현
+
+| inherited component | mesh / local transform | 역할 |
+|---|---|---|
+| `FuelIntake` | Engine Cube, Location `(0,-33,42)`, Scale `(0.25,0.06,0.18)` | 별도 Visibility hit target, QueryOnly, Navigation off |
+| `GaugeFace` | Engine Cube, Location `(0,-32,90)`, Scale `(0.30,0.02,0.30)` | 고정 계기판, NoCollision/Navigation off |
+| `GaugeNeedlePivot` | Location `(0,-34,90)` | 바늘 회전 중심 |
+| `GaugeNeedleMesh` | Engine Cube, pivot child, Location `(7,0,0)`, Scale `(0.14,0.02,0.015)` | 두 축을 축소한 얇은 바늘, NoCollision/Navigation off |
+
+`GaugePresentation.LocalRotationAxis=(0,1,0)`, `ZeroAngleDegrees=-90`, `MaxAngleDegrees=90`, `ActiveStartRatio=1/3`이다. `Operation`의 최대 잔량은 100, 감소량은 초당 1이다. 최종 보일러 모델은 투입구·계기판을 본체에 통합하고 움직이는 바늘만 별도 mesh로 교체할 예정이다.
 
 ## Native component hierarchy
 

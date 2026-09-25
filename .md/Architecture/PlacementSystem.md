@@ -1,5 +1,7 @@
 # Placement System
 
+2026-09-24 Utility Labor Source: utility conversion payload에 optional operation-state marker와 잔량을 추가하고 기존 actor conversion transaction에 clock stop/restart hook을 연결했다. 회수 Hold는 연료 감소를 멈추지 않고, rollback은 Hold 시작 잔량을 복원하지 않는다. 코드/PIE 검증은 미실행이며 Editor 단계가 남아 있다.
+
 ## Implementation Status
 
 배치 설비 Actor와 전용 `APlaceableFacilityItemActor`의 staged 양방향 transaction, 공통 Held 설정, footprint 파생 cell, 명시적 zone floor, 범용 native preview, 기본 collision 기반 Dynamic Navigation, pre-placed 락커 reconciliation 및 호환 PlacementZone 전체의 native 그리드 표현은 Source와 native automation까지 구현되어 있다. 전용 grid Material과 기존 Definition/Blueprint/Level migration의 Editor·PIE 검증이 필요하다.

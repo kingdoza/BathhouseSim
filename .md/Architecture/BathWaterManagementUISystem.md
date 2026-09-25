@@ -6,6 +6,7 @@
 - domain 정본: [BathWaterOperationsSystem.md](BathWaterOperationsSystem.md)
 - computer session 정본: [ComputerSystem.md](ComputerSystem.md)
 - 공통 native Widget 정책: [UISystem.md](UISystem.md)
+- 2026-09-24 Source 확장: [UtilityLaborSystem.md](UtilityLaborSystem.md)의 예약/가동/설치 값, 이중 부족 상태와 snapshot cache를 native summary에 반영했다. 기존 WBP의 줄바꿈/높이 확인은 Editor 단계에서 필요하며, 빌드와 automation은 미실행이다.
 
 ## Target Source Scope
 
@@ -29,7 +30,7 @@ Source/BathhouseSim/Private/UI/
 
 ## Responsibilities
 
-- 종류별 utility used/total/deficit 표시
+- 종류별 예약/가동/설치 용량과 설치 부족/가동 부족을 구분해 표시
 - 관리 PlacementZone과 설치 Bath footprint의 world-to-screen 투영
 - 선택 Bath 상태 표시와 circulation/target setting intent 전달
 - topology revision과 연속 presentation 값의 효율적인 refresh
@@ -60,7 +61,7 @@ UBathWaterManagementScreenWidget
 ```
 
 - root: subsystem/Zone context, selected Bath weak reference, snapshot refresh와 child 조립
-- capacity summary: 종류별 used/total/deficit 표시
+- capacity summary: 종류별 예약/가동/설치 및 두 종류 부족 표시
 - map: Zone과 footprint의 화면 투영과 tile lifecycle
 - tile: 이름, 실제 수온, 오염도, 상태색과 선택 의도
 - detail: 수위, 실제/목표 수온, 오염도, 순환도, 요구량, 임계치와 slider intent
@@ -100,6 +101,14 @@ UBathWaterManagementScreenWidget
 - detail: `BathNameText`, `WaterAmountText`, `ActualTemperatureText`, `TargetTemperatureText`, `ContaminationText`, `CirculationText`, `CirculationDemandText`, `HeatingDemandText`, `CoolingDemandText`, `ThermalStatusText`, `ThermalThresholdText`, `CapacityStatusText`, `FeedbackText`, `CirculationSlider`, `TargetTemperatureSlider`
 
 Optional native presentation hooks are `OnCapacityDisplayStateChanged` and `OnBathTileStateChanged`; gameplay correctness does not depend on Blueprint implementation.
+
+### Labor Capacity Presentation Target
+
+- 기존 CapacityText는 `예약 {Used} / 가동 {Active} / 설치 {Total}`를 표시한다. 새 BindWidget를 요구하지 않는다.
+- StatusText는 설치 부족을 먼저 표시하되 동시에 발생한 가동 부족도 숨기지 않는다. bar는 예약/설치 비율이며 가동률로 오인되지 않게 한다.
+- summary cache에 ActivePoints와 InstalledDeficitPoints를 포함한다. 가동 0 경계는 capacity/data만 갱신하고 bath tile을 재생성하지 않는다.
+- slider 제한은 설치 기준, bath effect/status는 가동 기준이다. tile/detail은 부족 종류를 유지하며 용량 summary가 설치/가동 부족의 상세 수치를 제공한다.
+- 기존 1024×576 화면에서 긴 text의 wrapping/높이를 Editor에서 확인한다. 개별 utility 목록·지도 아이콘은 추가하지 않는다.
 
 ## Compatibility
 

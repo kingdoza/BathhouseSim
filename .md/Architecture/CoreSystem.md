@@ -86,6 +86,7 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 - `BathWaterSystem.md`: 욕탕 급수·배수 상태, control/수면 표현과 Customer 입욕 가능성 경계
 - `BathWaterOperationsSystem.md`: utility 용량 원장과 욕탕 수온·오염도 domain 경계
 - `BathWaterManagementUISystem.md`: computer management context, Zone 지도와 native Widget 계층
+- `UtilityLaborSystem.md`: 신규 `Public/Utility`, `Private/Utility`의 보일러 노동 수직 구현과 Source 계약.
 - `PlacementSystem.md`: 설비 mode/preview/placement/recovery, 확장 단계와 락커 capacity lease 경계
 - `EconomySystem.md`: wallet과 cash claim 경계
 - `CustomerSystem.md`: StateTree routine과 customer session 경계
@@ -118,6 +119,7 @@ Cleaning/Towel/Computer, Combat/Customer Recovery, Physical Carry와 Bath Water 
 - 범용 Facility Actor에 물 control·표현을 누적하지 않는다. 기존 `UBathWaterStateComponent`는 authoritative water owner로 확장하고 욕탕 전용 Actor가 control, 수면과 Niagara를 조립한다.
 - 300줄을 넘은 `UBathWaterStateComponent`에는 수온·오염도·용량 원장을 누적하지 않는다. 이 component는 실제 유입·유출 flow sample만 추가하고, 물 condition은 `UBathWaterConditionComponent`, world aggregate는 `UBathWaterOperationsSubsystem`으로 분리한다.
 - 순환기·보일러·쿨러는 customer slot을 가진 범용 `ABathhouseFacilityActor`에 조건 분기를 추가하지 않고 placement/recovery 계약을 구현한 독립 utility Actor로 둔다.
+- utility base에 연료·계기 로직을 누적하지 않는다. boiler 자식이 Operation/Intake/Gauge를 조립하고 연료 transaction은 private helper가 맡는다. 기존 module을 재사용하며 header forward declaration으로 상호 include를 피한다.
 - 설치 락커 용량, customer lease와 임시 action-slot 후보는 `ULockerCapacitySubsystem`에 두며 Customer Session이나 설비 Actor에 전역 합계를 복제하지 않는다.
 
 ## Manual Review Points

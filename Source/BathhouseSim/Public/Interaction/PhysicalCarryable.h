@@ -17,7 +17,8 @@ enum class EPhysicalCarryKind : uint8
 	WetMop,
 	TowelBasket,
 	MonkeyWrench,
-	Facility
+	Facility,
+	Shovel
 };
 
 UENUM(BlueprintType, meta = (Bitflags))

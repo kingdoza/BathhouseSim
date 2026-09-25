@@ -331,13 +331,15 @@ FBathWaterCapacitySnapshot UBathWaterOperationsSubsystem::BuildCapacitySnapshot(
 	FBathWaterCapacitySnapshot Result;
 	Result.Kind = Kind;
 	Result.TotalPoints = CalculateTotalCapacity(Kind);
+	Result.ActivePoints = CalculateActiveCapacity(Kind);
 	switch (Kind)
 	{
 	case EBathWaterCapacityKind::Heating: Result.UsedPoints = Used.Heating; break;
 	case EBathWaterCapacityKind::Cooling: Result.UsedPoints = Used.Cooling; break;
 	default: Result.UsedPoints = Used.Circulation; break;
 	}
-	Result.DeficitPoints = FMath::Max(0.0f, Result.UsedPoints - Result.TotalPoints);
+	Result.DeficitPoints = FMath::Max(0.0f, Result.UsedPoints - Result.ActivePoints);
+	Result.InstalledDeficitPoints = FMath::Max(0.0f, Result.UsedPoints - Result.TotalPoints);
 	Result.Revision = CapacityRevision;
 	return Result;
 }
@@ -491,6 +493,19 @@ float UBathWaterOperationsSubsystem::CalculateTotalCapacity(const EBathWaterCapa
 		if (Entry.IsValid() && Entry->GetCapacityKind() == Kind)
 		{
 			Total += Entry->GetCapacityPoints();
+		}
+	}
+	return Total;
+}
+
+float UBathWaterOperationsSubsystem::CalculateActiveCapacity(const EBathWaterCapacityKind Kind) const
+{
+	float Total = 0.0f;
+	for (const TWeakObjectPtr<UBathWaterUtilityCapacityComponent>& Entry : Providers)
+	{
+		if (Entry.IsValid() && Entry->GetCapacityKind() == Kind)
+		{
+			Total += Entry->GetActiveCapacityPoints();
 		}
 	}
 	return Total;

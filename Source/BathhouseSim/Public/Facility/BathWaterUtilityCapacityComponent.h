@@ -5,6 +5,8 @@
 #include "Facility/BathWaterOperationsTypes.h"
 #include "BathWaterUtilityCapacityComponent.generated.h"
 
+class UUtilityOperationComponent;
+
 UCLASS(ClassGroup = (Bathhouse), meta = (BlueprintSpawnableComponent))
 class BATHHOUSESIM_API UBathWaterUtilityCapacityComponent : public UActorComponent
 {
@@ -15,6 +17,8 @@ public:
 
 	EBathWaterCapacityKind GetCapacityKind() const { return CapacityKind; }
 	float GetCapacityPoints() const;
+	float GetActiveCapacityPoints() const;
+	void SetUtilityOperation(UUtilityOperationComponent* InOperation, bool bRequireOperation = false);
 	bool HasValidAuthoring(FText& OutFailureReason) const;
 	void RestoreCapacity(EBathWaterCapacityKind InKind, float InPoints);
 
@@ -28,5 +32,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bath Water Utility", meta = (ClampMin = "0.0"))
 	float CapacityPoints = 100.0f;
-};
 
+	UPROPERTY(Transient)
+	TObjectPtr<UUtilityOperationComponent> UtilityOperation = nullptr;
+
+	UPROPERTY(Transient)
+	bool bOperationRequired = false;
+};

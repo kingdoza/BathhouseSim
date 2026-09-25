@@ -15,6 +15,7 @@
 | Placement | [PlacementSystem.md](PlacementSystem.md) | Zone, footprint, preview, placed/item Definition, grid와 Navigation authoring |
 | Facility | [FacilitySystem.md](FacilitySystem.md) | 설비 Blueprint, slot, counter, locker와 expansion authoring |
 | Bath Water | [BathWaterSystem.md](BathWaterSystem.md) | 욕탕 물, 밸브·레버, 수면 marker와 Niagara authoring |
+| Utility Labor | [UtilityLaborSystem.md](UtilityLaborSystem.md) | 보일러 투입구·계기와 삽·석탄 공급함 Blueprint authoring |
 | Customer AI | [CustomerSystem.md](CustomerSystem.md) | Customer routine Data Asset, Character/AIController Blueprint, StateTree schema/state/task/binding |
 | Interaction/UI | [InteractionUISystem.md](InteractionUISystem.md) | Input Mapping, Widget hierarchy, BindWidget와 표시 asset |
 | Towel | `TowelSystem.md` | 수건 설비·표현 Blueprint, mesh/material과 presentation 설정 |

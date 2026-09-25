@@ -1,35 +1,26 @@
-# 통합 검토 프롬프트 — Bath Water Operations 관리 화면
+# 통합 검토 인계 — 보일러 노동 가동 수직 구현
 
-## 결론
+## 상태
 
-상태는 **관리 화면 재작업 저장·자동 PIE 확인 완료, 실제 LMB와 기능 수용 대기**다. 기존 사용자 PIE에서는 패널/텍스트가 거의 흰색으로 겹치고 지도 격자가 보이지 않았으며 욕탕 타일 선택이 되지 않았다. 기존 sample 화면의 LMB 클릭은 사용자 테스트로 통과했으므로 입력 매핑은 바꾸지 않았다. 이번 컴퓨터 Widget 재작업에는 앞선 사용자 요청 범위에 한해 Unreal Editor API/Python fallback을 적용했다.
+**부분 완료, 통합 승인 불가.** 사용자 지시로 코드 리뷰 승인 관문만 MCP 실행에서 건너뛰었다. UE 5.8 공식 `Build.bat`은 `Target is up to date`, `Result: Succeeded`였다. Blueprint/Level 단계는 Unreal MCP로, 이후 사용자가 별도로 요청한 Capacity Summary 레이아웃은 Unreal Editor Python API로 진행했다. Computer Use와 Save All은 사용하지 않았다.
 
-WBP 5개의 패널·글자 대비, 간격, tile 색·글자 크기를 수정해 개별 Compile/Save했다. `WBP_BathWaterMap`에 타일보다 뒤에 놓이는 `GridCanvas`를 추가했고, native `BathWaterMapWidget`은 Zone의 grid size와 major interval을 사용해 격자선과 경계를 생성한다. 타일 표기는 내부 UObject 이름 대신 Actor 표시명이다. 실제 타일 0개의 원인은 Map WBP의 Class Default가 아니라 화면에 중첩된 `BathMap.BathTileWidgetClass`가 `None`으로 저장된 것이었다. 이를 명시적으로 연결해 저장했다. UE 5.8 DLL 링크 뒤 새 Editor PIE에서 욕탕 타일 2개와 격자 렌더를 확인했다.
+## 저장·재로드된 Content
 
-## 저장된 Content·Level
+- `/Game/Bathhouse/Blueprints/Facility/BP_Boiler`: `/Script/BathhouseSim.BathWaterBoilerFacilityActor`로 reparent. 기존 Definition, Capacity Heating 100, 본체 mesh·footprint를 보존하고 inherited `FuelIntake`, `GaugeFace`, `GaugeNeedlePivot`, `GaugeNeedleMesh`, `GaugePresentation`, `Operation`을 승인된 Cube 임시 표현으로 설정했다. warnings-as-errors Compile·개별 Save·새 Editor 재로드 성공.
+- `/Game/Bathhouse/Blueprints/Utility/BP_UtilityShovel`: native `UtilityShovelActor` 자식으로 생성. `WorldMesh`·`LoadVisual`에 Cube, 물리 root/child 계약을 설정했다. warnings-as-errors Compile·개별 Save·재로드 성공.
+- `/Game/Bathhouse/Blueprints/Utility/BP_CoalSupply`: native `UtilityFuelSupplyActor` 자식으로 생성. `SupplyMesh=SM_Facility_sample`, FuelKind Coal, ScoopPoints 25를 확인했다. warnings-as-errors Compile·개별 Save·재로드 성공.
+- `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler`: 읽기 전용 확인만 했다. `PlacedFacilityClass=BP_Boiler_C`, `RecoveryItemClass=BP_PlaceableFacilityItem_C`, `RecoveryItemMesh=None`을 유지한다.
+- `/Game/Bathhouse/UI/WBP_BathWaterCapacitySummary`: 기존 3열·9개 BindWidget과 Bar·native 로직을 유지하고 제목·레이블을 한국어로, 값 13pt/상태 10.5pt의 줄바꿈·여백을 조정했다. Unreal Editor Python API로 해당 WBP만 개별 Save, 새 프로세스 재로드와 `BS_UP_TO_DATE` Compile·오류/경고 0건 확인. 메인 컴퓨터 WBP와 Map은 저장하지 않았다.
+- 현재 상태를 `.md/Unreal/BathWaterSystem.md`, `PlacementSystem.md`, `InteractionUISystem.md`, 신규 `UtilityLaborSystem.md` 및 `0_UNREAL.md` 라우팅에 반영했다.
 
-- Utility: `BP_Circulator`, `BP_Boiler`, `BP_Cooler`와 대응 `DA_FacilityPlacement_*` 3개. Capacity는 각각 Circulation/Heating/Cooling `100`이다.
-- Utility visual: 공통 `/Game/Bathhouse/Meshes/SM_Facility_sample`; Boiler/Cooler footprint 100×60×120cm, Circulator 120×80×120cm. Recovery mesh는 `None`이며 native Cube fallback이다.
-- `BP_Bath`: inherited `BathWaterCondition` 1개; circulation `100`, heating/cooling `5 points/°C`, cleaning `1 point/s`, contamination `0.1 point/s/actual bather`, target control `0.5°C/s`, natural return `0.05°C/s`. Bath Water Settings는 ambient `20°C`, target `10~50°C`, step `1°C`로 별도 Config 변경이 없다.
-- Widget: `/Game/Bathhouse/UI/WBP_BathWaterManagementScreen`, `WBP_BathWaterCapacitySummary`, `WBP_BathWaterMap`, `WBP_BathWaterBathTile`, `WBP_BathWaterDetail`. 각각 대응 native Widget class를 상속한다. 필수 `BindWidget` 이름/타입, Map tile class와 clipping을 재로드 후 검사했다. 실제 hierarchy 정본은 [InteractionUISystem.md](Unreal/InteractionUISystem.md)다.
-- `BP_BathhouseComputer.ScreenWidget.WidgetClass`: 새 management WBP. World Space, Draw Size `1024×576`, Hardware Input `false` 유지.
-- DefaultMap exact computer actor `ManagedBathPlacementZone`: exact `BP_FacilityPlacementZone_C_UAID_F02F7433CA36D1FF02_1155169559`. 저장 대상은 해당 external actor package `/Game/__ExternalActors__/Maps/DefaultMap/7/EH/E4FLO971KSWUJ40H7W7PHK`이며 `DefaultMap.umap`은 저장하지 않았다.
+## Level 저장 실패와 PIE
 
-## 확인 결과
+- `DefaultMap`에 CoalSupply `(550,-850,0)`, UtilityShovel `(425,-800,45)`, ShovelSlot `(425,-800,45)`을 임시 배치하고 슬롯 `AssignedItem`을 그 삽 인스턴스로 지정했으나, 신규/기존 World Partition actor에 대한 MCP `save_actor`가 모두 외부 패키지 `Asset does not exist`를 반환했다. `/Game/Maps/DefaultMap` 개별 저장도 이 external actor들을 영속화하지 않았다.
+- 따라서 세 임시 신규 actor를 제거하고 agent-owned Editor를 재시작했다. 재로드 후 세 actor가 없음을 확인했다. 기존 보일러 인스턴스는 재시작 후 새 Blueprint 투입구·계기 메시를 정상 상속했고, 별도 Level override는 저장하지 않았다.
+- 첫 PIE는 stale live 보일러 인스턴스의 `FuelIntake.StaticMesh=None`으로 invalid utility 경고가 났다. Editor 재시작 후 재로드된 두 번째 PIE에서는 같은 `LogBathWaterUtility` 경고가 재발하지 않았다. 실제 LMB/G/E/F/Q 입력과 연료·가동·계기 시각 수용은 검증하지 않았다.
+- 대상 Blueprint dirty는 해제됐다. `DefaultMap` 및 외부 액터에 이번 작업의 디스크 변경은 없다. 이번 MCP에는 native Data Validation 실행 기능과 WidgetTree layout 편집 기능이 없어 후자는 별도 승인된 Editor Python API 단계에서 수행했다.
+- 사용자가 열어 둔 Editor에서 CoalSupply `(550,-850,0)`, UtilityShovel `(425,-800,45)`, ShovelSlot `(425,-800,45)`을 다시 배치하고 `AssignedItem`을 정확한 삽 actor로 지정했다. PIE 시작·종료의 새 유틸리티 초기화 오류는 없었다. 세 actor는 아직 외부 패키지에 저장되지 않았으므로 저장·재로드 검증 전이며 Editor를 닫으면 안 된다. MCP 저장 실패를 재시도하지 않고 세 actor를 선택한 채 사용자 저장 단계로 인계했다.
 
-- WBP 5개와 computer BP를 개별 Compile/Save하고 같은 Editor에서 패키지 재로드했다. 복제 원본 Widget GUID map 정리 후 다섯 WBP를 강제 저장·재로드했고 해당 재로드 구간에 GUID `Ensure` 또는 Blueprint compile error는 없었다.
-- WBP 5개와 computer BP의 Editor Data Validation 6/6 `VALID`, errors/warnings 0건이다. 재작업 WBP 5개를 개별 Compile/Save하고 새 DLL을 적용한 Editor에서 검증했다.
-- Utility Definition 3개도 새 Editor에서 Data Validation `VALID`다. 각 Definition은 recovery mesh `None`에 따른 native Cube fallback 경고만 있다.
-- computer Widget Class, Draw Size/Space/Hardware Input과 Level Zone reference가 재로드 후 유지된다.
-- PIE RenderTarget 1024×576에서 어두운 panel, 전체 폭 utility summary, Zone 경계·격자, Bath 타일 2개와 detail을 확인했다. 타일 Button `OnClicked` 이벤트를 호출하자 Bath2가 선택되고 detail 값·두 slider 활성화가 갱신됐다. 실제 플레이어 LMB hit test는 미검증이다.
-- 별도 Unreal Python commandlet 프로세스에서 다섯 WBP의 native parent, Map tile class, computer screen class와 `1024×576`을 디스크로부터 다시 읽었다. 검사 스크립트는 성공했으나 로컬 Zen/DDC cache에 writable node가 없어 commandlet 프로세스 종료 코드는 `1`이었다. 이는 Asset assertion 실패가 아니며 정상 Editor 재시작 검증을 대체하지 않는다.
-- 첫 PIE 종료 중 Bath unregister 알림이 월드 teardown 중 위젯 재생성을 시도해 `ensure` 1건이 발생했다. `RefreshSnapshot`의 world teardown guard를 추가하고 DLL 재빌드했다. 새 Editor PIE 종료 로그에서 같은 `ensure`는 재발하지 않았다.
-- `Save All`과 컴퓨터 Focus/Input graph 변경은 하지 않았다. 사용자 소유 Editor는 사용자가 닫았고, 검증용 agent-owned background Editor만 개별 종료·재시작했다.
+## 남은 항목
 
-## 잔여 위험과 통합 리뷰 재개 조건
-
-1. `.md/PROMPT_UNREAL.md`의 PIE 14개 시나리오로 capacity/demand, 지도 투영, 선택/슬라이더/feedback, utility와 Bath recovery transaction, focus/input 회귀를 직접 검증한다. 자동 PIE의 RenderTarget과 Button 이벤트만으로 기능 수용을 선언하지 않는다.
-2. 실제 월드 화면에서 타일·슬라이더 hit target을 플레이어 LMB로 확인한다. 자동 RenderTarget과 Button 이벤트는 통과했지만 화면 조준/포커스 입력 경로는 대신하지 못한다. 격자선은 타일 아래, Zone 경계 안에만 나타나고 클릭을 막지 않아야 한다.
-3. authoring 과정의 이전 compile/reload 로그에는 원본 sample Widget GUID fixup과 transient graph reload 메시지가 있었다. 최종 강제 저장 후 새 Editor 재로드에서는 해당 GUID `Ensure`가 재발하지 않았다. 실제 플레이 시 로그도 살핀다.
-
-위 조건이 완료되기 전에는 최종 통합 승인하지 않는다. 다른 Placement fixture 오류와 현 작업의 Widget 결과는 분리해서 보고한다.
+`.md/USER_UNREAL.md`에 DefaultMap의 세 actor 배치·exact fixed-slot 참조와 World Partition 외부 actor 저장, WBP 1024×576 실제 화면 잘림 확인, Data Validation 및 LAB 직접 입력 수용을 기록했다. 레벨 저장·재로드와 직접 PIE 수용 전에는 통합 승인하지 않는다.

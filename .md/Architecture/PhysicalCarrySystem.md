@@ -1,5 +1,7 @@
 # Physical Carry System
 
+2026-09-24 Utility Labor Source: `AUtilityShovelActor`가 기존 단일 carry/FreeDrop/exact FixedSlot 계약과 동일 Actor load 보존을 구현한다. `Shovel` carry kind만 append했으며 공통 carry 기반 Actor/Component는 추가하지 않았다. 빌드/automation은 미실행이다.
+
 ## Implementation Status
 
 Q47~Q52의 exact fixed slot과 actual-held-position free drop은 구현되어 있다. 기존 설비 Actor의 `Packaged` carry 책임은 비활성화되었고 Placement 전용 `APlaceableFacilityItemActor`가 single carry, held-pose free drop, CCD와 carry-owner 기반 낙하 복구를 재사용한다. 설비 아이템은 fixed-slot capability를 명시적으로 제외한다.

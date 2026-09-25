@@ -1,5 +1,7 @@
 # UI System
 
+Source 구현 반영·Editor 수용 대기: [UtilityLaborSystem.md](UtilityLaborSystem.md)의 보일러 수직은 기존 equipment prompt와 capacity summary의 9개 binding을 재사용한다. 삽 LMB는 진행률 없는 단발 행, 관리 화면은 예약/가동/설치와 두 부족 원인을 native로 표시하며 WBP는 배치·스타일만 담당한다.
+
 ## Status And Scope
 
 UI System은 BathhouseSim의 native C++ Widget과 Widget Blueprint 사이의 공통 책임 경계를 정의한다.

@@ -237,6 +237,7 @@ bool UPlayerEquipmentUseComponent::BuildContext(
 	OutContext.User = GetOwner();
 	OutContext.Equipment = Equipment;
 	OutContext.CarryComponent = CarryComponent;
+	OutContext.InteractionComponent = InteractionComponent;
 	OutContext.Camera = Camera;
 	OutContext.MotionComponent = MotionComponent;
 	OutContext.CameraOrigin = Camera->GetComponentLocation();

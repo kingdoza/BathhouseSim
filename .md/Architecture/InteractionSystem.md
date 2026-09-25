@@ -1,5 +1,7 @@
 # Interaction System
 
+2026-09-24 Utility Labor Source: 장비/interaction context에 기존 interaction component를 전달해 삽 transaction이 같은 거리/channel로 fresh single-hit를 다시 조회한다. 삽 LMB는 Instant equipment use, 공급함 F는 반환 intent이며 generic router에는 concrete 보일러/연료 분기를 넣지 않았다. 빌드/automation은 미실행이다.
+
 ## Implementation Status
 
 이 문서는 현재 구현된 primary/secondary/hold interaction, Computer suppression과 LMB equipment-use를 정의하고 Placement target의 LMB confirm/Q Hold prompt 합성 경계를 추가한다. carry 상세는 [PhysicalCarrySystem.md](PhysicalCarrySystem.md), placement 실행은 [PlacementSystem.md](PlacementSystem.md)를 따른다.

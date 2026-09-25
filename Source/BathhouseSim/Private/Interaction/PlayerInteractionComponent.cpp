@@ -354,6 +354,7 @@ bool UPlayerInteractionComponent::BuildInteraction(
 	OutTargetObject = Candidate;
 	OutContext.Interactor = GetOwner();
 	OutContext.CarryComponent = CarryComponent;
+	OutContext.InteractionComponent = const_cast<UPlayerInteractionComponent*>(this);
 	OutContext.HitActor = Hit.GetActor();
 	OutContext.HitComponent = Hit.GetComponent();
 	OutContext.HitResult = Hit;

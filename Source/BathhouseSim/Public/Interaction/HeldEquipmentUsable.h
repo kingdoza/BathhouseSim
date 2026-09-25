@@ -9,6 +9,7 @@ class AActor;
 class UCameraComponent;
 class UHeldEquipmentMotionComponent;
 class UPlayerCarryComponent;
+class UPlayerInteractionComponent;
 
 USTRUCT()
 struct BATHHOUSESIM_API FHeldEquipmentUseContext
@@ -23,6 +24,9 @@ struct BATHHOUSESIM_API FHeldEquipmentUseContext
 
 	UPROPERTY()
 	TObjectPtr<UPlayerCarryComponent> CarryComponent = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UPlayerInteractionComponent> InteractionComponent = nullptr;
 
 	UPROPERTY()
 	TObjectPtr<UCameraComponent> Camera = nullptr;

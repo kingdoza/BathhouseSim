@@ -2,9 +2,10 @@
 
 ## Implementation Status
 
-- 상태: 2026-09-22 Source 수직 및 deficit/registry/actor-transaction 재작업 완료, Editor asset authoring 대기
+- 상태: 기존 Source 수직 및 deficit/registry/actor-transaction 구현은 완료. 2026-09-24 Utility Labor 수직 변경으로 Installed/Active 집계와 operation-aware provider 연결을 Source에 반영했으며, 전체 빌드/automation과 Editor 수용 검증은 미실행이다.
 - 정본: 기능 `.md/PROMPT_ARCHITECTURE.md`, Editor 조사 `.md/REPORT_UNREAL_DISCOVERY.md`, 기존 수위·급수·배수 `BathWaterSystem.md`
 - 이 문서는 순환·가열·냉각 용량과 수온·오염도 domain만 소유한다.
+- 2026-09-24 Utility Labor Source: `TotalPoints`는 Installed, `ActivePoints`는 실제 가동 provider, `DeficitPoints`는 Active shortfall, `InstalledDeficitPoints`는 Installed shortfall이다. setting request와 회수 검증은 기존처럼 Installed를 기준으로 하며, 효과 충족은 Active를 기준으로 한다. 세부 정본은 [UtilityLaborSystem.md](UtilityLaborSystem.md)다.
 
 ## Target Source Scope
 
@@ -76,7 +77,7 @@ Widget, Character와 Blueprint Event Graph는 용량·수온·오염도를 직�
 - `EBathWaterCapacityKind`: `Circulation`, `Heating`, `Cooling`
 - `EBathWaterThermalStatus`: `Empty`, `ReturningToAmbient`, `Stalled`, `MovingToTarget`, `MaintainingTarget`, `SuspendedByCapacity`
 - `EBathWaterRequestFailure`: invalid target, invalid number, insufficient circulation/heating/cooling capacity, unavailable bath
-- `FBathWaterCapacitySnapshot`: 종류별 used, total, deficit와 revision
+- `FBathWaterCapacitySnapshot`: `UsedPoints` 예약, `TotalPoints` 설치, `ActivePoints` 가동, `InstalledDeficitPoints` 설치 부족, `DeficitPoints` 가동 부족과 revision. `IsSatisfied()`는 가동 기준이다.
 - `FBathWaterBathSnapshot`: weak bath identity, world transform/footprint, water/setting/condition 값, 요구량, 상태와 revision
 - `FBathWaterSettingRequestResult`: requested, committed, limited kind, required additional points와 failure
 
@@ -105,7 +106,7 @@ CandidateUsed(kind)
   + CandidateBathDemand(kind)
 ```
 
-- candidate가 total 이하인 범위만 commit한다.
+- candidate가 설치 total 이하인 범위만 commit한다. 가동 잔량 부족은 설정 상한을 낮추지 않는다.
 - slider 요청이 초과하면 남은 용량으로 가능한 최대 step/percent를 계산해 제한된 값을 한 번 commit하고 결과에 제한 이유를 넣는다.
 - 값을 낮추는 방향은 현재 world가 deficit 상태여도 항상 허용한다.
 - 목표가 실온을 건너면 이전 종류 요구량을 먼저 0으로 만들고 반대 종류의 남은 용량으로 계속 제한한다.
@@ -144,6 +145,7 @@ CoolingDemand = max(AmbientC - TargetC, 0) * CoolingDemandPointsPerC
 - `CapacityPoints`: `EditAnywhere`, Blueprint default와 Level instance override 허용, 기본 `100`
 - 음수·NaN은 등록할 수 없고 명확한 validation error를 기록한다.
 - component는 자기 값을 소유하지만 world aggregate mutation은 subsystem API로만 수행한다.
+- 정격은 설치 합계에, 명시적으로 주입된 Operation이 양수인 정격은 가동 합계에 기여한다. 보일러는 Operation 필수, 첫 수직 단계의 기존 쿨러·순환기는 기존 공급을 유지한다.
 
 ### `ABathWaterUtilityFacilityActor`
 
@@ -151,7 +153,7 @@ CoolingDemand = max(AmbientC - TargetC, 0) * CoolingDemandPointsPerC
 
 - `IPlaceableFacility`, `IPhysicalCarryable`, 기존 primary/supplemental interaction 계약 구현
 - scene root, packaged item용 physics primitive, `VisualMesh`, `PlacementFootprint`, `UFacilityPlacementComponent`, capacity component 소유
-- 세 Blueprint가 같은 native parent를 사용하고 class default의 kind만 다르게 authoring한다.
+- base는 공통 배치·회수를 유지한다. 보일러만 `ABathWaterBoilerFacilityActor` 자식으로 분리하여 가동·투입·계기를 조립한다. 순환기·쿨러 노동은 후속 단계다.
 - customer `UBathhouseFacilitySubsystem`에 사용 슬롯 설비로 등록하지 않는다.
 - 직접 On/Off 또는 E primary 행동을 제공하지 않는다. Q Hold recovery만 기존 prompt 경로로 노출한다.
 - placed/preview/packaged 상태, collision/navigation과 item 전환은 `PlacementSystem.md` 계약을 그대로 따른다.
@@ -164,6 +166,7 @@ CoolingDemand = max(AmbientC - TargetC, 0) * CoolingDemandPointsPerC
 - 용량은 유한한 음이 아닌 값만 restore한다.
 - 설비 item은 기존 전용 회수 item 외형·Held 계약을 사용하며 capacity gameplay owner가 되지 않는다.
 - placed Actor가 성공적으로 등록된 뒤에만 item 원본 제거를 commit한다.
+- 노동 설비는 optional 가동 잔량 payload를 추가한다. Hold 동안 감소, 성공 시점 잔량 보존, packaged 감소 중지와 rollback 시 비-rewind는 `UtilityLaborSystem.md`를 따른다.
 
 ## `UBathWaterConditionComponent`
 
@@ -251,9 +254,9 @@ MixedContamination =
 
 - 물 양 `> 0`
 - circulation percent `> 0`
-- 전체 circulation capacity가 전체 circulation demand 이상
-- 목표가 ambient보다 높으면 전체 heating capacity가 demand 이상
-- 목표가 ambient보다 낮으면 전체 cooling capacity가 demand 이상
+- 전체 circulation 가동 capacity가 전체 circulation demand 이상
+- 목표가 ambient보다 높으면 전체 heating 가동 capacity가 demand 이상
+- 목표가 ambient보다 낮으면 전체 cooling 가동 capacity가 demand 이상
 
 정화는 circulation 조건만 요구한다. 자연 복귀는 물이 있고 recovery freeze가 아니면 항상 활성이다.
 
@@ -313,7 +316,7 @@ Delta = (IncreaseRate - EffectiveCleaningRate) * DeltaSeconds
 
 Editor 단계의 최소 신규 asset은 다음이다.
 
-- `BP_Circulator`, `BP_Boiler`, `BP_Cooler`: `ABathWaterUtilityFacilityActor` 파생
+- `BP_Circulator`, `BP_Cooler`: 기존 base 유지. `BP_Boiler`: 노동 수직 단계에서 native boiler child로 reparent 예정
 - 종류별 placement definition과 회수 item presentation 연결
 
 기존 `BP_Bath`는 inherited condition component 값을 확인하고 필요 시 instance override한다. 관리 화면의 WBP와 computer instance reference는 [BathWaterManagementUISystem.md](BathWaterManagementUISystem.md)가 소유한다.

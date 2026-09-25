@@ -16,5 +16,10 @@ public:
 
 	UPROPERTY()
 	float CapacityPoints = 100.0f;
-};
 
+	UPROPERTY()
+	bool bHasOperationState = false;
+
+	UPROPERTY()
+	float RemainingOperationPoints = 0.0f;
+};

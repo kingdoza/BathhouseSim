@@ -1,5 +1,7 @@
 #include "Facility/BathWaterUtilityCapacityComponent.h"
 
+#include "Utility/UtilityOperationComponent.h"
+
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
 #endif
@@ -16,9 +18,28 @@ float UBathWaterUtilityCapacityComponent::GetCapacityPoints() const
 	return FMath::IsFinite(CapacityPoints) ? FMath::Max(0.0f, CapacityPoints) : 0.0f;
 }
 
+float UBathWaterUtilityCapacityComponent::GetActiveCapacityPoints() const
+{
+	const float InstalledPoints = GetCapacityPoints();
+	if (!IsValid(UtilityOperation))
+	{
+		return bOperationRequired ? 0.0f : InstalledPoints;
+	}
+	return UtilityOperation->IsProvidingCapacity() ? InstalledPoints : 0.0f;
+}
+
+void UBathWaterUtilityCapacityComponent::SetUtilityOperation(
+	UUtilityOperationComponent* InOperation,
+	const bool bRequireOperation)
+{
+	UtilityOperation = InOperation;
+	bOperationRequired = bRequireOperation;
+}
+
 bool UBathWaterUtilityCapacityComponent::HasValidAuthoring(FText& OutFailureReason) const
 {
-	if (!StaticEnum<EBathWaterCapacityKind>()->IsValidEnumValue(static_cast<int64>(CapacityKind))
+	if ((bOperationRequired && !IsValid(UtilityOperation))
+		|| !StaticEnum<EBathWaterCapacityKind>()->IsValidEnumValue(static_cast<int64>(CapacityKind))
 		|| !FMath::IsFinite(CapacityPoints) || CapacityPoints < 0.0f)
 	{
 		OutFailureReason = LOCTEXT("InvalidCapacity", "설비 용량 종류와 값은 유효하고 음수가 아니어야 합니다.");
@@ -51,4 +72,3 @@ EDataValidationResult UBathWaterUtilityCapacityComponent::IsDataValid(FDataValid
 #endif
 
 #undef LOCTEXT_NAMESPACE
-

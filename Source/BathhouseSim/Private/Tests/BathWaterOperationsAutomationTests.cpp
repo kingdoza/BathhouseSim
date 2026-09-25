@@ -513,21 +513,28 @@ bool FBathWaterOperationsUIWidgetTest::RunTest(const FString& Parameters)
 	FBathWaterOperationsSnapshot OperationsSnapshot;
 	OperationsSnapshot.Circulation.Kind = EBathWaterCapacityKind::Circulation;
 	OperationsSnapshot.Circulation.TotalPoints = 100.0f;
+	OperationsSnapshot.Circulation.ActivePoints = 100.0f;
 	OperationsSnapshot.Circulation.UsedPoints = 100.0f;
 	OperationsSnapshot.Heating.Kind = EBathWaterCapacityKind::Heating;
 	OperationsSnapshot.Heating.TotalPoints = 50.0f;
+	OperationsSnapshot.Heating.ActivePoints = 30.0f;
 	OperationsSnapshot.Heating.UsedPoints = 70.0f;
-	OperationsSnapshot.Heating.DeficitPoints = 20.0f;
+	OperationsSnapshot.Heating.DeficitPoints = 40.0f;
+	OperationsSnapshot.Heating.InstalledDeficitPoints = 20.0f;
 	OperationsSnapshot.Cooling.Kind = EBathWaterCapacityKind::Cooling;
 	OperationsSnapshot.Cooling.TotalPoints = 100.0f;
+	OperationsSnapshot.Cooling.ActivePoints = 100.0f;
 	OperationsSnapshot.Cooling.UsedPoints = 20.0f;
 	Summary->ApplyCapacitySnapshot(OperationsSnapshot);
 	TestEqual(TEXT("Capacity widgets write each kind once"), Summary->PresentationWriteCount, 3);
-	TestEqual(TEXT("Full capacity exposes a full status"),
-		Summary->CirculationCapacityStatusText->GetText().ToString(), FString(TEXT("가득 참")));
-	TestTrue(TEXT("Deficit capacity exposes shortage and clamps progress"),
-		Summary->HeatingCapacityStatusText->GetText().ToString() == TEXT("부족")
+	TestEqual(TEXT("Full capacity exposes a reservation status"),
+		Summary->CirculationCapacityStatusText->GetText().ToString(), FString(TEXT("예약 용량 사용 중")));
+	TestTrue(TEXT("Deficit capacity exposes installed and operating shortages and clamps progress"),
+		Summary->HeatingCapacityStatusText->GetText().ToString().Contains(TEXT("설치 용량 20 부족"))
+		&& Summary->HeatingCapacityStatusText->GetText().ToString().Contains(TEXT("가동 용량 40 부족"))
 		&& FMath::IsNearlyEqual(Summary->HeatingCapacityBar->GetPercent(), 1.0f));
+	TestEqual(TEXT("Capacity text shows reserved, active and installed values"),
+		Summary->HeatingCapacityText->GetText().ToString(), FString(TEXT("예약 70 / 가동 30 / 설치 50")));
 	Summary->ApplyCapacitySnapshot(OperationsSnapshot);
 	TestEqual(TEXT("An identical snapshot performs no child writes"), Summary->PresentationWriteCount, 3);
 

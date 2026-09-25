@@ -1,5 +1,33 @@
 # 사용자 Unreal 후속 작업
 
+# 보일러 노동 가동 수직 구현 — MCP 미지원 작업
+
+## 현재 확인 상태
+
+`/Game/Bathhouse/Blueprints/Facility/BP_Boiler`는 `/Script/BathhouseSim.BathWaterBoilerFacilityActor`로 reparent했고 `FacilityPlacement.Definition=/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler`와 임시 Cube 투입구·계기·바늘을 저장·재로드했다. `/Game/Bathhouse/Blueprints/Utility/BP_UtilityShovel`과 `BP_CoalSupply`도 임시 Cube/`SM_Facility_sample`로 생성·컴파일·저장·재로드했다. 새 Editor에서 기존 보일러 instance는 새 component 값을 상속했고 기본 PIE에서 필수 투입구 누락 경고가 재발하지 않았다.
+
+`DefaultMap`의 신규 석탄 공급함·삽·전용 거치대는 **디스크에 저장되지 않았다.** 이전 MCP 세션의 개별 `save_actor`는 신규/기존 World Partition 외부 액터 모두에 `Asset does not exist: /Game/__ExternalActors__/...`를 반환했다. 현재 사용자가 열어 둔 Editor에는 아래 세 actor를 다시 배치하고 exact 삽 참조를 연결했으나, Editor를 닫으면 사라질 수 있다. MCP 저장 실패를 반복하지 않았다.
+
+## 1. DefaultMap 액터 배치·외부 액터 저장
+
+현재 열린 `/Game/Maps/DefaultMap`에는 다음 세 Blueprint instance가 **미저장 상태로 배치되어 있고 선택되어 있다.** 재생성하지 말고 위치가 괜찮은지 확인한다. 바닥 trace는 두 위치 모두 Z=0이었다.
+
+| Actor | Blueprint | 제안 world Location |
+|---|---|---|
+| `CoalSupply` | `/Game/Bathhouse/Blueprints/Utility/BP_CoalSupply` | `(550,-850,0)` |
+| `UtilityShovel` | `/Game/Bathhouse/Blueprints/Utility/BP_UtilityShovel` | `(425,-800,45)` |
+| `ShovelSlot` | `/Game/Bathhouse/Blueprints/Interaction/BP_PhysicalCarryFixedSlot` | `(425,-800,45)` |
+
+`ShovelSlot.AssignedItem`은 **그 레벨의 `UtilityShovel` 인스턴스**를 가리키고, `bStartOccupied=true`, `SlotDisplayName=삽 거치대`다. `ItemAnchor`와 삽의 시작 world transform은 둘 다 `(425,-800,45)`/회전 0이다. 현재 열린 Editor에서 `DefaultMap`과 해당 세 World Partition 외부 액터만 저장한 뒤, 다시 열어 세 actor와 exact 참조가 유지되는지 확인한다. 이번 MCP는 외부 액터의 디스크 저장을 완료하지 못했다. 저장 전 Editor를 종료하지 않는다.
+
+## 2. Capacity Summary 실제 화면 검증
+
+`/Game/Bathhouse/UI/WBP_BathWaterCapacitySummary`의 기존 9개 BindWidget을 유지한 상태로 제목·3열 레이블, 글자 크기, 줄바꿈과 여백을 Editor Python API로 개별 저장했다. 새 프로세스 재로드와 Blueprint Compile `BS_UP_TO_DATE`를 확인했다. 이제 1024×576 컴퓨터 화면에서 세 종류의 `예약 Used / 가동 Active / 설치 Total` 및 설치 부족·가동 부족 동시 상태가 잘리지 않고 아래 지도·상세 영역을 누르지 않는지 직접 확인한다. 자산을 다시 편집할 필요는 없으며, 잘림이 보일 때만 해당 화면을 캡처해 재작업 대상으로 돌린다.
+
+## 3. 검증
+
+세 Blueprint의 Data Validation, 실제 LMB 삽·투입구 판정, G/E/F/Q, 석탄 잔량·가동·바늘 회전 및 1024×576 화면 판독성을 `.md/PROMPT_UNREAL.md`의 LAB 시나리오대로 확인한다. 자동 기본 PIE 시작만으로 실제 입력/시각 수용을 대신하지 않는다.
+
 # 욕탕 물 순환·가열·냉각과 컴퓨터 제어
 
 ## 관리 화면 직접 플레이 검증

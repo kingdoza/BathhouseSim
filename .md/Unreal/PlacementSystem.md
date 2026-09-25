@@ -30,6 +30,8 @@
 
 활성 10개 Definition의 `RecoveryItemClass`는 공통 `/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem.BP_PlaceableFacilityItem_C`, `RecoveryItemMesh`는 `None`이며 native Cube fallback을 사용한다. Stack과 Bin은 `PlacedFacilityClass`, `RecoveryItemClass`, `RecoveryItemMesh`가 모두 `None`인 opt-out 상태다.
 
+`BP_Boiler`의 inherited `FacilityPlacement.Definition`은 `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler`로 저장됐다. `DefaultMap`의 기존 보일러 인스턴스는 별도 override 없이 재시작 후 같은 Definition을 상속한다. 다른 utility Blueprint의 Definition 연결 여부는 이 변경으로 보장하지 않는다.
+
 공통 설비 아이템 Blueprint의 parent는 `/Script/BathhouseSim.PlaceableFacilityItemActor`다. 상속된 `ItemRoot`의 기본 Relative Scale은 `(0.3,0.3,0.3)`이며, 설비 회수 아이템의 공통 크기는 이 값에서 조정한다. Project Settings의 `FacilityItemHeldTransform.Scale`로는 크기를 조정하지 않는다.
 
 구형 `/Game/Bathhouse/Blueprints/Placement/Preview/BP_FacilityPreview_*` 9개는 Definition 재저장 뒤 참조가 0임을 확인하고 삭제됐다. 현재 preview는 native `AFacilityPlacementPreviewActor` 경로만 사용한다.
@@ -48,7 +50,7 @@
 | `/Game/Bathhouse/Blueprints/Towel/BP_Washer` | `/Script/BathhouseSim.TowelProcessingMachineActor` | `(30,25,40)` | 40 | `MachineVisual`, Engine Cube, BlockAllDynamic, Navigation 활성 |
 | `/Game/Bathhouse/Blueprints/Towel/BP_Dryer` | `/Script/BathhouseSim.TowelProcessingMachineActor` | `(30,25,40)` | 40 | `MachineVisual`, Engine Cube, BlockAllDynamic, Navigation 활성 |
 | `/Game/Bathhouse/Blueprints/Facility/BP_Circulator` | `/Script/BathhouseSim.BathWaterUtilityFacilityActor` | `(60,40,60)` | 60 | `VisualMesh`, `SM_Facility_sample`, scale `(1.2,0.8,1.2)`, BlockAllDynamic, Navigation 활성 |
-| `/Game/Bathhouse/Blueprints/Facility/BP_Boiler` | `/Script/BathhouseSim.BathWaterUtilityFacilityActor` | `(50,30,60)` | 60 | `VisualMesh`, `SM_Facility_sample`, scale `(1.0,0.6,1.2)`, BlockAllDynamic, Navigation 활성 |
+| `/Game/Bathhouse/Blueprints/Facility/BP_Boiler` | `/Script/BathhouseSim.BathWaterBoilerFacilityActor` | `(50,30,60)` | 60 | `VisualMesh`, `SM_Facility_sample`, scale `(1.0,0.6,1.2)`, BlockAllDynamic, Navigation 활성 |
 | `/Game/Bathhouse/Blueprints/Facility/BP_Cooler` | `/Script/BathhouseSim.BathWaterUtilityFacilityActor` | `(50,30,60)` | 60 | `VisualMesh`, `SM_Facility_sample`, scale `(1.0,0.6,1.2)`, BlockAllDynamic, Navigation 활성 |
 
 `PackagePhysicalRoot`, slot, interaction, action/approach point, towel presentation, water/contents helper는 Navigation에 관여하지 않는다. Bath의 `SM_Bath_old`에는 generated convex collision과 NavCollision이 존재한다.

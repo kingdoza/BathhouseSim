@@ -15,6 +15,7 @@ class UFacilityPlacementComponent;
 class UPlayerCarryComponent;
 class USceneComponent;
 class UStaticMeshComponent;
+class UUtilityOperationComponent;
 
 UCLASS(Blueprintable)
 class BATHHOUSESIM_API ABathWaterUtilityFacilityActor
@@ -81,6 +82,9 @@ public:
 	virtual void RecoverPhysicalCarryable(UPlayerCarryComponent* PreviousCarry) override;
 
 	UBathWaterUtilityCapacityComponent* GetCapacityComponent() const { return Capacity; }
+	virtual UUtilityOperationComponent* GetUtilityOperation() const;
+	virtual bool RequiresLaborOperation() const { return false; }
+	virtual bool HasValidUtilityAuthoring(FText& OutFailureReason) const;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Bath Water Utility")
@@ -98,6 +102,10 @@ protected:
 
 private:
 	friend class FBathWaterOperationsFacilityTransactionTest;
+	void HandleUtilityOperatingChanged(bool bIsOperating);
+	void BindUtilityOperation();
+	void UnbindUtilityOperation();
+	TWeakObjectPtr<UUtilityOperationComponent> BoundUtilityOperation;
 	bool bProviderRegistered = false;
 	bool bRecoveryHoldActive = false;
 };

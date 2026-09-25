@@ -2,16 +2,13 @@
 
 ## 문서 기준
 
-- 기준일: 2026-09-22(KST) 욕탕 물 순환·가열·냉각과 컴퓨터 제어 설계 기준
-- 상태: 기존 PlacementZone grid와 Bath Water/Operations/Management UI Source 및 focused automation 구현 완료, Editor asset authoring 대기
+- 기준일: 2026-09-24(KST), 보일러 노동 가동 수직 Source 구현 반영
+- 상태: 기존 Source 구현에 Utility Labor Source/test 초안을 추가했다. 이전 UE 5.8 빌드에서 당시 C++ compile과 `.lib` link는 통과했으나 실행 중인 UnrealEditor의 DLL 잠금으로 최종 link가 막혔다. 이후 테스트 보강·분할분은 아직 재빌드하지 않았다. automation은 미실행이며 코드 리뷰와 Editor authoring/PIE가 남아 있다.
 - 정본 문서: `.md/0_ARCHITECTURE.md`와 `.md/Architecture/*.md`
-- legacy 문서: 현재 별도 legacy architecture 문서는 없다.
 
 ## 분석 범위
 
-- 주 분석 범위:
-  - `Source/BathhouseSim/Public`
-  - `Source/BathhouseSim/Private`
+- 주 분석 범위: `Source/BathhouseSim/Public`, `Source/BathhouseSim/Private`
 - 현재 구현된 C++ 하위 시스템:
   - Core
   - Character
@@ -26,11 +23,13 @@
   - Computer
   - Combat
   - Customer Recovery
+  - Utility Labor
 - `Content`는 Blueprint 참조 검증 범위로만 다룬다. C++ 시스템 책임의 정본은 Source 하위 문서에 둔다.
 - `Config/DefaultEngine.ini`는 GameMode/Pawn/Controller 연결 또는 Core Redirect가 필요한 rename 호환 경로로만 문서화한다.
 
 ## 시스템 문서
 
+- [UtilityLaborSystem.md](Architecture/UtilityLaborSystem.md): 보일러·석탄·삽·계기와 설치/가동 용량 분리의 Source 구현 및 후속 Editor 계약
 - [CharacterSystem.md](Architecture/CharacterSystem.md): 1인칭 입력, 컨트롤러 입력 매핑, 이동, 점프, sprint, 캐릭터 조립
 - [CameraSystem.md](Architecture/CameraSystem.md): 이동/착지 기반 카메라 셰이크, camera manager 기반 pitch limit
 - [InteractionSystem.md](Architecture/InteractionSystem.md): camera trace, primary/secondary intent와 equipment-use routing
@@ -59,6 +58,7 @@ Source/BathhouseSim/
     Camera/
     Interaction/
     Facility/
+    Utility/
     Economy/
     Customer/
     UI/
@@ -70,6 +70,7 @@ Source/BathhouseSim/
     Camera/
     Interaction/
     Facility/
+    Utility/
     Economy/
     Customer/
     UI/
@@ -80,6 +81,7 @@ Source/BathhouseSim/
 ```
 
 Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, `Private/UI` 확장을 사용한다.
+Utility Labor target은 신규 `Public/Utility`, `Private/Utility`와 기존 Facility/Interaction/UI의 최소 확장이다. 잔량은 Operation, 적재는 삽, 전역 용량은 Operations가 소유한다.
 
 - `Core`는 소스 폴더가 아니라 문서상 공통 경계다.
 - 시스템 하위 폴더명은 include 경로의 1차 네임스페이스 역할을 한다.
@@ -151,6 +153,7 @@ Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, 
 - Facility overflow volume -> UE NavigationSystem
 - UI -> Interaction
 - Computer/UI -> Interaction과 Bath Water Operations snapshot/request API
+- Utility -> Interaction/Placement 계약, Facility utility base. Facility Capacity는 주입된 Operation 가동 query만 사용하며 전역 합계는 Operations에 둔다.
 - Computer -> UMG/Engine Camera/PlayerController
 - Cleaning -> Interaction
 - Towel -> Interaction

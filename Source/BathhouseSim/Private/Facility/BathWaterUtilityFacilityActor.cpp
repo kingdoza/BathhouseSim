@@ -13,11 +13,14 @@
 #include "Placement/FacilityPlacementSettings.h"
 #include "Placement/FacilityPlacementZoneActor.h"
 #include "Placement/PlaceableFacilityItemActor.h"
+#include "Utility/UtilityOperationComponent.h"
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "BathWaterUtilityFacilityActor"
+
+DEFINE_LOG_CATEGORY_STATIC(LogBathWaterUtility, Log, All);
 
 ABathWaterUtilityFacilityActor::ABathWaterUtilityFacilityActor()
 {
@@ -49,17 +52,44 @@ ABathWaterUtilityFacilityActor::ABathWaterUtilityFacilityActor()
 void ABathWaterUtilityFacilityActor::BeginPlay()
 {
 	Super::BeginPlay();
+	BindUtilityOperation();
 	if (FacilityPlacement && FacilityPlacement->IsPlacedDomainActive())
 	{
-		if (UBathWaterOperationsSubsystem* Operations = GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>())
+		FText FailureReason;
+		if (HasValidUtilityAuthoring(FailureReason))
 		{
-			bProviderRegistered = Operations->RegisterProvider(Capacity);
+			if (UUtilityOperationComponent* Operation = GetUtilityOperation())
+			{
+				Operation->StartPlacedClock(false);
+			}
+			if (UBathWaterOperationsSubsystem* Operations = GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>())
+			{
+				bProviderRegistered = Operations->RegisterProvider(Capacity);
+			}
+			if (!bProviderRegistered)
+			{
+				if (UUtilityOperationComponent* Operation = GetUtilityOperation())
+				{
+					Operation->StopPlacedClock(false);
+				}
+			}
+		}
+		else
+		{
+			UE_LOG(LogBathWaterUtility, Warning, TEXT("Rejected invalid placed utility %s: %s"),
+				*GetName(), *FailureReason.ToString());
 		}
 	}
 }
 
 void ABathWaterUtilityFacilityActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UnbindUtilityOperation();
+	if (UUtilityOperationComponent* Operation = GetUtilityOperation())
+	{
+		Operation->SetLaborBlocked(true);
+		Operation->StopPlacedClock(false);
+	}
 	if (bProviderRegistered)
 	{
 		if (UBathWaterOperationsSubsystem* Operations = GetWorld()
@@ -89,6 +119,74 @@ FPlayerInteractionResult ABathWaterUtilityFacilityActor::ExecuteInteraction(cons
 	return FPlayerInteractionResult::Failed(LOCTEXT("NoDirectUse", "이 설비는 직접 조작하지 않습니다."));
 }
 
+UUtilityOperationComponent* ABathWaterUtilityFacilityActor::GetUtilityOperation() const
+{
+	return nullptr;
+}
+
+bool ABathWaterUtilityFacilityActor::HasValidUtilityAuthoring(FText& OutFailureReason) const
+{
+	if (!Capacity || !Capacity->HasValidAuthoring(OutFailureReason))
+	{
+		if (OutFailureReason.IsEmpty())
+		{
+			OutFailureReason = LOCTEXT("MissingUtilityCapacity", "설비 용량 component가 없습니다.");
+		}
+		return false;
+	}
+	if (RequiresLaborOperation())
+	{
+		const UUtilityOperationComponent* Operation = GetUtilityOperation();
+		if (!Operation || !Operation->HasValidAuthoring(OutFailureReason))
+		{
+			if (OutFailureReason.IsEmpty())
+			{
+				OutFailureReason = LOCTEXT("MissingRequiredOperation", "노동 가동 설비에 Operation component가 없습니다.");
+			}
+			return false;
+		}
+	}
+	OutFailureReason = FText::GetEmpty();
+	return true;
+}
+
+void ABathWaterUtilityFacilityActor::BindUtilityOperation()
+{
+	if (Capacity)
+	{
+		Capacity->SetUtilityOperation(GetUtilityOperation(), RequiresLaborOperation());
+	}
+	if (UUtilityOperationComponent* Operation = GetUtilityOperation())
+	{
+		BoundUtilityOperation = Operation;
+		Operation->OnOperatingChanged.AddUObject(
+			this, &ABathWaterUtilityFacilityActor::HandleUtilityOperatingChanged);
+	}
+}
+
+void ABathWaterUtilityFacilityActor::UnbindUtilityOperation()
+{
+	if (BoundUtilityOperation.IsValid())
+	{
+		BoundUtilityOperation->OnOperatingChanged.RemoveAll(this);
+	}
+	BoundUtilityOperation.Reset();
+}
+
+void ABathWaterUtilityFacilityActor::HandleUtilityOperatingChanged(const bool bIsOperating)
+{
+	(void)bIsOperating;
+	if (!bProviderRegistered)
+	{
+		return;
+	}
+	if (UBathWaterOperationsSubsystem* Operations = GetWorld()
+		? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr)
+	{
+		Operations->PublishMutation(false, true);
+	}
+}
+
 FPlayerInteractionQuery ABathWaterUtilityFacilityActor::MergeSupplementalInteractionQuery(
 	const FPlayerInteractionQuery& BaseQuery) const
 {
@@ -113,7 +211,7 @@ FFacilityPlacementTransactionResult ABathWaterUtilityFacilityActor::QueryFacilit
 {
 	(void)CandidateTransform;
 	FText FailureReason;
-	if (!FacilityPlacement || !Capacity || !Capacity->HasValidAuthoring(FailureReason)
+	if (!FacilityPlacement || !HasValidUtilityAuthoring(FailureReason)
 		|| !FacilityPlacement->IsOperational(FailureReason)
 		|| !FacilityPlacement->GetDefinition()->ValidateRuntime(FailureReason))
 	{
@@ -138,7 +236,7 @@ FFacilityPlacementTransactionResult ABathWaterUtilityFacilityActor::QueryFacilit
 	if (!FacilityPlacement || !Capacity || !FacilityPlacement->IsOperational(FailureReason)
 		|| FacilityPlacement->GetMode() != EPlaceableFacilityMode::Placed
 		|| FacilityPlacement->IsStagedPlacement() || !FacilityPlacement->IsPlacedDomainActive()
-		|| !bProviderRegistered || !Capacity->HasValidAuthoring(FailureReason))
+		|| !bProviderRegistered || !HasValidUtilityAuthoring(FailureReason))
 	{
 		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::WrongMode,
 			FailureReason.IsEmpty() ? LOCTEXT("UtilityNotPlaced", "설치된 설비만 회수할 수 있습니다.") : FailureReason);
@@ -174,12 +272,20 @@ bool ABathWaterUtilityFacilityActor::TryBeginFacilityRecoveryHold(FText& OutFail
 		return false;
 	}
 	bRecoveryHoldActive = true;
+	if (UUtilityOperationComponent* Operation = GetUtilityOperation())
+	{
+		Operation->SetLaborBlocked(true);
+	}
 	return true;
 }
 
 void ABathWaterUtilityFacilityActor::CancelFacilityRecoveryHold()
 {
 	bRecoveryHoldActive = false;
+	if (UUtilityOperationComponent* Operation = GetUtilityOperation())
+	{
+		Operation->SetLaborBlocked(false);
+	}
 }
 
 bool ABathWaterUtilityFacilityActor::ExportPlacementPayload(
@@ -187,8 +293,7 @@ bool ABathWaterUtilityFacilityActor::ExportPlacementPayload(
 	FFacilityPlacementPayload& OutPayload,
 	FText& OutFailureReason) const
 {
-	if (!FacilityPlacement || !FacilityPlacement->GetDefinition() || !Capacity
-		|| !Capacity->HasValidAuthoring(OutFailureReason))
+	if (!FacilityPlacement || !FacilityPlacement->GetDefinition() || !HasValidUtilityAuthoring(OutFailureReason))
 	{
 		return false;
 	}
@@ -200,6 +305,17 @@ bool ABathWaterUtilityFacilityActor::ExportPlacementPayload(
 	}
 	Data->CapacityKind = Capacity->GetCapacityKind();
 	Data->CapacityPoints = Capacity->GetCapacityPoints();
+	if (RequiresLaborOperation())
+	{
+		const UUtilityOperationComponent* Operation = GetUtilityOperation();
+		if (!Operation)
+		{
+			OutFailureReason = LOCTEXT("MissingOperationForExport", "가동 잔량을 회수 payload에 저장할 수 없습니다.");
+			return false;
+		}
+		Data->bHasOperationState = true;
+		Data->RemainingOperationPoints = Operation->GetRemainingPoints();
+	}
 	OutPayload.Definition = FacilityPlacement->GetDefinition();
 	OutPayload.InstanceData = Data;
 	return OutPayload.Validate(Item, OutFailureReason);
@@ -217,7 +333,8 @@ bool ABathWaterUtilityFacilityActor::ImportPlacementPayload(
 		|| FacilityPlacement->GetDefinition() != Payload.Definition
 		|| Payload.Definition->PlacedFacilityClass.Get() != GetClass()
 		|| Data->CapacityKind != Capacity->GetCapacityKind()
-		|| !FMath::IsFinite(Data->CapacityPoints) || Data->CapacityPoints < 0.0f)
+		|| !FMath::IsFinite(Data->CapacityPoints) || Data->CapacityPoints < 0.0f
+		|| !HasValidUtilityAuthoring(OutFailureReason))
 	{
 		if (OutFailureReason.IsEmpty())
 		{
@@ -226,6 +343,20 @@ bool ABathWaterUtilityFacilityActor::ImportPlacementPayload(
 		return false;
 	}
 	Capacity->RestoreCapacity(Data->CapacityKind, Data->CapacityPoints);
+	if (RequiresLaborOperation())
+	{
+		UUtilityOperationComponent* Operation = GetUtilityOperation();
+		const float ImportedPoints = Data->bHasOperationState ? Data->RemainingOperationPoints : 0.0f;
+		if (!Operation || !Operation->ImportOperationState(ImportedPoints, OutFailureReason))
+		{
+			return false;
+		}
+	}
+	else if (Data->bHasOperationState)
+	{
+		OutFailureReason = LOCTEXT("UnexpectedOperationPayload", "가동 상태가 없는 설비에 가동 payload를 가져올 수 없습니다.");
+		return false;
+	}
 	return true;
 }
 
@@ -238,12 +369,34 @@ bool ABathWaterUtilityFacilityActor::StagePlacedDomainRegistration(FText& OutFai
 	}
 	UBathWaterOperationsSubsystem* Operations = GetWorld()
 		? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr;
-	if (!Operations || !Operations->RegisterProvider(Capacity, false))
+	if (!HasValidUtilityAuthoring(OutFailureReason))
 	{
-		OutFailureReason = LOCTEXT("UtilityRegistrationFailed", "설비 용량을 등록할 수 없습니다.");
+		return false;
+	}
+	if (!Operations)
+	{
+		OutFailureReason = LOCTEXT("UtilityOperationsUnavailable", "설비 용량을 등록할 운영 시스템을 찾을 수 없습니다.");
+		return false;
+	}
+	if (!Operations->RegisterProvider(Capacity, false))
+	{
+		if (OutFailureReason.IsEmpty())
+		{
+			OutFailureReason = LOCTEXT("UtilityRegistrationFailed", "설비 용량을 등록할 수 없습니다.");
+		}
 		return false;
 	}
 	bProviderRegistered = true;
+	if (UUtilityOperationComponent* Operation = GetUtilityOperation())
+	{
+		if (!Operation->StartPlacedClock(false))
+		{
+			Operations->UnregisterProvider(Capacity, false);
+			bProviderRegistered = false;
+			OutFailureReason = LOCTEXT("OperationClockStartFailed", "설비 가동 시계를 시작할 수 없습니다.");
+			return false;
+		}
+	}
 	return true;
 }
 
@@ -257,6 +410,10 @@ void ABathWaterUtilityFacilityActor::RollbackPlacedDomainRegistration()
 			Operations->UnregisterProvider(Capacity, false);
 		}
 		bProviderRegistered = false;
+	}
+	if (UUtilityOperationComponent* Operation = GetUtilityOperation())
+	{
+		Operation->StopPlacedClock(false);
 	}
 	if (FacilityPlacement)
 	{
@@ -276,8 +433,17 @@ bool ABathWaterUtilityFacilityActor::StagePlacedDomainUnregistration(
 	}
 	UBathWaterOperationsSubsystem* Operations = GetWorld()
 		? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr;
+	UUtilityOperationComponent* Operation = GetUtilityOperation();
+	if (Operation)
+	{
+		Operation->StopPlacedClock(false);
+	}
 	if (!Operations || !Operations->UnregisterProvider(Capacity, false))
 	{
+		if (Operation)
+		{
+			Operation->StartPlacedClock(true);
+		}
 		OutFailureReason = LOCTEXT("UtilityUnregistrationFailed", "설비 용량 등록을 해제할 수 없습니다.");
 		return false;
 	}
@@ -285,6 +451,10 @@ bool ABathWaterUtilityFacilityActor::StagePlacedDomainUnregistration(
 	if (!FacilityPlacement->CaptureAndDisableActorCollision(OutFailureReason))
 	{
 		bProviderRegistered = Operations->RegisterProvider(Capacity, false);
+		if (Operation)
+		{
+			Operation->StartPlacedClock(true);
+		}
 		return false;
 	}
 	FacilityPlacement->SetPlacedDomainActive(false);
@@ -322,6 +492,15 @@ bool ABathWaterUtilityFacilityActor::RollbackPlacedDomainUnregistration(FText& O
 	}
 	FacilityPlacement->SetPlacedDomainActive(true);
 	bRecoveryHoldActive = false;
+	if (UUtilityOperationComponent* Operation = GetUtilityOperation())
+	{
+		Operation->SetLaborBlocked(false);
+		if (!Operation->StartPlacedClock(true))
+		{
+			OutFailureReason = LOCTEXT("UtilityRollbackClockFailed", "설비 가동 시계를 복구할 수 없습니다.");
+			return false;
+		}
+	}
 	return true;
 }
 
@@ -394,7 +573,7 @@ EDataValidationResult ABathWaterUtilityFacilityActor::IsDataValid(FDataValidatio
 	EDataValidationResult Result = Super::IsDataValid(Context);
 	FText FailureReason;
 	if (!Capacity || !FacilityPlacement || !PlacementFootprint || !PackagePhysicalRoot || !VisualMesh
-		|| !Capacity->HasValidAuthoring(FailureReason))
+		|| !HasValidUtilityAuthoring(FailureReason))
 	{
 		Context.AddError(FailureReason.IsEmpty()
 			? LOCTEXT("MissingUtilityComponents", "물 설비 native component 구성이 완전하지 않습니다.")

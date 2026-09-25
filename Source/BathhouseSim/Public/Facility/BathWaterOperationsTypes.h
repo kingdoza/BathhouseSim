@@ -51,7 +51,13 @@ struct BATHHOUSESIM_API FBathWaterCapacitySnapshot
 	float TotalPoints = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Bath Water")
+	float ActivePoints = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Bath Water")
 	float DeficitPoints = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Bath Water")
+	float InstalledDeficitPoints = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Bath Water")
 	int64 Revision = 0;

@@ -7,6 +7,7 @@
 class AActor;
 class UActorComponent;
 class UPlayerCarryComponent;
+class UPlayerInteractionComponent;
 
 UENUM(BlueprintType)
 enum class EPlayerInteractionIntent : uint8
@@ -54,6 +55,9 @@ struct BATHHOUSESIM_API FPlayerInteractionContext
 
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	TObjectPtr<UPlayerCarryComponent> CarryComponent = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	TObjectPtr<UPlayerInteractionComponent> InteractionComponent = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	TObjectPtr<AActor> HitActor = nullptr;

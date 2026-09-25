@@ -52,6 +52,7 @@ private:
 	FBathWaterCapacitySnapshot BuildCapacitySnapshot(EBathWaterCapacityKind Kind) const;
 	bool BuildBathSnapshot(const ABathhouseBathFacilityActor* Bath, FBathWaterBathSnapshot& OutSnapshot) const;
 	float CalculateTotalCapacity(EBathWaterCapacityKind Kind) const;
+	float CalculateActiveCapacity(EBathWaterCapacityKind Kind) const;
 	FDemandTotals CalculateDemandTotals(const UBathWaterConditionComponent* ReplacedCondition = nullptr,
 		float CandidateCirculation = 0.0f, float CandidateTarget = 0.0f, bool bUseCandidate = false) const;
 	UBathWaterConditionComponent* FindCondition(const ABathhouseBathFacilityActor* Bath) const;

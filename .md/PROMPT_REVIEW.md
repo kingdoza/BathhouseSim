@@ -1,115 +1,59 @@
-# 코드 리뷰 프롬프트 — Bath Water Operations 재작업
+# 코드 리뷰 요청 — 보일러 노동 가동 수직 구현
 
-## 리뷰 범위
+## 단계와 범위
 
-`.md/PROMPT_IMPLEMENTATION_R.md`의 deficit transaction, 지도 투영, native 관리 UI, registry revision과 실제 facility transaction 보강을 리뷰한다.
+- C++ 구현 뒤, Unreal Editor 변경 전 코드 리뷰다.
+- 입력 정본: .md/PROMPT_ARCHITECTURE.md, .md/PROMPT_IMPLEMENTATION.md, .md/Architecture/UtilityLaborSystem.md.
+- 대상은 LAB-001~025, LAB-037~039다. LAB-026~036의 쿨러·수동 순환기는 범위 밖이다.
+- 이 결과물은 Editor 작업 승인이 아니다. 리뷰 승인 뒤에만 .md/PROMPT_UNREAL.md를 따른다.
 
-- Source와 architecture/review/Unreal 인계 문서만 수정했다.
-- `Content/`, `Config/`, Level, StateTree, Blueprint/WBP와 `.md/Unreal/*`은 수정하지 않았다.
-- 기존 reflected 이름과 enum ordinal을 유지했고 Core Redirect를 추가하지 않았다.
+## 구현 요약
 
-## 구현 결과
+- UUtilityOperationComponent가 가동 잔량, 게임시간 감소, 0 경계와 payload import 상태를 소유한다.
+- ABathWaterBoilerFacilityActor가 기존 utility 설비의 native child composition을 만들고 Heating 전용 authoring을 검증한다.
+- AUtilityShovelActor, AUtilityFuelSupplyActor, private FUtilityFuelTransaction이 기존 carry/equipment/focus 경로로 한 회분 Coal 이동·반환과 재진입 방어를 처리한다.
+- capacity snapshot을 Installed/Active로 나눴다. TotalPoints는 Installed로 유지하고 ActivePoints, InstalledDeficitPoints를 추가했다. 예약 요청/회수 gate는 Installed, 물 효과는 Active를 쓴다.
+- 회수 payload에 bHasOperationState, RemainingOperationPoints를 추가해 stage/cancel/rollback/reinstall clock lifecycle을 연결했다.
+- 관리 화면은 예약·가동·설치와 두 부족 원인을 표시한다. Interaction context에 generic component pointer를 추가하고 EPhysicalCarryKind 끝에 Shovel을 append했다.
+- 0_ARCHITECTURE와 관련 Bath Water/Interaction/Physical Carry/Placement/UI Architecture 문서를 Source 구조에 맞췄다. Content와 Unreal 정본은 구현 단계에서 수정하지 않았다.
 
-### Request atomicity
+## 시나리오와 자동화
 
-- heating 방향 증가는 현재 target을 하한, cooling 방향 증가는 현재 target을 상한으로 보존한다.
-- deficit 상태에서도 ambient 방향 감소와 ambient 횡단은 계속 허용한다.
-- 제한 부족량은 `max(RequestedCandidateAggregateUsed - TotalCapacity, 0)`이다.
-- limited/no-op의 committed 값이 current와 같으면 setter, `DataRevision`, delegate publication을 모두 생략한다.
-
-### Registry와 snapshot
-
-- provider register/unregister는 capacity/data revision만 변경하고 bath topology revision을 변경하지 않는다.
-- bath identity 변경만 topology/data revision을 변경한다.
-- invalid provider/bath weak entry prune는 대응 revision과 data revision을 올리고 reentrant-safe publication을 수행한다.
-- bath snapshot은 demand가 있는 종류에 한해 `bCirculationCapacityDeficit`, `bHeatingCapacityDeficit`, `bCoolingCapacityDeficit`을 독립적으로 채운다.
-
-### 지도 투영
-
-- Zone world X:Y 비율을 보존하는 중앙 letterbox content rect를 사용한다.
-- footprint 네 corner를 `TransformPosition()`으로 world에 옮겨 Actor/root/component scale을 포함한다.
-- Zone world 축에 투영해 `+X=화면 위`, `+Y=화면 오른쪽`을 유지한다.
-- position은 네 projected corner 평균, size/angle은 인접 edge에서 한 번만 계산한다. screen AABB 뒤 재회전하지 않는다.
-- 네 corner 중 하나라도 Zone 밖이면 tile을 제외한다.
-- bath topology 또는 Zone geometry가 바뀔 때만 tile set을 rebuild하며 provider-only 변화는 tile identity를 유지한다.
-
-### Native UI 계약
-
-- capacity summary는 종류별 text, progress와 `Normal/Full/Deficit` 상태를 C++에서 적용한다.
-- tile/detail은 욕탕별 복수 deficit 이유를 동시에 표시하며 thermal status와 합치지 않는다.
-- detail은 bath 이름, `°C`, empty-selection clear, limited kind/points feedback과 selection/context/revision 기반 stale cleanup을 구현한다.
-- root의 사용하지 않던 `bSnapshotDirty`를 제거하고 delegate refresh + polling, child별 value cache 정책으로 통일했다.
-- 동일 snapshot은 text/progress/slider/layout/hook을 다시 쓰지 않는다.
-
-필수 `BindWidget`:
-
-| Native Widget | 필수 이름 |
+| 자동화 이름 | 의도한 범위 |
 |---|---|
-| `UBathWaterManagementScreenWidget` | `CapacitySummary`, `BathMap`, `BathDetail` |
-| `UBathWaterCapacitySummaryWidget` | `CirculationCapacityText`, `HeatingCapacityText`, `CoolingCapacityText`, `CirculationCapacityBar`, `HeatingCapacityBar`, `CoolingCapacityBar`, `CirculationCapacityStatusText`, `HeatingCapacityStatusText`, `CoolingCapacityStatusText` |
-| `UBathWaterMapWidget` | `BathTileCanvas`, `EmptyStateText` |
-| `UBathWaterBathTileWidget` | `SelectButton`, `BathNameText`, `ActualTemperatureText`, `ContaminationText`, `ThermalStatusText`, `CapacityStatusText` |
-| `UBathWaterDetailWidget` | `BathNameText`, `WaterAmountText`, `ActualTemperatureText`, `TargetTemperatureText`, `ContaminationText`, `CirculationText`, `CirculationDemandText`, `HeatingDemandText`, `CoolingDemandText`, `ThermalStatusText`, `ThermalThresholdText`, `CapacityStatusText`, `FeedbackText`, `CirculationSlider`, `TargetTemperatureSlider` |
+| BathhouseSim.Utility.Labor.OperationAndCapacitySplit | LAB-001~002, 012~013, 017 Installed/Active·소진, LAB-023의 0/min-positive/25/50/100 계기 quaternion과 construction/BeginPlay/configure/rebind/EndPlay 수명 |
+| BathhouseSim.Utility.Labor.FuelInteractionAtomicity | LAB-003, 005~009, 011 fuel 이동; exhaustion Tick 전·후 투입, operation/fuel delegate 재진입과 완전 commit 상태, authoring fail-closed, actual Hold 입력 거부, G drop와 fixed-slot E 왕복 |
+| BathhouseSim.Utility.Labor.RecoveryPayloadAndRollback | LAB-018, 020, 021, 037, 038 회수/배치; stage rollback, 잔존 staged actor/clock 검사, 구·무효 payload, 0 잔량 성공 회수, public `PlaceItemAsFacility()` 성공·실패와 재설치 감소 재개 |
+| 기존 Bath Water Operations 테스트 + Utility recovery integration | snapshot의 Active/Installed 부족값·summary, Installed 300 / Active 100에서 가열 정지, 두 번째 보일러 가동 후 가열 재개 |
 
-Optional presentation hook은 `OnCapacityDisplayStateChanged`, `OnBathTileStateChanged`다. Blueprint 구현이 없어도 값과 입력은 정상 동작해야 한다.
+automation world에서 장시간 tick을 돌릴 때는 프레임 카운터도 전진시켜 operation component tick과 delegate publication을 실제로 실행한다. 회수·재배치 fixture는 test 전용 mesh boiler class를 사용해 실제 staged placement 순서를 검증한다.
 
-### Facility transaction 검증
+## 변경 파일군
 
-- `ABathWaterUtilityFacilityActor` 실제 instance로 pre-placed registration, demand-blocked recovery, silent stage/success publication, injected activation failure rollback, unexpected Destroy deficit와 replacement resume을 실행한다.
-- 실제 typed payload의 kind/points round trip과 mismatched kind/NaN import fail-closed를 실행한다.
-- `ABathhouseBathFacilityActor` 실제 instance로 empty-bath recovery hold, staged unregister와 condition/water/registry rollback을 실행한다.
-- utility native footprint 기본은 프로젝트 20cm grid에서도 유효한 60×60cm로 정리했다.
-- 기존 generic ActorReplacement 실패는 Content fixture의 현재 grid/Blueprint footprint 불일치와 함께 별도 남아 있으며, 이번 domain은 독립 실제 utility/bath integration으로 success/failure/rollback을 검증한다.
+- 신규 Source: Public/Utility, Private/Utility, operation/fuel/recovery별 Private test translation unit, 공통 test support와 dynamic fuel delegate probe.
+- 수정 Source: Facility Operations/types/capacity/utility actor/payload, Interaction context/carry enum/equipment-use trace context, UI capacity summary, 기존 Bath Water Operations tests.
+- Architecture 정본: .md/0_ARCHITECTURE.md, BathWaterOperations, BathWaterManagementUI, Interaction, PhysicalCarry, Placement, UI, 신규 UtilityLabor 문서.
+- 이번 단계 Content/Config/Level 변경은 없다.
 
-## 자동화 근거
+## 책임·호환성·lifecycle 검토
 
-`BathhouseSim.BathWater`의 다음 10개 테스트가 성공해야 한다.
+- reflected 타입/컴포넌트 이름, UPROPERTY와 delegate 수명, staged FinishSpawning 전 payload import 순서를 확인한다.
+- 기존 reflected symbol은 rename/delete하지 않았다. Shovel enum만 append했다. BP_Boiler reparent은 별도 Editor 작업이며 새 Core Redirect는 필요하지 않은 설계다.
+- fresh visibility trace가 SupplyMesh/FuelIntake에 일치하는지, computer·placement 입력 소유 중 LMB를 차단하는지, 두 상태 silent commit 뒤에만 delegate가 broadcast되는지 본다.
+- Hold 동안 clock/provider, 성공 회수 publication 1회, 실패 rollback의 stage 시점 잔량, invalid payload 시 원래 아이템 보존을 추적한다.
+- utility base Actor의 신규 책임이 optional labor lifecycle hook 범위로 제한됐는지 확인한다.
+- 변경 뒤 크기: UtilityShovelActor.cpp 516줄, UtilityFuelTransaction.cpp 296줄, UtilityOperationComponent.cpp 301줄, UtilityGaugeComponent.cpp 163줄, utility base cpp 543줄. 자동화는 operation/capacity, fuel interaction, recovery transaction 세 translation unit으로 나누고 공통 test fixture와 fuel delegate probe를 분리했다. 삽의 authoring validation 책임이 carry/equipment 경계에 적합한지와 transaction helper의 동기 원자성 경계를 검토한다.
+- PROMPT_UNREAL의 exact BP/Definition 연결, 미확정 mesh 후보, WBP 글자 폭·PIE 조건이 C++ 계약과 일치하는지 검토한다.
 
-- `Operations.CapacityDemandAndRequests`
-- `Operations.FacilityTransactionAtomicity`
-- `Operations.FlowConditionAndBathers`
-- `Operations.MapProjection`
-- `Operations.NativeWidgetPresentation`
-- `Operations.PayloadAndUIContracts`
-- `Operations.RequestAtomicityAndRevision`
-- `ControlAxisMotionAndPlanePresentation`
-- `CustomerSearchActualTimeAndInvalidation`
-- `StateThresholdFlowAndFreeze`
+## 검증 상태
 
-추가 확인:
+- UE 5.8 `Build.bat BathhouseSimEditor Win64 Development` 최종 build가 성공했다. 새 automation translation unit을 포함해 compile했고 `UnrealEditor-BathhouseSim.lib`, `UnrealEditor-BathhouseSim.dll` link까지 완료했다.
+- `BathhouseSim.Utility.Labor`: 3/3 통과. `BathhouseSim.BathWater`: 10/10 통과. `BathhouseSim.Interaction`(Physical Carry 포함): 11/11 통과. `BathhouseSim.Computer`: 1/1 통과.
+- `BathhouseSim.Placement`: 5개 중 `StartupLockerReconciliation`, `TraceChannelIsolation` 통과. 다음 3개는 실패했다: `ActorReplacementFailureAtomicity`의 recovery fixture가 item을 반환하지 않음, `ActorReplacementTransaction`의 native Cube fallback/비차단 recovery fixture가 유효하지 않음, `SettingsZoneLeaseAndCompatibility`에서 기본 grid 20cm가 예상 10cm와 다르고 공통 item validation도 실패함.
+- 전체 `Automation RunTests BathhouseSim`: 50개 실행, 47개 통과, 위 Placement 세 테스트만 실패. 두 actor replacement 테스트는 generic `ABathhouseFacilityActor` conversion 경로이고 `.md/PROMPT_REVIEW.md` 외 구현 변경에서 그 테스트·conversion 코드·facility setting을 수정하지 않았다. grid/validation 실패 역시 변경하지 않은 `FacilityPlacementAutomationTests.cpp`와 설정 정본을 사용하며 이번 utility code path와 별개다. 이 원인 분리는 수정 파일과 실패 assertion 경로를 대조한 판단이며, 이전 baseline 실행으로 회귀 여부를 확인한 것은 아니다. 전체 로그에서 assertion/ensure/fatal marker는 발견되지 않았다.
+- `git diff --check` 통과. 신규 Source/Architecture 파일 trailing whitespace 검색 결과 없음. LF→CRLF 경고만 있다. `Content/`, `Config/`, `.md/Unreal/` 및 `USER_UNREAL.md`에는 수정 사항이 없다.
+- Blueprint Compile/Save/reload와 PIE는 미실행. PIE에서 actual LMB hold duration/input routing, visible mesh silhouette와 pivot, BP_Boiler/WBP authoring, computer/placement 입력 우선순위, 1024×576 layout, world gauge와 computer 동시 갱신을 확인해야 한다.
 
-- UE 5.8 `BathhouseSimEditor Win64 Development` 실제 compile
-- `BathhouseSim.Customer` 회귀
-- 전체 `BathhouseSim`에서 신규 실패 여부
-- `git diff --check`
+## 리뷰 결과 요청
 
-2026-09-22 실제 실행 결과:
-
-- `git diff --check`: 성공(기존 LF→CRLF 경고만 존재)
-- UE 5.8 `BathhouseSimEditor Win64 Development`: 실제 compile 성공
-- `BathhouseSim.BathWater`: 10/10 성공
-- `BathhouseSim.Customer`: 8/8 성공
-- 전체 `BathhouseSim`: 47개 중 44 성공, 아래 기존 Placement 3 실패
-
-현재 Placement 분리 기준:
-
-- `Placement.ActorReplacementTransaction`, `Placement.ActorReplacementFailureAtomicity`: 기존 Content/fixture의 global 20cm grid와 authored footprint 불일치가 남아 있다. 이번 실제 utility/bath focused transaction은 성공해야 한다.
-- `Placement.SettingsZoneLeaseAndCompatibility`: test의 10cm 기대와 현재 Config 20cm, 기존 grid/material fixture 문제로 이번 완료 조건에서 분리한다.
-
-## 집중 리뷰 항목
-
-1. deficit outward request가 current target을 낮추지 않으며 no-op publication이 없는가.
-2. provider 변화가 bath topology를 올리지 않고 invalid weak prune가 revision/publication을 남기는가.
-3. projection이 Zone/footprint scale과 임의 yaw를 한 좌표계에서 처리하고 letterbox 비율을 보존하는가.
-4. child cache가 continuous state 갱신을 누락하지 않으면서 동일 snapshot write를 억제하는가.
-5. 복수 deficit flag가 demand 0인 Bath에 오표시되지 않는가.
-6. slider limited feedback이 kind/points를 유지하고 selection/context/후속 mutation에서 정리되는가.
-7. utility/bath staged rollback이 identity, state, capacity와 publication을 중복시키지 않는가.
-8. Content/Config/기존 sample computer와 input owner 계약에 파장이 없는가.
-
-## Editor 전 남은 작업
-
-- 새 WBP hierarchy와 모든 필수 BindWidget compile
-- utility 3종 Blueprint/Definition과 승인된 mesh/footprint authoring
-- computer Widget Class 및 exact `ManagedBathPlacementZone` instance reference
-- PIE에서 letterbox/yaw/selection/deficit/feedback/회수 시각 확인
+시나리오 추적, C++/Blueprint 계약, 클래스 성장, lifecycle·rollback, 남은 3개 Placement 회귀 실패와 미검증 Editor/PIE 상태를 판정해 주세요. 문제가 있으면 .md/PROMPT_IMPLEMENTATION_R.md에 우선순위·정확한 경로·재현·수정 방향을 작성하고, 승인하더라도 이 보일러 수직 구현만 승인해 주세요.
