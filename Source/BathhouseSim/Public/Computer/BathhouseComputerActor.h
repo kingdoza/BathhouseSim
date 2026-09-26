@@ -5,11 +5,15 @@
 #include "Interaction/PlayerInteractable.h"
 #include "BathhouseComputerActor.generated.h"
 
+class UArrowComponent;
 class UCameraComponent;
 class UPlayerComputerUseComponent;
+class USceneComponent;
 class UStaticMeshComponent;
 class UWidgetComponent;
 class AFacilityPlacementZoneActor;
+
+DECLARE_LOG_CATEGORY_EXTERN(LogBathhouseComputer, Log, All);
 
 UCLASS()
 class BATHHOUSESIM_API ABathhouseComputerActor : public AActor, public IPlayerInteractable
@@ -30,6 +34,8 @@ public:
 	UCameraComponent* GetFocusCamera() const { return FocusCamera; }
 	float GetFocusBlendInSeconds() const { return FocusBlendInSeconds; }
 	float GetFocusBlendOutSeconds() const { return FocusBlendOutSeconds; }
+	FTransform GetFocusExitFootTransform() const;
+	float GetFocusExitSearchRadiusCm() const;
 	bool IsScreenReady() const;
 
 protected:
@@ -44,6 +50,17 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Computer")
 	TObjectPtr<UCameraComponent> FocusCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Computer|Focus")
+	TObjectPtr<USceneComponent> FocusExitPoint;
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(VisibleAnywhere, Category = "Computer|Focus")
+	TObjectPtr<UArrowComponent> FocusExitArrow;
+#endif
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Computer|Focus", meta = (ClampMin = "0.0"))
+	float FocusExitSearchRadiusCm = 100.0f;
 
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Computer|Bath Water")
 	TObjectPtr<AFacilityPlacementZoneActor> ManagedBathPlacementZone;

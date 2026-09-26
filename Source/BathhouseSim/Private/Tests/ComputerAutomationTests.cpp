@@ -8,12 +8,15 @@
 #include "Character/FirstPersonMovementComponent.h"
 #include "Cleaning/WaterStainActor.h"
 #include "Cleaning/WetMopActor.h"
+#include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/Button.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextBlock.h"
 #include "Components/WidgetComponent.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Computer/BathhouseComputerActor.h"
+#include "Computer/ComputerFocusExitPlacement.h"
 #include "Computer/PlayerComputerUseComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
@@ -86,6 +89,28 @@ void ConfigureCarryMesh(AActor* Actor, UStaticMesh* Mesh)
 		Primitive->UpdateBounds();
 	}
 }
+
+AActor* SpawnComputerPlacementBlocker(UWorld* World, const FVector& Center, const FVector& Extent)
+{
+	AActor* BlockerActor = World ? World->SpawnActor<AActor>() : nullptr;
+	if (!BlockerActor)
+	{
+		return nullptr;
+	}
+
+	UBoxComponent* Box = NewObject<UBoxComponent>(BlockerActor, TEXT("ComputerPlacementBlocker"));
+	BlockerActor->SetRootComponent(Box);
+	BlockerActor->AddInstanceComponent(Box);
+	Box->SetBoxExtent(Extent);
+	Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	Box->SetCollisionObjectType(ECC_WorldStatic);
+	Box->SetCollisionResponseToAllChannels(ECR_Ignore);
+	Box->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+	Box->RegisterComponent();
+	BlockerActor->SetActorLocation(Center);
+	World->UpdateWorldComponents(true, false);
+	return BlockerActor;
+}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -129,6 +154,7 @@ bool FBathhouseComputerSessionTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("ScreenWidget keeps its reflected subobject name"), Computer->ScreenWidget->GetFName(), FName(TEXT("ScreenWidget")));
 	TestEqual(TEXT("FocusCamera keeps its reflected subobject name"), Computer->FocusCamera->GetFName(), FName(TEXT("FocusCamera")));
 	TestTrue(TEXT("A real screen widget makes the computer ready"), Computer->IsScreenReady());
+	TestEqual(TEXT("Computer exit search defaults to 100 cm"), Computer->GetFocusExitSearchRadiusCm(), 100.0f);
 
 	FPlayerInteractionContext Context;
 	Context.Interactor = Character;
@@ -183,6 +209,9 @@ bool FBathhouseComputerSessionTest::RunTest(const FString& Parameters)
 	Computer->SetActorLocation(
 		Character->GetFirstPersonCamera()->GetComponentLocation()
 		+ Character->GetFirstPersonCamera()->GetForwardVector() * 150.0f);
+	Computer->FocusExitPoint->SetWorldLocationAndRotation(
+		Computer->GetActorLocation() + FVector(350.0f, 300.0f, 0.0f),
+		FRotator(24.0f, 137.0f, 38.0f));
 	Computer->ComputerMesh->UpdateBounds();
 	Computer->ComputerMesh->RecreatePhysicsState();
 	World->UpdateWorldComponents(true, false);
@@ -221,6 +250,13 @@ bool FBathhouseComputerSessionTest::RunTest(const FString& Parameters)
 	UPlayerComputerUseComponent* ComputerUse = Character->GetPlayerComputerUse();
 	UFirstPersonMovementComponent* Movement = Character->GetFirstPersonMovement();
 	const EMovementMode MovementModeBeforeFocus = Movement->MovementMode;
+	const FVector LocationBeforeInactiveCancel = Character->GetActorLocation();
+	Character->CancelInput();
+	TestFalse(TEXT("Cancel is inert when no computer session captures input"), ComputerUse->IsCapturingInput());
+	TestTrue(TEXT("Cancel outside computer use preserves the player location"),
+		Character->GetActorLocation().Equals(LocationBeforeInactiveCancel));
+	TestEqual(TEXT("Cancel outside computer use preserves movement mode"),
+		Movement->MovementMode.GetValue(), MovementModeBeforeFocus);
 	TestTrue(TEXT("An empty hand can query the available computer"), Computer->QueryInteraction(Context).bCanInteract);
 	FHitResult DirectTraceHit;
 	FCollisionQueryParams DirectTraceParams(SCENE_QUERY_STAT(ComputerAutomationTrace), true, Character);
@@ -242,6 +278,9 @@ bool FBathhouseComputerSessionTest::RunTest(const FString& Parameters)
 	const int32 AntiAliasingMethodBeforeFocus = AntiAliasingMethod ? AntiAliasingMethod->GetInt() : INDEX_NONE;
 	Interaction->OnInteractionAttemptFinishedNative.AddLambda(
 		[&AttemptBroadcastCount](const FPlayerInteractionResult&) { ++AttemptBroadcastCount; });
+	const FTransform ExpectedExitFootTransform = Computer->GetFocusExitFootTransform();
+	const FVector ExpectedExitCapsuleCenter = ExpectedExitFootTransform.GetLocation()
+		+ FVector::UpVector * Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	Character->InteractStartInput();
 	TestTrue(TEXT("Entry E Started owns the press after opening the computer"), Character->bComputerOwnsInteractPress);
 	TestTrue(TEXT("Zero blend enters Active immediately"), ComputerUse->IsActive());
@@ -286,7 +325,14 @@ bool FBathhouseComputerSessionTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Zero blend exits immediately"), ComputerUse->IsCapturingInput());
 	TestFalse(TEXT("Focus-out forces a pending pointer release"), ComputerUse->bPointerDown);
 	TestFalse(TEXT("Focus-out disables widget hit testing"), Character->ComputerWidgetInteraction->bEnableHitTesting);
-	TestTrue(TEXT("Focus-out restores the previous view target"), PlayerController->GetViewTarget() == Character);
+	TestFalse(TEXT("Pointer presses are rejected after focus-out"), ComputerUse->PressPointer());
+	TestTrue(TEXT("Focus-out blends back to the owner pawn"), PlayerController->GetViewTarget() == Character);
+	TestTrue(TEXT("Normal focus-out places the capsule center at the authored exit point"),
+		Character->GetActorLocation().Equals(ExpectedExitCapsuleCenter, 0.1f));
+	TestTrue(TEXT("Normal focus-out keeps yaw on the pawn actor only"),
+		Character->GetActorRotation().Equals(FRotator(0.0f, 137.0f, 0.0f), 0.1f));
+	TestTrue(TEXT("Normal focus-out restores authored pitch and yaw on the controller"),
+		PlayerController->GetControlRotation().Equals(FRotator(24.0f, 137.0f, 0.0f), 0.1f));
 	TestEqual(TEXT("Focus-out restores the movement mode"),
 		Movement->MovementMode.GetValue(), MovementModeBeforeFocus);
 	TestFalse(TEXT("Focus-out restores interaction availability"), Interaction->IsInteractionSuppressed());
@@ -301,8 +347,36 @@ bool FBathhouseComputerSessionTest::RunTest(const FString& Parameters)
 	Character->InteractEndInput();
 	TestFalse(TEXT("Exit E Completed is consumed after the session has ended"), Character->bComputerOwnsInteractPress);
 
+	const FVector ExitStartLocations[] = {
+		FVector(10.0f, -80.0f, 96.0f),
+		FVector(120.0f, 45.0f, 110.0f),
+		FVector(-65.0f, 90.0f, 260.0f)
+	};
+	const FRotator EntryControlRotations[] = {
+		FRotator(5.0f, 15.0f, 0.0f),
+		FRotator(-12.0f, 195.0f, 0.0f),
+		FRotator(30.0f, -80.0f, 0.0f)
+	};
+	for (int32 StartIndex = 0; StartIndex < UE_ARRAY_COUNT(ExitStartLocations); ++StartIndex)
+	{
+		Character->SetActorLocation(ExitStartLocations[StartIndex]);
+		PlayerController->SetControlRotation(EntryControlRotations[StartIndex]);
+		TestTrue(TEXT("Computer can reserve for each fixed-exit repeat"), Computer->TryReserveFor(ComputerUse));
+		TestTrue(TEXT("Computer session starts from each different player position"), ComputerUse->BeginComputerUse(Computer));
+		Character->CancelInput();
+		TestTrue(TEXT("Each position and entry direction exits at the same capsule center"),
+			Character->GetActorLocation().Equals(ExpectedExitCapsuleCenter, 0.1f));
+		TestTrue(TEXT("Each position and entry direction exits with the same actor yaw"),
+			Character->GetActorRotation().Equals(FRotator(0.0f, 137.0f, 0.0f), 0.1f));
+		TestTrue(TEXT("Each position and entry direction exits with the same controller pitch and yaw"),
+			PlayerController->GetControlRotation().Equals(FRotator(24.0f, 137.0f, 0.0f), 0.1f));
+	}
+
 	Computer->FocusBlendInSeconds = 0.2f;
 	Computer->FocusBlendOutSeconds = 0.2f;
+	Character->SetActorLocation(FVector::ZeroVector);
+	PlayerController->SetControlRotation(FRotator::ZeroRotator);
+	Character->SetActorRotation(FRotator::ZeroRotator);
 	Interaction->RefreshInteractionQuery();
 	Character->InteractStartInput();
 	TestEqual(TEXT("A non-zero entry blend stays in FocusingIn"),
@@ -310,7 +384,12 @@ bool FBathhouseComputerSessionTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Pointer input is rejected during FocusingIn"), ComputerUse->PressPointer());
 	Character->InteractEndInput();
 	Character->InteractStartInput();
-	TestEqual(TEXT("E can reverse a session while FocusingIn"),
+	TestEqual(TEXT("E reverses a session while FocusingIn"),
+		ComputerUse->GetPhase(), EPlayerComputerUsePhase::FocusingOut);
+	TestTrue(TEXT("Focus-out moves to the authored exit center at transition start"),
+		Character->GetActorLocation().Equals(ExpectedExitCapsuleCenter, 0.1f));
+	Character->CancelInput();
+	TestEqual(TEXT("Cancel during FocusingOut is ignored"),
 		ComputerUse->GetPhase(), EPlayerComputerUsePhase::FocusingOut);
 	ComputerUse->RequestEndComputerUse();
 	TestEqual(TEXT("Repeated end during FocusingOut is idempotent"),
@@ -321,24 +400,45 @@ bool FBathhouseComputerSessionTest::RunTest(const FString& Parameters)
 
 	Computer->FocusBlendInSeconds = 0.0f;
 	Computer->FocusBlendOutSeconds = 0.0f;
+	Character->SetActorLocation(FVector::ZeroVector);
+	PlayerController->SetControlRotation(FRotator::ZeroRotator);
+	Character->SetActorRotation(FRotator::ZeroRotator);
 	Interaction->RefreshInteractionQuery();
 	Character->InteractStartInput();
 	TestTrue(TEXT("The session can be re-entered after cleanup"), ComputerUse->IsActive());
+	const FVector LocationBeforeControllerLoss = Character->GetActorLocation();
 	PlayerController->UnPossess();
 	ComputerUse->TickComponent(0.0f, LEVELTICK_All, nullptr);
 	TestFalse(TEXT("Controller loss cleans the player session"), ComputerUse->IsCapturingInput());
 	TestFalse(TEXT("Controller loss releases the reservation"), Computer->IsReservedBy(ComputerUse));
 	TestFalse(TEXT("Controller loss restores interaction"), Interaction->IsInteractionSuppressed());
+	TestTrue(TEXT("Controller loss does not teleport the player"),
+		Character->GetActorLocation().Equals(LocationBeforeControllerLoss, 0.1f));
 	Character->InteractEndInput();
 	PlayerController->Possess(Character);
 	PlayerController->SetViewTarget(Character);
+	Character->SetActorLocation(FVector(123.0f, 45.0f, 96.0f));
 	Interaction->RefreshInteractionQuery();
-	Character->InteractStartInput();
-	TestTrue(TEXT("The session can re-enter after controller recovery"), ComputerUse->IsActive());
+	TestTrue(TEXT("The session can re-enter after controller recovery"), Computer->TryReserveFor(ComputerUse));
+	TestTrue(TEXT("The recovered player can begin a computer session"), ComputerUse->BeginComputerUse(Computer));
+	const FVector LocationBeforeUnavailable = Character->GetActorLocation();
+	ComputerUse->HandleComputerUnavailable(Computer);
+	TestFalse(TEXT("Computer unavailable cleans the player session"), ComputerUse->IsCapturingInput());
+	TestFalse(TEXT("Computer unavailable restores interaction"), Interaction->IsInteractionSuppressed());
+	TestEqual(TEXT("Computer unavailable restores movement"), Movement->MovementMode.GetValue(), MovementModeBeforeFocus);
+	TestTrue(TEXT("Computer unavailable does not teleport the player"),
+		Character->GetActorLocation().Equals(LocationBeforeUnavailable, 0.1f));
+	Computer->ReleaseReservation(ComputerUse);
+	TestTrue(TEXT("A computer remains usable after unavailable cleanup"), Computer->TryReserveFor(ComputerUse));
+	TestTrue(TEXT("A second session begins before EndPlay"), ComputerUse->BeginComputerUse(Computer));
+	const FVector LocationBeforeEndPlay = Character->GetActorLocation();
 	Computer->Destroy();
 	TestFalse(TEXT("Computer EndPlay cleans the player session"), ComputerUse->IsCapturingInput());
 	TestFalse(TEXT("Computer EndPlay restores interaction"), Interaction->IsInteractionSuppressed());
+	TestEqual(TEXT("Computer EndPlay restores movement"), Movement->MovementMode.GetValue(), MovementModeBeforeFocus);
 	TestTrue(TEXT("Computer EndPlay restores the player view"), PlayerController->GetViewTarget() == Character);
+	TestTrue(TEXT("Computer EndPlay does not teleport the player"),
+		Character->GetActorLocation().Equals(LocationBeforeEndPlay, 0.1f));
 
 	UComputerSampleScreenWidget* SampleWidget = NewObject<UComputerSampleScreenWidget>();
 	SampleWidget->TestButton = NewObject<UButton>(SampleWidget, TEXT("TestButton"));
@@ -412,6 +512,101 @@ bool FBathhouseComputerSessionTest::RunTest(const FString& Parameters)
 		QueryProbe->BroadcastCount, QueryBroadcastCountAfterRefresh);
 	QueryProbe->Unbind();
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FComputerFocusExitPlacementTest,
+	"BathhouseSim.Computer.FocusExitPlacement",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FComputerFocusExitPlacementTest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	FScopedComputerAutomationWorld TestWorld(TEXT("ComputerExitPlacementWorld"));
+	UWorld* World = TestWorld.Get();
+	if (!World)
+	{
+		AddError(TEXT("Failed to create the computer exit-placement automation world."));
+		return false;
+	}
+
+	AFirstPersonCharacter* Character = World->SpawnActor<AFirstPersonCharacter>();
+	BeginActorForComputerTest(Character);
+	if (!TestNotNull(TEXT("The test character exists"), Character))
+	{
+		return false;
+	}
+	UCapsuleComponent* Capsule = Character->GetCapsuleComponent();
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	const FVector FootLocation(3.0f, 4.0f, 37.0f);
+	const FVector FixedCenter = FootLocation + FVector::UpVector * HalfHeight;
+	FComputerFocusExitPlacementResult Result;
+
+	TestTrue(TEXT("An open authored position is accepted"),
+		FComputerFocusExitPlacement::Resolve(World, Capsule, Character, FootLocation, 0.0f, 100.0f, Result));
+	TestEqual(TEXT("An open authored position uses the fixed path"),
+		static_cast<uint8>(Result.Path),
+		static_cast<uint8>(FComputerFocusExitPlacementResult::EPath::Fixed));
+	TestTrue(TEXT("Capsule center is exactly foot height plus scaled half-height"),
+		Result.CapsuleCenter.Equals(FixedCenter, 0.1f));
+	TestEqual(TEXT("Fixed placement has zero search distance"), Result.SearchDistanceCm, 0.0f);
+
+	AActor* CenterBlocker = SpawnComputerPlacementBlocker(World, FixedCenter, FVector(1.0f, 1.0f, 1.0f));
+	TestNotNull(TEXT("A capsule blocker is available"), CenterBlocker);
+	const FVector BlockerLocationBeforeSearch = CenterBlocker->GetActorLocation();
+	TestTrue(TEXT("A blocked authored position is searched"),
+		FComputerFocusExitPlacement::Resolve(World, Capsule, Character, FootLocation, 0.0f, 100.0f, Result));
+	TestEqual(TEXT("An available nearby position uses the searched path"),
+		static_cast<uint8>(Result.Path),
+		static_cast<uint8>(FComputerFocusExitPlacementResult::EPath::Searched));
+	TestTrue(TEXT("The selected free position is within the authored radius"),
+		Result.SearchDistanceCm > 0.0f && Result.SearchDistanceCm <= 100.0f);
+	TestTrue(TEXT("Search does not move the blocking actor"),
+		CenterBlocker->GetActorLocation().Equals(BlockerLocationBeforeSearch));
+
+	CenterBlocker->SetActorEnableCollision(false);
+	World->UpdateWorldComponents(true, false);
+	AActor* Occupant = SpawnComputerPlacementBlocker(World, FixedCenter, FVector(1.0f, 1.0f, 1.0f));
+	AActor* Wall = SpawnComputerPlacementBlocker(
+		World,
+		FixedCenter + FVector(40.0f, 0.0f, 0.0f),
+		FVector(1.0f, 250.0f, 150.0f));
+	TestNotNull(TEXT("The center occupant is available"), Occupant);
+	TestNotNull(TEXT("The separating wall is available"), Wall);
+	TestTrue(TEXT("A wall-separated exit candidate is resolved"),
+		FComputerFocusExitPlacement::Resolve(World, Capsule, Character, FootLocation, 0.0f, 120.0f, Result));
+	TestEqual(TEXT("The search finds a reachable position"),
+		static_cast<uint8>(Result.Path),
+		static_cast<uint8>(FComputerFocusExitPlacementResult::EPath::Searched));
+	TestTrue(TEXT("The result stays on the original side of the wall"),
+		Result.CapsuleCenter.X < FixedCenter.X + 40.0f);
+
+	Occupant->SetActorEnableCollision(false);
+	Wall->SetActorEnableCollision(false);
+	World->UpdateWorldComponents(true, false);
+	AActor* EnclosingBlocker = SpawnComputerPlacementBlocker(
+		World,
+		FixedCenter,
+		FVector(200.0f, 200.0f, 200.0f));
+	TestNotNull(TEXT("The enclosing blocker is available"), EnclosingBlocker);
+	TestTrue(TEXT("A fully blocked search falls back to the authored position"),
+		FComputerFocusExitPlacement::Resolve(World, Capsule, Character, FootLocation, 15.0f, 100.0f, Result));
+	TestEqual(TEXT("No reachable candidate uses the forced path"),
+		static_cast<uint8>(Result.Path),
+		static_cast<uint8>(FComputerFocusExitPlacementResult::EPath::Forced));
+	TestTrue(TEXT("Forced placement keeps the original capsule center"),
+		Result.CapsuleCenter.Equals(FixedCenter, 0.1f));
+	TestTrue(TEXT("Forced placement does not move the enclosing actor"),
+		EnclosingBlocker->GetActorLocation().Equals(FixedCenter, 0.1f));
+
+	TestTrue(TEXT("A zero search radius does not search"),
+		FComputerFocusExitPlacement::Resolve(World, Capsule, Character, FootLocation, 15.0f, 0.0f, Result));
+	TestEqual(TEXT("A blocked zero-radius placement is forced"),
+		static_cast<uint8>(Result.Path),
+		static_cast<uint8>(FComputerFocusExitPlacementResult::EPath::Forced));
+	TestTrue(TEXT("Zero-radius placement preserves the fixed height"),
+		Result.CapsuleCenter.Equals(FixedCenter, 0.1f));
 	return true;
 }
 

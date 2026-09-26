@@ -154,7 +154,7 @@ void ABathWaterUtilityFacilityActor::BindUtilityOperation()
 {
 	if (Capacity)
 	{
-		Capacity->SetUtilityOperation(GetUtilityOperation(), RequiresLaborOperation());
+		Capacity->SetUtilityOperation(GetUtilityOperation());
 	}
 	if (UUtilityOperationComponent* Operation = GetUtilityOperation())
 	{
@@ -272,6 +272,7 @@ bool ABathWaterUtilityFacilityActor::TryBeginFacilityRecoveryHold(FText& OutFail
 		return false;
 	}
 	bRecoveryHoldActive = true;
+	OnFacilityRecoveryHoldStarted();
 	if (UUtilityOperationComponent* Operation = GetUtilityOperation())
 	{
 		Operation->SetLaborBlocked(true);

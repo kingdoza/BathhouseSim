@@ -10,6 +10,7 @@ class IPlayerInteractable;
 class UCameraComponent;
 class UPlayerCarryComponent;
 class UPlayerEquipmentUseComponent;
+class UObject;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractionQueryChanged, const FPlayerInteractionQuery&, Query);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnInteractionAttemptFinishedNative, const FPlayerInteractionResult&);
@@ -89,6 +90,7 @@ private:
 		bool bRefreshQuery = true);
 	void ClearActiveHoldState();
 	void CommitQuery(UObject* TargetObject, const FPlayerInteractionQuery& NewQuery);
+	void SyncFocusObservers();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UCameraComponent> Camera = nullptr;
@@ -107,6 +109,12 @@ private:
 
 	UPROPERTY(Transient)
 	FPlayerInteractionQuery CurrentQuery;
+
+	TWeakObjectPtr<UObject> LastFocusObserverTarget;
+	FPlayerInteractionQuery LastFocusObserverQuery;
+	bool bHasLastFocusObserverTarget = false;
+	bool bSyncingFocusObservers = false;
+	bool bFocusObserverSyncPending = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UObject> ActiveHoldTarget = nullptr;

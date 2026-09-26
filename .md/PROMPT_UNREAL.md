@@ -1,76 +1,64 @@
-# Unreal 작업 프롬프트 — 보일러 노동 가동 수직 구현
+# Unreal Editor 인계 — 컴퓨터 포커스 진입·이탈 수정
 
-## 진입 조건과 현재 상태
+## 현재 단계와 진입 조건
 
-- 이번 재개에서는 사용자 지시로 코드 리뷰 승인 관문을 건너뛴다. UE 5.8 native build/restart 조건은 유지한다. 이전 MCP 단계에서 BP_Boiler의 FacilityPlacement.Definition만 저장·재로드 확인했으며 나머지 Editor 작업은 하지 않았다.
-- 기준 정본: .md/PROMPT_ARCHITECTURE.md, .md/PROMPT_IMPLEMENTATION.md, .md/Architecture/UtilityLaborSystem.md, .md/REPORT_UNREAL_DISCOVERY.md.
-- 범위는 LAB-001~025, LAB-037~039다. LAB-026~036은 미구현으로 남긴다.
-- Unreal MCP 도구만 사용한다. Computer Use, 셸/바이너리 asset 편집, Save All을 사용하지 않는다. 필요한 MCP 기능이 없으면 정확한 작업을 .md/USER_UNREAL.md에 넘긴다.
+- C++ 구현과 focused automation 코드는 작성했다. 코드 리뷰 승인 뒤 Editor authoring·Compile/Save·재로드·PIE를 수행한다.
+- 본 구현 단계에서는 Content, Config, Level을 저장하지 않았다. 이 문서는 후속 Editor 단계용 지침이다.
+- 사용자가 쿨러·순환기 작업 완료를 확인하고 기존 작업 프롬프트 덮어쓰기를 승인했다. 컴퓨터 Editor handoff는 이 표준 파일에 기록하며, 쿨러·순환기 Source/Content 변경은 이 구현에서 수정하지 않았다.
 
-## 대상 asset과 저장 allowlist
+## 백업과 load gate
 
-| 경로 | 작업 |
+백업은 Editor 종료 상태에서 완료했다.
+
+| 파일 | SHA-256 |
 |---|---|
-| /Game/Bathhouse/Blueprints/Facility/BP_Boiler | parent를 /Script/BathhouseSim.BathWaterBoilerFacilityActor로 변경, inherited 설정 보존 |
-| /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler | Placed class BP_Boiler와 기존 BP_PlaceableFacilityItem recovery class 확인 |
-| /Game/Bathhouse/Blueprints/Utility/BP_UtilityShovel | 생성, parent /Script/BathhouseSim.UtilityShovelActor |
-| /Game/Bathhouse/Blueprints/Utility/BP_CoalSupply | 생성, parent /Script/BathhouseSim.UtilityFuelSupplyActor |
-| /Game/Bathhouse/Blueprints/Interaction/BP_PhysicalCarryFixedSlot | class는 유지하고 아래 map에 삽 전용 instance 추가 |
-| /Game/Maps/DefaultMap 및 위 대상의 external actor | 기존 Boiler(현재 위치 299,-885,0) 연결 수정, Supply·Shovel·Slot instance 배치 |
-| /Game/Bathhouse/UI/WBP_BathWaterCapacitySummary | hierarchy와 bindings 유지, 글자 layout 조정이 필요할 때만 저장 |
+| `Content/Bathhouse/Blueprints/Computer/BP_BathhouseComputer.uasset` | `A74BEE23F4C4A5F1B2C48379E629DC22900DEE9FD9AF75313CCB89559ADDC89E` |
+| `Content/__ExternalActors__/Maps/DefaultMap/7/EH/E4FLO971KSWUJ40H7W7PHK.uasset` | `B9C38D4E99091451E9375016BDB18592790FB91AF5BEE3FAE8A6E071D2590BD0` |
 
-표 밖의 package는 저장하지 않는다. 이번 수직 단계는 기능 검증용 임시 표현이며 단일 Cube 사용을 허용한다. 삽 WorldMesh와 적재 석탄 LoadVisual, FuelIntake, GaugeFace, GaugeNeedleMesh에는 기존 `/Engine/BasicShapes/Cube`를 사용하고 component scale/transform으로 역할을 구분한다. SupplyMesh에는 바닥 pivot Cube인 `/Game/Bathhouse/Meshes/SM_Facility_sample`을 사용한다. 새 mesh package를 제작·저장하지 않는다. 최종 보일러 모델은 투입구와 계기판이 본체에 통합되고 움직이는 시각 부품은 바늘뿐이라는 사용자 결정을 따른다.
+처음 시도한 복사본 gate는 DDC `Installed` graph에 writable node가 없어 asset load 전에 Fatal로 중단됐다. 재실행에 `-DDC-ForceMemoryCache`를 추가하자 engine이 memory fallback으로 시작해 copy·원본·DefaultMap 검증을 완료했다. 로그에는 graph 설정 오류가 fallback 메시지와 함께 남지만, load gate에서 Fatal, `Serial size mismatch`, `Failed to load`는 발생하지 않았다.
 
-## BP_Boiler와 Definition
+| 단계 | 결과 | 기록 |
+|---|---|---|
+| Template_Default 복사본 | 통과, 1/1 성공·경고 0 | `Saved/Reimplementation/Computer/BlueprintLoad_Copy_ForceMemoryCache/BlueprintLoad_Copy.log`, `Saved/Reimplementation/Computer/BlueprintLoad_Copy_ForceMemoryCache/Report/index.json` |
+| 복사본 정리 | 완료 | `Content/Developers/MigrationCheck`와 임시 `.uasset` 삭제. Content status에서 임시 사본이 없음 |
+| Template_Default 원본 | 통과, 1/1 성공·경고 0 | `Saved/Reimplementation/Computer/BlueprintLoad_Original/BlueprintLoad_Original.log`, `Saved/Reimplementation/Computer/BlueprintLoad_Original/Report/index.json` |
+| DefaultMap | 통과, 1/1 성공·경고 0 | `Saved/Reimplementation/Computer/BlueprintLoad_DefaultMap/BlueprintLoad_DefaultMap.log`, `Saved/Reimplementation/Computer/BlueprintLoad_DefaultMap/Report/index.json`; World instance 1개 확인 |
 
-- 기존 asset 경로, Capacity=Heating 100, VisualMesh, PlacementFootprint와 모든 inherited component 이름/transform을 보존한다. 중복 root/Capacity/placement component 또는 graph gameplay를 추가하지 않는다.
-- BP_Boiler CDO의 FacilityPlacement.Definition을 DA_FacilityPlacement_Boiler에 연결한다. 조사 당시 CDO와 DefaultMap instance 모두 None이었다. 기존 instance에 상속되지 않으면 그 한 Boiler만 연결하고 저장한다.
-- DA_FacilityPlacement_Boiler의 PlacedFacilityClass=BP_Boiler, RecoveryItemClass=/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem을 확인한다. 승인 없이 footprint, recovery mesh 또는 크기를 바꾸지 않는다.
-- native subobject Operation, FuelIntake, GaugeFace, GaugeNeedlePivot, GaugeNeedleMesh, GaugePresentation이 각각 하나인지 확인한다.
+세 단계는 native parent, CDO `FocusExitPoint`, `ScreenWidget` class, blend 값, 그리고 DefaultMap instance의 `FocusExitPoint`·`ManagedBathPlacementZone` 참조를 확인했다. `-BathhouseComputerRequireWorldInstance` 조건도 통과했다.
 
-## Intake와 gauge
+Blueprint load용 Content 사본은 삭제했다. Content의 작업 전 Utility asset/external actor 변경 목록은 그대로이고 Config 변경은 없다. 두 백업 asset의 현재 hash도 위 기록과 일치한다. Editor authoring·Blueprint Save·Level Save·PIE는 아직 수행하지 않았으며, 아래 Editor 작업 순서를 따른다.
+## 대상 자산과 authoring
 
-- FuelIntake는 임시 Cube를 크기·위치로 조정해 투입구의 별도 hit target으로 둔다. QueryOnly, Visibility Block, Navigation off이며 본체 mesh가 가리지 않아 실제 LMB trace가 이 component에 맞아야 한다. 최종 본체 모델에 투입구 외형이 통합돼도 이 입력 판정 역할은 유지한다.
-- GaugeFace는 임시로 납작한 Cube mesh를 지정하는 고정 표현이다. GaugeNeedleMesh도 얇은 Cube로 설정한다. 둘 다 NoCollision, Navigation off이고 NeedleMesh는 GaugeNeedlePivot child다. pivot relative transform으로 회전 중심과 바늘 길이를 맞춘다. 최종 본체 모델에 계기판 외형이 통합되면 GaugeFace의 중복 표시를 제거하되 현재 C++의 필수 mesh authoring 계약을 충족한다.
-- GaugePresentation의 LocalRotationAxis, ZeroAngleDegrees, MaxAngleDegrees, ActiveStartRatio=1/3을 선택 mesh의 local 좌표계에 맞춘다. 회전축/원점을 확인하고 추정값을 저장하지 않는다. 0은 zero 표시, 최소 양수는 전체 범위의 1/3 부근, 50/100은 2/3이어야 한다.
-- Operation defaults는 최대 100, 감소 1/sec다. BP/Level에서 초기 잔량을 넣지 않는다.
+| 자산 | 작업 |
+|---|---|
+| `/Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer` | `FocusExitPoint` 위치·방향과 `FocusExitSearchRadiusCm`을 class default로 authoring. 새 FocusExitPoint는 모니터 앞 바닥에 발바닥 위치를 두고 모니터를 보게 한다. Editor-only Arrow의 +X를 바라보는 방향으로 확인. 고정 위치의 player capsule이 벽·책상과 겹치지 않는지도 확인한다. |
+| `/Game/Maps/DefaultMap.DefaultMap:PersistentLevel.BP_BathhouseComputer_C_UAID_F02F7433CA3690F802_2051456727` | class default를 우선 사용. instance override가 필요하면 World Partition 저장 기준을 확인한 뒤 해당 external actor만 개별 저장 |
+| `/Game/FirstPersonCharacter/BP_FirstPersonCharacter` | `CancelAction`에 `/Game/Input/Actions/IA_Cancel`을 지정 |
+| `/Game/Input/IMC_FirstPerson` | 기존 `IA_Interact` mapping context에 Escape → `IA_Cancel` 추가. 프로젝트 serialized name 참조 확인에서 이 context와 `IA_Interact`가 확인됐으며 Editor에서 실제 mapping을 확인한 뒤 저장 |
+| `/Game/FirstPersonCharacter/BP_FirstPersonController` | `DefaultMappingContext`가 `IMC_FirstPerson`을 사용하는지 확인 |
 
-## 삽·공급함·거치
+`IA_Cancel`은 Digital bool로 만든다. `CancelAction`이 null이어도 C++가 정상 동작해야 한다. 사용자 Editor의 PIE 종료 키 F2는 Editor 설정으로 두고 프로젝트 asset에서 변경하지 않는다.
 
-- BP_UtilityShovel에서 WorldMesh는 물리 root, LoadVisual은 child 표현으로 설정한다. LoadVisual은 NoCollision/Navigation off, empty에서 숨김. native root collision, CCD, Pawn Ignore와 held 위치/회전 계약을 보존한다.
-- 이번 단계에서는 WorldMesh와 LoadVisual에 Cube를 각각 지정하고 크기·위치로 빈 상태와 석탄 적재 상태를 구분한다. 최종 삽 silhouette는 수용 조건이 아니다. LoadVisual은 world/held/slot 상태에서 같은 삽의 적재 상태를 유지해야 한다.
-- BP_CoalSupply defaults: FuelKind=Coal, ScoopPoints=25. SupplyMesh가 실제 trace target이며 QueryOnly, Visibility Block, Navigation off.
-- DefaultMap에 BP_UtilityShovel instance 하나를 만들고 fixed slot의 AssignedItem에 그 정확한 actor reference를 지정한다. bStartOccupied=true, ItemAnchor에 외형을 맞춘다. 중복 삽/slot 연결은 허용하지 않는다.
-- Supply와 slot은 접근 가능하며 placement zone, 욕탕, 문과 동선을 막지 않는 위치에 둔다. 저장 뒤 transform을 기록한다.
+기존 컴퓨터 연결 정본은 `/Game/Bathhouse/UI/WBP_BathWaterManagementScreen.WBP_BathWaterManagementScreen_C`, `ManagedBathPlacementZone`은 같은 Level의 `BP_FacilityPlacementZone_C_UAID_F02F7433CA36D1FF02_1155169559`다. Compile·저장·재로드 뒤 이 연결, ScreenWidget, 0.35/0.25초 blend가 보존되는지 확인한다.
 
-## Capacity Summary Widget
+## Compile, 개별 저장, 재로드
 
-- /Game/Bathhouse/UI/WBP_BathWaterCapacitySummary의 기존 9개 BindWidget 이름/타입을 유지한다.
-- circulation/heating/cooling 각각에 “예약 Used / 가동 Active / 설치 Total”이 읽히고 설치 부족과 가동 부족 status가 잘리지 않아야 한다. Bar는 예약/설치 비율이다.
-- /Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer 및 DefaultMap의 기존 World Space 화면 1024×576을 확인한다. 필요할 때만 allowlist WBP를 수정/개별 Save한다. Widget graph에 계산, 입력, domain logic을 넣지 않는다.
-- LMB 삽 action은 instant이며 progress가 없어야 한다. F 반환과 기존 Q 회수 prompt 행을 보존한다.
+- `BP_BathhouseComputer`와 입력을 authoring한 Blueprint만 Compile한다. 오류가 없으면 대상 Blueprint를 개별 Save한다. Save All은 사용하지 않는다.
+- DefaultMap instance override가 없다면 Level/external actor를 저장하지 않는다. override가 필요하면 위 exact external actor만 저장한다.
+- 새 Editor session에서 재로드하고 Blueprint parent, FocusExitPoint/Arrow, WidgetClass, ManagedBathPlacementZone, blend 값을 재확인한다(CMP-018).
 
-## Compile, Save, reload
+## PIE 수용
 
-1. UE 5.8에서 대상 BP의 parent/component/property를 확인하고 Data Validation을 실행한다. BP_Boiler의 GaugeFace/GaugeNeedleMesh asset, exact attachment와 NoCollision/Navigation off; BP_UtilityShovel의 WorldMesh/LoadVisual asset, attachment, root QueryAndPhysics/WorldStatic Block/CCD/Pawn Ignore, child NoCollision/Navigation off가 검증되어야 한다. Data Validation은 BP CDO를 확인하고, 실제 placed/held actor는 런타임 authoring validation이 등록·pickup·use 전에 같은 asset/hierarchy 계약을 차단하는지 확인한다.
-2. BP_Boiler, BP_UtilityShovel, BP_CoalSupply 및 변경 WBP를 warnings-as-errors로 개별 Compile한다.
-3. allowlist package만 개별 저장한다. DefaultMap 저장은 새 Supply/Shovel/Slot과 기존 boiler 연결만 포함한다. 다른 dirty package를 함께 저장하지 않는다.
-4. 새 Editor session에서 reload해 parent, Definition, exact slot assignment, mesh/collision, widget bindings와 transforms를 재확인한다.
-5. Compile/save/reload 전 값을 Unreal 정본에 저장 완료 상태로 기록하지 않는다.
+- 포커스인 완료 뒤 화면을 클릭하지 않고 E/ESC 각 한 번으로 나가는지, 진입에 사용한 E의 release는 유지되는지, FocusingIn 중 E/ESC가 종료를 시작하는지 확인한다.
+- 화면 버튼 클릭 후, 슬라이더 조작 후, 슬라이더 drag 중 이탈한다. LMB가 release되고 나간 뒤 setting 값이 더 바뀌지 않아야 한다.
+- 커서가 나타나는 순간 화면 중앙인지 확인한다. 구석으로 옮긴 뒤 재진입해 중앙으로 돌아오는지, 중앙 배치가 click을 만들지 않는지 본다.
+- 서로 다른 세 위치·방향에서 진입해도 같은 고정 발바닥 위치·방향인지, 화면은 0.25초 동안 그 시점으로 blend하는지 본다.
+- 고정 위치의 손님/물건 blocker, 벽 너머가 더 가까운 배치, 반경 내 전체 blocker에서 탐색·같은 쪽 경로·Forced 경로를 확인하고 blocker가 이동하지 않는지 확인한다.
+- 고정점 30cm 위 authoring에서 낙하 후 이동되는지, 바닥 높이에서는 떨어지지 않는지 확인한다.
+- 비사용 ESC가 placement, circulator lever, recovery hold를 취소하지 않는지 확인한다. 완료 후 컴퓨터에 다시 조준해 재진입한다.
 
-## PIE 수용 기준
+## 저장 경계·정본 갱신
 
-- 새 Boiler 설치 시 Installed 100, Active 0. Installed 상한까지 목표 예약을 허용하고 Active 부족 중 가열 효과를 멈춘다.
-- 빈 삽으로 LMB 한 번에 Coal 25를 즉시 퍼담는다. 누르고 있어도 반복되지 않는다. 이미 찬 삽은 내용 보존/추가 거부.
-- 실제 intake에 LMB: 0→25, 90→100(초과 폐기, 삽 전체 소모). full, 다른 component/body hit, 300cm 초과, 가림, recovery Hold에서는 삽/설비 값을 바꾸지 않는다.
-- 삽 G drop/재획득과 exact fixed slot E 왕복에서도 Coal 25를 보존한다. 같은 Coal supply의 F 반환은 즉시 비우고 Boiler 잔량을 바꾸지 않는다.
-- 25는 10초 후 15, 25초 후 0. 양수일 때 정격 100, 정확히 0에서 Active 0이며 Installed/예약은 유지된다. 재투입 후 computer 재입력 없이 가열 재개.
-- Q recovery Hold는 투입을 막고 시간을 계속 흐르게 한다. 취소해도 감소값을 복구하지 않는다. 두 Boiler/예약 조합으로 Installed 기준 회수 gate를 확인한다.
-- 성공 회수는 잔량을 payload에 보존하고 포장 중 줄이지 않는다. cancel/placement failure는 원래 item·잔량 유지, capacity 추가 없음. 재설치 뒤 보존값부터 감소를 재개한다.
-- computer 또는 placement가 입력을 소유하면 LMB와 삽 사용이 겹치지 않는다. 순환 공급이 있는 상태에서 가열/정지/재개 및 LAB-025 물·입욕자 규칙을 본다.
-- 임시 Cube 바늘의 0, 25%, 50%, 소진 회전 각도가 계약식과 일치해야 한다. 최종 원형 계기판의 외형 판독성은 이번 임시 표현 수용 조건이 아니다. 1024×576 summary의 세 capacity와 부족 원인, computer 재진입 후 값 유지도 확인한다.
-- Output Log에 BP 오류, duplicate registration, NaN transform, tick/input spam이 없어야 한다.
-
-## Unreal 정본과 결과물
-
-실제 저장·reload가 끝난 값으로 .md/Unreal/BathWaterSystem.md, PlacementSystem.md, InteractionUISystem.md를 갱신한다. 새 .md/Unreal/UtilityLaborSystem.md를 만들고 .md/Unreal/0_UNREAL.md 라우팅 표에 추가한다. 미지원 시각 작업은 한국어 .md/USER_UNREAL.md에 exact path, 조작, 기대 결과, 재개 조건을 기록한다. 저장 asset, Compile/Validation/PIE, dirty package와 미완료 항목은 .md/PROMPT_INTEGRATION_REVIEW.md로 인계한다.
+- Save allowlist: `BP_BathhouseComputer`, 실제 override가 필요한 경우 해당 DefaultMap external actor, 그리고 신규 `IA_Cancel`/`IMC_FirstPerson`/Character Blueprint.
+- 기존 managed Zone actor와 DefaultMap.umap은 기능에 필요한 변경이 없으면 저장하지 않는다. 다른 dirty package가 보이면 Save 전에 원인을 분리한다.
+- 실제 저장·재로드한 상태만 `.md/Unreal/InteractionUISystem.md`에 반영한다. Editor 작업에서 수행하지 못한 조작과 정확한 사유는 해당 단계에서 `.md/USER_UNREAL.md`에 인계한다.

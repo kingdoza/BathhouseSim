@@ -7,8 +7,27 @@ UENUM(BlueprintType)
 enum class EUtilityFuelKind : uint8
 {
 	None = 0,
-	Coal = 1
+	Coal = 1,
+	DryIce = 2
 };
+
+inline bool IsSupportedUtilityFuelKind(const EUtilityFuelKind Kind)
+{
+	return Kind == EUtilityFuelKind::Coal || Kind == EUtilityFuelKind::DryIce;
+}
+
+inline FText GetUtilityFuelKindDisplayName(const EUtilityFuelKind Kind)
+{
+	switch (Kind)
+	{
+	case EUtilityFuelKind::Coal:
+		return NSLOCTEXT("UtilityFuel", "CoalDisplayName", "석탄");
+	case EUtilityFuelKind::DryIce:
+		return NSLOCTEXT("UtilityFuel", "DryIceDisplayName", "드라이아이스");
+	default:
+		return FText::GetEmpty();
+	}
+}
 
 UENUM(BlueprintType)
 enum class EUtilityFuelFailure : uint8
@@ -49,7 +68,7 @@ struct BATHHOUSESIM_API FUtilityFuelLoad
 		{
 			return false;
 		}
-		return IsEmpty() || (Kind == EUtilityFuelKind::Coal && Points > 0.0f);
+		return IsEmpty() || (IsSupportedUtilityFuelKind(Kind) && Points > 0.0f);
 	}
 };
 

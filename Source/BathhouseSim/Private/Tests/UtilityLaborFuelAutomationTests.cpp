@@ -2,6 +2,7 @@
 #include "Tests/UtilityLaborAutomationTestSupport.h"
 #include "Tests/UtilityLaborAutomationTestProbe.h"
 #include "Engine/StaticMeshActor.h"
+#include "Interaction/HeldEquipmentUsable.h"
 #include "Interaction/PhysicalCarryFixedSlotActor.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Utility/UtilityFuelTransaction.h"
@@ -29,21 +30,21 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 	UCameraComponent* Camera = NewObject<UCameraComponent>(User, TEXT("FuelTestCamera"));
 	UPlayerCarryComponent* Carry = NewObject<UPlayerCarryComponent>(User, TEXT("FuelTestCarry"));
 	UPlayerInteractionComponent* Interaction = NewObject<UPlayerInteractionComponent>(User, TEXT("FuelTestInteraction"));
-	UPlayerEquipmentUseComponent* EquipmentUse = NewObject<UPlayerEquipmentUseComponent>(User, TEXT("FuelTestEquipmentUse"));
 	User->SetRootComponent(Camera);
 	User->AddInstanceComponent(Camera);
 	User->AddInstanceComponent(Carry);
 	User->AddInstanceComponent(Interaction);
-	User->AddInstanceComponent(EquipmentUse);
 	Camera->RegisterComponent();
 	Carry->RegisterComponent();
 	Interaction->RegisterComponent();
-	EquipmentUse->RegisterComponent();
 	Carry->ConfigureHeldAnchor(Camera);
-	Carry->ConfigureEquipmentUse(EquipmentUse);
 	Interaction->Configure(Camera, Carry);
-	Interaction->ConfigureEquipmentUse(EquipmentUse);
-	EquipmentUse->Configure(Camera, Carry, Interaction, nullptr);
+	const auto ExecutePrimary = [Interaction]()
+	{
+		const FPlayerInteractionResult Result = Interaction->BeginPrimaryInteraction();
+		Interaction->EndPrimaryInteraction();
+		return Result;
+	};
 
 	AUtilityFuelSupplyActor* Supply = World->SpawnActor<AUtilityFuelSupplyActor>(FVector(100.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
 	Supply->GetSupplyMesh()->SetStaticMesh(CubeMesh);
@@ -126,7 +127,7 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 		*GetNameSafe(FocusHit.GetActor()),
 		*GetNameSafe(FocusHit.GetComponent()),
 		FocusHit.Distance), FocusHit.GetActor() == Blocker);
-	TestFalse(TEXT("An occluded supply cannot load the shovel"), EquipmentUse->BeginEquipmentUse().bSucceeded);
+	TestFalse(TEXT("An occluded supply cannot load the shovel"), ExecutePrimary().bSucceeded);
 	TestTrue(TEXT("An occluded attempt preserves an empty shovel"), Shovel->IsLoadEmpty());
 	BlockerMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Blocker->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
@@ -135,44 +136,42 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 	TestFalse(FString::Printf(
 		TEXT("A target beyond the shared interaction range is not traced (actor=%s, component=%s, distance=%.1f cm)"),
 		*GetNameSafe(FocusHit.GetActor()), *GetNameSafe(FocusHit.GetComponent()), FocusHit.Distance), bOutOfRangeHit);
-	TestFalse(TEXT("An out-of-range supply cannot load the shovel"), EquipmentUse->BeginEquipmentUse().bSucceeded);
+	TestFalse(TEXT("An out-of-range supply cannot load the shovel"), ExecutePrimary().bSucceeded);
 	Supply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
-	TestTrue(TEXT("A visible supply can be scooped"), EquipmentUse->BeginEquipmentUse().bSucceeded);
-	EquipmentUse->EndEquipmentUse();
+	TestTrue(TEXT("A visible supply can be scooped"), ExecutePrimary().bSucceeded);
+
 	TestTrue(TEXT("One scoop copies exactly 25 coal points"),
 		Shovel->GetFuelLoad().Kind == EUtilityFuelKind::Coal
 		&& FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, 25.0f));
-	TestFalse(TEXT("A loaded shovel cannot scoop a second batch"), EquipmentUse->BeginEquipmentUse().bSucceeded);
+	Interaction->RefreshInteractionQuery();
+	TestTrue(TEXT("A loaded shovel advertises E return at the supply"),
+		Interaction->GetCurrentInteractionQuery().bCanInteract
+		&& Interaction->GetCurrentInteractionQuery().ActionName.ToString() == TEXT("석탄 반환"));
+	TestTrue(TEXT("A second E press returns the existing batch instead of scooping again"), ExecutePrimary().bSucceeded);
+	TestTrue(TEXT("E return leaves the shovel empty"), Shovel->IsLoadEmpty());
+	TestTrue(TEXT("An empty shovel can scoop one new batch"), ExecutePrimary().bSucceeded);
+	TestFalse(TEXT("The shovel has no LMB equipment-use behavior"),
+		Shovel->GetClass()->ImplementsInterface(UHeldEquipmentUsable::StaticClass()));
 
 	ABathWaterBoilerFacilityActor* Boiler = World->SpawnActor<ABathWaterBoilerFacilityActor>(FVector(150.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
 	TestFalse(TEXT("Boiler authoring rejects missing gauge meshes"), Boiler->HasValidUtilityAuthoring(FailureReason));
 	TestTrue(TEXT("Boiler test fixture assigns intake and gauge meshes"), SetBoilerTestMeshes(Boiler, CubeMesh));
-	Boiler->GetFuelIntake()->SetWorldScale3D(FVector(0.15f));
 	TestTrue(TEXT("Boiler native components pass labor authoring validation"), Boiler->HasValidUtilityAuthoring(FailureReason));
-	UStaticMeshComponent* BoilerGaugeFace = FindNamedMeshComponent(Boiler, TEXT("GaugeFace"));
-	UStaticMeshComponent* BoilerGaugeNeedle = FindNamedMeshComponent(Boiler, TEXT("GaugeNeedleMesh"));
+	TestNull(TEXT("Boiler has no native GaugeFace component"), FindNamedMeshComponent(Boiler, TEXT("GaugeFace")));
+	UStaticMeshComponent* BoilerGaugeNeedle = Boiler->GetGaugeNeedleMesh();
 	USceneComponent* BoilerGaugePivot = BoilerGaugeNeedle ? BoilerGaugeNeedle->GetAttachParent() : nullptr;
 	USceneComponent* BoilerGaugeRoot = BoilerGaugePivot ? BoilerGaugePivot->GetAttachParent() : nullptr;
-	if (TestNotNull(TEXT("Boiler gauge face exists"), BoilerGaugeFace)
-		&& TestNotNull(TEXT("Boiler gauge needle exists"), BoilerGaugeNeedle)
+	if (TestNotNull(TEXT("Boiler gauge needle exists"), BoilerGaugeNeedle)
 		&& TestNotNull(TEXT("Boiler gauge pivot exists"), BoilerGaugePivot)
 		&& TestNotNull(TEXT("Boiler gauge root exists"), BoilerGaugeRoot))
 	{
-		BoilerGaugeFace->SetStaticMesh(nullptr);
-		TestFalse(TEXT("Boiler authoring rejects a missing gauge face mesh"), Boiler->HasValidUtilityAuthoring(FailureReason));
-		BoilerGaugeFace->SetStaticMesh(CubeMesh);
+		UStaticMesh* DoorMesh = Boiler->GetFuelDoorMesh()->GetStaticMesh();
+		Boiler->GetFuelDoorMesh()->SetStaticMesh(nullptr);
+		TestFalse(TEXT("Boiler authoring rejects a missing fuel door mesh"), Boiler->HasValidUtilityAuthoring(FailureReason));
+		Boiler->GetFuelDoorMesh()->SetStaticMesh(DoorMesh);
 		BoilerGaugeNeedle->SetStaticMesh(nullptr);
 		TestFalse(TEXT("Boiler authoring rejects a missing gauge needle mesh"), Boiler->HasValidUtilityAuthoring(FailureReason));
 		BoilerGaugeNeedle->SetStaticMesh(CubeMesh);
-		BoilerGaugeFace->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		TestFalse(TEXT("Boiler authoring rejects gauge face collision"), Boiler->HasValidUtilityAuthoring(FailureReason));
-		BoilerGaugeFace->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		BoilerGaugeFace->SetCanEverAffectNavigation(true);
-		TestFalse(TEXT("Boiler authoring rejects gauge face navigation influence"), Boiler->HasValidUtilityAuthoring(FailureReason));
-		BoilerGaugeFace->SetCanEverAffectNavigation(false);
-		BoilerGaugeFace->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
-		TestFalse(TEXT("Boiler authoring rejects a detached gauge face"), Boiler->HasValidUtilityAuthoring(FailureReason));
-		BoilerGaugeFace->AttachToComponent(BoilerGaugeRoot, FAttachmentTransformRules::KeepRelativeTransform);
 		BoilerGaugeNeedle->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 		TestFalse(TEXT("Boiler authoring rejects gauge needle collision"), Boiler->HasValidUtilityAuthoring(FailureReason));
 		BoilerGaugeNeedle->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -187,6 +186,13 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 		BoilerGaugePivot->AttachToComponent(BoilerGaugeRoot, FAttachmentTransformRules::KeepRelativeTransform);
 	}
 	TestTrue(TEXT("Restored boiler gauge hierarchy passes validation"), Boiler->HasValidUtilityAuthoring(FailureReason));
+	Boiler->GetFuelIntakeVolume()->SetBoxExtent(FVector(0.0f, 15.0f, 15.0f));
+	TestFalse(TEXT("Boiler authoring rejects a zero intake Box extent"), Boiler->HasValidUtilityAuthoring(FailureReason));
+	Boiler->GetFuelIntakeVolume()->SetBoxExtent(FVector(15.0f));
+	Boiler->GetFuelIntakeVolume()->SetRelativeScale3D(FVector(0.15f));
+	TestFalse(TEXT("Boiler authoring rejects scaled intake Box geometry"), Boiler->HasValidUtilityAuthoring(FailureReason));
+	Boiler->GetFuelIntakeVolume()->SetRelativeScale3D(FVector::OneVector);
+	TestTrue(TEXT("Restored unit scale and Box extent pass intake validation"), Boiler->HasValidUtilityAuthoring(FailureReason));
 	TestTrue(TEXT("Recovered charge imports before operation starts"), Boiler->GetOperation()->ImportOperationState(90.0f, FailureReason));
 	Boiler->GetFacilityPlacementComponent()->SetPlacedDomainActive(true);
 	UBathWaterOperationsSubsystem* Operations = World->GetSubsystem<UBathWaterOperationsSubsystem>();
@@ -195,28 +201,29 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 	Supply->SetActorLocation(FVector(500.0f, 0.0f, 0.0f));
 	TestTrue(TEXT("The visible native intake is the exact target hit"),
 		Interaction->GetCurrentFocusHit(FocusHit) && FocusHit.GetActor() == Boiler
-		&& FocusHit.GetComponent() == Boiler->GetFuelIntake());
-	TestTrue(TEXT("A 25 point load enters a 90 point boiler"), EquipmentUse->BeginEquipmentUse().bSucceeded);
-	EquipmentUse->EndEquipmentUse();
+		&& FocusHit.GetComponent() == Boiler->GetFuelIntakeVolume());
+	TestTrue(TEXT("A 25 point load enters a 90 point boiler"), ExecutePrimary().bSucceeded);
+
 	TestTrue(TEXT("Partial remaining space is capped at 100 and the whole load is consumed"),
 		FMath::IsNearlyEqual(Boiler->GetOperation()->GetRemainingPoints(), 100.0f)
 		&& Shovel->IsLoadEmpty());
 
 	Boiler->SetActorLocation(FVector(500.0f, 0.0f, 0.0f));
 	Supply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
-	TestTrue(TEXT("A second coal batch loads after the first was consumed"), EquipmentUse->BeginEquipmentUse().bSucceeded);
-	EquipmentUse->EndEquipmentUse();
+	TestTrue(TEXT("A second coal batch loads after the first was consumed"), ExecutePrimary().bSucceeded);
+
 	Boiler->SetActorLocation(FVector(150.0f, 0.0f, 0.0f));
 	Supply->SetActorLocation(FVector(500.0f, 0.0f, 0.0f));
-	TestFalse(TEXT("A full boiler rejects insertion"), EquipmentUse->BeginEquipmentUse().bSucceeded);
+	TestFalse(TEXT("A full boiler rejects insertion"), ExecutePrimary().bSucceeded);
 	TestTrue(TEXT("Full-boiler refusal keeps all shovel fuel"),
 		Shovel->GetFuelLoad().Kind == EUtilityFuelKind::Coal
 		&& FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, 25.0f));
 	Boiler->SetActorLocation(FVector(500.0f, 0.0f, 0.0f));
 	Supply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
-	TestTrue(TEXT("F returns a matching load through the focused supply"),
-		Interaction->TrySecondaryInteract().bSucceeded);
+	TestTrue(TEXT("E returns a matching load through the focused supply"), ExecutePrimary().bSucceeded);
 	TestTrue(TEXT("Fuel return clears the same shovel load"), Shovel->IsLoadEmpty());
+	TestFalse(TEXT("F has no fuel return action"), Interaction->TrySecondaryInteract().bSucceeded);
+	TestTrue(TEXT("F cannot change the shovel load"), Shovel->IsLoadEmpty());
 
 	UFacilityPlacementDefinition* RaceBoilerDefinition = NewObject<UFacilityPlacementDefinition>();
 	RaceBoilerDefinition->StableId = TEXT("UtilityLaborRaceBoiler");
@@ -237,7 +244,6 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 		{
 			return static_cast<ABathWaterBoilerFacilityActor*>(nullptr);
 		}
-		RaceBoiler->GetFuelIntake()->SetWorldScale3D(FVector(0.15f));
 		if (!RaceBoiler->GetFacilityPlacementComponent()->PrepareForStagedPlacement(*RaceBoilerDefinition, FailureReason))
 		{
 			RaceBoiler->Destroy();
@@ -285,18 +291,18 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 		&& TickFirstOperationsPublications == 1);
 	Supply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
 	TickFirstBoiler->SetActorLocation(FVector(500.0f, 0.0f, 0.0f));
-	TestTrue(TEXT("Fuel can be scooped for the exhausted boiler"), EquipmentUse->BeginEquipmentUse().bSucceeded);
-	EquipmentUse->EndEquipmentUse();
+	TestTrue(TEXT("Fuel can be scooped for the exhausted boiler"), ExecutePrimary().bSucceeded);
+
 	Supply->SetActorLocation(FVector(500.0f, 0.0f, 0.0f));
 	TickFirstBoiler->SetActorLocation(FVector(150.0f, 0.0f, 0.0f));
 	TestTrue(TEXT("Recovery hold starts for the exhausted boiler"), TickFirstBoiler->TryBeginFacilityRecoveryHold(FailureReason));
-	TestFalse(TEXT("Actual equipment-use path rejects fuel during recovery Hold"), EquipmentUse->BeginEquipmentUse().bSucceeded);
+	TestFalse(TEXT("Actual equipment-use path rejects fuel during recovery Hold"), ExecutePrimary().bSucceeded);
 	TestTrue(TEXT("Rejected Hold insertion preserves shovel coal"),
 		Shovel->GetFuelLoad().Kind == EUtilityFuelKind::Coal
 		&& FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, 25.0f));
 	TickFirstBoiler->CancelFacilityRecoveryHold();
-	TestTrue(TEXT("Insertion after the exhaustion Tick succeeds"), EquipmentUse->BeginEquipmentUse().bSucceeded);
-	EquipmentUse->EndEquipmentUse();
+	TestTrue(TEXT("Insertion after the exhaustion Tick succeeds"), ExecutePrimary().bSucceeded);
+
 	TestTrue(TEXT("Tick-first insertion publishes the positive edge exactly once"),
 		TickFirstEdges.Num() == 2 && TickFirstEdges[1]
 		&& TickFirstOperationsPublications == 2);
@@ -309,8 +315,8 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	Supply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
-	TestTrue(TEXT("Fuel can be scooped for the insert-first boiler"), EquipmentUse->BeginEquipmentUse().bSucceeded);
-	EquipmentUse->EndEquipmentUse();
+	TestTrue(TEXT("Fuel can be scooped for the insert-first boiler"), ExecutePrimary().bSucceeded);
+
 	Supply->SetActorLocation(FVector(500.0f, 0.0f, 0.0f));
 	InsertFirstBoiler->SetActorLocation(FVector(150.0f, 0.0f, 0.0f));
 	InsertFirstBoiler->GetOperation()->SetComponentTickEnabled(false);
@@ -334,41 +340,42 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 	UCameraComponent* ReentrantCamera = NewObject<UCameraComponent>(ReentrantUser, TEXT("ReentrantFuelCamera"));
 	UPlayerCarryComponent* ReentrantCarry = NewObject<UPlayerCarryComponent>(ReentrantUser, TEXT("ReentrantFuelCarry"));
 	UPlayerInteractionComponent* ReentrantInteraction = NewObject<UPlayerInteractionComponent>(ReentrantUser, TEXT("ReentrantFuelInteraction"));
-	UPlayerEquipmentUseComponent* ReentrantEquipmentUse = NewObject<UPlayerEquipmentUseComponent>(ReentrantUser, TEXT("ReentrantFuelEquipmentUse"));
 	ReentrantUser->SetRootComponent(ReentrantCamera);
 	ReentrantUser->AddInstanceComponent(ReentrantCamera);
 	ReentrantUser->AddInstanceComponent(ReentrantCarry);
 	ReentrantUser->AddInstanceComponent(ReentrantInteraction);
-	ReentrantUser->AddInstanceComponent(ReentrantEquipmentUse);
 	ReentrantCamera->RegisterComponent();
 	ReentrantCarry->RegisterComponent();
 	ReentrantInteraction->RegisterComponent();
-	ReentrantEquipmentUse->RegisterComponent();
 	ReentrantCarry->ConfigureHeldAnchor(ReentrantCamera);
-	ReentrantCarry->ConfigureEquipmentUse(ReentrantEquipmentUse);
 	ReentrantInteraction->Configure(ReentrantCamera, ReentrantCarry);
-	ReentrantInteraction->ConfigureEquipmentUse(ReentrantEquipmentUse);
-	ReentrantEquipmentUse->Configure(ReentrantCamera, ReentrantCarry, ReentrantInteraction, nullptr);
+	const auto ExecuteReentrantPrimary = [ReentrantInteraction]()
+	{
+		const FPlayerInteractionResult Result = ReentrantInteraction->BeginPrimaryInteraction();
+		ReentrantInteraction->EndPrimaryInteraction();
+		return Result;
+	};
 	AUtilityShovelActor* ReentrantShovel = World->SpawnActor<AUtilityShovelActor>();
 	TestTrue(TEXT("Reentrant shovel has valid authoring"), SetShovelTestMeshes(ReentrantShovel, CubeMesh));
 	TestTrue(TEXT("Second user takes the reentrant-test shovel"), ReentrantCarry->TryTakePhysicalObject(ReentrantShovel, FailureReason));
 	Supply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
-	TestTrue(TEXT("Second user loads an independent batch for reentrancy"), ReentrantEquipmentUse->BeginEquipmentUse().bSucceeded);
-	ReentrantEquipmentUse->EndEquipmentUse();
+	TestTrue(TEXT("Second user loads an independent batch for reentrancy"), ExecuteReentrantPrimary().bSucceeded);
 	Supply->SetActorLocation(FVector(500.0f, 0.0f, 0.0f));
 	Boiler->SetActorLocation(FVector(800.0f, 500.0f, 0.0f));
 	TickFirstBoiler->SetActorLocation(FVector(800.0f, 0.0f, 0.0f));
 	InsertFirstBoiler->SetActorLocation(FVector(150.0f, 0.0f, 0.0f));
-	FHeldEquipmentUseContext ReentrantContext;
-	ReentrantContext.User = ReentrantUser;
-	ReentrantContext.Equipment = ReentrantShovel;
+	FPlayerInteractionContext ReentrantContext;
+	ReentrantContext.Interactor = ReentrantUser;
 	ReentrantContext.CarryComponent = ReentrantCarry;
 	ReentrantContext.InteractionComponent = ReentrantInteraction;
-	ReentrantContext.Camera = ReentrantCamera;
+	FHitResult ReentrantFocusHit;
 	TestTrue(TEXT("Reentrant context focuses the boiler intake"),
-		ReentrantInteraction->GetCurrentFocusHit(ReentrantContext.FocusHit)
-		&& ReentrantContext.FocusHit.GetActor() == InsertFirstBoiler
-		&& ReentrantContext.FocusHit.GetComponent() == InsertFirstBoiler->GetFuelIntake());
+		ReentrantInteraction->GetCurrentFocusHit(ReentrantFocusHit)
+		&& ReentrantFocusHit.GetActor() == InsertFirstBoiler
+		&& ReentrantFocusHit.GetComponent() == InsertFirstBoiler->GetFuelIntakeVolume());
+	ReentrantContext.HitActor = ReentrantFocusHit.GetActor();
+	ReentrantContext.HitComponent = ReentrantFocusHit.GetComponent();
+	ReentrantContext.HitResult = ReentrantFocusHit;
 	TStrongObjectPtr<UUtilityLaborFuelChangedAutomationProbe> FuelChangedProbe(
 		NewObject<UUtilityLaborFuelChangedAutomationProbe>(World));
 	if (!TestNotNull(TEXT("Fuel delegate observer is created"), FuelChangedProbe.Get()))
@@ -379,7 +386,7 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 		Shovel,
 		ReentrantShovel,
 		InsertFirstBoiler->GetOperation(),
-		InsertFirstBoiler->GetFuelIntake(),
+		InsertFirstBoiler->GetFuelIntakeVolume(),
 		ReentrantContext,
 		25.0f);
 	int32 OperationChangedCallbacks = 0;
@@ -392,12 +399,12 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 			&& ReentrantShovel->GetFuelLoad().Points == 25.0f
 			&& FMath::IsNearlyEqual(InsertFirstBoiler->GetOperation()->GetRemainingPoints(), 25.0f);
 		const FUtilityFuelResult NestedResult = FUtilityFuelTransaction::Insert(
-			*ReentrantShovel, *InsertFirstBoiler->GetFuelIntake(), ReentrantContext);
+			*ReentrantShovel, *InsertFirstBoiler->GetFuelIntakeVolume(), ReentrantContext);
 		bReentrantInsertRejectedByGuard = !NestedResult.bSucceeded
 			&& NestedResult.Failure == EUtilityFuelFailure::TransactionBusy;
 	});
-	TestTrue(TEXT("Fuel insertion before the exhaustion Tick succeeds"), EquipmentUse->BeginEquipmentUse().bSucceeded);
-	EquipmentUse->EndEquipmentUse();
+	TestTrue(TEXT("Fuel insertion before the exhaustion Tick succeeds"), ExecutePrimary().bSucceeded);
+
 	FuelChangedProbe->Unbind();
 	InsertFirstBoiler->GetOperation()->OnOperationChanged.Remove(ReentrantOperationHandle);
 	const float ActiveAfterInsert = Operations->GetCapacitySnapshot(EBathWaterCapacityKind::Heating).ActivePoints;
@@ -424,8 +431,8 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 	Supply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
 	TickFirstBoiler->SetActorLocation(FVector(800.0f, 0.0f, 0.0f));
 	InsertFirstBoiler->SetActorLocation(FVector(800.0f, 500.0f, 0.0f));
-	TestTrue(TEXT("Final load is scooped through the equipment-use action"), EquipmentUse->BeginEquipmentUse().bSucceeded);
-	EquipmentUse->EndEquipmentUse();
+	TestTrue(TEXT("Final load is scooped through the equipment-use action"), ExecutePrimary().bSucceeded);
+
 	Supply->SetActorLocation(FVector(500.0f, 0.0f, 0.0f));
 	TestTrue(TEXT("G drop action releases the loaded shovel"),
 		Interaction->TryDropCarry(FVector::ForwardVector).bSucceeded);

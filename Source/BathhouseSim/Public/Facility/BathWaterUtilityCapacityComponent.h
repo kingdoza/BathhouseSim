@@ -18,7 +18,7 @@ public:
 	EBathWaterCapacityKind GetCapacityKind() const { return CapacityKind; }
 	float GetCapacityPoints() const;
 	float GetActiveCapacityPoints() const;
-	void SetUtilityOperation(UUtilityOperationComponent* InOperation, bool bRequireOperation = false);
+	void SetUtilityOperation(UUtilityOperationComponent* InOperation);
 	bool HasValidAuthoring(FText& OutFailureReason) const;
 	void RestoreCapacity(EBathWaterCapacityKind InKind, float InPoints);
 
@@ -36,6 +36,4 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UUtilityOperationComponent> UtilityOperation = nullptr;
 
-	UPROPERTY(Transient)
-	bool bOperationRequired = false;
 };

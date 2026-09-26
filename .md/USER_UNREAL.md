@@ -1,16 +1,33 @@
 # 사용자 Unreal 후속 작업
 
+## FuelIntake migration — 직접 Editor 검증 대기
+
+### 현재 상태
+
+- 사용자가 이번 대화에서 코드 리뷰 승인 관문을 건너뛰도록 지시했다. Unreal MCP 서버에 실제 연결해 `/Game/Bathhouse/Blueprints/Facility/BP_Boiler`만 Compile·개별 Save했다. 기존 `FuelIntake` class와 Definition 참조는 유지했고 새 판정 Volume·문 Cube를 설정했다. 정확한 값은 `.md/Unreal/UtilityLaborSystem.md`에 있다.
+- 같은 Editor에서 `/Game/Maps/DefaultMap`을 다시 로드하자 기존 보일러 instance가 새 Class Default를 상속했다. Definition과 Map은 저장하지 않았고 BP·Definition·Map의 dirty는 false, PIE는 종료 상태였다. 짧은 자동 PIE에서 보일러 provider 등록 오류는 없었으나 직접 입력·시각 수용은 하지 않았다.
+- 이후 새 Editor 프로세스로 재로드하려 했으나 MCP 포트는 열려도 `initialize` 응답이 시간 초과됐고 시작 로그는 Slate 초기화 뒤 진행되지 않았다. 이 재시작 검증은 미완료다. 작업 소유 백그라운드 Editor는 종료했다. 복구 패키지 창 등 UI 상태를 MCP로 확인할 수 없어 원인은 확정하지 않았다.
+
+### 필요한 직접 조작과 확인
+
+1. UE 5.8 Editor에서 `/Game/Bathhouse/Blueprints/Facility/BP_Boiler`를 열고 `Data Validation`을 실행한다. `FuelIntake` 외형은 NoCollision, `FuelIntakeVolume`은 QueryOnly·Visibility Block, BoxExtent `(15,4,11)` cm·Scale `(1,1,1)`, 문 mesh와 바늘 mesh는 필수·NoCollision인지 확인한다. 오류가 나면 임의 저장하지 말고 오류 내용을 남긴다. 현재 MCP에는 Data Validation 실행 tool이 없다.
+2. 새 Editor 세션에서 BP와 `/Game/Maps/DefaultMap` 보일러 instance를 다시 열어 새 Volume·문 설정, 기존 Definition 연결과 instance override가 유지되는지 확인한다. 복구 패키지 창이 뜨면 기존 작업과 autosave 내용을 비교한 뒤 선택하고, 무조건 복구·건너뛰지 않는다. 이 항목은 백그라운드 재시작이 초기화 단계에서 멈춰 확인하지 못했다.
+3. BP 컴포넌트 미리보기에서 `FuelDoorPresentation` preview-open/restore-closed와 `GaugePresentation` construction preview/restore를 실행해 피벗 축, 문 닫힘 자세, 바늘 기준 회전이 유지되는지 확인한다. 현재 MCP는 이 native 호출과 시각 판정을 제공하지 않는다.
+4. PIE에서 `.md/PROMPT_UNREAL.md`의 E 퍼담기·반환·투입, LMB/F 비변경, 투입 Volume 단독 판정, 문 자동 열림·닫힘/중간 반전·두 보일러 독립, 가열·소진·재투입·회수 rollback을 실제 입력과 화면으로 확인한다. 실패하면 조준 위치와 Output Log를 기록한다.
+
+위 항목과 Data Validation이 통과해야 통합 리뷰에서 Editor 단계를 승인할 수 있다. `Save All`은 사용하지 않는다.
+
 # 보일러 노동 가동 수직 구현 — MCP 미지원 작업
 
 ## 현재 확인 상태
 
 `/Game/Bathhouse/Blueprints/Facility/BP_Boiler`는 `/Script/BathhouseSim.BathWaterBoilerFacilityActor`로 reparent했고 `FacilityPlacement.Definition=/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler`와 임시 Cube 투입구·계기·바늘을 저장·재로드했다. `/Game/Bathhouse/Blueprints/Utility/BP_UtilityShovel`과 `BP_CoalSupply`도 임시 Cube/`SM_Facility_sample`로 생성·컴파일·저장·재로드했다. 새 Editor에서 기존 보일러 instance는 새 component 값을 상속했고 기본 PIE에서 필수 투입구 누락 경고가 재발하지 않았다.
 
-`DefaultMap`의 신규 석탄 공급함·삽·전용 거치대는 **디스크에 저장되지 않았다.** 이전 MCP 세션의 개별 `save_actor`는 신규/기존 World Partition 외부 액터 모두에 `Asset does not exist: /Game/__ExternalActors__/...`를 반환했다. 현재 사용자가 열어 둔 Editor에는 아래 세 actor를 다시 배치하고 exact 삽 참조를 연결했으나, Editor를 닫으면 사라질 수 있다. MCP 저장 실패를 반복하지 않았다.
+이전 MCP 세션의 개별 `save_actor`는 World Partition 외부 액터에 `Asset does not exist: /Game/__ExternalActors__/...`를 반환했다. 이번 새 배경 Editor에서 `DefaultMap`을 로드했을 때 석탄 공급함·삽·전용 거치대 actor 세 개가 다시 발견됐다. 다만 각 external actor의 디스크 저장 경로와 `AssignedItem`의 exact 참조는 이번 작업에서 확인하지 않았으므로 영속 상태를 단정하지 않는다.
 
 ## 1. DefaultMap 액터 배치·외부 액터 저장
 
-현재 열린 `/Game/Maps/DefaultMap`에는 다음 세 Blueprint instance가 **미저장 상태로 배치되어 있고 선택되어 있다.** 재생성하지 말고 위치가 괜찮은지 확인한다. 바닥 trace는 두 위치 모두 Z=0이었다.
+`/Game/Maps/DefaultMap`에서 아래 세 Blueprint instance가 이미 있는지 먼저 확인한다. 없을 때만 재배치한다. 이전 배치에서 바닥 trace는 두 위치 모두 Z=0이었다.
 
 | Actor | Blueprint | 제안 world Location |
 |---|---|---|
@@ -18,7 +35,7 @@
 | `UtilityShovel` | `/Game/Bathhouse/Blueprints/Utility/BP_UtilityShovel` | `(425,-800,45)` |
 | `ShovelSlot` | `/Game/Bathhouse/Blueprints/Interaction/BP_PhysicalCarryFixedSlot` | `(425,-800,45)` |
 
-`ShovelSlot.AssignedItem`은 **그 레벨의 `UtilityShovel` 인스턴스**를 가리키고, `bStartOccupied=true`, `SlotDisplayName=삽 거치대`다. `ItemAnchor`와 삽의 시작 world transform은 둘 다 `(425,-800,45)`/회전 0이다. 현재 열린 Editor에서 `DefaultMap`과 해당 세 World Partition 외부 액터만 저장한 뒤, 다시 열어 세 actor와 exact 참조가 유지되는지 확인한다. 이번 MCP는 외부 액터의 디스크 저장을 완료하지 못했다. 저장 전 Editor를 종료하지 않는다.
+`ShovelSlot.AssignedItem`이 **그 레벨의 `UtilityShovel` 인스턴스**를 가리키는지, `bStartOccupied=true`, `SlotDisplayName=삽 거치대`인지 확인한다. `ItemAnchor`와 삽의 시작 world transform은 둘 다 `(425,-800,45)`/회전 0이 목표다. 필요한 변경이 있을 때만 `DefaultMap`과 해당 World Partition 외부 액터를 개별 저장하고, 다시 열어 세 actor와 exact 참조가 유지되는지 확인한다. `Save All`은 사용하지 않는다.
 
 ## 2. Capacity Summary 실제 화면 검증
 
@@ -174,3 +191,103 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 - 5번 native grid 입력·시각 검증 결과를 기록한다.
 
 완료 후 `.md/PROMPT_INTEGRATION_REVIEW.md`의 미완료 항목을 최종 통합 리뷰에서 다시 판정한다.
+
+# 쿨러 전체 확장과 순환기 레버 — 2026-09-26 Unreal MCP 인계
+
+## 현재 확인 상태
+
+- 로컬 Unreal MCP 127.0.0.1:8000 연결 후 DefaultMap에서 작업했다. 다섯 Blueprint의 warnings-as-errors Compile이 모두 통과했고 BP_Boiler, BP_Cooler, BP_Circulator, BP_UtilityShovel, 신규 BP_DryIceSupply를 각각 Save했다. 현재 세션에서 CDO 변경값을 읽어 확인했지만 새 Editor 프로세스 재로드는 하지 못했다.
+- BP_Boiler CDO에 GaugeFacePlate StaticMeshComponent를 추가해 Cube, Location (0,-32,90), Scale (0.30,0.02,0.30), NoCollision, navigation/overlap off로 authoring했다. 기존 FuelIntake와 Definition은 유지했다.
+- BP_Cooler parent는 /Script/BathhouseSim.BathWaterCoolerFacilityActor다. 본체·footprint·Capacity=Cooling/100, Operation=100/1은 보존했다. CDO FuelIntakeVolume은 (0,-42,42), extent (15,4,11), unit scale, native QueryOnly/Visibility Block이다. Cube needle/door, gauge/door presentation, FacilityPlacement.Definition=DA_FacilityPlacement_Cooler를 설정했다.
+- BP_Circulator parent는 /Script/BathhouseSim.BathWaterCirculatorFacilityActor다. 본체·footprint·Capacity=Circulation/100, Operation=100/1은 보존했다. CDO에는 Cube gauge needle, unit-scale QueryOnly lever volume Location=(19,-44,42)/extent=(16,6,16), pivot=(30,-44,30), Cube lever mesh, Stroke=1s/10점, CancelReturnSeconds=0, axis=(0,1,0), down angle=-60도, FacilityPlacement.Definition=DA_FacilityPlacement_Circulator를 설정했다.
+- BP_UtilityShovel CDO LoadAppearances는 Coal=Cube, DryIce=Sphere+M_Glaze_Celadon_1로 구성했다. 전용 coal/dry-ice art가 없어 기존 assets로 구분한 임시 표현이다.
+- BP_DryIceSupply는 /Script/BathhouseSim.UtilityFuelSupplyActor 자식이며 CDO FuelKind=DryIce, ScoopPoints=25, SupplyMesh=SM_Facility_sample, Scale=(0.5,0.5,0.5)다.
+- 기존 DefaultMap instance는 class defaults를 완전히 상속하지 않았다. Boiler actor의 새 GaugeFacePlate는 instance에서 Mesh=None, 기본 transform/BlockAllDynamic/nav on이다. Cooler instance는 FacilityPlacement.Definition=None, needle/door Mesh=None, gauge 기본 축, intake extent=(32,32,32)다. Circulator instance는 Definition=None, gauge/lever Mesh=None, lever extent=(32,32,32), LeverLabor.CancelReturnSeconds=0.2다. 기존 Shovel instance LoadAppearances는 빈 맵이다. 따라서 위 CDO 저장만으로 기존 WP actor authoring이 갱신됐다고 보지 않는다.
+- Cooler/Circulator instance FacilityPlacement.Definition에 set_properties 및 reset_properties를 호출했으나 둘 다 definition read-only 오류로 거부됐다. 현재 actor 경로는 /Game/Maps/DefaultMap.DefaultMap:PersistentLevel.BP_Cooler_C_UAID_F02F7433CA366F0403_1976197592 및 /Game/Maps/DefaultMap.DefaultMap:PersistentLevel.BP_Circulator_C_UAID_F02F7433CA366F0403_1986151593다.
+- 새 DryIceSupply는 (450,-900,0)에 배치했다. PlacementZone 안이고 stain-spawn 영역 밖이며 기존 공급함/설비와 bounds가 겹치지 않는 위치다. 현재 세션에서 actor와 CDO 값은 읽었으나 저장되지 않았다. SceneTools.save_actor는 두 번 모두 Asset does not exist: /Game/__ExternalActors__/Maps/DefaultMap/B/E4/YYD7GB5C924IGGI6PAL42T로 실패했다. /Game/Maps/DefaultMap 개별 Save는 성공 응답을 반환했지만 map은 clean 상태였고 actor external package는 여전히 없었다. 이 배치의 디스크 영속 상태를 단정하지 않는다.
+- PIE는 한 번 시작·종료됐고 종료 뒤 IsPIERunning=false였다. Data Validation 실행, PreviewDownPose/RestoreUpPose 호출, 실제 E 입력 주입 도구는 현재 MCP tool registry에 없었다. 직접 조작 수용은 수행하지 않았다.
+- 저장 후 새 Editor 재로드를 위해 작업 소유 PID 25024를 정상 종료하려 했지만 숨김 창 MainWindowHandle=0이라 CloseMainWindow()가 false를 반환했다. Editor MCP에도 종료 tool이 없어 강제 종료하지 않았다. 현재 작업 Editor/MCP listener는 살아 있으며 깨끗한 새 프로세스 reload 검증은 미완료다.
+
+## 직접 Editor 인계
+
+1. 새 Editor에서 위 다섯 저장 Blueprint의 parent/CDO 값을 재로드 확인한다. 기존 WP actor component override도 Blueprint defaults와 맞춘다. Boiler의 새 GaugeFacePlate는 기존 actor에서 빠져 있고, Cooler/Circulator의 component Mesh/Volume/Gauge/Lever 값과 Shovel의 LoadAppearances가 stale하므로 actor별 reset/reinstance 상태를 먼저 확인한다. 기존 world transform은 보존한다.
+2. Cooler/Circulator actor의 FacilityPlacement.Definition이 각각 DA_FacilityPlacement_Cooler, DA_FacilityPlacement_Circulator를 가리키는지 확인한다. 현재 MCP instance setter/reset은 read-only 오류로 막혔다. 변경이 필요하면 해당 WP external actor만 개별 저장하고 재로드해 확인한다.
+3. DefaultMap에서 BP_DryIceSupply를 (450,-900,0)에 배치하고 해당 external actor package를 개별 저장한다. actor package 생성/저장 및 DefaultMap 재로드 뒤 class와 transform이 유지되는지 확인한다. 현재 MCP save_actor 실패를 재현하면 디스크에 저장된 것으로 처리하지 않는다.
+4. Boiler/Cooler/Circulator 및 Shovel의 PIE 결과를 .md/PROMPT_UNREAL.md의 E 입력 시나리오로 직접 수용한다. Circulator에서 CancelReturnSeconds=0이 cancel 시 즉시 up/Idle로 돌아오는지 확인한다.
+5. 저장된 Blueprint와 세 Placement Definition에 Data Validation을 실행하고, Circulator의 PreviewDownPose 후 RestoreUpPose를 Details 버튼으로 확인한다. 오류와 화면 결과를 기록한다.
+
+## 재개 조건
+
+- 기존 Level instance가 필요한 CDO/Definition 값을 상속하거나 해당 WP actor에 저장된 값으로 갱신된다.
+- DryIceSupply external actor package가 생성·저장되고 새 Editor 재로드 뒤 배치가 남는다.
+- Data Validation, lever preview 복원, 직접 PIE 입력·시각 수용이 완료된다.
+- 재로드 뒤에만 .md/Unreal/UtilityLaborSystem.md, .md/Unreal/PlacementSystem.md, .md/Unreal/BathWaterSystem.md의 authoring 정본을 갱신한다.
+
+### MCP 속성 설정·WP 저장 재시도 — 2026-09-26
+
+- 현재 MCP registry에는 ActorTools.get_components와 ObjectTools.set_properties/reset_properties가 있다. 그러므로 모든 instance authoring이 API에 없는 것은 아니다.
+- Boiler level instance의 GaugeFacePlate에서 staticMesh 설정은 반영됐지만 relativeLocation, relativeScale3D, bCanEverAffectNavigation, bGenerateOverlapEvents 설정은 성공 응답 뒤에도 읽기 값이 바뀌지 않았다. 시험 중 바꾼 staticMesh는 원래 None으로 되돌려 이 진단으로 남은 변경은 없다.
+- Circulator level instance의 LeverLabor.cancelReturnSeconds=0 설정은 MCP가 해당 property를 설정할 수 없다고 명시적으로 거부했다.
+- 기존 Circulator actor에 SceneTools.save_actor를 실행했으나 /Game/__ExternalActors__/Maps/DefaultMap/5/YZ/KRUXF2RNGDHA3WNR999GN3 패키지가 없다는 오류로 실패했다. 신규 DryIceSupply 외부 actor 저장 오류와 같은 종류의 blocker다.
+- 따라서 현재 MCP toolset으로는 모든 stale WP component override를 instance에서 복구·저장할 수 있다고 확인되지 않았다. BP CDO authoring은 가능하며, actor component별 property는 개별 편집 가능 여부가 다르다. 이 단계는 수동 Editor authoring 또는 WP external actor package 생성·저장 지원이 필요하다.
+
+# 컴퓨터 포커스 CMP-001~020 — Unreal MCP 재시도 인계 (2026-09-26)
+
+## 현재 상태
+
+- 코드 단계 승인을 받은 현재 작업은 .md/PROMPT_UNREAL.md의 컴퓨터 포커스 진입·이탈 authoring이다. 이번 시도에서는 Content, Config, Level asset을 수정하거나 저장하지 않았다.
+- 대상 프로젝트에 실행 중인 Editor가 없어 UE 5.8 작업용 백그라운드 Editor PID 33284를 시작했다. Saved/Logs/BathhouseSim.log는 14.26.08 UTC의 LogTurnkeySupport VerifySdk 호출 뒤 진행 로그가 없었고 Intermediate/TurnkeyLog_0.log 및 TurnkeyReport_0.log도 생성되지 않았다. 8000 포트는 열리지 않았다.
+- Unreal MCP list_toolsets transport 호출이 http://127.0.0.1:8000/mcp 연결 실패를 반환했다. 실제 Unreal tool 호출 성공/세션 초기화에 도달하지 못했다. Turnkey 정지 원인은 확인되지 않았다.
+- 해당 Editor는 MainWindowHandle=0이라 정상 종료와 CloseMainWindow가 실패했다. 소유권을 확인한 PID와 그 실행으로 생성된 cmd/dotnet 자식만 종료했으며 현재 Editor와 8000 listener는 없다.
+
+## 재개할 Editor 작업
+
+MCP 연결이 실제 읽기 전용 조회까지 성공하면 .md/PROMPT_UNREAL.md allowlist 안에서 다음 authoring을 진행한다.
+
+1. /Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer의 FocusExitPoint와 FocusExitSearchRadiusCm class default를 정하고 Editor-only Arrow 방향을 확인한다. 고정 exit 위치는 player capsule이 주변 구조물과 겹치지 않아야 한다.
+2. 필요하면 exact Level actor /Game/Maps/DefaultMap.DefaultMap:PersistentLevel.BP_BathhouseComputer_C_UAID_F02F7433CA3690F802_2051456727에만 instance override를 authoring하고, 기존 ScreenWidget, ManagedBathPlacementZone과 blend 값 0.35/0.25초를 보존한다.
+3. /Game/Input/Actions/IA_Cancel이 없으면 Digital bool Input Action으로 만들고, /Game/FirstPersonCharacter/BP_FirstPersonCharacter의 CancelAction과 /Game/Input/IMC_FirstPerson의 Escape mapping에 연결한다. /Game/FirstPersonCharacter/BP_FirstPersonController의 DefaultMappingContext가 IMC_FirstPerson인지 확인한다.
+4. 대상 Blueprint만 Compile하고 allowlist asset만 개별 Save한다. Data Validation, 새 Editor session 재로드와 CMP-001~020 중 PIE 수용 항목은 현재 미실행 상태다.
+
+## 재개 조건
+
+- Turnkey VerifySdk가 반환하고 Editor startup log가 Slate/asset load까지 진행한다.
+- MCP 서버가 127.0.0.1:8000에서 대상 PID 소유로 listen하며 Unreal read-only 조회가 성공한다.
+- authoring 후 allowlist 개별 Save와 새 세션 재로드 결과를 기록한다. 작업 종료 시 에이전트가 시작한 백그라운드 Editor와 MCP 하위 프로세스를 종료한다.
+### 연결 실패 원인 비교 — 2026-09-27
+
+- 이전 성공 로그와 실패 시도의 실행 인자는 둘 다 `-NoSplash -log`이며 Turnkey VerifySdk 호출도 같은 명령이다. 이전 Editor는 Turnkey 호출(09:40:18 UTC) 후 11초 안에 MCP listener를 127.0.0.1:8000에 열고 세션 초기화 및 tool 목록 조회까지 진행했다.
+- 이번 재시도는 Turnkey 호출(14:57:30 UTC) 이후 60초 넘게 로그가 갱신되지 않았고 `Intermediate/TurnkeyLog_0.log`, `TurnkeyReport_0.log`, MCP listener가 생성되지 않았다. 따라서 관찰된 연결 실패는 MCP plugin 통신보다 앞선 Editor/Turnkey startup 정지의 결과다.
+- `-WaitForUATMutex` 또는 다른 Turnkey 단계 중 무엇이 대기 원인인지는 아직 증명되지 않았다. 작업용 Editor PID 27704와 이번 실행에서 시작된 UE 5.8 UAT 하위 프로세스를 종료했다. 현재 Editor/listener는 없고 에셋 변경도 없다. 이전 로그의 `resources/templates/list` 미지원 응답은 MCP 세션 초기화 후 나온 별도 프로토콜 요청 오류다.
+# 컴퓨터 포커스 CMP-001~020 — authoring 및 재로드 재개 상태 (2026-09-27)
+
+## 이전 인계 갱신
+
+위의 2026-09-26 MCP 실패 기록은 당시 상태의 이력이다. 이후 최초 authoring 세션은 AutomationTool 로그 경로에 대한 sandbox UnauthorizedAccessException 때문에 시작하지 못했으나, 승인된 권한으로 재실행한 Turnkey는 ExitCode=0을 반환했고 MCP 연결·편집이 진행됐다. 따라서 이 작업의 최신 차단점은 Turnkey 권한이나 포트 개방 실패가 아니다.
+
+## 저장된 MCP authoring 상태
+
+- /Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer CDO의 FocusExitPoint.relativeLocation을 (1000, 0, -228.5714285714)로 설정했다. 기존 SearchRadius 100cm, editor-only Arrow의 +X 방향을 유지했다. 수치 bounds와 floor trace에서는 고정 발 위치 (-350, 0, 0)가 컴퓨터 mesh와 capsule을 겹치지 않는 후보로 계산됐다. 화면 캡처는 승인 검토에서 거부되어 시각 배치는 확인하지 못했다.
+- /Game/Input/Actions/IA_Cancel이 없어서 ValueType Boolean인 action을 생성했다.
+- /Game/FirstPersonCharacter/BP_FirstPersonCharacter의 CancelAction을 IA_Cancel로 설정했고 기존 InteractAction은 유지했다.
+- /Game/Input/IMC_FirstPerson에 Escape → IA_Cancel을 추가했다. 기존 7개 mapping을 보존해 총 8개다.
+- /Game/FirstPersonCharacter/BP_FirstPersonController의 DefaultMappingContext가 IMC_FirstPerson을 참조하는 것을 확인했다.
+- BP_BathhouseComputer, BP_FirstPersonCharacter, BP_FirstPersonController를 warnings-as-errors Compile했다. Compile 결과 오류를 받지 않았고 LogBlueprint 조회에서 새 항목이 없었다.
+- allowlist 네 asset인 BP_BathhouseComputer, BP_FirstPersonCharacter, IMC_FirstPerson, IA_Cancel을 각각 Save해 성공 응답과 dirty=false를 확인했다. Controller는 변경하지 않아 저장하지 않았다.
+- DefaultMap exact computer actor 저장은 SceneTools.save_actor가 external actor asset registry path를 찾지 못해 실패했다. 대응하는 .uasset 파일은 디스크에 있었지만 MCP registry에서는 external package가 확인되지 않았다. Map/actor를 저장하지 않았다. Blueprint Compile 뒤 같은 세션의 actor는 CDO FocusExitPoint를 상속했지만 새 프로세스에서 재로드된 Level 인스턴스 결과는 아직 모른다.
+
+## 새 프로세스 재로드 시도와 연결 원인
+
+- 작업용 UE 5.8 Editor PID 4284는 Turnkey ExitCode=0, Engine initialized, 127.0.0.1:8000 listener 시작 및 MCP client 연결까지 진행했다.
+- 로그에는 MCP 메타 도구 검색 가능 표시가 최대 3개뿐이고 Python init_unreal.py 실행이나 Editor 작업 toolset 등록이 없었다. DDC maintenance 종료 후 로그가 더 진행하지 않았다.
+- 해당 상태에서 list_toolsets 단일 호출은 시간 초과했다. 포트와 client TCP 연결은 있었으므로 이는 이전의 포트 연결 실패와 다른 증상이다. 현재 근거만으로 초기화가 멈춘 구체 원인은 확정할 수 없다.
+- 동일 작업 재로드 확인의 두 번째 시도도 성공하지 않아 추가 재시도는 중단했다. CloseMainWindow는 false였고 이 작업이 시작한 정확한 PID 4284를 종료했다. 종료 확인 시 UnrealEditor 프로세스와 8000 listener가 없었다.
+
+## 남은 Editor 수용
+
+1. 정상 초기화되어 Editor toolset이 완전히 등록된 새 MCP 세션에서 저장된 네 asset을 읽기 전용 재로드 확인한다. 특히 BP_BathhouseComputer CDO와 DefaultMap exact actor의 FocusExitPoint 상속을 구분해 기록한다. 새 세션에 작업용 Editor를 다시 시작했다면 마무리 후 종료한다.
+2. 현재 MCP registry에는 Data Validation 호출 tool이 없어 assets의 Data Validation을 실행하지 못했다. Editor에서 allowlist assets의 Validate Assets 결과와 오류를 기록한다.
+3. MCP는 PIE 시작/종료를 제공하지만 게임 입력을 주입할 수 없다. 화면·키보드·마우스가 필요한 수용은 별도 Editor 플레이에서 .md/PROMPT_UNREAL.md의 PIE 수용 절차를 수행한다. E/ESC 이탈과 진입 E release, 버튼/slider drag 중 LMB release, cursor 중앙 복귀, 고정 exit 위치/방향, blocker 및 forced 경로, 바닥 낙하 조건, placement/lever/recovery ESC 비간섭과 재진입을 기록한다.
+4. Editor screenshot capture 호출은 automatic approval review에서 프로젝트 UI/asset 정보를 MCP로 전송할 수 있다는 사유로 거부됐다. 시각 기준은 Editor에서 직접 확인한다.
+
+재로드, Data Validation, 직접 PIE 및 시각 수용이 끝나기 전까지 완료로 판정하지 않는다. 다음 재개는 우선 새 Editor의 MCP Python/toolset 초기화 및 read-only 호출 성공을 확인한 뒤 진행한다.

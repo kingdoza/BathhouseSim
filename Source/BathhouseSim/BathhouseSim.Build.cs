@@ -28,5 +28,10 @@ public class BathhouseSim : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
+
 	}
 }

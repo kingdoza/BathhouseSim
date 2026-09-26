@@ -1,13 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Interaction/HeldEquipmentUsable.h"
+#include "Interaction/InteractionTypes.h"
 #include "Utility/BathWaterBoilerFacilityActor.h"
 #include "Utility/UtilityFuelTypes.h"
 #include "UtilityLaborAutomationTestProbe.generated.h"
 
 class AUtilityShovelActor;
-class UUtilityFuelIntakeComponent;
+class UUtilityFuelIntakeVolumeComponent;
 class UUtilityOperationComponent;
 
 UCLASS(Transient, NotBlueprintable)
@@ -29,8 +29,8 @@ public:
 		AUtilityShovelActor* InSourceShovel,
 		AUtilityShovelActor* InNestedShovel,
 		UUtilityOperationComponent* InOperation,
-		UUtilityFuelIntakeComponent* InIntake,
-		const FHeldEquipmentUseContext& InContext,
+		UUtilityFuelIntakeVolumeComponent* InIntake,
+		const FPlayerInteractionContext& InContext,
 		float InExpectedOperationPoints);
 	void Unbind();
 
@@ -52,10 +52,10 @@ private:
 	TObjectPtr<UUtilityOperationComponent> Operation = nullptr;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UUtilityFuelIntakeComponent> Intake = nullptr;
+	TObjectPtr<UUtilityFuelIntakeVolumeComponent> Intake = nullptr;
 
 	UPROPERTY(Transient)
-	FHeldEquipmentUseContext Context;
+	FPlayerInteractionContext Context;
 
 	float ExpectedOperationPoints = 0.0f;
 };

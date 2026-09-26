@@ -2,8 +2,8 @@
 
 ## 문서 기준
 
-- 기준일: 2026-09-24(KST), 보일러 노동 가동 수직 Source 구현 반영
-- 상태: 기존 Source 구현에 Utility Labor Source/test 초안을 추가했다. 이전 UE 5.8 빌드에서 당시 C++ compile과 `.lib` link는 통과했으나 실행 중인 UnrealEditor의 DLL 잠금으로 최종 link가 막혔다. 이후 테스트 보강·분할분은 아직 재빌드하지 않았다. automation은 미실행이며 코드 리뷰와 Editor authoring/PIE가 남아 있다.
+- 기준일: 2026-09-26(KST), 쿨러 전체 확장·순환기 레버 수직 설계 반영
+- 상태: 보일러 노동 수직은 완료·승인됐다. 쿨러 전체 확장·순환기 레버 수직은 Source 구현·코드 리뷰 승인 뒤 Editor 부분 완료, 통합 승인 전이다. 2026-09-26 컴퓨터 포커스 진입·이탈 수정을 설계했으며 Source·Content에 미반영이다.
 - 정본 문서: `.md/0_ARCHITECTURE.md`와 `.md/Architecture/*.md`
 
 ## 분석 범위
@@ -29,7 +29,9 @@
 
 ## 시스템 문서
 
-- [UtilityLaborSystem.md](Architecture/UtilityLaborSystem.md): 보일러·석탄·삽·계기와 설치/가동 용량 분리의 Source 구현 및 후속 Editor 계약
+- [UtilityLaborSystem.md](Architecture/UtilityLaborSystem.md): 설비 노동 hub — class 계층, Operation·시간, 설치/가동 용량, 바늘 계기, 회수 payload
+- [UtilityFuelSystem.md](Architecture/UtilityFuelSystem.md): 석탄·드라이아이스, 공급함, 삽, 보일러·쿨러 투입 Volume·자동 열림 문
+- [UtilityLeverSystem.md](Architecture/UtilityLeverSystem.md): 순환기 조작부, 레버 왕복·취소·복귀와 E 진행 표시
 - [CharacterSystem.md](Architecture/CharacterSystem.md): 1인칭 입력, 컨트롤러 입력 매핑, 이동, 점프, sprint, 캐릭터 조립
 - [CameraSystem.md](Architecture/CameraSystem.md): 이동/착지 기반 카메라 셰이크, camera manager 기반 pitch limit
 - [InteractionSystem.md](Architecture/InteractionSystem.md): camera trace, primary/secondary intent와 equipment-use routing
@@ -81,7 +83,7 @@ Source/BathhouseSim/
 ```
 
 Computer 구현은 `Public/Computer`, `Private/Computer`와 기존 `Public/UI`, `Private/UI` 확장을 사용한다.
-Utility Labor target은 신규 `Public/Utility`, `Private/Utility`와 기존 Facility/Interaction/UI의 최소 확장이다. 잔량은 Operation, 적재는 삽, 전역 용량은 Operations가 소유한다.
+Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/Interaction/UI의 최소 확장이다. 잔량은 Operation, 적재는 삽, 레버 왕복은 레버 노동 component, 전역 용량은 Operations가 소유한다. 모든 utility는 Operation이 있어야 가동용량을 제공한다.
 
 - `Core`는 소스 폴더가 아니라 문서상 공통 경계다.
 - 시스템 하위 폴더명은 include 경로의 1차 네임스페이스 역할을 한다.
@@ -123,7 +125,7 @@ Utility Labor target은 신규 `Public/Utility`, `Private/Utility`와 기존 Fac
 - Bath의 `ApproachPoint`와 `ActionPoint`는 모두 캐릭터 발바닥 transform으로 authoring하며, Customer Session이 scaled capsule half height를 한 번 더해 실제 actor/capsule-center transform으로 변환한다. 고객은 NavMesh 위 `ApproachPoint`까지 이동한 뒤 blocking collision 사전 검사 없이 `ActionPoint`로 unswept snap하고, 퇴탕 시 같은 방식으로 `ApproachPoint`에 복귀한 뒤 navigation을 재개한다.
 - Customer 행동 montage는 native StateTree Task가 유효 후보 중 하나를 EnterState에서 선택하며 one-shot 종료 또는 선택된 한 montage의 duration loop를 완료 기준으로 사용한다.
 - UI는 Interaction query를 표시하고 domain 상태를 직접 판단하거나 변경하지 않는다.
-- Computer는 빈손 primary interaction으로 진입하고 world-space monitor를 유지한 채 player별 camera/input session만 전환한다. 포커스아웃은 widget을 파괴하지 않아 actor lifetime 동안 마지막 화면 상태를 유지한다.
+- Computer는 빈손 primary interaction으로 진입하고 world-space monitor를 유지한 채 player별 camera/input session만 전환한다. 포커스아웃은 widget을 파괴하지 않아 actor lifetime 동안 마지막 화면 상태를 유지한다. 이탈은 E·ESC 한 번이며, 정상 이탈은 컴퓨터별 고정 발바닥 위치·방향(막히면 근처 도달 가능한 빈자리)으로 캐릭터를 옮긴 뒤 시점을 blend한다.
 - Cleaning은 zone 기반 water stain spawn, spawn별 material/yaw/XY scale variation과 wet mop hold-cleaning state를 소유한다.
 - Combat은 LMB Started 단발 몽키스패너 swing, camera-based multi shape trace와 공용 health/depleted event를 소유한다. 무기 World Mesh는 authoritative 피격 판정이 아니다.
 - Cleaning의 wet mop은 LMB Hold중 target 유무와 관계없이 mopping state/motion을 유지하고 유효한 정면 water stain에만 제거 progress를 commit한다.
@@ -201,3 +203,4 @@ Utility Labor target은 신규 `Public/Utility`, `Private/Utility`와 기존 Fac
 - counter queue transform/overflow, shared queue navigation, recovery pose gate와 physical checkout key drop은 Source와 native automation까지 구현되었다. StateTree/Counter/overflow volume/Blueprint authoring과 PIE 통합은 후속 Editor 단계이며 기존 queue target Task와 returned-key reflected symbol은 asset migration 동안 deprecated compatibility로 보존한다.
 - placed facility↔전용 item 교체, global Held/material, derived footprint, explicit floor, generic preview, collision snapshot, locker reconciliation과 native `GridVisual`/DMI·호환 Zone grid session은 구현됐다. 기존 migration과 전용 grid material·Plane authoring은 Unreal 단계에서 함께 검증한다.
 - Bath Water 수직과 Operations 용량 설비, condition, flow mixing, actual-bather 연계, management Widget은 Source/focused automation까지 구현돼 Editor 통합 대기다. deficit no-op transaction, 실제 네-corner 지도 투영, child presentation cache와 utility/bath actor transaction 회귀는 `.md/PROMPT_IMPLEMENTATION_R.md` 기준으로 보강됐다.
+- 보일러 노동 수직(Operation, 삽·석탄 공급함, 투입 Volume·문, 계기, 설치/가동 용량, 회수 잔량 보존)은 구현·승인됐다. 2026-09-26 설계로 labor·fuel intermediate class, 쿨러·드라이아이스, 순환기 레버, native `GaugeFace` 삭제와 legacy 항상 공급 제거가 추가되며 `.md/PROMPT_IMPLEMENTATION.md`가 다음 Source 입력이다.

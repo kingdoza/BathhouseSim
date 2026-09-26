@@ -204,7 +204,8 @@ void UInteractionPromptWidget::ApplyCurrentPresentation()
 	const bool bShowSecondaryFailure = (bSecondaryVisible || bHasSecondaryTransientFailure)
 		&& !EffectiveSecondaryFailureReason.IsEmpty();
 	const bool bShowHold = bHasVisibleQuery
-		&& CachedQuery.PrimaryActivationMode == EPlayerInteractionActivationMode::Hold;
+		&& (CachedQuery.PrimaryActivationMode == EPlayerInteractionActivationMode::Hold
+			|| CachedQuery.bPrimaryProgressVisible);
 	const bool bEquipmentVisible = CachedQuery.bEquipmentUseVisible || bHasEquipmentTransientFailure;
 	const FText& EquipmentActionName = CachedQuery.bEquipmentUseVisible ? CachedQuery.EquipmentActionName : EmptyText;
 	const FText& EffectiveEquipmentFailureReason = bHasEquipmentTransientFailure

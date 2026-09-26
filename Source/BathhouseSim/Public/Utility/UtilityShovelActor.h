@@ -2,15 +2,28 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Interaction/HeldEquipmentUsable.h"
 #include "Interaction/PhysicalCarryable.h"
 #include "Interaction/PlayerInteractable.h"
 #include "Utility/UtilityFuelTypes.h"
 #include "UtilityShovelActor.generated.h"
 
+class UMaterialInterface;
 class UPlayerCarryComponent;
 class USceneComponent;
+class UStaticMesh;
 class UStaticMeshComponent;
+
+USTRUCT(BlueprintType)
+struct BATHHOUSESIM_API FUtilityShovelLoadAppearance
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Utility|Shovel|Appearance")
+	TObjectPtr<UStaticMesh> Mesh = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Utility|Shovel|Appearance")
+	TObjectPtr<UMaterialInterface> Material = nullptr;
+};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUtilityShovelLoadChanged, FUtilityFuelLoad, Load);
 
@@ -19,7 +32,6 @@ class BATHHOUSESIM_API AUtilityShovelActor
 	: public AActor
 	, public IPlayerInteractable
 	, public IPhysicalCarryable
-	, public IHeldEquipmentUsable
 {
 	GENERATED_BODY()
 
@@ -53,16 +65,12 @@ public:
 	virtual bool NotifyPhysicalDropCommitted(UPlayerCarryComponent& Carry) override;
 	virtual void PublishPhysicalCarryCommit(EPhysicalCarryCommitTransition Transition) override;
 	virtual void RecoverPhysicalCarryable(UPlayerCarryComponent* PreviousCarry) override;
-	virtual FHeldEquipmentUseQuery QueryEquipmentUse(const FHeldEquipmentUseContext& Context) const override;
-	virtual FHeldEquipmentUseResult BeginEquipmentUse(const FHeldEquipmentUseContext& Context) override;
-	virtual FHeldEquipmentUseUpdate UpdateEquipmentUse(const FHeldEquipmentUseContext& Context, float DeltaTime) override;
-	virtual FHeldEquipmentUseResult EndEquipmentUse(const FHeldEquipmentUseContext& Context) override;
-	virtual void CancelEquipmentUse(const FHeldEquipmentUseContext& Context) override;
 
 	FUtilityFuelLoad GetFuelLoad() const { return FuelLoad; }
 	bool IsLoadEmpty() const { return FuelLoad.IsEmpty(); }
 	bool HasValidAuthoring(FText& OutFailureReason) const;
 	bool CanAcceptLoad(const FUtilityFuelLoad& Load, FText& OutFailureReason) const;
+	void SetLoadAppearance(EUtilityFuelKind Kind, const FUtilityShovelLoadAppearance& Appearance);
 	UStaticMeshComponent* GetWorldMesh() const { return WorldMesh; }
 
 	UPROPERTY(BlueprintAssignable, Category = "Utility|Fuel")
@@ -82,6 +90,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Utility|Carry|Presentation")
 	FTransform HeldTransform = FTransform::Identity;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Utility|Shovel|Appearance")
+	TMap<EUtilityFuelKind, FUtilityShovelLoadAppearance> LoadAppearances;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Utility|Carry", meta = (ClampMin = "0.0"))
 	float ThrowImpulseStrength = 120.0f;
 
@@ -96,6 +107,7 @@ private:
 	void SetFuelLoadSilently(const FUtilityFuelLoad& NewLoad);
 	void PublishFuelLoadChanged();
 	void ApplyLoadPresentation();
+	void CaptureAuthoredLoadAppearance();
 	void SetWorldPhysics(bool bEnabled);
 	void ApplyHeldTransform();
 
@@ -105,10 +117,17 @@ private:
 	UPROPERTY(Transient)
 	FUtilityFuelLoad FuelLoad;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMesh> AuthoredLoadMesh = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> AuthoredLoadMaterial = nullptr;
+
 	TWeakObjectPtr<AActor> FixedSlot;
 	FTransform LastSafeTransform;
 	int64 FuelLoadRevision = 0;
 	bool bFuelMutationInProgress = false;
 	bool bEndingPlay = false;
 	bool bFixedSlotBindingConflict = false;
+	bool bCapturedAuthoredLoadAppearance = false;
 };

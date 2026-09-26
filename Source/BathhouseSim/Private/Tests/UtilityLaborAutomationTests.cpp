@@ -46,7 +46,7 @@ bool FUtilityLaborOperationAndCapacityTest::RunTest(const FString& Parameters)
 
 	UBathWaterUtilityCapacityComponent* Heating = NewObject<UBathWaterUtilityCapacityComponent>(OperationOwner, TEXT("LaborHeatingCapacity"));
 	Heating->RestoreCapacity(EBathWaterCapacityKind::Heating, 100.0f);
-	Heating->SetUtilityOperation(Operation, true);
+	Heating->SetUtilityOperation(Operation);
 	Heating->RegisterComponent();
 	TestTrue(TEXT("Labor provider registers silently"), Operations->RegisterProvider(Heating, false));
 	FBathWaterCapacitySnapshot BeforeStart = Operations->GetCapacitySnapshot(EBathWaterCapacityKind::Heating);
@@ -56,7 +56,9 @@ bool FUtilityLaborOperationAndCapacityTest::RunTest(const FString& Parameters)
 	UBathWaterUtilityCapacityComponent* Circulation = NewObject<UBathWaterUtilityCapacityComponent>(OperationOwner, TEXT("LaborCirculationCapacity"));
 	Circulation->RestoreCapacity(EBathWaterCapacityKind::Circulation, 100.0f);
 	Circulation->RegisterComponent();
-	TestTrue(TEXT("Legacy circulation provider registers"), Operations->RegisterProvider(Circulation, false));
+	TestFalse(TEXT("Capacity without an Operation is rejected"), Operations->RegisterProvider(Circulation, false));
+	TestTrue(TEXT("Capacity without an Operation contributes zero active points"),
+		FMath::IsNearlyZero(Circulation->GetActiveCapacityPoints()));
 	OperationOwner->FinishSpawning(FTransform::Identity);
 	BeginActorPlayIfNeeded(OperationOwner);
 	ABathhouseBathFacilityActor* Bath = World->SpawnActor<ABathhouseBathFacilityActor>();

@@ -1,6 +1,6 @@
 # UI System
 
-Source 구현 반영·Editor 수용 대기: [UtilityLaborSystem.md](UtilityLaborSystem.md)의 보일러 수직은 기존 equipment prompt와 capacity summary의 9개 binding을 재사용한다. 삽 LMB는 진행률 없는 단발 행, 관리 화면은 예약/가동/설치와 두 부족 원인을 native로 표시하며 WBP는 배치·스타일만 담당한다.
+Utility Labor: [UtilityLaborSystem.md](UtilityLaborSystem.md)는 기존 prompt와 capacity summary 9개 binding을 재사용한다. 삽 작업은 진행률 없는 E 행, 순환기 레버 왕복은 `bPrimaryProgressVisible`을 켠 E 행 진행 막대, 관리 화면은 순환·가열·냉각의 예약/가동/설치와 두 부족 원인을 native로 표시한다. WBP는 배치·스타일만 담당한다.
 
 ## Status And Scope
 
@@ -118,6 +118,7 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - native construct 뒤 initial query가 empty여도 bound widget 상태를 정확히 한 번 적용하며, unpossession 또는 null context 주입 시 즉시 hidden/empty presentation으로 지운다.
 - native widget은 primary/secondary/equipment/placement/recovery의 표시, 실행 가능 여부, 행동명, 실패 이유와 hold progress를 직접 bound widget에 적용한다.
 - optional equipment row는 LMB 실행 가능 여부·행동명·실패 이유와 equipment hold progress를 표시하며 E primary hold progress와 상태를 공유하지 않는다.
+- E row `InteractionProgressBar`는 `PrimaryActivationMode == Hold` 또는 `bPrimaryProgressVisible`이면 `HoldProgress`로 표시한다. 새 BindWidget은 없다.
 - 기존 필수 계약 `PromptRoot`, `TargetNameText`, `ActionNameText`, `FailureReasonText`는 유지하며 `ActionNameText`/`FailureReasonText`를 primary E row로 사용한다.
 - target 확장 필수 계약은 `SecondaryActionNameText: UTextBlock`, `SecondaryFailureReasonText: UTextBlock`, `InteractionProgressBar: UProgressBar`다.
 - equipment target 확장 필수 계약은 `EquipmentActionNameText: UTextBlock`, `EquipmentFailureReasonText: UTextBlock`, `EquipmentProgressBar: UProgressBar`다.

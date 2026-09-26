@@ -23,22 +23,19 @@ float UBathWaterUtilityCapacityComponent::GetActiveCapacityPoints() const
 	const float InstalledPoints = GetCapacityPoints();
 	if (!IsValid(UtilityOperation))
 	{
-		return bOperationRequired ? 0.0f : InstalledPoints;
+		return 0.0f;
 	}
 	return UtilityOperation->IsProvidingCapacity() ? InstalledPoints : 0.0f;
 }
 
-void UBathWaterUtilityCapacityComponent::SetUtilityOperation(
-	UUtilityOperationComponent* InOperation,
-	const bool bRequireOperation)
+void UBathWaterUtilityCapacityComponent::SetUtilityOperation(UUtilityOperationComponent* InOperation)
 {
 	UtilityOperation = InOperation;
-	bOperationRequired = bRequireOperation;
 }
 
 bool UBathWaterUtilityCapacityComponent::HasValidAuthoring(FText& OutFailureReason) const
 {
-	if ((bOperationRequired && !IsValid(UtilityOperation))
+	if (!IsValid(UtilityOperation)
 		|| !StaticEnum<EBathWaterCapacityKind>()->IsValidEnumValue(static_cast<int64>(CapacityKind))
 		|| !FMath::IsFinite(CapacityPoints) || CapacityPoints < 0.0f)
 	{

@@ -2,6 +2,7 @@
 
 #include "Components/SceneComponent.h"
 #include "Utility/UtilityOperationComponent.h"
+#include "Utility/UtilityPivotRotation.h"
 
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
@@ -12,6 +13,13 @@
 UUtilityGaugeComponent::UUtilityGaugeComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	PivotRotation = new FUtilityPivotRotation();
+}
+
+UUtilityGaugeComponent::~UUtilityGaugeComponent()
+{
+	delete PivotRotation;
+	PivotRotation = nullptr;
 }
 
 void UUtilityGaugeComponent::BeginPlay()
@@ -29,13 +37,11 @@ void UUtilityGaugeComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		Operation->OnOperationChanged.RemoveAll(this);
 	}
+	if (!bHasBegunPlay)
+	{
+		return;
+	}
 	bHasBegunPlay = false;
-	Operation = nullptr;
-	NeedlePivot = nullptr;
-	BaselineRelativeRotation = FQuat::Identity;
-	LastAppliedRelativeRotation = FQuat::Identity;
-	bHasBaseline = false;
-	bHasAppliedDisplayRotation = false;
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -49,11 +55,10 @@ void UUtilityGaugeComponent::Configure(
 		Operation->OnOperationChanged.RemoveAll(this);
 	}
 	Operation = InOperation;
-	NeedlePivot = InNeedlePivot;
 	if (!bSamePivot)
 	{
-		bHasBaseline = false;
-		bHasAppliedDisplayRotation = false;
+		NeedlePivot = InNeedlePivot;
+		PivotRotation->Forget();
 	}
 	if (bHasBegunPlay)
 	{
@@ -64,19 +69,7 @@ void UUtilityGaugeComponent::Configure(
 
 void UUtilityGaugeComponent::CaptureBaselineFromPivot()
 {
-	if (!IsValid(NeedlePivot))
-	{
-		return;
-	}
-	const FQuat CurrentRelativeRotation = NeedlePivot->GetRelativeRotation().Quaternion();
-	if (bHasBaseline && bHasAppliedDisplayRotation
-		&& CurrentRelativeRotation.Equals(LastAppliedRelativeRotation, 1.0e-4f))
-	{
-		return;
-	}
-	BaselineRelativeRotation = CurrentRelativeRotation;
-	bHasBaseline = true;
-	bHasAppliedDisplayRotation = false;
+	PivotRotation->CaptureBaseline(NeedlePivot);
 }
 
 void UUtilityGaugeComponent::BindOperationDelegate()
@@ -94,7 +87,7 @@ void UUtilityGaugeComponent::ApplyCurrentOperation()
 	{
 		return;
 	}
-	if (!bHasBaseline)
+	if (!PivotRotation->HasBaseline())
 	{
 		CaptureBaselineFromPivot();
 	}
@@ -112,7 +105,7 @@ void UUtilityGaugeComponent::ApplyConstructionPreview()
 
 void UUtilityGaugeComponent::ApplyPoints(const float RemainingPoints, const float MaximumPoints)
 {
-	if (!IsValid(NeedlePivot) || !bHasBaseline || !FMath::IsFinite(MaximumPoints) || MaximumPoints <= 0.0f)
+	if (!IsValid(NeedlePivot) || !FMath::IsFinite(MaximumPoints) || MaximumPoints <= 0.0f)
 	{
 		return;
 	}
@@ -125,11 +118,7 @@ void UUtilityGaugeComponent::ApplyPoints(const float RemainingPoints, const floa
 	}
 	const float DisplayFraction = CalculateDisplayFraction(RemainingPoints, MaximumPoints, ActiveStartRatio);
 	const float Angle = FMath::Lerp(ZeroAngleDegrees, MaxAngleDegrees, DisplayFraction);
-	const FVector Axis = LocalRotationAxis.GetSafeNormal();
-	const FQuat LocalAxisRotation(Axis, FMath::DegreesToRadians(Angle));
-	LastAppliedRelativeRotation = BaselineRelativeRotation * LocalAxisRotation;
-	NeedlePivot->SetRelativeRotation(LastAppliedRelativeRotation);
-	bHasAppliedDisplayRotation = true;
+	PivotRotation->Apply(NeedlePivot, LocalRotationAxis, Angle);
 }
 
 bool UUtilityGaugeComponent::HasValidAuthoring(FText& OutFailureReason) const

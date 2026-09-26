@@ -1,6 +1,6 @@
 # Interaction System
 
-2026-09-24 Utility Labor Source: 장비/interaction context에 기존 interaction component를 전달해 삽 transaction이 같은 거리/channel로 fresh single-hit를 다시 조회한다. 삽 LMB는 Instant equipment use, 공급함 F는 반환 intent이며 generic router에는 concrete 보일러/연료 분기를 넣지 않았다. 빌드/automation은 미실행이다.
+2026-09-26 Utility Labor: 삽 퍼담기·반환·투입은 공급함·투입 판정 Volume target의 E primary이고 삽 LMB·공급함 F는 없다. 보일러·쿨러 문은 generic `IPlayerInteractionFocusObserver`를 쓴다. 순환기 레버 왕복은 Instant E로 시작하는 시간 작업이며, 진행 표시를 위해 query에 `bPrimaryProgressVisible`을 추가한다. generic router에는 concrete 설비 분기를 넣지 않는다.
 
 ## Implementation Status
 
@@ -12,6 +12,7 @@
 Source/BathhouseSim/Public/Interaction/
   InteractionTypes.h
   PlayerInteractable.h
+  PlayerInteractionFocusObserver.h
   PhysicalCarryable.h
   PhysicalCarryFixedSlot.h
   PhysicalCarryFixedSlotActor.h
@@ -55,6 +56,7 @@ Source/BathhouseSim/Private/Tests/
 - key token/hook lifecycle과 physical placement 연결; locker 번호 topology에는 의존하지 않음
 - focus와 held key 변화의 UI용 delegate
 - 외부 focus mode가 활성화된 동안 active hold, trace와 prompt를 중단하는 C++ suppression 경계
+- focus target 교체와 target query 변화를 optional target 표현에 알리는 C++ focus 알림
 
 Interaction은 cleaning progress, attack/damage/health, towel count/machine, customer routine, facility slot, queue와 player money를 소유하지 않는다.
 
@@ -70,9 +72,17 @@ Interaction은 cleaning progress, attack/damage/health, towel count/machine, cus
 - secondary는 현재 계약에서 Started 한 번의 instant 실행만 사용한다.
 - 기존 `ExecuteInteraction(Context)`는 primary API로 유지하고 optional secondary execute와 hold begin/update/cancel 계약을 추가한다.
 
+`IPlayerInteractionFocusObserver`는 target이 선택적으로 구현하는 C++ 전용 표현 계약이다(`CannotImplementInterfaceInBlueprint`).
+
+- `NotifyInteractionFocusChanged(Source, Query)`: 이 target이 source의 현재 focus이고 commit된 query가 처음 설정되거나 바뀌었을 때 호출된다.
+- `NotifyInteractionFocusEnded(Source)`: 이 target이 더 이상 source의 focus가 아닐 때 한 번 호출된다.
+- 알림은 표현 전용이다. observer는 query 결과를 읽기만 하고 domain mutation, interaction 실행이나 source 상태 변경을 하지 않는다. 실행 가능 여부의 정본은 여전히 `QueryInteraction`/`ExecuteInteraction`이다.
+
 `FPlayerInteractionContext`는 interactor, `UPlayerCarryComponent`, hit actor/component와 hit 정보를 가진다. `FPlayerInteractionQuery`와 결과 문구는 localization 가능한 `FText`를 사용한다.
 
 `FPlayerInteractionQuery`는 기존 E primary/F secondary/LMB equipment 필드를 유지하고 optional LMB placement와 Q recovery의 visibility/can-use/action/failure/progress를 추가한다. `EPlayerInteractionIntent::PlacementConfirm`, `FacilityRecovery`와 `EPhysicalCarryKind::Facility`는 기존 ordinal을 보존하도록 각 enum 끝에 추가한다.
+
+`FPlayerInteractionQuery.bPrimaryProgressVisible`(신규, 기본 false)은 E row 진행 막대를 Hold mode가 아니어도 보이게 한다. 값은 기존 `HoldProgress`를 쓴다. Instant로 시작한 뒤 target이 소유한 시간 작업의 진행을 보여 주는 용도이며, Interaction은 이 값을 해석하거나 갱신하지 않는다. `ActiveHoldTarget`이 아닐 때 target query의 `HoldProgress`를 덮어쓰지 않는 기존 규칙을 유지한다. `Equals`에 포함한다.
 
 ## Held Equipment Use Contract
 
@@ -93,6 +103,8 @@ Equipment row 합성은 현재 held Actor가 `IHeldEquipmentUsable`이면 해당
 - local player camera 기준 configurable distance/channel line trace를 수행한다.
 - actor 또는 hit component에서 `IPlayerInteractable`을 찾는다.
 - target 또는 query 결과가 바뀔 때만 `OnInteractionQueryChanged`를 방송한다.
+- 같은 commit 지점에서 target이 바뀌면 이전 target observer에 종료를 먼저 보내고 새 target observer에 변화 알림을 보낸다. 같은 target의 query만 바뀌면 변화 알림만 보낸다. query가 같으면 알림하지 않는다.
+- clear, suppression, 로컬 제어 상실과 EndPlay의 focus 해제는 기존 target에 종료를 정확히 한 번 보낸다. 파괴된 target에는 알림하지 않는다. 알림 callback 중 재진입 commit은 이전 알림 순서를 뒤섞지 않는다.
 - `TryInteract()`에서 대상을 다시 trace/query한 뒤 execute한다.
 - 기존 `TryInteract()`는 instant primary 호환 wrapper로 유지한다.
 - E Started/Completed/Canceled를 primary begin/end로 받고 active hold 동안 같은 target, focus, carry와 query 조건을 매 Tick 재검증한다.
@@ -166,6 +178,7 @@ Blueprint 조회·표현 API:
 - `UPlayerInteractionComponent::OnInteractionQueryChanged`는 Blueprint 표시 갱신 계약이다.
 - `UPlayerInteractionComponent::OnInteractionAttemptFinishedNative`는 C++ 전용 실행 결과 계약이며 BlueprintAssignable로 노출하지 않는다.
 - `UPlayerInteractionComponent::SetInteractionSuppressed`, `IsInteractionSuppressed`는 외부 focus owner가 사용하는 C++ 전용 계약이며 Blueprint에 노출하지 않는다.
+- `IPlayerInteractionFocusObserver`는 target 표현용 C++ 전용 계약이며 Blueprint에 노출하지 않는다.
 - `UPlayerCarryComponent::IsHandEmpty`
 - `UPlayerCarryComponent::GetHeldKey`
 - generic held object와 held kind 조회, `OnHeldObjectChanged`
@@ -203,6 +216,7 @@ Editor authoring 값:
 - Cleaning -> Interaction public query/equipment-use/motion/carry 계약
 - Combat -> Interaction public carry/equipment-use/motion 계약
 - Towel -> Interaction public intent/carry 계약
+- Utility -> Interaction public interactable/carry/focus-observer 계약
 - Character -> Interaction
 - Computer -> Interaction public query/carry/suppression 계약
 - UI -> Interaction
@@ -216,6 +230,7 @@ Editor authoring 값:
 - E hold cancel과 F/G attempt가 기존 primary result를 중복 방송하지 않는지 확인한다.
 - key의 기존 state transition과 GetHeldKey/OnHeldKeyChanged 계약이 generic carry 확장 뒤에도 유지되는지 확인한다.
 - query가 상태를 바꾸지 않고 execute가 조건을 재검증하는지 확인한다.
+- focus observer 알림이 query 변화 때만 발생하고 target 교체·clear·suppress·EndPlay에서 종료가 한 번만 전달되는지 확인한다.
 - 같은 query에서 UI delegate가 매 Tick 반복되지 않는지 확인한다.
 - 한 번의 `TryInteract()`에서 result delegate가 중복 방송되지 않고 반환값과 동일한 성공·실패 이유를 전달하는지 확인한다.
 - dropped key가 복제·소실되거나 자신의 exact hook 이외에 반환되지 않는지 확인한다.

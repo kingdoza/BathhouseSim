@@ -1,11 +1,14 @@
 #include "Computer/PlayerComputerUseComponent.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Character/FirstPersonMovementComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Computer/BathhouseComputerActor.h"
+#include "Computer/ComputerFocusExitPlacement.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -18,6 +21,23 @@
 namespace
 {
 const FName FocusedComputerAntiAliasingTag(TEXT("Bathhouse.ComputerFocus"));
+
+void LogNonFixedComputerExit(
+	const FComputerFocusExitPlacementResult& Placement,
+	const ABathhouseComputerActor* Computer)
+{
+
+	const TCHAR* PathName = TEXT("Forced");
+	if (Placement.Path == FComputerFocusExitPlacementResult::EPath::Searched)
+	{
+		PathName = TEXT("Searched");
+	}
+	UE_LOG(LogBathhouseComputer, Verbose,
+		TEXT("Computer focus exit used %s placement at %.1f cm from %s."),
+		PathName,
+		Placement.SearchDistanceCm,
+		Computer ? *Computer->GetPathName() : TEXT("<invalid computer>"));
+}
 }
 
 UPlayerComputerUseComponent::UPlayerComputerUseComponent()
@@ -161,14 +181,47 @@ void UPlayerComputerUseComponent::RequestEndComputerUse()
 	PlayerController->bShowMouseCursor = false;
 	FInputModeGameOnly InputMode;
 	PlayerController->SetInputMode(InputMode);
-	Phase = EPlayerComputerUsePhase::FocusingOut;
 
 	ABathhouseComputerActor* Computer = ActiveComputer.Get();
-	const float BlendSeconds = Computer ? FMath::Max(0.0f, Computer->GetFocusBlendOutSeconds()) : 0.0f;
-	if (AActor* ReturnViewTarget = ResolveReturnViewTarget(PlayerController))
+	ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+	UCapsuleComponent* PlayerCapsule = OwnerCharacter ? OwnerCharacter->GetCapsuleComponent() : nullptr;
+	if (!IsValid(Computer) || !IsValid(OwnerCharacter) || !IsValid(PlayerCapsule) || !GetWorld())
 	{
-		PlayerController->SetViewTargetWithBlend(ReturnViewTarget, BlendSeconds);
+		ForceCleanup(true, true);
+		return;
 	}
+
+	const FTransform ExitFootTransform = Computer->GetFocusExitFootTransform();
+	const FRotator ExitRotation = ExitFootTransform.Rotator();
+	FComputerFocusExitPlacementResult Placement;
+	if (!FComputerFocusExitPlacement::Resolve(
+		GetWorld(),
+		PlayerCapsule,
+		OwnerCharacter,
+		ExitFootTransform.GetLocation(),
+		ExitRotation.Yaw,
+		Computer->GetFocusExitSearchRadiusCm(),
+		Placement))
+	{
+		ForceCleanup(true, true);
+		return;
+	}
+
+	OwnerCharacter->SetActorLocationAndRotation(
+		Placement.CapsuleCenter,
+		FRotator(0.0f, ExitRotation.Yaw, 0.0f),
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics);
+	PlayerController->SetControlRotation(FRotator(ExitRotation.Pitch, ExitRotation.Yaw, 0.0f));
+	if (Placement.Path != FComputerFocusExitPlacementResult::EPath::Fixed)
+	{
+		LogNonFixedComputerExit(Placement, Computer);
+	}
+
+	const float BlendSeconds = FMath::Max(0.0f, Computer->GetFocusBlendOutSeconds());
+	PlayerController->SetViewTargetWithBlend(OwnerCharacter, BlendSeconds);
+	Phase = EPlayerComputerUsePhase::FocusingOut;
 	if (BlendSeconds <= 0.0f)
 	{
 		CompleteFocusOut();
@@ -253,13 +306,20 @@ void UPlayerComputerUseComponent::CompleteFocusIn()
 
 	Phase = EPlayerComputerUsePhase::Active;
 	ApplyFocusedAntiAliasingOverride();
-	WidgetInteraction->bEnableHitTesting = true;
 	PlayerController->bShowMouseCursor = true;
 	FInputModeGameAndUI InputMode;
-	InputMode.SetWidgetToFocus(ScreenWidget->TakeWidget());
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	InputMode.SetHideCursorDuringCapture(false);
 	PlayerController->SetInputMode(InputMode);
+	UWidgetBlueprintLibrary::SetFocusToGameViewport();
+	int32 ViewportSizeX = 0;
+	int32 ViewportSizeY = 0;
+	PlayerController->GetViewportSize(ViewportSizeX, ViewportSizeY);
+	if (ViewportSizeX > 0 && ViewportSizeY > 0)
+	{
+		PlayerController->SetMouseLocation(ViewportSizeX / 2, ViewportSizeY / 2);
+	}
+	WidgetInteraction->bEnableHitTesting = true;
 }
 
 void UPlayerComputerUseComponent::CompleteFocusOut()

@@ -1,16 +1,11 @@
 #include "Utility/UtilityShovelActor.h"
 
 #include "Components/PrimitiveComponent.h"
+#include "Materials/MaterialInterface.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Interaction/PhysicalCarryFixedSlot.h"
 #include "Interaction/PlayerCarryComponent.h"
-#include "Interaction/PlayerInteractionComponent.h"
-#include "Utility/BathWaterBoilerFacilityActor.h"
-#include "Utility/UtilityFuelIntakeComponent.h"
-#include "Utility/UtilityFuelSupplyActor.h"
-#include "Utility/UtilityOperationComponent.h"
-#include "UtilityFuelTransaction.h"
 
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
@@ -310,120 +305,6 @@ void AUtilityShovelActor::RecoverPhysicalCarryable(UPlayerCarryComponent* Previo
 	SetWorldPhysics(true);
 }
 
-FHeldEquipmentUseQuery AUtilityShovelActor::QueryEquipmentUse(
-	const FHeldEquipmentUseContext& Context) const
-{
-	FHeldEquipmentUseQuery Query;
-	Query.DisplayName = GetPhysicalCarryDisplayName();
-	Query.ActionName = LOCTEXT("ShovelUse", "연료 퍼담기 / 보일러에 투입");
-	Query.ActivationMode = EPlayerInteractionActivationMode::Instant;
-	if (!HasValidAuthoring(Query.FailureReason))
-	{
-		return Query;
-	}
-	if (Carrier != Context.CarryComponent || !Context.CarryComponent
-		|| Context.CarryComponent->GetHeldObject() != this
-		|| Context.Equipment != this || !IsValid(Context.User))
-	{
-		Query.FailureReason = LOCTEXT("ShovelNotHeld", "삽을 들고 있어야 합니다.");
-		return Query;
-	}
-	if (!Context.InteractionComponent || Context.InteractionComponent->IsInteractionSuppressed())
-	{
-		Query.FailureReason = LOCTEXT("ShovelUseSuppressed", "현재 장비를 사용할 수 없습니다.");
-		return Query;
-	}
-
-	if (AUtilityFuelSupplyActor* Supply = Cast<AUtilityFuelSupplyActor>(Context.FocusHit.GetActor()))
-	{
-		if (Context.FocusHit.GetComponent() != Supply->GetSupplyMesh())
-		{
-			Query.FailureReason = LOCTEXT("WrongSupplyComponent", "공급함의 실제 메시를 조준하세요.");
-			return Query;
-		}
-		FUtilityFuelLoad Candidate;
-		Query.bCanUse = Supply->CanScoop(this, Candidate, Query.FailureReason);
-		if (Query.bCanUse)
-		{
-			Query.ActionName = LOCTEXT("ScoopCoal", "석탄 퍼담기");
-		}
-		return Query;
-	}
-
-	UUtilityFuelIntakeComponent* Intake = Cast<UUtilityFuelIntakeComponent>(Context.FocusHit.GetComponent());
-	ABathWaterBoilerFacilityActor* Boiler = Intake
-		? Cast<ABathWaterBoilerFacilityActor>(Intake->GetOwner()) : nullptr;
-	if (!Intake || !Boiler || Boiler->GetFuelIntake() != Intake)
-	{
-		Query.FailureReason = LOCTEXT("NoFuelTarget", "석탄 공급함 또는 보일러 투입구를 조준하세요.");
-		return Query;
-	}
-	UUtilityOperationComponent* Operation = Boiler->GetUtilityOperation();
-	if (!Operation || FuelLoad.IsEmpty())
-	{
-		Query.FailureReason = FuelLoad.IsEmpty()
-			? LOCTEXT("ShovelEmpty", "삽에 연료가 없습니다.")
-			: LOCTEXT("InvalidBoilerOperation", "보일러 가동 상태를 확인할 수 없습니다.");
-		return Query;
-	}
-	Query.bCanUse = Operation->CanAcceptFuel(FuelLoad, Query.FailureReason);
-	if (Query.bCanUse)
-	{
-		Query.ActionName = LOCTEXT("InsertCoal", "보일러에 연료 투입");
-	}
-	return Query;
-}
-
-FHeldEquipmentUseResult AUtilityShovelActor::BeginEquipmentUse(
-	const FHeldEquipmentUseContext& Context)
-{
-	const FHeldEquipmentUseQuery Query = QueryEquipmentUse(Context);
-	if (!Query.bVisible || !Query.bCanUse)
-	{
-		return FHeldEquipmentUseResult::Failed(Query.FailureReason);
-	}
-	const FHitResult& FocusHit = Context.FocusHit;
-	FUtilityFuelResult Result;
-	if (AUtilityFuelSupplyActor* Supply = Cast<AUtilityFuelSupplyActor>(FocusHit.GetActor()))
-	{
-		Result = FUtilityFuelTransaction::Scoop(*this, *Supply, Context);
-	}
-	else if (UUtilityFuelIntakeComponent* Intake = Cast<UUtilityFuelIntakeComponent>(FocusHit.GetComponent()))
-	{
-		Result = FUtilityFuelTransaction::Insert(*this, *Intake, Context);
-	}
-	else
-	{
-		return FHeldEquipmentUseResult::Failed(
-			LOCTEXT("NoFuelTarget", "석탄 공급함 또는 보일러 투입구를 조준하세요."));
-	}
-	return Result.bSucceeded
-		? FHeldEquipmentUseResult::Succeeded()
-		: FHeldEquipmentUseResult::Failed(Result.FailureReason);
-}
-
-FHeldEquipmentUseUpdate AUtilityShovelActor::UpdateEquipmentUse(
-	const FHeldEquipmentUseContext& Context,
-	const float DeltaTime)
-{
-	(void)Context;
-	(void)DeltaTime;
-	FHeldEquipmentUseUpdate Update;
-	Update.State = EPlayerHoldInteractionState::Succeeded;
-	return Update;
-}
-
-FHeldEquipmentUseResult AUtilityShovelActor::EndEquipmentUse(const FHeldEquipmentUseContext& Context)
-{
-	(void)Context;
-	return FHeldEquipmentUseResult::Succeeded();
-}
-
-void AUtilityShovelActor::CancelEquipmentUse(const FHeldEquipmentUseContext& Context)
-{
-	(void)Context;
-}
-
 bool AUtilityShovelActor::CanAcceptLoad(
 	const FUtilityFuelLoad& Load,
 	FText& OutFailureReason) const
@@ -433,7 +314,7 @@ bool AUtilityShovelActor::CanAcceptLoad(
 		OutFailureReason = LOCTEXT("ShovelBusy", "삽의 연료 이동이 이미 처리 중입니다.");
 		return false;
 	}
-	if (!Load.IsValid() || Load.IsEmpty() || Load.Kind != EUtilityFuelKind::Coal)
+	if (!Load.IsValid() || Load.IsEmpty() || !IsSupportedUtilityFuelKind(Load.Kind))
 	{
 		OutFailureReason = LOCTEXT("InvalidShovelLoad", "삽에 담을 연료 종류와 양이 올바르지 않습니다.");
 		return false;
@@ -454,19 +335,30 @@ bool AUtilityShovelActor::HasValidAuthoring(FText& OutFailureReason) const
 	const ECollisionEnabled::Type ExpectedWorldCollision = bIsHeld || bIsStored
 		? ECollisionEnabled::NoCollision
 		: ECollisionEnabled::QueryAndPhysics;
+	const FUtilityShovelLoadAppearance* CoalAppearance = LoadAppearances.Find(EUtilityFuelKind::Coal);
+	const FUtilityShovelLoadAppearance* DryIceAppearance = LoadAppearances.Find(EUtilityFuelKind::DryIce);
+	const bool bValidCoalAppearance = CoalAppearance && (CoalAppearance->Mesh || CoalAppearance->Material);
+	const bool bValidDryIceAppearance = DryIceAppearance && (DryIceAppearance->Mesh || DryIceAppearance->Material);
+	const bool bAppearanceCombinationsDiffer = CoalAppearance && DryIceAppearance
+		&& (CoalAppearance->Mesh != nullptr) != (DryIceAppearance->Mesh != nullptr)
+		|| (CoalAppearance && DryIceAppearance
+			&& (CoalAppearance->Material != nullptr) != (DryIceAppearance->Material != nullptr));
+	const bool bNeedsFallbackMesh = !CoalAppearance || !CoalAppearance->Mesh || !DryIceAppearance || !DryIceAppearance->Mesh;
 	if (!WorldMesh || WorldMesh != GetRootComponent() || !WorldMesh->GetStaticMesh()
-		|| !LoadVisual || !LoadVisual->GetStaticMesh() || LoadVisual->GetAttachParent() != WorldMesh
+		|| !LoadVisual || (bNeedsFallbackMesh && !LoadVisual->GetStaticMesh())
+		|| LoadVisual->GetAttachParent() != WorldMesh
 		|| !HeldTransform.GetScale3D().Equals(FVector::OneVector)
 		|| WorldMesh->GetCollisionEnabled() != ExpectedWorldCollision
 		|| WorldMesh->GetCollisionResponseToChannel(ECC_WorldStatic) != ECR_Block
 		|| WorldMesh->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Ignore
 		|| !WorldMesh->BodyInstance.bUseCCD
 		|| LoadVisual->GetCollisionEnabled() != ECollisionEnabled::NoCollision
-		|| LoadVisual->CanEverAffectNavigation())
+		|| LoadVisual->CanEverAffectNavigation()
+		|| !bValidCoalAppearance || !bValidDryIceAppearance || !bAppearanceCombinationsDiffer)
 	{
 		OutFailureReason = LOCTEXT(
 			"InvalidShovelAuthoring",
-			"삽의 월드 메시, 적재 메시, hierarchy, Pawn ignore, CCD 또는 held transform authoring이 올바르지 않습니다.");
+			"삽의 월드 메시, 연료별 적재 외형, hierarchy, Pawn ignore, CCD 또는 held transform authoring이 올바르지 않습니다.");
 		return false;
 	}
 	OutFailureReason = FText::GetEmpty();
@@ -500,12 +392,47 @@ void AUtilityShovelActor::PublishFuelLoadChanged()
 	OnFuelLoadChanged.Broadcast(FuelLoad);
 }
 
+void AUtilityShovelActor::SetLoadAppearance(
+	const EUtilityFuelKind Kind,
+	const FUtilityShovelLoadAppearance& Appearance)
+{
+	if (!IsSupportedUtilityFuelKind(Kind))
+	{
+		return;
+	}
+	LoadAppearances.Add(Kind, Appearance);
+	ApplyLoadPresentation();
+}
+
+void AUtilityShovelActor::CaptureAuthoredLoadAppearance()
+{
+	if (bCapturedAuthoredLoadAppearance || !LoadVisual)
+	{
+		return;
+	}
+	AuthoredLoadMesh = LoadVisual->GetStaticMesh();
+	AuthoredLoadMaterial = LoadVisual->GetMaterial(0);
+	bCapturedAuthoredLoadAppearance = true;
+}
+
 void AUtilityShovelActor::ApplyLoadPresentation()
 {
-	if (LoadVisual)
+	if (!LoadVisual)
 	{
-		LoadVisual->SetVisibility(!FuelLoad.IsEmpty(), true);
+		return;
 	}
+	CaptureAuthoredLoadAppearance();
+	if (FuelLoad.IsEmpty())
+	{
+		LoadVisual->SetStaticMesh(AuthoredLoadMesh);
+		LoadVisual->SetMaterial(0, AuthoredLoadMaterial);
+		LoadVisual->SetVisibility(false, true);
+		return;
+	}
+	const FUtilityShovelLoadAppearance* Appearance = LoadAppearances.Find(FuelLoad.Kind);
+	LoadVisual->SetStaticMesh(Appearance && Appearance->Mesh ? Appearance->Mesh : AuthoredLoadMesh);
+	LoadVisual->SetMaterial(0, Appearance && Appearance->Material ? Appearance->Material : nullptr);
+	LoadVisual->SetVisibility(true, true);
 }
 
 void AUtilityShovelActor::SetWorldPhysics(const bool bEnabled)

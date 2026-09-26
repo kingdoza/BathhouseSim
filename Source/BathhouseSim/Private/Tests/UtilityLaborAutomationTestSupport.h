@@ -27,12 +27,16 @@
 #include "Tests/FacilityPlacementAutomationTestProbe.h"
 #include "Tests/UtilityLaborAutomationTestProbe.h"
 #include "Utility/BathWaterBoilerFacilityActor.h"
-#include "Utility/UtilityFuelIntakeComponent.h"
+#include "Utility/BathWaterCoolerFacilityActor.h"
+#include "Utility/BathWaterCirculatorFacilityActor.h"
+#include "Utility/UtilityLeverOperatingVolumeComponent.h"
+#include "Utility/UtilityFuelIntakeVolumeComponent.h"
 #include "Utility/UtilityFuelSupplyActor.h"
 #include "Utility/UtilityFuelTransaction.h"
 #include "Utility/UtilityGaugeComponent.h"
 #include "Utility/UtilityOperationComponent.h"
 #include "Utility/UtilityShovelActor.h"
+#include "Materials/MaterialInterface.h"
 #include "UObject/UnrealType.h"
 
 #include <limits>
@@ -127,18 +131,50 @@ bool SetBoilerTestMeshes(ABathWaterBoilerFacilityActor* Boiler, UStaticMesh* Mes
 	{
 		return false;
 	}
-	UStaticMeshComponent* GaugeFace = FindNamedMeshComponent(Boiler, TEXT("GaugeFace"));
-	UStaticMeshComponent* GaugeNeedle = FindNamedMeshComponent(Boiler, TEXT("GaugeNeedleMesh"));
-	if (!GaugeFace || !GaugeNeedle)
+	UStaticMeshComponent* GaugeNeedle = Boiler->GetGaugeNeedleMesh();
+	UStaticMeshComponent* FuelDoorMesh = Boiler->GetFuelDoorMesh();
+	UUtilityFuelIntakeVolumeComponent* FuelIntakeVolume = Boiler->GetFuelIntakeVolume();
+	if (!GaugeNeedle || !FuelDoorMesh || !FuelIntakeVolume)
 	{
 		return false;
 	}
-	Boiler->GetFuelIntake()->SetStaticMesh(Mesh);
-	Boiler->GetFuelIntake()->UpdateBounds();
-	GaugeFace->SetStaticMesh(Mesh);
-	GaugeFace->UpdateBounds();
+	FuelIntakeVolume->SetBoxExtent(FVector(15.0f));
+	FuelIntakeVolume->SetRelativeScale3D(FVector::OneVector);
 	GaugeNeedle->SetStaticMesh(Mesh);
 	GaugeNeedle->UpdateBounds();
+	FuelDoorMesh->SetStaticMesh(Mesh);
+	FuelDoorMesh->UpdateBounds();
+	return true;
+}
+
+bool SetCoolerTestMeshes(ABathWaterCoolerFacilityActor* Cooler, UStaticMesh* Mesh)
+{
+	if (!Cooler || !Mesh || !Cooler->GetFuelIntakeVolume() || !Cooler->GetFuelDoorMesh()
+		|| !Cooler->GetGaugeNeedleMesh())
+	{
+		return false;
+	}
+	Cooler->GetFuelIntakeVolume()->SetBoxExtent(FVector(15.0f));
+	Cooler->GetFuelIntakeVolume()->SetRelativeScale3D(FVector::OneVector);
+	Cooler->GetFuelDoorMesh()->SetStaticMesh(Mesh);
+	Cooler->GetGaugeNeedleMesh()->SetStaticMesh(Mesh);
+	Cooler->GetFuelDoorMesh()->UpdateBounds();
+	Cooler->GetGaugeNeedleMesh()->UpdateBounds();
+	return true;
+}
+
+bool SetCirculatorTestMeshes(ABathWaterCirculatorFacilityActor* Circulator, UStaticMesh* Mesh)
+{
+	if (!Circulator || !Mesh || !Circulator->GetLeverOperatingVolume() || !Circulator->GetLeverMesh())
+	{
+		return false;
+	}
+	Circulator->GetLeverOperatingVolume()->SetBoxExtent(FVector(15.0f));
+	Circulator->GetLeverOperatingVolume()->SetRelativeScale3D(FVector::OneVector);
+	Circulator->GetLeverMesh()->SetStaticMesh(Mesh);
+	Circulator->GetLeverMesh()->UpdateBounds();
+	Circulator->GetGaugeNeedleMesh()->SetStaticMesh(Mesh);
+	Circulator->GetGaugeNeedleMesh()->UpdateBounds();
 	return true;
 }
 
@@ -150,7 +186,9 @@ bool SetShovelTestMeshes(AUtilityShovelActor* Shovel, UStaticMesh* Mesh)
 	}
 	UStaticMeshComponent* WorldMesh = FindNamedMeshComponent(Shovel, TEXT("WorldMesh"));
 	UStaticMeshComponent* LoadVisual = FindNamedMeshComponent(Shovel, TEXT("LoadVisual"));
-	if (!WorldMesh || !LoadVisual)
+	UMaterialInterface* DryIceMaterial = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial"));
+	if (!WorldMesh || !LoadVisual || !DryIceMaterial)
 	{
 		return false;
 	}
@@ -158,6 +196,12 @@ bool SetShovelTestMeshes(AUtilityShovelActor* Shovel, UStaticMesh* Mesh)
 	WorldMesh->UpdateBounds();
 	LoadVisual->SetStaticMesh(Mesh);
 	LoadVisual->UpdateBounds();
+	FUtilityShovelLoadAppearance CoalAppearance;
+	CoalAppearance.Mesh = Mesh;
+	FUtilityShovelLoadAppearance DryIceAppearance;
+	DryIceAppearance.Material = DryIceMaterial;
+	Shovel->SetLoadAppearance(EUtilityFuelKind::Coal, CoalAppearance);
+	Shovel->SetLoadAppearance(EUtilityFuelKind::DryIce, DryIceAppearance);
 	return true;
 }
 

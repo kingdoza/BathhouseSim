@@ -145,7 +145,7 @@ CoolingDemand = max(AmbientC - TargetC, 0) * CoolingDemandPointsPerC
 - `CapacityPoints`: `EditAnywhere`, Blueprint default와 Level instance override 허용, 기본 `100`
 - 음수·NaN은 등록할 수 없고 명확한 validation error를 기록한다.
 - component는 자기 값을 소유하지만 world aggregate mutation은 subsystem API로만 수행한다.
-- 정격은 설치 합계에, 명시적으로 주입된 Operation이 양수인 정격은 가동 합계에 기여한다. 보일러는 Operation 필수, 첫 수직 단계의 기존 쿨러·순환기는 기존 공급을 유지한다.
+- 정격은 설치 합계에, 명시적으로 주입된 Operation이 양수인 정격은 가동 합계에 기여한다. 보일러·쿨러·순환기 모두 Operation 필수이며 Operation 없는 항상 공급 경로는 없다([UtilityLaborSystem.md](UtilityLaborSystem.md)).
 
 ### `ABathWaterUtilityFacilityActor`
 
@@ -316,7 +316,7 @@ Delta = (IncreaseRate - EffectiveCleaningRate) * DeltaSeconds
 
 Editor 단계의 최소 신규 asset은 다음이다.
 
-- `BP_Circulator`, `BP_Cooler`: 기존 base 유지. `BP_Boiler`: 노동 수직 단계에서 native boiler child로 reparent 예정
+- `BP_Boiler`, `BP_Cooler`, `BP_Circulator`: 각각 native boiler·cooler·circulator 자식. 구성은 [UtilityLaborSystem.md](UtilityLaborSystem.md)
 - 종류별 placement definition과 회수 item presentation 연결
 
 기존 `BP_Bath`는 inherited condition component 값을 확인하고 필요 시 instance override한다. 관리 화면의 WBP와 computer instance reference는 [BathWaterManagementUISystem.md](BathWaterManagementUISystem.md)가 소유한다.

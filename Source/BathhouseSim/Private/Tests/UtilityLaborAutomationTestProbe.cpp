@@ -1,9 +1,10 @@
 #include "Tests/UtilityLaborAutomationTestProbe.h"
 
-#include "Utility/UtilityFuelIntakeComponent.h"
+#include "Utility/UtilityFuelIntakeVolumeComponent.h"
 #include "Utility/UtilityFuelTransaction.h"
 #include "Utility/UtilityOperationComponent.h"
 #include "Utility/UtilityShovelActor.h"
+#include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
@@ -15,25 +16,26 @@ AUtilityLaborBoilerAutomationActor::AUtilityLaborBoilerAutomationActor()
 	{
 		return;
 	}
-	GetFuelIntake()->SetStaticMesh(TestMesh.Object);
+	GetFuelIntakeVolume()->SetBoxExtent(FVector(15.0f));
+	GetFuelIntakeVolume()->SetRelativeScale3D(FVector::OneVector);
 	TArray<UStaticMeshComponent*> MeshComponents;
 	GetComponents(MeshComponents);
 	for (UStaticMeshComponent* MeshComponent : MeshComponents)
 	{
-		if (MeshComponent && (MeshComponent->GetFName() == TEXT("GaugeFace")
-			|| MeshComponent->GetFName() == TEXT("GaugeNeedleMesh")))
+		if (MeshComponent && MeshComponent->GetFName() == TEXT("GaugeNeedleMesh"))
 		{
 			MeshComponent->SetStaticMesh(TestMesh.Object);
 		}
 	}
+	GetFuelDoorMesh()->SetStaticMesh(TestMesh.Object);
 }
 
 void UUtilityLaborFuelChangedAutomationProbe::Bind(
 	AUtilityShovelActor* InSourceShovel,
 	AUtilityShovelActor* InNestedShovel,
 	UUtilityOperationComponent* InOperation,
-	UUtilityFuelIntakeComponent* InIntake,
-	const FHeldEquipmentUseContext& InContext,
+	UUtilityFuelIntakeVolumeComponent* InIntake,
+	const FPlayerInteractionContext& InContext,
 	const float InExpectedOperationPoints)
 {
 	Unbind();

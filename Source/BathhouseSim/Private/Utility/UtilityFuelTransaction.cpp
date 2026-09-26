@@ -1,14 +1,13 @@
 #include "UtilityFuelTransaction.h"
 
-#include "Placement/FacilityPlacementComponent.h"
-#include "Placement/PlayerFacilityPlacementComponent.h"
-#include "Character/FirstPersonCharacter.h"
-#include "Computer/PlayerComputerUseComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Facility/BathWaterUtilityCapacityComponent.h"
 #include "Interaction/PlayerCarryComponent.h"
 #include "Interaction/PlayerInteractionComponent.h"
-#include "Utility/BathWaterBoilerFacilityActor.h"
-#include "Utility/UtilityFuelIntakeComponent.h"
+#include "Placement/FacilityPlacementComponent.h"
+#include "Utility/BathWaterFuelUtilityFacilityActor.h"
+#include "Utility/UtilityFuelIntakeVolumeComponent.h"
+#include "Utility/UtilityLaborInputGuard.h"
 #include "Utility/UtilityFuelSupplyActor.h"
 #include "Utility/UtilityOperationComponent.h"
 #include "Utility/UtilityShovelActor.h"
@@ -28,58 +27,217 @@ FUtilityFuelLoad EmptyLoad()
 }
 }
 
+FUtilityFuelResult FUtilityFuelTransaction::EvaluateScoop(
+	const FPlayerInteractionContext& Context,
+	const AUtilityFuelSupplyActor& Supply)
+{
+	AUtilityShovelActor* Shovel = GetHeldShovel(Context);
+	if (!IsValid(Shovel))
+	{
+		return Fail(EUtilityFuelFailure::NoShovel,
+			LOCTEXT("ScoopNeedsShovel", "삽을 들고 있어야 합니다."));
+	}
+	if (!IsValid(&Supply))
+	{
+		return Fail(EUtilityFuelFailure::InvalidTarget,
+			LOCTEXT("InvalidSupplyTarget", "연료 공급함 상태가 올바르지 않습니다."));
+	}
+
+	FText FailureReason;
+	if (!ValidateHeldContext(*Shovel, Context, FailureReason))
+	{
+		return Fail(EUtilityFuelFailure::InvalidTarget, FailureReason);
+	}
+	if (!Shovel->HasValidAuthoring(FailureReason) || !Supply.HasValidAuthoring(FailureReason))
+	{
+		return Fail(EUtilityFuelFailure::InvalidAuthoring, FailureReason);
+	}
+	if (!Shovel->FuelLoad.IsValid())
+	{
+		return Fail(EUtilityFuelFailure::InvalidLoad,
+			LOCTEXT("InvalidExistingShovelLoad", "삽의 연료 상태가 올바르지 않습니다."));
+	}
+	if (!Shovel->FuelLoad.IsEmpty())
+	{
+		return Fail(EUtilityFuelFailure::ShovelAlreadyLoaded,
+			LOCTEXT("ScoopOnlyWhenEmpty", "삽이 비어 있을 때만 연료를 퍼담을 수 있습니다."));
+	}
+
+	FUtilityFuelLoad CandidateLoad;
+	CandidateLoad.Kind = Supply.GetFuelKind();
+	CandidateLoad.Points = Supply.GetScoopPoints();
+	if (!CandidateLoad.IsValid() || CandidateLoad.IsEmpty())
+	{
+		return Fail(EUtilityFuelFailure::InvalidLoad,
+			LOCTEXT("InvalidScoopCandidate", "공급할 연료 종류와 양이 올바르지 않습니다."));
+	}
+	return FUtilityFuelResult::Succeeded(CandidateLoad.Points);
+}
+
+FUtilityFuelResult FUtilityFuelTransaction::EvaluateReturn(
+	const FPlayerInteractionContext& Context,
+	const AUtilityFuelSupplyActor& Supply)
+{
+	AUtilityShovelActor* Shovel = GetHeldShovel(Context);
+	if (!IsValid(Shovel))
+	{
+		return Fail(EUtilityFuelFailure::NoShovel,
+			LOCTEXT("ReturnNeedsShovel", "연료가 든 삽을 들고 있어야 합니다."));
+	}
+	if (!IsValid(&Supply))
+	{
+		return Fail(EUtilityFuelFailure::InvalidTarget,
+			LOCTEXT("InvalidReturnSupply", "연료 공급함 상태가 올바르지 않습니다."));
+	}
+
+	FText FailureReason;
+	if (!ValidateHeldContext(*Shovel, Context, FailureReason))
+	{
+		return Fail(EUtilityFuelFailure::InvalidTarget, FailureReason);
+	}
+	if (!Shovel->HasValidAuthoring(FailureReason) || !Supply.HasValidAuthoring(FailureReason))
+	{
+		return Fail(EUtilityFuelFailure::InvalidAuthoring, FailureReason);
+	}
+	if (!Shovel->FuelLoad.IsValid())
+	{
+		return Fail(EUtilityFuelFailure::InvalidLoad,
+			LOCTEXT("InvalidReturnLoad", "삽의 연료 상태가 올바르지 않습니다."));
+	}
+	if (Shovel->FuelLoad.IsEmpty())
+	{
+		return Fail(EUtilityFuelFailure::ShovelEmpty,
+			LOCTEXT("ReturnEmptyShovel", "삽에 반환할 연료가 없습니다."));
+	}
+	if (Shovel->FuelLoad.Kind != Supply.GetFuelKind())
+	{
+		return Fail(EUtilityFuelFailure::WrongFuel,
+			LOCTEXT("ReturnWrongFuel", "같은 종류의 연료가 든 삽만 반환할 수 있습니다."));
+	}
+	return FUtilityFuelResult::Succeeded(Shovel->FuelLoad.Points);
+}
+
+FUtilityFuelResult FUtilityFuelTransaction::EvaluateInsert(
+	const FPlayerInteractionContext& Context,
+	const UUtilityFuelIntakeVolumeComponent& Intake)
+{
+	AUtilityShovelActor* Shovel = GetHeldShovel(Context);
+	if (!IsValid(Shovel))
+	{
+		return Fail(EUtilityFuelFailure::NoShovel,
+			LOCTEXT("InsertNeedsShovel", "삽을 들고 있어야 합니다."));
+	}
+	if (!IsValid(&Intake))
+	{
+		return Fail(EUtilityFuelFailure::InvalidTarget,
+			LOCTEXT("InvalidIntakeTarget", "보일러 투입구 상태가 올바르지 않습니다."));
+	}
+
+	ABathWaterFuelUtilityFacilityActor* FuelFacility = Cast<ABathWaterFuelUtilityFacilityActor>(Intake.GetOwner());
+	UUtilityOperationComponent* Operation = FuelFacility ? FuelFacility->GetUtilityOperation() : nullptr;
+	if (!IsValid(FuelFacility) || !IsValid(Operation) || FuelFacility->GetFuelIntakeVolume() != &Intake)
+	{
+		return Fail(EUtilityFuelFailure::InvalidTarget,
+			LOCTEXT("WrongIntake", "연료 설비의 실제 투입구를 조준하세요."));
+	}
+
+	FText FailureReason;
+	if (!ValidateHeldContext(*Shovel, Context, FailureReason))
+	{
+		return Fail(EUtilityFuelFailure::InvalidTarget, FailureReason);
+	}
+	if (!Shovel->HasValidAuthoring(FailureReason)
+		|| !FuelFacility->HasValidUtilityAuthoring(FailureReason)
+		|| !Operation->HasValidAuthoring(FailureReason)
+		|| !Intake.HasValidAuthoring(FailureReason))
+	{
+		return Fail(EUtilityFuelFailure::InvalidAuthoring, FailureReason);
+	}
+	if (!Shovel->FuelLoad.IsValid())
+	{
+		return Fail(EUtilityFuelFailure::InvalidLoad,
+			LOCTEXT("InvalidInsertLoad", "삽의 연료 상태가 올바르지 않습니다."));
+	}
+	if (Shovel->FuelLoad.IsEmpty())
+	{
+		return Fail(EUtilityFuelFailure::ShovelEmpty,
+			LOCTEXT("ShovelHasNoFuel", "삽에 연료가 없습니다."));
+	}
+	if (Shovel->FuelLoad.Kind != FuelFacility->GetAcceptedFuelKind())
+	{
+		return Fail(EUtilityFuelFailure::WrongFuel,
+			FText::Format(LOCTEXT("WrongInsertFuel", "{0}에는 {1}만 넣을 수 있습니다."),
+				FuelFacility->GetFuelFacilityDisplayName(),
+				GetUtilityFuelKindDisplayName(FuelFacility->GetAcceptedFuelKind())));
+	}
+
+	const UFacilityPlacementComponent* Placement = FuelFacility->GetFacilityPlacementComponent();
+	if (!Placement || Placement->IsStagedPlacement() || !Placement->IsPlacedDomainActive()
+		|| !Operation->IsPlacedClockActive())
+	{
+		return Fail(EUtilityFuelFailure::NotInstalled,
+			LOCTEXT("FuelFacilityNotInstalled", "설치된 연료 설비에만 연료를 넣을 수 있습니다."));
+	}
+	if (Operation->IsLaborBlocked())
+	{
+		return Fail(EUtilityFuelFailure::RecoveryInProgress,
+			LOCTEXT("FuelFacilityRecoveryInProgress", "회수 중에는 재료를 넣을 수 없습니다."));
+	}
+
+	const float CurrentPoints = Operation->GetRemainingPoints();
+	const float MaximumPoints = Operation->GetMaximumPoints();
+	if (!FMath::IsFinite(CurrentPoints) || !FMath::IsFinite(MaximumPoints) || MaximumPoints <= 0.0f)
+	{
+		return Fail(EUtilityFuelFailure::InvalidAuthoring,
+			LOCTEXT("InvalidOperationCapacity", "설비 가동 용량을 확인할 수 없습니다."));
+	}
+	if (CurrentPoints >= MaximumPoints)
+	{
+		return Fail(EUtilityFuelFailure::CapacityFull,
+			LOCTEXT("FuelFacilityFull", "설비가 가득 차 있습니다."));
+	}
+	return FUtilityFuelResult::Succeeded(FMath::Min(MaximumPoints, CurrentPoints + Shovel->FuelLoad.Points) - CurrentPoints);
+}
+
 FUtilityFuelResult FUtilityFuelTransaction::Scoop(
 	AUtilityShovelActor& Shovel,
 	AUtilityFuelSupplyActor& Supply,
-	const FHeldEquipmentUseContext& Context)
+	const FPlayerInteractionContext& Context)
 {
-	FText FailureReason;
-	if (!IsValid(&Shovel) || !IsValid(&Supply)
-		|| !ValidateHeldContext(Shovel, Context, FailureReason))
+	FUtilityFuelResult Evaluation = EvaluateScoop(Context, Supply);
+	if (!Evaluation.bSucceeded)
 	{
-		return Fail(EUtilityFuelFailure::InvalidTarget,
-			FailureReason.IsEmpty() ? LOCTEXT("InvalidScoopContext", "삽 또는 연료 공급함 상태가 올바르지 않습니다.") : FailureReason);
+		return Evaluation;
+	}
+
+	FText FailureReason;
+	if (!ValidateFreshHit(Context.InteractionComponent, Context.Interactor, &Supply, Supply.GetSupplyMesh(), FailureReason))
+	{
+		return Fail(EUtilityFuelFailure::InvalidTarget, FailureReason);
 	}
 	if (Shovel.bFuelMutationInProgress || Supply.bFuelMutationInProgress)
 	{
 		return Fail(EUtilityFuelFailure::TransactionBusy,
 			LOCTEXT("ScoopAlreadyInProgress", "연료 이동이 이미 처리 중입니다."));
 	}
-	if (!Shovel.HasValidAuthoring(FailureReason))
-	{
-		return Fail(EUtilityFuelFailure::InvalidAuthoring, FailureReason);
-	}
-	if (!ValidateFreshHit(Context.InteractionComponent, Context.User, &Supply, Supply.GetSupplyMesh(), FailureReason))
-	{
-		return Fail(EUtilityFuelFailure::InvalidTarget, FailureReason);
-	}
-	FUtilityFuelLoad CandidateLoad;
-	if (!Supply.CanScoop(&Shovel, CandidateLoad, FailureReason))
-	{
-		return Fail(Shovel.IsLoadEmpty()
-			? EUtilityFuelFailure::InvalidAuthoring
-			: EUtilityFuelFailure::ShovelAlreadyLoaded, FailureReason);
-	}
 
 	TGuardValue<bool> ShovelGuard(Shovel.bFuelMutationInProgress, true);
 	TGuardValue<bool> SupplyGuard(Supply.bFuelMutationInProgress, true);
-	if (!ValidateHeldContext(Shovel, Context, FailureReason)
-		|| !ValidateFreshHit(Context.InteractionComponent, Context.User, &Supply, Supply.GetSupplyMesh(), FailureReason)
-		|| !Shovel.HasValidAuthoring(FailureReason)
-		|| !Supply.HasValidAuthoring(FailureReason)
-		|| !Shovel.FuelLoad.IsEmpty()
-		|| Supply.FuelKind != EUtilityFuelKind::Coal
-		|| !FMath::IsFinite(Supply.ScoopPoints) || Supply.ScoopPoints <= 0.0f)
+	Evaluation = EvaluateScoop(Context, Supply);
+	if (!Evaluation.bSucceeded || !ValidateHeldContext(Shovel, Context, FailureReason))
 	{
-		return Fail(EUtilityFuelFailure::InvalidTarget,
-			FailureReason.IsEmpty() ? LOCTEXT("ScoopRevalidationFailed", "퍼담기 조건이 변경되었습니다.") : FailureReason);
+		return Evaluation.bSucceeded
+			? Fail(EUtilityFuelFailure::InvalidTarget, FailureReason)
+			: Evaluation;
 	}
 
+	FUtilityFuelLoad CandidateLoad;
 	CandidateLoad.Kind = Supply.FuelKind;
 	CandidateLoad.Points = Supply.ScoopPoints;
 	if (!CandidateLoad.IsValid() || CandidateLoad.IsEmpty())
 	{
-		return Fail(EUtilityFuelFailure::InvalidLoad, LOCTEXT("InvalidScoopLoad", "공급할 연료 양이 올바르지 않습니다."));
+		return Fail(EUtilityFuelFailure::InvalidLoad,
+			LOCTEXT("InvalidScoopLoad", "공급할 연료 양이 올바르지 않습니다."));
 	}
 	Shovel.SetFuelLoadSilently(CandidateLoad);
 	const TWeakObjectPtr<AUtilityShovelActor> WeakShovel(&Shovel);
@@ -92,65 +250,38 @@ FUtilityFuelResult FUtilityFuelTransaction::Scoop(
 
 FUtilityFuelResult FUtilityFuelTransaction::Insert(
 	AUtilityShovelActor& Shovel,
-	UUtilityFuelIntakeComponent& Intake,
-	const FHeldEquipmentUseContext& Context)
+	UUtilityFuelIntakeVolumeComponent& Intake,
+	const FPlayerInteractionContext& Context)
 {
+	FUtilityFuelResult Evaluation = EvaluateInsert(Context, Intake);
+	if (!Evaluation.bSucceeded)
+	{
+		return Evaluation;
+	}
+
+	ABathWaterFuelUtilityFacilityActor* FuelFacility = Cast<ABathWaterFuelUtilityFacilityActor>(Intake.GetOwner());
+	UUtilityOperationComponent* Operation = FuelFacility ? FuelFacility->GetUtilityOperation() : nullptr;
 	FText FailureReason;
-	ABathWaterBoilerFacilityActor* Boiler = Cast<ABathWaterBoilerFacilityActor>(Intake.GetOwner());
-	UUtilityOperationComponent* Operation = Boiler ? Boiler->GetUtilityOperation() : nullptr;
-	if (!IsValid(&Shovel) || !IsValid(&Intake) || !IsValid(Boiler) || !IsValid(Operation)
-		|| !ValidateHeldContext(Shovel, Context, FailureReason))
+	if (!IsValid(FuelFacility) || !IsValid(Operation)
+		|| !ValidateFreshHit(Context.InteractionComponent, Context.Interactor, FuelFacility, &Intake, FailureReason))
 	{
 		return Fail(EUtilityFuelFailure::InvalidTarget,
-			FailureReason.IsEmpty() ? LOCTEXT("InvalidInsertContext", "삽 또는 보일러 투입구 상태가 올바르지 않습니다.") : FailureReason);
+			FailureReason.IsEmpty() ? LOCTEXT("InvalidInsertTarget", "연료 설비의 실제 투입구를 조준하세요.") : FailureReason);
 	}
 	if (Shovel.bFuelMutationInProgress || Operation->bMutationInProgress)
 	{
 		return Fail(EUtilityFuelFailure::TransactionBusy,
 			LOCTEXT("InsertAlreadyInProgress", "연료 이동이 이미 처리 중입니다."));
 	}
-	if (Boiler->GetFuelIntake() != &Intake
-		|| !ValidateFreshHit(Context.InteractionComponent, Context.User, Boiler, &Intake, FailureReason))
-	{
-		return Fail(EUtilityFuelFailure::InvalidTarget,
-			FailureReason.IsEmpty() ? LOCTEXT("WrongIntake", "보일러의 실제 연료 투입구를 조준하세요.") : FailureReason);
-	}
-	const UFacilityPlacementComponent* Placement = Boiler->GetFacilityPlacementComponent();
-	if (!Placement || Placement->IsStagedPlacement() || !Placement->IsPlacedDomainActive()
-		|| !Operation->IsPlacedClockActive())
-	{
-		return Fail(EUtilityFuelFailure::NotInstalled, LOCTEXT("BoilerNotInstalled", "설치된 보일러에만 연료를 넣을 수 있습니다."));
-	}
-	if (!Boiler->HasValidUtilityAuthoring(FailureReason)
-		|| !Shovel.HasValidAuthoring(FailureReason)
-		|| Shovel.FuelLoad.IsEmpty() || !Shovel.FuelLoad.IsValid()
-		|| Shovel.FuelLoad.Kind != EUtilityFuelKind::Coal)
-	{
-		return Fail(EUtilityFuelFailure::InvalidLoad,
-			FailureReason.IsEmpty() ? LOCTEXT("ShovelHasNoCoal", "삽에 유효한 석탄이 없습니다.") : FailureReason);
-	}
-	if (!Operation->CanAcceptFuel(Shovel.FuelLoad, FailureReason))
-	{
-		const EUtilityFuelFailure Code = Operation->IsLaborBlocked()
-			? EUtilityFuelFailure::RecoveryInProgress
-			: (Operation->GetRemainingPoints() >= Operation->GetMaximumPoints()
-				? EUtilityFuelFailure::CapacityFull : EUtilityFuelFailure::NotInstalled);
-		return Fail(Code, FailureReason);
-	}
+
 	TGuardValue<bool> ShovelGuard(Shovel.bFuelMutationInProgress, true);
 	TGuardValue<bool> OperationGuard(Operation->bMutationInProgress, true);
-	if (!ValidateHeldContext(Shovel, Context, FailureReason)
-		|| !ValidateFreshHit(Context.InteractionComponent, Context.User, Boiler, &Intake, FailureReason)
-		|| !IsValid(Boiler) || Boiler->GetFuelIntake() != &Intake
-		|| !Placement->IsPlacedDomainActive() || Placement->IsStagedPlacement()
-		|| !Operation->bPlacedClockActive || Operation->bLaborBlocked
-		|| !Shovel.HasValidAuthoring(FailureReason)
-		|| !Shovel.FuelLoad.IsValid() || Shovel.FuelLoad.IsEmpty()
-		|| Shovel.FuelLoad.Kind != EUtilityFuelKind::Coal
-		|| !Intake.HasValidAuthoring(FailureReason))
+	Evaluation = EvaluateInsert(Context, Intake);
+	if (!Evaluation.bSucceeded || !ValidateHeldContext(Shovel, Context, FailureReason))
 	{
-		return Fail(EUtilityFuelFailure::InvalidTarget,
-			FailureReason.IsEmpty() ? LOCTEXT("InsertRevalidationFailed", "연료 투입 조건이 변경되었습니다.") : FailureReason);
+		return Evaluation.bSucceeded
+			? Fail(EUtilityFuelFailure::InvalidTarget, FailureReason)
+			: Evaluation;
 	}
 
 	const double GameTimeSeconds = Operation->GetGameTimeSeconds();
@@ -158,14 +289,16 @@ FUtilityFuelResult FUtilityFuelTransaction::Insert(
 	const bool bWasProvidingCapacity = Operation->bPlacedClockActive && CurrentPoints > 0.0f;
 	if (CurrentPoints >= Operation->MaxOperationPoints)
 	{
-		return Fail(EUtilityFuelFailure::CapacityFull, LOCTEXT("BoilerFull", "보일러가 가득 차 있습니다."));
+		return Fail(EUtilityFuelFailure::CapacityFull,
+			LOCTEXT("FuelFacilityFull", "설비가 가득 차 있습니다."));
 	}
 	const float CandidatePoints = FMath::Min(
 		Operation->MaxOperationPoints,
 		CurrentPoints + Shovel.FuelLoad.Points);
 	if (!FMath::IsFinite(CandidatePoints) || CandidatePoints <= CurrentPoints)
 	{
-		return Fail(EUtilityFuelFailure::InvalidLoad, LOCTEXT("InvalidBoilerCandidate", "연료 투입 결과를 계산할 수 없습니다."));
+		return Fail(EUtilityFuelFailure::InvalidLoad,
+			LOCTEXT("InvalidFuelFacilityCandidate", "연료 투입 결과를 계산할 수 없습니다."));
 	}
 
 	Operation->SetRemainingPointsSilently(CandidatePoints, GameTimeSeconds);
@@ -184,43 +317,33 @@ FUtilityFuelResult FUtilityFuelTransaction::Return(
 	AUtilityFuelSupplyActor& Supply,
 	const FPlayerInteractionContext& Context)
 {
-	FText FailureReason;
-	if (!IsValid(&Shovel) || !IsValid(&Supply)
-		|| !ValidateHeldContext(Shovel, Context, FailureReason))
+	FUtilityFuelResult Evaluation = EvaluateReturn(Context, Supply);
+	if (!Evaluation.bSucceeded)
 	{
-		return Fail(EUtilityFuelFailure::InvalidTarget,
-			FailureReason.IsEmpty() ? LOCTEXT("InvalidReturnContext", "삽 또는 연료 공급함 상태가 올바르지 않습니다.") : FailureReason);
+		return Evaluation;
+	}
+
+	FText FailureReason;
+	if (!ValidateFreshHit(Context.InteractionComponent, Context.Interactor, &Supply, Supply.GetSupplyMesh(), FailureReason))
+	{
+		return Fail(EUtilityFuelFailure::InvalidTarget, FailureReason);
 	}
 	if (Shovel.bFuelMutationInProgress || Supply.bFuelMutationInProgress)
 	{
 		return Fail(EUtilityFuelFailure::TransactionBusy,
 			LOCTEXT("ReturnAlreadyInProgress", "연료 이동이 이미 처리 중입니다."));
 	}
-	if (!Shovel.HasValidAuthoring(FailureReason))
-	{
-		return Fail(EUtilityFuelFailure::InvalidAuthoring, FailureReason);
-	}
-	if (!ValidateFreshHit(Context.InteractionComponent, Context.Interactor, &Supply, Supply.GetSupplyMesh(), FailureReason))
-	{
-		return Fail(EUtilityFuelFailure::InvalidTarget, FailureReason);
-	}
-	if (!Supply.CanReturn(Shovel.FuelLoad, FailureReason))
-	{
-		return Fail(Shovel.FuelLoad.IsEmpty()
-			? EUtilityFuelFailure::ShovelEmpty : EUtilityFuelFailure::WrongFuel, FailureReason);
-	}
+
 	TGuardValue<bool> ShovelGuard(Shovel.bFuelMutationInProgress, true);
 	TGuardValue<bool> SupplyGuard(Supply.bFuelMutationInProgress, true);
-	if (!ValidateHeldContext(Shovel, Context, FailureReason)
-		|| !ValidateFreshHit(Context.InteractionComponent, Context.Interactor, &Supply, Supply.GetSupplyMesh(), FailureReason)
-		|| !Shovel.HasValidAuthoring(FailureReason)
-		|| !Supply.HasValidAuthoring(FailureReason)
-		|| !Shovel.FuelLoad.IsValid() || Shovel.FuelLoad.IsEmpty()
-		|| Shovel.FuelLoad.Kind != Supply.FuelKind)
+	Evaluation = EvaluateReturn(Context, Supply);
+	if (!Evaluation.bSucceeded || !ValidateHeldContext(Shovel, Context, FailureReason))
 	{
-		return Fail(EUtilityFuelFailure::WrongFuel,
-			FailureReason.IsEmpty() ? LOCTEXT("ReturnRevalidationFailed", "연료 반환 조건이 변경되었습니다.") : FailureReason);
+		return Evaluation.bSucceeded
+			? Fail(EUtilityFuelFailure::InvalidTarget, FailureReason)
+			: Evaluation;
 	}
+
 	const float ReturnedPoints = Shovel.FuelLoad.Points;
 	Shovel.SetFuelLoadSilently(EmptyLoad());
 	const TWeakObjectPtr<AUtilityShovelActor> WeakShovel(&Shovel);
@@ -229,6 +352,13 @@ FUtilityFuelResult FUtilityFuelTransaction::Return(
 		Shovel.PublishFuelLoadChanged();
 	}
 	return FUtilityFuelResult::Succeeded(ReturnedPoints);
+}
+
+AUtilityShovelActor* FUtilityFuelTransaction::GetHeldShovel(const FPlayerInteractionContext& Context)
+{
+	return Context.CarryComponent
+		? Cast<AUtilityShovelActor>(Context.CarryComponent->GetHeldObject())
+		: nullptr;
 }
 
 bool FUtilityFuelTransaction::ValidateFreshHit(
@@ -253,24 +383,6 @@ bool FUtilityFuelTransaction::ValidateFreshHit(
 
 bool FUtilityFuelTransaction::ValidateHeldContext(
 	const AUtilityShovelActor& Shovel,
-	const FHeldEquipmentUseContext& Context,
-	FText& OutFailureReason)
-{
-	if (!IsValid(Context.User) || !IsValid(Context.CarryComponent)
-		|| !IsValid(Context.InteractionComponent) || Context.Equipment != &Shovel
-		|| Context.CarryComponent->GetOwner() != Context.User
-		|| Context.CarryComponent->GetHeldObject() != &Shovel
-		|| Context.InteractionComponent->GetOwner() != Context.User
-		|| Context.InteractionComponent->IsInteractionSuppressed())
-	{
-		OutFailureReason = LOCTEXT("ShovelContextInvalid", "현재 들고 있는 삽과 사용자가 일치하지 않습니다.");
-		return false;
-	}
-	return ValidateOwnerInput(Context.User, OutFailureReason);
-}
-
-bool FUtilityFuelTransaction::ValidateHeldContext(
-	const AUtilityShovelActor& Shovel,
 	const FPlayerInteractionContext& Context,
 	FText& OutFailureReason)
 {
@@ -281,32 +393,11 @@ bool FUtilityFuelTransaction::ValidateHeldContext(
 		|| Context.InteractionComponent->GetOwner() != Context.Interactor
 		|| Context.InteractionComponent->IsInteractionSuppressed())
 	{
-		OutFailureReason = LOCTEXT("ReturnContextInvalid", "현재 들고 있는 삽과 사용자가 일치하지 않습니다.");
+		OutFailureReason = LOCTEXT("ShovelContextInvalid", "현재 들고 있는 삽과 사용자가 일치하지 않습니다.");
 		return false;
 	}
-	return ValidateOwnerInput(Context.Interactor, OutFailureReason);
+	return UtilityLaborInputGuard::ValidateOwnerInput(Context.Interactor, OutFailureReason);
 }
 
-bool FUtilityFuelTransaction::ValidateOwnerInput(AActor* User, FText& OutFailureReason)
-{
-	const AFirstPersonCharacter* Character = Cast<AFirstPersonCharacter>(User);
-	if (Character)
-	{
-		if (const UPlayerComputerUseComponent* Computer = Character->GetPlayerComputerUse();
-			Computer && Computer->IsCapturingInput())
-		{
-			OutFailureReason = LOCTEXT("ComputerOwnsInput", "컴퓨터 조작 중에는 삽을 사용할 수 없습니다.");
-			return false;
-		}
-		if (const UPlayerFacilityPlacementComponent* Placement = Character->GetPlayerFacilityPlacement();
-			Placement && Placement->IsPlacementActive())
-		{
-			OutFailureReason = LOCTEXT("PlacementOwnsInput", "설비 배치 중에는 삽을 사용할 수 없습니다.");
-			return false;
-		}
-	}
-	OutFailureReason = FText::GetEmpty();
-	return true;
-}
 
 #undef LOCTEXT_NAMESPACE

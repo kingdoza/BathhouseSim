@@ -35,6 +35,7 @@ Computer Use는 사용자가 별도 작업으로 명시적으로 요청했을 �
 ## 필수 문서
 
 - `.md/AGENT_WORKFLOW.md`
+- [UNREAL_MCP_CONNECTION.md](UNREAL_MCP_CONNECTION.md): Editor 선택·실행, MCP 연결·진단, 세션 종료 절차
 - 사전 조사 모드는 기능 명세 초안 또는 exact 조사 요청과 관련 `.md/PROMPT_ARCHITECTURE.md`
 - Editor 작업 모드는 승인된 `.md/PROMPT_ARCHITECTURE.md`와 현재 `.md/PROMPT_UNREAL.md` 또는 `.md/PROMPT_UNREAL_R.md`
 - `.md/0_ARCHITECTURE.md`, 관련 `.md/Architecture/*System.md`
@@ -54,24 +55,18 @@ Computer Use는 사용자가 별도 작업으로 명시적으로 요청했을 �
 
 ## MCP Capability Preflight
 
-1. `.uproject`의 EngineAssociation과 workflow의 UE 버전을 확인한다.
-2. 연결된 Editor의 project path, engine version, MCP 응답과 PIE 상태를 확인한다.
+1. [UNREAL_MCP_CONNECTION.md](UNREAL_MCP_CONNECTION.md)의 절차로 대상 Editor를 선택하고 실제 MCP 조회 호출까지 확인한다.
+2. 연결 문서의 성공 기준을 충족한 세션에서 PIE 상태를 확인한다.
 3. 현재 작업에 필요한 MCP tool을 열거하고 조회·수정·저장·검증 가능 여부를 작업 전에 판정한다.
 4. `git status`, 대상 asset의 기존 변경과 Editor dirty package를 기준선으로 기록한다.
 5. startup log의 Blueprint compile, missing component/property와 load error를 확인한다.
 6. 필요한 tool이 없으면 가능한 항목과 불가능한 항목을 즉시 분리한다.
 
-MCP 서버가 연결되지 않았거나 필요한 tool이 없으면 같은 연결을 반복 시도하지 않는다. 읽기 전용 Source 분석으로 Editor 결과를 추측하지 않고 해당 항목을 `USER_UNREAL.md`로 인계한다.
+연결 실패와 현재 대화의 도구 미노출은 연결 문서에 따라 구분한다. 연결 확인 후에도 필요한 Editor 기능이 없으면 해당 작업을 `USER_UNREAL.md`로 인계한다. 읽기 전용 Source 분석으로 Editor 결과를 추측하지 않는다.
 
 ## 세션 정책
 
-- 동일 project를 연 Editor는 한 프로세스만 사용한다.
-- 사용자 Editor가 실행 중이면 project/version/MCP가 일치하는 해당 세션을 우선한다.
-- MCP 연결을 제공하는 승인된 background 세션만 필요할 때 시작할 수 있으며 Computer Use로 창을 조작하지 않는다.
-- 사용자 Editor는 명시적 종료 요청 없이 종료하지 않는다.
-- agent-owned background Editor는 작업 후 PIE 종료, allowlist Save, 재로드와 dirty package를 확인한 뒤 종료하고 PID 소멸을 확인한다.
-- 저장 sharing violation이 발생하면 재저장을 반복하지 않고 중복 Editor와 agent-owned PID를 확인한다.
-- 강제 종료는 저장 상태와 사용자 변경 보존을 확인한 뒤에만 수행한다.
+Editor 소유권, 중복 실행 방지, 재시작·종료와 sharing violation 대응은 [UNREAL_MCP_CONNECTION.md](UNREAL_MCP_CONNECTION.md)를 따른다. 연결과 종료 절차를 이 문서에 중복 작성하지 않는다.
 
 ## 사전 조사 절차
 

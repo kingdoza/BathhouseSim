@@ -3,6 +3,7 @@
 #include "Facility/BathWaterUtilityPlacementInstanceData.h"
 #include "Placement/FacilityActorConversionTransaction.h"
 #include "Utility/BathWaterBoilerFacilityActor.h"
+#include "Utility/BathWaterCirculatorFacilityActor.h"
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FUtilityLaborRecoveryPayloadTest,
 	"BathhouseSim.Utility.Labor.RecoveryPayloadAndRollback",
@@ -47,7 +48,6 @@ bool FUtilityLaborRecoveryPayloadTest::RunTest(const FString& Parameters)
 		UBathWaterUtilityCapacityComponent* Capacity = Boiler->GetCapacityComponent();
 		Capacity->RestoreCapacity(EBathWaterCapacityKind::Heating, 100.0f);
 		TestTrue(TEXT("Boiler fixture authors intake and gauge meshes"), SetBoilerTestMeshes(Boiler, CubeMesh));
-		Boiler->GetFuelIntake()->SetWorldScale3D(FVector(0.15f));
 		FText PreStageAuthoringReason;
 		if (!Boiler->HasValidUtilityAuthoring(PreStageAuthoringReason))
 		{
@@ -79,11 +79,12 @@ bool FUtilityLaborRecoveryPayloadTest::RunTest(const FString& Parameters)
 		FText AuthoringFailureReason;
 		if (!Boiler->HasValidUtilityAuthoring(AuthoringFailureReason))
 		{
-			const UUtilityFuelIntakeComponent* Intake = Boiler->GetFuelIntake();
+			const UUtilityFuelIntakeVolumeComponent* Intake = Boiler->GetFuelIntakeVolume();
 			AddError(FString::Printf(
-				TEXT("Staged boiler authoring invalid before registration: %s (mesh=%s, collision=%d, visibility=%d, navigation=%d)"),
+				TEXT("Staged boiler authoring invalid before registration: %s (extent=%s, scale=%s, collision=%d, visibility=%d, navigation=%d)"),
 				*AuthoringFailureReason.ToString(),
-				*GetNameSafe(Intake ? Intake->GetStaticMesh() : nullptr),
+				Intake ? *Intake->GetUnscaledBoxExtent().ToString() : TEXT("<none>"),
+				Intake ? *Intake->GetRelativeScale3D().ToString() : TEXT("<none>"),
 				Intake ? static_cast<int32>(Intake->GetCollisionEnabled()) : -1,
 				Intake ? static_cast<int32>(Intake->GetCollisionResponseToChannel(ECC_Visibility)) : -1,
 				Intake ? Intake->CanEverAffectNavigation() : false));
@@ -167,7 +168,6 @@ bool FUtilityLaborRecoveryPayloadTest::RunTest(const FString& Parameters)
 		nullptr,
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	TestTrue(TEXT("Reinstall fixture authors intake and gauge meshes"), SetBoilerTestMeshes(Staged, CubeMesh));
-	Staged->GetFuelIntake()->SetWorldScale3D(FVector(0.15f));
 	TestTrue(TEXT("Reinstall fixture prepares staged placement"),
 		Staged->GetFacilityPlacementComponent()->PrepareForStagedPlacement(*Definition, FailureReason));
 	TestTrue(TEXT("Payload import succeeds before FinishSpawning"),
@@ -196,7 +196,6 @@ bool FUtilityLaborRecoveryPayloadTest::RunTest(const FString& Parameters)
 		nullptr,
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	TestTrue(TEXT("Legacy fixture authors intake and gauge meshes"), SetBoilerTestMeshes(LegacyStaged, CubeMesh));
-	LegacyStaged->GetFuelIntake()->SetWorldScale3D(FVector(0.15f));
 	LegacyStaged->GetFacilityPlacementComponent()->PrepareForStagedPlacement(*Definition, FailureReason);
 	UBathWaterUtilityPlacementInstanceData* LegacyData =
 		NewObject<UBathWaterUtilityPlacementInstanceData>(Item, TEXT("LegacyUtilityPayload"));
@@ -218,7 +217,6 @@ bool FUtilityLaborRecoveryPayloadTest::RunTest(const FString& Parameters)
 		nullptr,
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	TestTrue(TEXT("Invalid-payload fixture authors intake and gauge meshes"), SetBoilerTestMeshes(InvalidStaged, CubeMesh));
-	InvalidStaged->GetFuelIntake()->SetWorldScale3D(FVector(0.15f));
 	InvalidStaged->GetFacilityPlacementComponent()->PrepareForStagedPlacement(*Definition, FailureReason);
 	UBathWaterUtilityPlacementInstanceData* InvalidData =
 		NewObject<UBathWaterUtilityPlacementInstanceData>(Item, TEXT("InvalidOperationPayload"));
@@ -241,12 +239,32 @@ bool FUtilityLaborRecoveryPayloadTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	TestTrue(TEXT("Demand fixture bath registers"), Operations->RegisterBath(DemandBath->GetBathWaterCondition(), false));
-	UBathWaterUtilityCapacityComponent* Circulation = NewObject<UBathWaterUtilityCapacityComponent>(
-		DemandBath, TEXT("RecoveryTestCirculation"));
-	Circulation->RestoreCapacity(EBathWaterCapacityKind::Circulation, 100.0f);
-	Circulation->RegisterComponent();
-	TestTrue(TEXT("Legacy circulation supports the thermal integration fixture"),
-		Operations->RegisterProvider(Circulation, false));
+	UFacilityPlacementDefinition* CirculatorDefinition = NewObject<UFacilityPlacementDefinition>();
+	CirculatorDefinition->StableId = TEXT("UtilityLaborRecoveryCirculatorAutomation");
+	CirculatorDefinition->FacilityTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Facility.Placeable")));
+	CirculatorDefinition->PlacedFacilityClass = ABathWaterCirculatorFacilityActor::StaticClass();
+	CirculatorDefinition->RecoveryItemClass = APlaceableFacilityItemActor::StaticClass();
+	CirculatorDefinition->RecoveryItemMesh = CubeMesh;
+	ABathWaterCirculatorFacilityActor* Circulator = World->SpawnActorDeferred<ABathWaterCirculatorFacilityActor>(
+		ABathWaterCirculatorFacilityActor::StaticClass(),
+		FTransform(FVector(10000.0f, 0.0f, 100.0f)), nullptr, nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!TestNotNull(TEXT("Native circulator capacity fixture exists"), Circulator)) return false;
+	Circulator->GetCapacityComponent()->RestoreCapacity(EBathWaterCapacityKind::Circulation, 100.0f);
+	TestTrue(TEXT("Circulator fixture authors its lever and gauge"), SetCirculatorTestMeshes(Circulator, CubeMesh));
+	TestTrue(TEXT("Native circulator stages for the thermal integration fixture"),
+		Circulator->GetFacilityPlacementComponent()->PrepareForStagedPlacement(*CirculatorDefinition, FailureReason));
+	TestTrue(TEXT("Native circulator starts with active operation points"),
+		Circulator->GetOperation()->ImportOperationState(100.0f, FailureReason));
+	Circulator->FinishSpawning(FTransform(FVector(10000.0f, 0.0f, 100.0f)));
+	BeginActorPlayIfNeeded(Circulator);
+	TestTrue(TEXT("Native circulator captures its collision snapshot"),
+		Circulator->GetFacilityPlacementComponent()->FinalizeStagedPlacementCollisionSnapshot(FailureReason));
+	TestTrue(TEXT("Native circulator registers its active circulation capacity"),
+		Circulator->StagePlacedDomainRegistration(FailureReason));
+	TestTrue(TEXT("Native circulator commits its placed state"),
+		Circulator->GetFacilityPlacementComponent()->CommitStagedPlacement(FailureReason));
+	Circulator->PublishPlacedDomainRegistration();
 	TestTrue(TEXT("Thermal integration fixture reserves full circulation"),
 		Operations->RequestCirculationPercent(DemandBath, 100.0f).bSucceeded);
 	DemandBath->GetBathWaterState()->SetNormalizedAmount(0.5f);
@@ -261,6 +279,60 @@ bool FUtilityLaborRecoveryPayloadTest::RunTest(const FString& Parameters)
 		Item->Destroy();
 		return false;
 	}
+	UBathWaterConditionComponent* CirculatorCondition = DemandBath->GetBathWaterCondition();
+	FFloatProperty* CirculatorDecayProperty = FindFProperty<FFloatProperty>(
+		UUtilityOperationComponent::StaticClass(), TEXT("DecayPointsPerSecond"));
+	FFloatProperty* ActualTemperatureProperty = FindFProperty<FFloatProperty>(
+		UBathWaterConditionComponent::StaticClass(), TEXT("ActualTemperatureC"));
+	FFloatProperty* ContaminationProperty = FindFProperty<FFloatProperty>(
+		UBathWaterConditionComponent::StaticClass(), TEXT("ContaminationPercent"));
+	if (!TestNotNull(TEXT("Circulator decay authoring property exists"), CirculatorDecayProperty)
+		|| !TestNotNull(TEXT("Bath actual temperature property exists"), ActualTemperatureProperty)
+		|| !TestNotNull(TEXT("Bath contamination property exists"), ContaminationProperty))
+	{
+		Item->Destroy();
+		return false;
+	}
+	TestTrue(TEXT("LAB-035/036 single-circulator bath accepts active temperature demand"),
+		Operations->RequestTargetTemperature(DemandBath, 30.0f).bSucceeded);
+	ActualTemperatureProperty->SetPropertyValue_InContainer(CirculatorCondition, 20.0f);
+	ContaminationProperty->SetPropertyValue_InContainer(CirculatorCondition, 50.0f);
+	CirculatorCondition->TickComponent(10.0f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("LAB-035/036 the sole active circulator cleans and heats the bath"),
+		CirculatorCondition->GetContaminationPercent() < 50.0f
+		&& CirculatorCondition->GetActualTemperatureC() > 20.0f);
+
+	ActualTemperatureProperty->SetPropertyValue_InContainer(CirculatorCondition, 25.0f);
+	ContaminationProperty->SetPropertyValue_InContainer(CirculatorCondition, 50.0f);
+	CirculatorDecayProperty->SetPropertyValue_InContainer(Circulator->GetOperation(), 100.0f);
+	TickWorldForDuration(World, 1.1, 0.05f);
+	TestTrue(TEXT("LAB-035/036 exhausting the only circulator removes all active circulation capacity"),
+		FMath::IsNearlyZero(Circulator->GetOperation()->GetRemainingPoints())
+		&& FMath::IsNearlyZero(Operations->GetCapacitySnapshot(EBathWaterCapacityKind::Circulation).ActivePoints)
+		&& !Operations->IsCapacitySatisfied(EBathWaterCapacityKind::Circulation));
+	TestTrue(TEXT("LAB-035/036 exhaustion preserves the bath's circulation and temperature settings"),
+		FMath::IsNearlyEqual(CirculatorCondition->GetCirculationPercent(), 100.0f)
+		&& FMath::IsNearlyEqual(CirculatorCondition->GetTargetTemperatureC(), 30.0f));
+	ActualTemperatureProperty->SetPropertyValue_InContainer(CirculatorCondition, 25.0f);
+	ContaminationProperty->SetPropertyValue_InContainer(CirculatorCondition, 50.0f);
+	CirculatorCondition->TickComponent(10.0f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("LAB-035 purification stops while LAB-036 active heating gives way to natural return"),
+		FMath::IsNearlyEqual(CirculatorCondition->GetContaminationPercent(), 50.0f, 0.001f)
+		&& CirculatorCondition->GetActualTemperatureC() < 25.0f);
+
+	CirculatorDecayProperty->SetPropertyValue_InContainer(Circulator->GetOperation(), 0.0f);
+	TestTrue(TEXT("Labor recovery restores the exhausted circulator"),
+		Circulator->GetOperation()->ApplyLaborReward(10.0f, FailureReason)
+		&& FMath::IsNearlyEqual(Circulator->GetOperation()->GetRemainingPoints(), 10.0f)
+		&& Operations->IsCapacitySatisfied(EBathWaterCapacityKind::Circulation));
+	CirculatorCondition->TickComponent(10.0f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("LAB-035/036 labor recovery automatically resumes purification and active heating"),
+		CirculatorCondition->GetContaminationPercent() < 50.0f
+		&& CirculatorCondition->GetActualTemperatureC() > 24.0f
+		&& FMath::IsNearlyEqual(CirculatorCondition->GetCirculationPercent(), 100.0f)
+		&& FMath::IsNearlyEqual(CirculatorCondition->GetTargetTemperatureC(), 30.0f));
+	ActualTemperatureProperty->SetPropertyValue_InContainer(CirculatorCondition, 20.0f);
+
 	const FBathWaterSettingRequestResult HeatingReservation = Operations->RequestTargetTemperature(DemandBath, 50.0f);
 	TestTrue(TEXT("Three installed boilers accept a 150 point reservation"), HeatingReservation.bSucceeded);
 	DemandBath->GetBathWaterCondition()->TickComponent(10.0f, LEVELTICK_All, nullptr);
@@ -357,6 +429,7 @@ bool FUtilityLaborRecoveryPayloadTest::RunTest(const FString& Parameters)
 	{
 		LowChargeBoiler->Destroy();
 	}
+	Circulator->Destroy();
 	Operations->UnregisterBath(DemandBath->GetBathWaterCondition(), false);
 	DemandBath->Destroy();
 

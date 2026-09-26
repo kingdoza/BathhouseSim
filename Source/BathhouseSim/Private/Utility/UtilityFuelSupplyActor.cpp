@@ -31,35 +31,33 @@ FPlayerInteractionQuery AUtilityFuelSupplyActor::QueryInteraction(
 {
 	FPlayerInteractionQuery Query;
 	Query.bVisible = true;
-	Query.TargetName = LOCTEXT("SupplyName", "석탄 공급함");
-	Query.ActionName = LOCTEXT("SupplyPrimaryName", "삽으로 석탄 퍼담기");
-	Query.FailureReason = LOCTEXT("UseShovel", "삽을 들고 석탄 공급함을 향해 사용하세요.");
-	Query.bSecondaryVisible = true;
-	Query.SecondaryActionName = LOCTEXT("ReturnFuel", "삽의 연료 반환");
+	const FText FuelName = GetUtilityFuelKindDisplayName(FuelKind);
+	Query.TargetName = FText::Format(LOCTEXT("SupplyName", "{0} 공급함"), FuelName);
+	Query.ActionName = FText::Format(LOCTEXT("SupplyPrimaryName", "{0} 퍼담기"), FuelName);
 
 	AUtilityShovelActor* Shovel = Context.CarryComponent
 		? Cast<AUtilityShovelActor>(Context.CarryComponent->GetHeldObject())
 		: nullptr;
 	if (!IsValid(Shovel))
 	{
-		Query.SecondaryFailureReason = LOCTEXT("ReturnNeedsShovel", "연료가 든 삽을 들고 있어야 합니다.");
+		Query.FailureReason = LOCTEXT("UseShovel", "삽을 들고 있어야 합니다.");
 		return Query;
 	}
-	FText FailureReason;
-	Query.bCanSecondaryInteract = CanReturn(Shovel->GetFuelLoad(), FailureReason);
-	Query.SecondaryFailureReason = FailureReason;
+
+	const FUtilityFuelLoad Load = Shovel->GetFuelLoad();
+	const FUtilityFuelResult Evaluation = Load.IsEmpty()
+		? FUtilityFuelTransaction::EvaluateScoop(Context, *this)
+		: FUtilityFuelTransaction::EvaluateReturn(Context, *this);
+	if (!Load.IsEmpty() && Load.Kind == FuelKind)
+	{
+		Query.ActionName = FText::Format(LOCTEXT("ReturnFuel", "{0} 반환"), FuelName);
+	}
+	Query.bCanInteract = Evaluation.bSucceeded;
+	Query.FailureReason = Evaluation.FailureReason;
 	return Query;
 }
 
 FPlayerInteractionResult AUtilityFuelSupplyActor::ExecuteInteraction(
-	const FPlayerInteractionContext& Context)
-{
-	(void)Context;
-	return FPlayerInteractionResult::Failed(
-		LOCTEXT("SupplyUseHeldEquipment", "삽을 들고 석탄 공급함을 향해 사용하세요."));
-}
-
-FPlayerInteractionResult AUtilityFuelSupplyActor::ExecuteSecondaryInteraction(
 	const FPlayerInteractionContext& Context)
 {
 	AUtilityShovelActor* Shovel = Context.CarryComponent
@@ -68,18 +66,30 @@ FPlayerInteractionResult AUtilityFuelSupplyActor::ExecuteSecondaryInteraction(
 	if (!IsValid(Shovel))
 	{
 		return FPlayerInteractionResult::Failed(
-			LOCTEXT("ReturnNeedsShovel", "연료가 든 삽을 들고 있어야 합니다."),
-			EPlayerInteractionIntent::Secondary);
+			LOCTEXT("ReturnNeedsShovel", "삽을 들고 있어야 합니다."));
 	}
-	const FUtilityFuelResult Result = FUtilityFuelTransaction::Return(*Shovel, *this, Context);
-	return Result.bSucceeded
-		? FPlayerInteractionResult::Succeeded(EPlayerInteractionIntent::Secondary)
-		: FPlayerInteractionResult::Failed(Result.FailureReason, EPlayerInteractionIntent::Secondary);
+	const FUtilityFuelLoad Load = Shovel->GetFuelLoad();
+	if (Load.IsEmpty())
+	{
+		const FUtilityFuelResult Result = FUtilityFuelTransaction::Scoop(*Shovel, *this, Context);
+		return Result.bSucceeded
+			? FPlayerInteractionResult::Succeeded()
+			: FPlayerInteractionResult::Failed(Result.FailureReason);
+	}
+	if (Load.Kind == FuelKind)
+	{
+		const FUtilityFuelResult Result = FUtilityFuelTransaction::Return(*Shovel, *this, Context);
+		return Result.bSucceeded
+			? FPlayerInteractionResult::Succeeded()
+			: FPlayerInteractionResult::Failed(Result.FailureReason);
+	}
+	const FUtilityFuelResult Evaluation = FUtilityFuelTransaction::EvaluateReturn(Context, *this);
+	return FPlayerInteractionResult::Failed(Evaluation.FailureReason);
 }
 
 bool AUtilityFuelSupplyActor::HasValidAuthoring(FText& OutFailureReason) const
 {
-	if (FuelKind != EUtilityFuelKind::Coal || !FMath::IsFinite(ScoopPoints) || ScoopPoints <= 0.0f
+	if (!IsSupportedUtilityFuelKind(FuelKind) || !FMath::IsFinite(ScoopPoints) || ScoopPoints <= 0.0f
 		|| !SupplyMesh || !SupplyMesh->GetStaticMesh()
 		|| SupplyMesh->GetCollisionEnabled() != ECollisionEnabled::QueryOnly
 		|| SupplyMesh->GetCollisionResponseToChannel(ECC_Visibility) != ECR_Block
@@ -87,7 +97,7 @@ bool AUtilityFuelSupplyActor::HasValidAuthoring(FText& OutFailureReason) const
 	{
 		OutFailureReason = LOCTEXT(
 			"InvalidSupplyAuthoring",
-			"석탄 공급함에는 Coal/양수 설정과 메시 기반 QueryOnly Visibility Block target이 필요합니다.");
+			"연료 공급함에는 지원 연료 종류, 양수 설정과 메시 기반 QueryOnly Visibility Block target이 필요합니다.");
 		return false;
 	}
 	OutFailureReason = FText::GetEmpty();

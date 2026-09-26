@@ -7,6 +7,7 @@
 #include "Interaction/PlayerCarryComponent.h"
 #include "Interaction/PlayerEquipmentUseComponent.h"
 #include "Interaction/PlayerInteractable.h"
+#include "Interaction/PlayerInteractionFocusObserver.h"
 #include "Interaction/SupplementalInteractionIntentSource.h"
 
 #if ENABLE_DRAW_DEBUG
@@ -36,6 +37,7 @@ void UPlayerInteractionComponent::BeginPlay()
 void UPlayerInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	CancelActiveHold(false, FText::GetEmpty(), false);
+	bInteractionSuppressed = true;
 	ClearInteractionQuery();
 	OnInteractionQueryChanged.Clear();
 	OnInteractionAttemptFinishedNative.Clear();
@@ -60,6 +62,10 @@ void UPlayerInteractionComponent::TickComponent(
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	if (bInteractionSuppressed)
 	{
+		if (bFocusObserverSyncPending)
+		{
+			SyncFocusObservers();
+		}
 		return;
 	}
 
@@ -529,10 +535,84 @@ void UPlayerInteractionComponent::CommitQuery(UObject* TargetObject, const FPlay
 {
 	if (CurrentTarget == TargetObject && CurrentQuery.Equals(NewQuery))
 	{
+		SyncFocusObservers();
 		return;
 	}
 
 	CurrentTarget = TargetObject;
 	CurrentQuery = NewQuery;
-	OnInteractionQueryChanged.Broadcast(CurrentQuery);
+	const FPlayerInteractionQuery QuerySnapshot = CurrentQuery;
+	OnInteractionQueryChanged.Broadcast(QuerySnapshot);
+	SyncFocusObservers();
+}
+
+void UPlayerInteractionComponent::SyncFocusObservers()
+{
+	if (bSyncingFocusObservers)
+	{
+		bFocusObserverSyncPending = true;
+		return;
+	}
+
+	constexpr int32 MaxDispatchPasses = 8;
+	bSyncingFocusObservers = true;
+	bFocusObserverSyncPending = false;
+	int32 DispatchPasses = 0;
+
+	while (DispatchPasses < MaxDispatchPasses)
+	{
+		++DispatchPasses;
+		bFocusObserverSyncPending = false;
+
+		UObject* PreviousTarget = LastFocusObserverTarget.Get();
+		if (bHasLastFocusObserverTarget && !IsValid(PreviousTarget))
+		{
+			LastFocusObserverTarget.Reset();
+			LastFocusObserverQuery = FPlayerInteractionQuery();
+			bHasLastFocusObserverTarget = false;
+			PreviousTarget = nullptr;
+		}
+
+		UObject* CurrentObserverTarget = CurrentTarget.Get();
+		if (!IsValid(CurrentObserverTarget)
+			|| !CurrentObserverTarget->GetClass()->ImplementsInterface(UPlayerInteractionFocusObserver::StaticClass()))
+		{
+			CurrentObserverTarget = nullptr;
+		}
+
+		if (bHasLastFocusObserverTarget && PreviousTarget != CurrentObserverTarget)
+		{
+			LastFocusObserverTarget.Reset();
+			LastFocusObserverQuery = FPlayerInteractionQuery();
+			bHasLastFocusObserverTarget = false;
+			if (IPlayerInteractionFocusObserver* PreviousObserver = Cast<IPlayerInteractionFocusObserver>(PreviousTarget))
+			{
+				PreviousObserver->NotifyInteractionFocusEnded(*this);
+			}
+			bFocusObserverSyncPending = true;
+			continue;
+		}
+
+		if (!CurrentObserverTarget)
+		{
+			break;
+		}
+
+		if (bHasLastFocusObserverTarget && LastFocusObserverQuery.Equals(CurrentQuery))
+		{
+			break;
+		}
+
+		const FPlayerInteractionQuery QuerySnapshot = CurrentQuery;
+		LastFocusObserverTarget = CurrentObserverTarget;
+		LastFocusObserverQuery = QuerySnapshot;
+		bHasLastFocusObserverTarget = true;
+		bFocusObserverSyncPending = true;
+		if (IPlayerInteractionFocusObserver* CurrentObserver = Cast<IPlayerInteractionFocusObserver>(CurrentObserverTarget))
+		{
+			CurrentObserver->NotifyInteractionFocusChanged(*this, QuerySnapshot);
+		}
+	}
+
+	bSyncingFocusObservers = false;
 }

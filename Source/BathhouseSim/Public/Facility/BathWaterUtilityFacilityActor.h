@@ -83,10 +83,12 @@ public:
 
 	UBathWaterUtilityCapacityComponent* GetCapacityComponent() const { return Capacity; }
 	virtual UUtilityOperationComponent* GetUtilityOperation() const;
-	virtual bool RequiresLaborOperation() const { return false; }
+	virtual bool RequiresLaborOperation() const { return true; }
 	virtual bool HasValidUtilityAuthoring(FText& OutFailureReason) const;
 
 protected:
+	virtual void OnFacilityRecoveryHoldStarted() {}
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Bath Water Utility")
 	TObjectPtr<UBoxComponent> PackagePhysicalRoot;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Bath Water Utility")

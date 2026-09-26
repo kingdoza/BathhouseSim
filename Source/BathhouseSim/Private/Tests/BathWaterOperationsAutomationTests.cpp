@@ -18,8 +18,11 @@
 #include "Facility/BathWaterSettings.h"
 #include "Facility/BathWaterStateComponent.h"
 #include "Facility/BathWaterUtilityCapacityComponent.h"
+#include "Utility/UtilityOperationComponent.h"
 #include "Facility/BathWaterUtilityPlacementInstanceData.h"
 #include "Facility/BathWaterUtilityFacilityActor.h"
+#include "Utility/BathWaterCirculatorFacilityActor.h"
+#include "Utility/UtilityLeverOperatingVolumeComponent.h"
 #include "Facility/BathhouseBathFacilityActor.h"
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
@@ -79,8 +82,16 @@ UBathWaterUtilityCapacityComponent* AddProvider(
 	const float Points)
 {
 	AActor* Owner = World.SpawnActor<AActor>();
+	UUtilityOperationComponent* Operation = NewObject<UUtilityOperationComponent>(Owner, FName(*FString::Printf(TEXT("%sOperation"), Name)));
+	Operation->RegisterComponent();
+	FText FailureReason;
+	if (!Operation->ImportOperationState(Points, FailureReason) || !Operation->StartPlacedClock(false))
+	{
+		return nullptr;
+	}
 	UBathWaterUtilityCapacityComponent* Provider = NewObject<UBathWaterUtilityCapacityComponent>(Owner, Name);
 	Provider->RestoreCapacity(Kind, Points);
+	Provider->SetUtilityOperation(Operation);
 	Provider->RegisterComponent();
 	return Provider;
 }
@@ -622,7 +633,7 @@ bool FBathWaterOperationsFacilityTransactionTest::RunTest(const FString& Paramet
 	UFacilityPlacementDefinition* Definition = NewObject<UFacilityPlacementDefinition>();
 	Definition->StableId = TEXT("BathWaterUtilityAutomation");
 	Definition->FacilityTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Facility.Placeable")));
-	Definition->PlacedFacilityClass = ABathWaterUtilityFacilityActor::StaticClass();
+	Definition->PlacedFacilityClass = ABathWaterCirculatorFacilityActor::StaticClass();
 	Definition->RecoveryItemClass = APlaceableFacilityItemActor::StaticClass();
 	Definition->RecoveryItemMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	FText FailureReason;
@@ -631,18 +642,26 @@ bool FBathWaterOperationsFacilityTransactionTest::RunTest(const FString& Paramet
 
 	auto SpawnUtility = [&](const float Points, const FVector& Location)
 	{
-		ABathWaterUtilityFacilityActor* Utility = World->SpawnActorDeferred<ABathWaterUtilityFacilityActor>(
-			ABathWaterUtilityFacilityActor::StaticClass(), FTransform(Location), nullptr, nullptr,
+		ABathWaterCirculatorFacilityActor* Utility = World->SpawnActorDeferred<ABathWaterCirculatorFacilityActor>(
+			ABathWaterCirculatorFacilityActor::StaticClass(), FTransform(Location), nullptr, nullptr,
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-		if (!Utility) return static_cast<ABathWaterUtilityFacilityActor*>(nullptr);
+		if (!Utility) return static_cast<ABathWaterCirculatorFacilityActor*>(nullptr);
 		Utility->GetFacilityPlacementComponent()->Definition = Definition;
 		Utility->GetCapacityComponent()->RestoreCapacity(EBathWaterCapacityKind::Circulation, Points);
+		FText OperationFailure;
+		TestTrue(FString::Printf(TEXT("Circulator fixture imports prepared operation points: %s"), *OperationFailure.ToString()),
+			Utility->GetOperation()->ImportOperationState(Points, OperationFailure));
+		UStaticMesh* TestMesh = Definition->RecoveryItemMesh;
+		Utility->GetLeverOperatingVolume()->SetBoxExtent(FVector(15.0f));
+		Utility->GetLeverOperatingVolume()->SetRelativeScale3D(FVector::OneVector);
+		Utility->GetLeverMesh()->SetStaticMesh(TestMesh);
+		Utility->GetGaugeNeedleMesh()->SetStaticMesh(TestMesh);
 		Utility->FinishSpawning(FTransform(Location));
 		if (!Utility->HasActorBegunPlay()) Utility->DispatchBeginPlay();
 		return Utility;
 	};
 
-	ABathWaterUtilityFacilityActor* Utility = SpawnUtility(100.0f, FVector(5000.0f, 0.0f, 100.0f));
+	ABathWaterCirculatorFacilityActor* Utility = SpawnUtility(100.0f, FVector(5000.0f, 0.0f, 100.0f));
 	if (!TestNotNull(TEXT("Placed utility actor exists"), Utility)) return false;
 	TestTrue(TEXT("Placed utility contributes native capacity"), Utility->bProviderRegistered
 		&& FMath::IsNearlyEqual(Operations->GetCapacitySnapshot(EBathWaterCapacityKind::Circulation).TotalPoints, 100.0f));
@@ -660,7 +679,7 @@ bool FBathWaterOperationsFacilityTransactionTest::RunTest(const FString& Paramet
 	const FDelegateHandle PublicationHandle = Operations->OnOperationsChanged.AddLambda([&Publications]() { ++Publications; });
 	TestTrue(FString::Printf(TEXT("Utility recovery hold starts: %s"), *FailureReason.ToString()),
 		Utility->TryBeginFacilityRecoveryHold(FailureReason));
-	TWeakObjectPtr<ABathWaterUtilityFacilityActor> UtilityWeak(Utility);
+	TWeakObjectPtr<ABathWaterCirculatorFacilityActor> UtilityWeak(Utility);
 	APlaceableFacilityItemActor* Item = FFacilityActorConversionTransaction::RecoverFacilityToItem(*Utility, FailureReason);
 	TestTrue(FString::Printf(TEXT("Utility recovery transaction succeeds: %s"), *FailureReason.ToString()),
 		Item != nullptr && !UtilityWeak.IsValid());
@@ -674,10 +693,13 @@ bool FBathWaterOperationsFacilityTransactionTest::RunTest(const FString& Paramet
 		&& FMath::IsNearlyEqual(RecoveredData->CapacityPoints, 100.0f));
 	Operations->OnOperationsChanged.Remove(PublicationHandle);
 
-	ABathWaterUtilityFacilityActor* Staged = World->SpawnActorDeferred<ABathWaterUtilityFacilityActor>(
-		ABathWaterUtilityFacilityActor::StaticClass(), FTransform(FVector(6000.0f, 0.0f, 100.0f)), nullptr, nullptr,
+	ABathWaterCirculatorFacilityActor* Staged = World->SpawnActorDeferred<ABathWaterCirculatorFacilityActor>(
+		ABathWaterCirculatorFacilityActor::StaticClass(), FTransform(FVector(6000.0f, 0.0f, 100.0f)), nullptr, nullptr,
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	Staged->GetCapacityComponent()->RestoreCapacity(EBathWaterCapacityKind::Circulation, 7.0f);
+	Staged->GetLeverOperatingVolume()->SetBoxExtent(FVector(15.0f));
+	Staged->GetLeverMesh()->SetStaticMesh(Definition->RecoveryItemMesh);
+	Staged->GetGaugeNeedleMesh()->SetStaticMesh(Definition->RecoveryItemMesh);
 	TestTrue(TEXT("Malformed payload fixture enters staged placement"),
 		Staged->GetFacilityPlacementComponent()->PrepareForStagedPlacement(*Definition, FailureReason));
 	Staged->FinishSpawning(FTransform(FVector(6000.0f, 0.0f, 100.0f)));
@@ -705,7 +727,7 @@ bool FBathWaterOperationsFacilityTransactionTest::RunTest(const FString& Paramet
 	Staged->Destroy();
 	if (Item) Item->Destroy();
 
-	ABathWaterUtilityFacilityActor* RollbackUtility = SpawnUtility(80.0f, FVector(7000.0f, 0.0f, 100.0f));
+	ABathWaterCirculatorFacilityActor* RollbackUtility = SpawnUtility(80.0f, FVector(7000.0f, 0.0f, 100.0f));
 	TestNotNull(TEXT("Rollback utility exists"), RollbackUtility);
 	FFacilityActorConversionTransaction::SetTestFault(
 		FFacilityActorConversionTransaction::ETestFault::RecoveryActivation);
@@ -732,7 +754,7 @@ bool FBathWaterOperationsFacilityTransactionTest::RunTest(const FString& Paramet
 		{
 			bReentrantSnapshotObserved = Operations->GetSnapshot().Circulation.IsSatisfied();
 		});
-	ABathWaterUtilityFacilityActor* Replacement = SpawnUtility(80.0f, FVector(8000.0f, 0.0f, 100.0f));
+	ABathWaterCirculatorFacilityActor* Replacement = SpawnUtility(80.0f, FVector(8000.0f, 0.0f, 100.0f));
 	TestTrue(TEXT("Replacement registration resumes service and tolerates reentrant snapshot reads"),
 		Replacement && bReentrantSnapshotObserved
 		&& Operations->GetCapacitySnapshot(EBathWaterCapacityKind::Circulation).IsSatisfied());

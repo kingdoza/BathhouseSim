@@ -33,6 +33,7 @@ public:
 	float GetDecayPointsPerSecond() const { return DecayPointsPerSecond; }
 	bool HasValidAuthoring(FText& OutFailureReason) const;
 	bool CanAcceptFuel(const FUtilityFuelLoad& Load, FText& OutFailureReason) const;
+	bool ApplyLaborReward(float Points, FText& OutFailureReason);
 	bool ImportOperationState(float RemainingPoints, FText& OutFailureReason);
 	bool StartPlacedClock(bool bPublishOperatingTransition = true);
 	void StopPlacedClock(bool bPublishOperatingTransition = true);

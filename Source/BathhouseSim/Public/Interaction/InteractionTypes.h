@@ -96,6 +96,9 @@ struct BATHHOUSESIM_API FPlayerInteractionQuery
 	float HoldProgress = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	bool bPrimaryProgressVisible = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	bool bSecondaryVisible = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
@@ -161,6 +164,7 @@ struct BATHHOUSESIM_API FPlayerInteractionQuery
 			&& FailureReason.EqualTo(Other.FailureReason)
 			&& PrimaryActivationMode == Other.PrimaryActivationMode
 			&& FMath::IsNearlyEqual(HoldProgress, Other.HoldProgress)
+			&& bPrimaryProgressVisible == Other.bPrimaryProgressVisible
 			&& bSecondaryVisible == Other.bSecondaryVisible
 			&& bCanSecondaryInteract == Other.bCanSecondaryInteract
 			&& SecondaryActionName.EqualTo(Other.SecondaryActionName)

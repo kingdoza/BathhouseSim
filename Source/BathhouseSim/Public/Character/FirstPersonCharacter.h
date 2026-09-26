@@ -64,6 +64,7 @@ protected:
 	void InteractEndInput();
 	void SecondaryInteractInput();
 	void DropCarryInput();
+	void CancelInput();
 	void PrimaryUseStartInput();
 	void PrimaryUseTriggeredInput();
 	void PrimaryUseEndInput();
@@ -142,6 +143,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> DropCarryAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> CancelAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> PrimaryUseAction;

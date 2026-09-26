@@ -6,6 +6,7 @@
 
 class USceneComponent;
 class UUtilityOperationComponent;
+class FUtilityPivotRotation;
 
 UCLASS(ClassGroup = (Bathhouse), meta = (BlueprintSpawnableComponent))
 class BATHHOUSESIM_API UUtilityGaugeComponent : public UActorComponent
@@ -14,6 +15,7 @@ class BATHHOUSESIM_API UUtilityGaugeComponent : public UActorComponent
 
 public:
 	UUtilityGaugeComponent();
+	virtual ~UUtilityGaugeComponent();
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -51,9 +53,6 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USceneComponent> NeedlePivot = nullptr;
 
-	FQuat BaselineRelativeRotation = FQuat::Identity;
-	FQuat LastAppliedRelativeRotation = FQuat::Identity;
-	bool bHasBaseline = false;
-	bool bHasAppliedDisplayRotation = false;
+	FUtilityPivotRotation* PivotRotation = nullptr;
 	bool bHasBegunPlay = false;
 };

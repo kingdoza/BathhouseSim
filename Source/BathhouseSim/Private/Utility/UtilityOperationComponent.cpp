@@ -1,5 +1,9 @@
 #include "Utility/UtilityOperationComponent.h"
 
+#include "Facility/BathWaterUtilityFacilityActor.h"
+#include "Placement/FacilityPlacementComponent.h"
+#include "Misc/ScopeExit.h"
+
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
 #endif
@@ -133,6 +137,52 @@ bool UUtilityOperationComponent::CanAcceptFuel(
 		OutFailureReason = LOCTEXT("OperationAtCapacity", "설비가 가득 차 있습니다.");
 		return false;
 	}
+	OutFailureReason = FText::GetEmpty();
+	return true;
+}
+
+bool UUtilityOperationComponent::ApplyLaborReward(const float Points, FText& OutFailureReason)
+{
+	if (!FMath::IsFinite(Points) || Points <= 0.0f)
+	{
+		OutFailureReason = LOCTEXT("InvalidLaborReward", "노동 보상은 유한한 양수여야 합니다.");
+		return false;
+	}
+	const ABathWaterUtilityFacilityActor* Facility = Cast<ABathWaterUtilityFacilityActor>(GetOwner());
+	const UFacilityPlacementComponent* Placement = Facility
+		? Facility->GetFacilityPlacementComponent() : nullptr;
+	if (!Placement || Placement->GetMode() != EPlaceableFacilityMode::Placed
+		|| Placement->IsStagedPlacement() || !Placement->IsPlacedDomainActive() || !bPlacedClockActive)
+	{
+		OutFailureReason = LOCTEXT("LaborRewardFacilityInactive", "설치되어 가동 중인 설비에만 노동 보상을 적용할 수 있습니다.");
+		return false;
+	}
+	if (bLaborBlocked)
+	{
+		OutFailureReason = LOCTEXT("LaborRewardBlocked", "회수 중에는 노동 보상을 적용할 수 없습니다.");
+		return false;
+	}
+	if (!HasValidAuthoring(OutFailureReason))
+	{
+		return false;
+	}
+	if (!TryAcquireMutationGuard())
+	{
+		OutFailureReason = LOCTEXT("LaborRewardBusy", "설비 가동 상태를 변경하는 중입니다.");
+		return false;
+	}
+	ON_SCOPE_EXIT
+	{
+		ReleaseMutationGuard();
+	};
+
+	const float PreviousPublishedPoints = LastPublishedPoints;
+	const bool bWasProvidingCapacity = bPlacedClockActive && GetRemainingPoints() > 0.0f;
+	double GameTimeSeconds = 0.0;
+	const float CurrentPoints = SettleToCurrentTimeSilently(GameTimeSeconds);
+	const float RewardedPoints = FMath::Min(MaxOperationPoints, CurrentPoints + Points);
+	SetRemainingPointsSilently(RewardedPoints, GameTimeSeconds);
+	PublishCommittedChanges(PreviousPublishedPoints, bWasProvidingCapacity);
 	OutFailureReason = FText::GetEmpty();
 	return true;
 }

@@ -155,6 +155,11 @@ void AFirstPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 			&AFirstPersonCharacter::DropCarryInput);
 	}
 
+	if (CancelAction)
+	{
+		EnhancedInputComponent->BindAction(CancelAction, ETriggerEvent::Started, this, &AFirstPersonCharacter::CancelInput);
+	}
+
 	if (RecoverFacilityAction)
 	{
 		EnhancedInputComponent->BindAction(RecoverFacilityAction, ETriggerEvent::Started, this, &AFirstPersonCharacter::RecoverFacilityStartInput);
@@ -298,6 +303,14 @@ void AFirstPersonCharacter::DropCarryInput()
 	if (PlayerInteraction && FirstPersonCamera)
 	{
 		PlayerInteraction->TryDropCarry(FirstPersonCamera->GetForwardVector());
+	}
+}
+
+void AFirstPersonCharacter::CancelInput()
+{
+	if (PlayerComputerUse && PlayerComputerUse->IsCapturingInput())
+	{
+		PlayerComputerUse->RequestEndComputerUse();
 	}
 }
 

@@ -1,12 +1,16 @@
 #include "Computer/BathhouseComputerActor.h"
 
 #include "Camera/CameraComponent.h"
+#include "Components/ArrowComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Computer/PlayerComputerUseComponent.h"
 #include "Interaction/PlayerCarryComponent.h"
 #include "Facility/BathWaterOperationsSubsystem.h"
 #include "UI/BathWaterManagementScreenWidget.h"
+
+DEFINE_LOG_CATEGORY(LogBathhouseComputer);
 
 #define LOCTEXT_NAMESPACE "BathhouseComputerActor"
 
@@ -25,6 +29,16 @@ ABathhouseComputerActor::ABathhouseComputerActor()
 
 	FocusCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FocusCamera"));
 	FocusCamera->SetupAttachment(ComputerMesh);
+
+	FocusExitPoint = CreateDefaultSubobject<USceneComponent>(TEXT("FocusExitPoint"));
+	FocusExitPoint->SetupAttachment(RootComponent);
+#if WITH_EDITORONLY_DATA
+	FocusExitArrow = CreateEditorOnlyDefaultSubobject<UArrowComponent>(TEXT("FocusExitArrow"));
+	if (FocusExitArrow)
+	{
+		FocusExitArrow->SetupAttachment(FocusExitPoint);
+	}
+#endif
 }
 
 void ABathhouseComputerActor::BeginPlay()
@@ -141,6 +155,30 @@ void ABathhouseComputerActor::ReleaseReservation(UPlayerComputerUseComponent* Pl
 bool ABathhouseComputerActor::IsReservedBy(const UPlayerComputerUseComponent* PlayerComputerUse) const
 {
 	return PlayerComputerUse && CurrentUser.Get() == PlayerComputerUse;
+}
+
+FTransform ABathhouseComputerActor::GetFocusExitFootTransform() const
+{
+	const FTransform PointTransform = FocusExitPoint
+		? FocusExitPoint->GetComponentTransform()
+		: GetActorTransform();
+	const FRotator PointRotation = PointTransform.Rotator();
+	return FTransform(
+		FRotator(PointRotation.Pitch, PointRotation.Yaw, 0.0f),
+		PointTransform.GetLocation());
+}
+
+float ABathhouseComputerActor::GetFocusExitSearchRadiusCm() const
+{
+	if (!FMath::IsFinite(FocusExitSearchRadiusCm) || FocusExitSearchRadiusCm < 0.0f)
+	{
+		UE_LOG(LogBathhouseComputer, Warning,
+			TEXT("%s has invalid FocusExitSearchRadiusCm (%g); treating it as 0 cm."),
+			*GetPathName(),
+			FocusExitSearchRadiusCm);
+		return 0.0f;
+	}
+	return FocusExitSearchRadiusCm;
 }
 
 bool ABathhouseComputerActor::IsScreenReady() const

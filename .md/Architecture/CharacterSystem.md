@@ -17,6 +17,7 @@ Character System은 범용 1인칭 조작 템플릿의 플레이어 조작을 �
 - player interaction/carry component와 first-person held key anchor 조립
 - InteractAction 입력 라우팅
 - SecondaryInteractAction과 DropCarryAction 입력 라우팅
+- CancelAction(ESC) 취소/뒤로 intent 라우팅
 - player computer-use component와 widget interaction 조립
 - computer focus 중 1인칭 입력 gate와 click action 라우팅
 - player equipment-use component 조립과 LMB Started/Triggered/Completed/Canceled routing
@@ -54,6 +55,7 @@ Source/BathhouseSim/Private/Character/
 - `InteractAction` E의 Started/Completed/Canceled를 primary begin/end intent로 전달한다. 기존 instant target은 Started에서 한 번 실행하고 hold target은 release까지 유지한다.
 - `SecondaryInteractAction` F의 Started를 secondary intent로 전달한다.
 - `DropCarryAction` G의 Started를 camera forward와 함께 generic held-item free-drop intent로 전달한다.
+- `CancelAction`(신규, `IA_Cancel`, 기본 ESC)의 Started를 범용 취소/뒤로 intent로 받는다. 현재는 computer session이 input을 capture 중일 때만 focus-out 요청으로 전달하고, 그 밖에는 아무 domain에도 전달하지 않는다. 계약은 [ComputerSystem.md](ComputerSystem.md)를 따른다.
 - `UPlayerComputerUseComponent`와 mouse-source `UWidgetInteractionComponent`를 조립한다.
 - `UPlayerEquipmentUseComponent`를 조립하고 camera, carry와 interaction query/result context를 주입한다.
 - target `UPlayerFacilityPlacementComponent`를 조립하고 camera, carry와 interaction에 context를 주입한다.
@@ -191,6 +193,7 @@ Blueprint/Editor에서 설정해야 하는 주요 property:
 - `AFirstPersonCharacter::InteractAction`
 - `AFirstPersonCharacter::SecondaryInteractAction`
 - `AFirstPersonCharacter::DropCarryAction`
+- `AFirstPersonCharacter::CancelAction`
 - `AFirstPersonCharacter::PrimaryUseAction`
 - `AFirstPersonCharacter::RecoverFacilityAction`
 - `AFirstPersonCharacter::PlacementSnapAction`
