@@ -1,93 +1,93 @@
-# 코드 리뷰 요청 — 컴퓨터 포커스 진입·이탈 수정
+# 구현 리뷰 입력 — 상점 주문·배송 상자·쓰레기통
 
 ## 단계와 범위
 
-- 기능 계약: `.md/PROMPT_ARCHITECTURE.md`의 컴퓨터 포커스 CMP-001~020 승인본.
-- 구현 계약: `.md/PROMPT_IMPLEMENTATION.md`의 2026-09-26 컴퓨터 포커스 수정.
-- 재구현 프롬의 백업, UE 5.8 Editor 빌드, Blueprint load gate, focused·full automation을 실행했다. 최초 load 시도는 DDC 초기화 Fatal로 시작 전에 중단됐으며, `-DDC-ForceMemoryCache`로 같은 gate를 재실행해 완료했다.
-- 최종 자동화에서 새로 드러난 컴퓨터 세션 테스트 fixture의 회전 초기화 누락을 보완하고, 빌드와 focused·full automation을 다시 실행했다.
-- Content·Config·Level은 저장하지 않았다. load gate용 임시 `.uasset` 사본은 만든 뒤 제거했다. 기존 쿨러·순환기 및 Utility 변경은 작업 전 상태 그대로 두었다.
-- 사용자가 쿨러·순환기 작업 완료를 확인하고 문서 덮어쓰기를 승인했다. 이 문서와 `.md/PROMPT_UNREAL.md`가 컴퓨터 구현의 표준 결과물이다.
+- 기능 계약: PROMPT_ARCHITECTURE.md의 상점 Q1~Q25, 구현 정본: PROMPT_IMPLEMENTATION.md와 Architecture/ShopSystem.md.
+- 현재 단계: 샤워기 단일 판매 수직 구현. SHOP-001~031, 036, 037 대상. SHOP-032~035는 미구현이다.
+- 사용자는 Editor의 열림 여부와 무관하게 Source 작업을 계속하라고 지시했다. Editor는 닫힌 상태로 확인했고 조작하지 않았다.
+- UE 5.8 `Build.bat` 빌드가 성공했다. 임시 복사본 4개와 원본 4개(Template_Default, DefaultMap) Blueprint load gate가 각각 성공했다. Shop focused automation 4/4, 전체 `BathhouseSim` 회귀 56 success + 6 succeeded-with-warnings, 실패 0, 미실행 0이다.
+- 네 Blueprint 원본을 `Saved/MigrationBackup/20260927_shop/`에 백업했고, 원본과 백업 SHA-256이 모두 일치한다. 임시 `Content/Developers/MigrationCheck/` 복사본은 제거했다.
+- Content, Config, Level을 수정·저장하지 않았다. 기존 dirty Content 상태는 보존했다. Blueprint Editor authoring/Compile/Save/PIE는 아직 수행하지 않았다.
 
 ## 수정 요약
 
-- `CompleteFocusIn`: widget keyboard focus를 제거하고 `FInputModeGameAndUI` → 게임 viewport focus → viewport 중앙 마우스 배치 → hit testing 활성화 순서로 바꿨다. 기존 FXAA override 위치는 유지했다.
-- `RequestEndComputerUse`: FocusingIn/Active에서 timer·AA·pointer·hit test·cursor·input mode를 정리하고, 컴퓨터별 발바닥 지점과 플레이어 capsule 충돌로 고정/탐색/강제 경로를 구한다. Capsule center로 sweep 없는 `TeleportPhysics` 이동, actor yaw와 controller pitch/yaw를 설정한 뒤 owner pawn으로 blend한다.
-- `FComputerFocusExitPlacement`: 10cm 간격 수평 고리, 고정 yaw 시작 각도, capsule channel/response를 사용하는 overlap·sweep, C0 초기 blocking component 무시를 구현했다. 다른 Actor는 옮기지 않는다.
-- `ABathhouseComputerActor`: root 하위 `FocusExitPoint`, Editor-only child `FocusExitArrow`, 100cm 기본 반경과 값 검증 getter를 추가했다. 기존 ComputerMesh/ScreenWidget/FocusCamera/ManagedBathPlacementZone 및 blend field는 유지했다.
-- `AFirstPersonCharacter`: `CancelAction`과 Started-only `CancelInput` route를 추가했다. 비컴퓨터 상태에는 전달하지 않는다. E press ownership 코드는 바꾸지 않았다.
-- 재검증 중 `ComputerAutomationTests.cpp`의 두 재진입 fixture가 이전 exit의 pawn yaw를 초기화하지 않는 것을 확인해 actor rotation을 명시적으로 reset했다. runtime 구현 코드는 이 수정에서 바꾸지 않았다.
+- Economy: wallet 시작 잔액 100,000과 초기화 무방송, CanSpendMoney/TrySpendMoney 및 잔액 delegate; PlayerState에 ShopCart default subobject.
+- Placement: null InstanceData 신규 설치 payload와 SpawnFreshItem factory. Facility, Utility, Towel import는 신규 설치 상태를 보존하며 보일러 operation 잔량은 0으로 시작한다. Facility.Discardable native tag, 락커/태그 Data Validation, 시설 아이템 폐기 구현.
+- Carry/Shop domain: DeliveryBox enum append, 범용 CommitConsumeHeldObject와 기존 배치 wrapper, catalog/settings/cart/order subsystem, FIFO 지연 배송, 배송 지점·배송 상자·개봉 transaction·쓰레기통.
+- Computer/UI/HUD: IComputerScreenContextReceiver를 통한 screen context/user 전달, 관리 화면 interface 연결, 탭 root·상점·행 3종·잔액 HUD·배송 알림 native widget 계약과 HUD 바인딩 lifecycle.
+- 주문 guard는 평가가 끝난 뒤 설정하도록 두어 정상 주문이 자기 자신을 Busy로 막지 않게 했다. UI는 버튼 비활성 상태에서도 잔액 부족액을 다시 평가해 표시한다.
 
-## 시나리오와 자동화 연결
+## 시나리오와 자동화 소스
 
-| 시나리오 | 코드·자동화 |
-|---|---|
-| CMP-001, 003, 004, 009 | `ComputerAutomationTests.cpp`: 정상 E 이탈, FocusingIn에서 E 이탈, 세 시작 위치·방향에서 같은 고정 위치·방향. 화면 widget instance 보존도 확인 |
-| CMP-002, 014, 015 | `CancelInput`: Active에서 같은 이탈, Inactive/FocusingOut 무반응. 다른 mode로 intent를 전달하지 않는 코드 경로 |
-| CMP-005 | pointer down 뒤 이탈, pointer 상태 release, hit testing off, 이후 pointer press 거부 |
-| CMP-006 | 기존 E press ownership 회귀 유지 |
-| CMP-011~013 | `BathhouseSim.Computer.FocusExitPlacement`: fixed/free, capsule blocker 탐색, 벽 반대편 배제, 모두 막힌 Forced, 반경 0, 높이 보정 없음, 장애물 위치 불변 |
-| CMP-016 | 이동 모드·interaction 복구, 예약 해제, 재진입 회귀 유지 |
-| CMP-017 | `HandleComputerUnavailable`, Actor EndPlay와 controller loss에서 teleport 없이 복구 |
-| CMP-018 | `BathhouseSim.Computer.BlueprintLoad`: native parent, CDO FocusExitPoint/Arrow, screen class, 반경/blend, 로드된 world instance의 FocusExitPoint/ManagedBathPlacementZone 확인 |
-| CMP-019, 020 | helper 검사에서 목표 capsule center Z가 foot Z + scaled half height와 일치. 낙하·실제 바닥 수용은 PIE 인계 |
-| CMP-007, 008, 010 | headless에서 실제 Slate focus, cursor 위치와 blend 외형 판정 불가. CompleteFocusIn 코드는 viewport focus·중앙 배치 호출 순서를 실행하며 수용은 PIE로 인계 |
-
-focused 최종 실행은 `BathhouseSim.Computer` prefix로 3개 테스트를 선택해 모두 통과했다. 최초의 `BathhouseSim.Computer.*` filter는 UE 5.8에서 wildcard로 처리되지 않아 0개를 선택했고, prefix 실행으로 바로잡았다.
-
-## 변경 파일과 클래스 성장
-
-- `Public/Computer/BathhouseComputerActor.h` 64→81줄, `Private/Computer/BathhouseComputerActor.cpp` 161→199줄.
-- `Public/Computer/PlayerComputerUseComponent.h` 101줄(변경 없음), `Private/Computer/PlayerComputerUseComponent.cpp` 427→492줄. Placement geometry는 별도 private helper에 분리했다. 종료 session owner 책임을 유지한다.
-- `Public/Character/FirstPersonCharacter.h` 186→190줄, `Private/Character/FirstPersonCharacter.cpp` 449→462줄. 입력 property/binding/intent만 추가했다.
-- 신규 `Private/Computer/ComputerFocusExitPlacement.h/.cpp` 34/166줄, `Private/Tests/ComputerBlueprintLoadAutomationTests.cpp` 148줄. `ComputerAutomationTests.cpp`는 구현 전 418줄에서 613줄로 늘었다.
-
-## Blueprint/API·migration 영향
-
-- 신규 reflected 이름은 `FocusExitPoint`, editor-only `FocusExitArrow`, `FocusExitSearchRadiusCm`, `CancelAction`이다. 기존 이름을 rename/delete하지 않았고 Core Redirect는 추가하지 않았다.
-- `FocusExitArrow`는 `WITH_EDITORONLY_DATA`에 남기고 `BlueprintReadOnly`를 제거했다. 백업은 `Saved/MigrationBackup/20260926_computer/`에 완료했고 아래 재검증에서도 두 asset의 현재 hash가 백업과 일치했다.
-- Module Rules, Slate/SlateCore, Config, Level은 변경하지 않았다. Content에는 기존 Utility 변경이 남아 있으며 이번 작업에서는 건드리지 않았다.
-
-## 재구현 검증 결과
-
-### 백업
-
-| 파일 | SHA-256 |
-|---|---|
-| `Content/Bathhouse/Blueprints/Computer/BP_BathhouseComputer.uasset` | `A74BEE23F4C4A5F1B2C48379E629DC22900DEE9FD9AF75313CCB89559ADDC89E` |
-| `Content/__ExternalActors__/Maps/DefaultMap/7/EH/E4FLO971KSWUJ40H7W7PHK.uasset` | `B9C38D4E99091451E9375016BDB18592790FB91AF5BEE3FAE8A6E071D2590BD0` |
-
-### 빌드
-
-- 재구현 후 UE 5.8 `BathhouseSimEditor Win64 Development` 빌드 성공, exit code 0. 수정된 `ComputerAutomationTests.cpp` compile, module link와 target metadata 생성이 완료됐다. UBT 로그: `%LOCALAPPDATA%/UnrealBuildTool/Log.txt`.
-- 첫 빌드에서 `ComputerFocusExitPlacement.cpp`의 `FOverlapResult` 불완전 형식 오류를 확인해 `Engine/OverlapResult.h` include를 추가했다. P2 `FocusExitArrow` 수정도 UHT 오류 없이 통과했다.
-
-### Blueprint load gate
-
-DDC `Installed` graph에 writable node가 없는 시작 환경은 그대로다. `-DDC-ForceMemoryCache` 적용 후 engine이 memory fallback으로 시작했고 아래 세 load test가 통과했다. 성공 로그에도 DDC graph 오류와 memory fallback 메시지는 남지만, 테스트 대상 Blueprint의 Fatal·`Serial size mismatch`·`Failed to load`는 없었다.
-
-| 단계 | 결과 | 기록 |
+| 시나리오 | 자동화 소스와 커버리지 | 실행 |
 |---|---|---|
-| Template_Default 복사본 | 통과, 1/1 성공·경고 0 | `Saved/Reimplementation/Computer/BlueprintLoad_Copy_ForceMemoryCache/BlueprintLoad_Copy.log`, `Saved/Reimplementation/Computer/BlueprintLoad_Copy_ForceMemoryCache/Report/index.json` |
-| 복사본 정리 | 완료 | `Content/Developers/MigrationCheck` 및 임시 `.uasset` 제거. `git --no-optional-locks status --short -- Content Config`에서 사본이 남지 않았고 기존 Content 변경 목록만 보임 |
-| Template_Default 원본 | 통과, 1/1 성공·경고 0 | `Saved/Reimplementation/Computer/BlueprintLoad_Original/BlueprintLoad_Original.log`, `Saved/Reimplementation/Computer/BlueprintLoad_Original/Report/index.json` |
-| DefaultMap instance | 통과, 1/1 성공·경고 0 | `Saved/Reimplementation/Computer/BlueprintLoad_DefaultMap/BlueprintLoad_DefaultMap.log`, `Saved/Reimplementation/Computer/BlueprintLoad_DefaultMap/Report/index.json`; world instance 1개 확인 |
+| SHOP-001, 029 | Shop.WalletAndCart: 시작 잔액·무방송, 지출·입금 이벤트. Economy.CashReentrancy는 configured StartingMoney 위에 지급 1회와 재진입 거부 확인 | 성공. Shop_Focused_Final의 4개 Shop 테스트 무실패·무경고 |
+| SHOP-004~008, catalog | Shop.WalletAndCart: 추가/증가/감소/삭제, 상품·전체 수량 상한, 합계 overflow, 부족액 재평가, 판매 중지 줄 보존, 비양수 가격·누락 discard tag·락커·중복 ID Data Validation | 성공. Shop_Focused_Final |
+| SHOP-009, 010 | WalletAndCart와 OrderDelayWaitingAndFIFO: 부족액 주문은 잔액/cart 불변, 성공 시 차감 1회·cart 비움, 반복 주문 거부와 snapshot | 성공. Shop_Focused_Final |
+| SHOP-011~015, 030 | 같은 주문 자동화: 10초/0초, FIFO, 낮은 천장 대기 후 회복, 같은 tick 도착, 상자 적층과 delivery event | 성공. Shop_Focused_Final |
+| SHOP-016~021 | Shop.FreshInstallTrashAndUnboxing: E pickup, summary, free-drop/re-pick 동일 Actor, suppression 거부, 개봉 성공/빈손/소모 이벤트, 트인 바닥·벽 앞·사방 막힌 구석 배치 | 성공. Shop_Focused_Final |
+| SHOP-022, 028 | 같은 자동화: 신규 샤워기 factory→기존 placement transaction→기본 번호/가중치→회수·재배치, 신규 보일러 0잔량, Pawn 무시 | 성공. Shop_Focused_Final |
+| SHOP-023~027, 036, 037 | 같은 자동화: 샤워기·보일러 폐기, 락커 1/4/8 거부, 열쇠·걸레·렌치·바구니·삽 interface 부재, 빈손 거부 | 성공. Shop_Focused_Final |
+| Blueprint load gate | Shop.BlueprintLoad: Computer, PlayerState, HUD, recovery item native parent와 CDO 계약. 네 복사본, 네 원본 Template_Default, 네 원본 DefaultMap | 성공. 각 단일 package gate 1/1, 실패·경고 0 |
+| 기존 회귀 | Economy 2개, Placement 5개, Computer 3개, Utility 8개, Interaction 12개 등 전체 `BathhouseSim` 62개 | 성공 56 + 경고 포함 성공 6, 실패 0, 미실행 0. All_Regression_Final3 |
+| SHOP-002, 003, 031 및 입력·물리 수용 | WBP tab layout, 실제 컴퓨터 입력 우선순위, viewport HUD와 낙하 외형 | PIE 인계. 미실행 |
 
-Copy/original test는 native parent, CDO FocusExitPoint, ScreenWidget class와 blend 값 검사를 통과했다. DefaultMap은 `-BathhouseComputerRequireWorldInstance` assertion과 instance의 FocusExitPoint·ManagedBathPlacementZone 확인을 통과했다.
+SHOP-032~035(7종 판매·혼합 주문)는 이 수직 구현과 자동화에 포함하지 않았다. 개봉 취소·실패 경로는 suppression 거부와 범용 carry consume domain 실패 복원 소스로 연결되며, partial-spawn rollback은 아직 동적 검증되지 않았다.
 
-### 자동화와 기타 확인
+## 변경 파일
 
-- 최초 `Automation RunTests BathhouseSim.Computer.*` 실행은 0개 선택으로 끝났다. 기록: `Saved/Reimplementation/Computer/Automation_Computer/Automation_Computer.log`. 이후 UE가 인식하는 prefix `BathhouseSim.Computer`로 최종 focused suite를 실행해 3/3 성공, 경고 0, 실패 0, 미실행 0을 기록했다. 최종 report: `Saved/Reimplementation/Computer/Automation_Computer_Final/Report/index.json`; log: `Saved/Reimplementation/Computer/Automation_Computer_Final/Automation_Computer_Final.log`.
-- 수정 뒤 전체 `Automation RunTests BathhouseSim`은 Template_Default에서 58개 실행: 성공 50, 경고 포함 성공 5, 실패 3, 미실행 0. report: `Saved/Reimplementation/Computer/Automation_Full_Final/Report/index.json`; log: `Saved/Reimplementation/Computer/Automation_Full_Final/Automation_Full_Final.log`.
-- 전체 실패 이름은 `BathhouseSim.Placement.ActorReplacementFailureAtomicity`, `BathhouseSim.Placement.ActorReplacementTransaction`, `BathhouseSim.Placement.SettingsZoneLeaseAndCompatibility`다. 기존 전체 로그 `Saved/Logs/BathhouseSim_Full_Final3_20260926.log`의 세 이름과 일치한다. 재구현 프롬 지시에 따라 이름만 대조했으며 무관 판정은 하지 않았다.
-- Focused를 수정 전 실행했을 때 `FocusSessionSuppressionAndSampleScreen`에서 비영 blend 재진입 fixture 관련 assertion 6개가 실패했다. pawn actor yaw 초기화를 보완한 뒤 해당 테스트를 포함한 focused 3개와 full suite를 다시 실행해 컴퓨터 관련 실패가 없는 것을 확인했다.
-- 백업 두 asset의 현재 SHA-256은 기록값과 각각 일치했다. 임시 load-copy는 제거됐고 기존 Content dirty 목록은 작업 전 상태와 같으며 Config status는 clean이다.
-- `git diff --check`는 소스와 문서에 통과했다. PIE 전용 Slate focus, 화면 cursor 위치, blend 외형과 실제 바닥 수용은 미실행이다.
+기존 수정:
+- Private/Computer/BathhouseComputerActor.cpp
+- Private/Economy/BathhousePlayerState.cpp, PlayerWalletComponent.cpp
+- Private/Facility/BathWaterUtilityFacilityActor.cpp, BathhouseFacilityPlacementDomain.cpp
+- Private/Interaction/PlayerCarryComponent.cpp
+- Private/Placement/FacilityPlacementDefinition.cpp, FacilityPlacementPayload.cpp, PlaceableFacilityItemActor.cpp
+- Private/Tests/BathhouseEconomyTests.cpp
+- Private/Tests/FacilityPlacementAutomationTests.cpp (테스트 geometry의 10cm grid CDO override를 범위 안에서만 적용하고 원래 20cm 설정을 복원)
+- Private/Towel/TowelProcessingMachinePlacement.cpp
+- Private/UI/BathWaterManagementScreenWidget.cpp, BathhouseHUD.cpp
+- Public/Economy/BathhousePlayerState.h, PlayerWalletComponent.h
+- Public/Interaction/PhysicalCarryable.h, PlayerCarryComponent.h
+- Public/Placement/FacilityPlacementPayload.h, FacilityPlacementTypes.h, PlaceableFacilityItemActor.h
+- Public/UI/BathWaterManagementScreenWidget.h, BathhouseHUD.h
 
-## 리뷰 중점
+신규:
+- Private/Placement/FacilityPlacementTypes.cpp
+- Private/Shop: BathhouseTrashBinActor, ShopCartComponent, ShopCatalog, ShopDeliveryBoxActor, ShopDeliveryPointActor, ShopOrderSubsystem, ShopSettings, ShopUnboxingPlacement, ShopUnboxingTransaction의 .cpp/.h
+- Private/Tests/ShopAutomationTestProbe.cpp/.h, ShopAutomationTests.cpp
+- Private/UI: ComputerScreenRootWidget, MoneyHudWidget, ShopCartLineWidget, ShopNoticeWidget, ShopOrderLineWidget, ShopProductCardWidget, ShopScreenWidget의 .cpp
+- Public/Computer/ComputerScreenContext.h, Public/Interaction/PhysicalCarryDiscardable.h
+- Public/Shop: BathhouseTrashBinActor.h, ShopCartComponent.h, ShopCatalog.h, ShopDeliveryBoxActor.h, ShopDeliveryPointActor.h, ShopOrderSubsystem.h, ShopSettings.h, ShopTypes.h
+- Public/UI: ComputerScreenRootWidget.h, MoneyHudWidget.h, ShopCartLineWidget.h, ShopNoticeWidget.h, ShopOrderLineWidget.h, ShopProductCardWidget.h, ShopScreenWidget.h
 
-1. copy/original/DefaultMap report가 Blueprint parent·Widget·Zone·blend migration을 보존하는지.
-2. `OverlapBlockingTestByChannel`과 sweep이 capsule object type·response를 동일하게 적용하는지, B0 component만 sweep에서 제외하는지.
-3. 후보가 고리 거리순으로 선택되고 wall을 통과하지 않는지, 강제 배치에서 다른 Actor 위치가 유지되는지.
-4. 정상 종료는 owner pawn으로 blend하고 abnormal cleanup 경로는 teleport하지 않는지.
-5. `CompleteFocusIn` 순서와 ESC 비사용 동작을 PIE에서 수용하는지.
+## 클래스 성장과 API 영향
+
+| 클래스/파일 | 변경 전→후 | 추가 책임 |
+|---|---:|---|
+| PlayerCarryComponent cpp/header | 610/100→617/101 | 기존 placement consume 경로를 감싸는 generic consume commit |
+| PlaceableFacilityItemActor cpp/header | 342/103→417/114 | 명세의 fresh-install factory와 tag 기반 discard lifecycle |
+| BathhouseHUD cpp/header | 56/31→132/49 | 두 HUD widget, PlayerState 재시도 timer, delegate 해제 |
+| BathhouseComputerActor.cpp | 199→215 | interface context 전달과 사용 시작 후 PlayerState 통지 |
+| ShopOrderSubsystem.cpp | 신규 322 | 주문·FIFO·배송 world owner |
+| ShopDeliveryBoxActor.cpp | 신규 390 | box lifecycle 및 carry/equipment/discard 계약 |
+| ShopScreenWidget.cpp | 신규 379 | domain 구독과 표시 갱신 |
+
+새 reflected type/property와 ShopCart default subobject, Facility.Discardable native tag, DeliveryBox enum append가 추가됐다. 기존 reflected 이름 삭제/변경, Serialize 변경, Core Redirect, Build.cs dependency 변경은 없다. 신규 로직은 승인된 책임 경계에 맞췄으며 Blueprint에는 표시 계층과 asset 연결만 남긴다.
+
+## 검증 결과와 미검증 항목
+
+- UE 5.8 `Build.bat`: 성공. 최종 Source 빌드 후 Shop, Economy, Placement와 전체 자동화를 수행했다. 빌드 로그는 `%LOCALAPPDATA%\UnrealBuildTool\Log.txt`에 있다.
+- Shop focused: `Saved/Automation/Reports/20260927/Shop_Focused_Final/index.json` — 4 success, 0 warning, 0 fail.
+- Economy focused: `Saved/Automation/Reports/20260927/Economy_Fixture_Final/index.json` — 2 success, 0 warning, 0 fail.
+- Placement focused: `Saved/Automation/Reports/20260927/Placement_Final/index.json` — 5 success, 0 fail; 2개 테스트의 의도된 grid geometry/material 경고와 1개 StartupLockerReconciliation 진단을 포함해 총 2개 테스트가 warning 상태다.
+- 전체 회귀: `Saved/Automation/Reports/20260927/All_Regression_Final3/index.json` — 56 success, 6 succeeded-with-warnings, 0 fail, 0 notRun. 경고 테스트는 Placement 2, Towel 1, Utility 3이다. 오류 없이 성공 상태인 해당 진단과 상세 이벤트는 JSON 보고서에서 확인한다.
+- Blueprint load gate 보고서: `Shop_Copy_Computer`, `Shop_Copy_PlayerState`, `Shop_Copy_HUD`, `Shop_Copy_PlaceableItem`, `Shop_Originals_Template`, `Shop_Originals_DefaultMap` 디렉터리의 `index.json`. 각 1/1 success, 0 warning, 0 fail.
+- 4개 원본/백업 SHA-256이 일치한다. backup directory: `Saved/MigrationBackup/20260927_shop/`. `Content/Developers/MigrationCheck/`는 제거됐고 Content의 기존 변경 목록은 이 작업 전과 동일하게 보존됐다.
+- `Config/DefaultGame.ini`에는 기존 `GridSizeCm=20` 설정이 있다. Placement 아키텍처의 기본값 10cm를 전제로 하는 세 테스트는 10cm CDO override를 임시 적용해 검증하고, 끝나면 20cm를 복원한다. Config는 수정하지 않았다.
+
+다음은 Editor pass에서 확인해야 한다.
+
+- Blueprint 실제 연결, compile/save/reload와 Project Settings/Level authoring.
+- PIE에서 컴퓨터 탭 전환, 주문 UI·HUD, 입력 우선순위, 물리 pickup/drop, 낮은 천장 대기와 재도착 수용.
+- ShopUnboxingTransaction의 부분 생성 rollback 동적 fault injection은 자동화에 포함되지 않았다.
+- 전체 회귀의 6개 warning 테스트 상세는 `All_Regression_Final3/index.json`에 기록되어 있다. 구현 프롬프트 요구대로 실패는 없고, 경고는 테스트 로그에 명시된 진단이다.

@@ -18,6 +18,7 @@
 | Utility Labor | [UtilityLaborSystem.md](UtilityLaborSystem.md) | 보일러 투입구·계기와 삽·석탄 공급함 Blueprint authoring |
 | Customer AI | [CustomerSystem.md](CustomerSystem.md) | Customer routine Data Asset, Character/AIController Blueprint, StateTree schema/state/task/binding |
 | Interaction/UI | [InteractionUISystem.md](InteractionUISystem.md) | Input Mapping, Widget hierarchy, BindWidget와 표시 asset |
+| Shop | [ShopSystem.md](ShopSystem.md) | Catalog, 상품 Definition tag와 Shop Editor authoring state |
 | Towel | `TowelSystem.md` | 수건 설비·표현 Blueprint, mesh/material과 presentation 설정 |
 | World | [WorldSystem.md](WorldSystem.md) | map actor, World Settings, RecastNavMesh와 유일 Authority |
 

@@ -42,6 +42,21 @@ bool ABathhouseFacilityActor::ImportPlacementPayload(
 	const FFacilityPlacementPayload& Payload,
 	FText& OutFailureReason)
 {
+	if (Payload.IsFreshInstall())
+	{
+		if (!Payload.Validate(Item, OutFailureReason) || !FacilityPlacement
+			|| !FacilityPlacement->IsStagedPlacement()
+			|| FacilityPlacement->GetDefinition() != Payload.Definition
+			|| Payload.Definition->PlacedFacilityClass.Get() != GetClass())
+		{
+			if (OutFailureReason.IsEmpty())
+			{
+				OutFailureReason = LOCTEXT("InvalidFreshFacilityPayload", "신규 설비 설치 데이터가 올바르지 않습니다.");
+			}
+			return false;
+		}
+		return true;
+	}
 	const UBathhouseFacilityPlacementInstanceData* Data =
 		Cast<UBathhouseFacilityPlacementInstanceData>(Payload.InstanceData);
 	if (!Data || !Payload.Validate(Item, OutFailureReason)

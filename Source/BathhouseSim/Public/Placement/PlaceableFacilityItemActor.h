@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Interaction/PhysicalCarryable.h"
+#include "Interaction/PhysicalCarryDiscardable.h"
 #include "Interaction/PlayerInteractable.h"
 #include "Placement/FacilityPlacementPayload.h"
 #include "PlaceableFacilityItemActor.generated.h"
@@ -11,12 +12,14 @@ class UFacilityPlacementDefinition;
 class UPlayerCarryComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
+class UWorld;
 
 UCLASS(Blueprintable, NotPlaceable)
 class BATHHOUSESIM_API APlaceableFacilityItemActor
 	: public AActor
 	, public IPlayerInteractable
 	, public IPhysicalCarryable
+	, public IPhysicalCarryDiscardable
 {
 	GENERATED_BODY()
 
@@ -45,6 +48,14 @@ public:
 	virtual bool NotifyPhysicalDropCommitted(UPlayerCarryComponent& Carry) override;
 	virtual void PublishPhysicalCarryCommit(EPhysicalCarryCommitTransition Transition) override;
 	virtual void RecoverPhysicalCarryable(UPlayerCarryComponent* PreviousCarry) override;
+	virtual bool CanDiscardCarriedObject(FText& OutFailureReason) const override;
+	virtual void HandleDiscardCommitted() override;
+
+	static APlaceableFacilityItemActor* SpawnFreshItem(
+		UWorld& World,
+		UFacilityPlacementDefinition& Definition,
+		const FTransform& WorldTransform,
+		FText& OutFailureReason);
 
 	bool InitializeStaged(UFacilityPlacementDefinition& InDefinition, FText& OutFailureReason);
 	bool SetPlacementPayload(const FFacilityPlacementPayload& InPayload, FText& OutFailureReason);

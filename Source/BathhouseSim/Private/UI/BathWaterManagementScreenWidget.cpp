@@ -1,12 +1,17 @@
 #include "UI/BathWaterManagementScreenWidget.h"
-
 #include "Facility/BathWaterOperationsSubsystem.h"
+
 #include "Facility/BathhouseBathFacilityActor.h"
 #include "Engine/World.h"
 #include "Placement/FacilityPlacementZoneActor.h"
 #include "UI/BathWaterCapacitySummaryWidget.h"
 #include "UI/BathWaterDetailWidget.h"
 #include "UI/BathWaterMapWidget.h"
+
+void UBathWaterManagementScreenWidget::InitializeComputerScreen(const FComputerScreenContext& Context)
+{
+	InitializeManagementContext(Context.Operations.Get(), Context.ManagedZone.Get());
+}
 
 void UBathWaterManagementScreenWidget::InitializeManagementContext(
 	UBathWaterOperationsSubsystem* InOperations,

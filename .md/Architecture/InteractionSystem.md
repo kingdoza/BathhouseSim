@@ -14,6 +14,7 @@ Source/BathhouseSim/Public/Interaction/
   PlayerInteractable.h
   PlayerInteractionFocusObserver.h
   PhysicalCarryable.h
+  PhysicalCarryDiscardable.h
   PhysicalCarryFixedSlot.h
   PhysicalCarryFixedSlotActor.h
   HeldEquipmentUsable.h
@@ -179,6 +180,7 @@ Blueprint 조회·표현 API:
 - `UPlayerInteractionComponent::OnInteractionAttemptFinishedNative`는 C++ 전용 실행 결과 계약이며 BlueprintAssignable로 노출하지 않는다.
 - `UPlayerInteractionComponent::SetInteractionSuppressed`, `IsInteractionSuppressed`는 외부 focus owner가 사용하는 C++ 전용 계약이며 Blueprint에 노출하지 않는다.
 - `IPlayerInteractionFocusObserver`는 target 표현용 C++ 전용 계약이며 Blueprint에 노출하지 않는다.
+- `IPhysicalCarryDiscardable`은 쓰레기통 판정용 C++ 전용 선택 계약이다([PhysicalCarrySystem.md](PhysicalCarrySystem.md)).
 - `UPlayerCarryComponent::IsHandEmpty`
 - `UPlayerCarryComponent::GetHeldKey`
 - generic held object와 held kind 조회, `OnHeldObjectChanged`
@@ -216,6 +218,7 @@ Editor authoring 값:
 - Cleaning -> Interaction public query/equipment-use/motion/carry 계약
 - Combat -> Interaction public carry/equipment-use/motion 계약
 - Towel -> Interaction public intent/carry 계약
+- Shop -> Interaction public interactable/carry/equipment-use/discardable 계약
 - Utility -> Interaction public interactable/carry/focus-observer 계약
 - Character -> Interaction
 - Computer -> Interaction public query/carry/suppression 계약

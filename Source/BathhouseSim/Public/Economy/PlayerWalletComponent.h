@@ -13,9 +13,13 @@ class BATHHOUSESIM_API UPlayerWalletComponent : public UActorComponent
 
 public:
 	UPlayerWalletComponent();
+	virtual void InitializeComponent() override;
 
 	UFUNCTION(BlueprintPure, Category = "Economy")
 	int32 GetCurrentMoney() const { return CurrentMoney; }
+
+	bool CanSpendMoney(int32 Amount) const;
+	bool TrySpendMoney(int32 Amount);
 
 	bool CanAddMoney(int32 Amount) const;
 	bool TryAddMoney(int32 Amount);
@@ -24,6 +28,9 @@ public:
 	FOnMoneyChanged OnMoneyChanged;
 
 private:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Economy", meta = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
+	int32 StartingMoney = 100000;
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Economy", meta = (AllowPrivateAccess = "true"))
 	int32 CurrentMoney = 0;
 };

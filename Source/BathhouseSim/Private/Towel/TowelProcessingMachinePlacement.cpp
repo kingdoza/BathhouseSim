@@ -36,6 +36,21 @@ bool ATowelProcessingMachineActor::ImportPlacementPayload(
 	const FFacilityPlacementPayload& Payload,
 	FText& OutFailureReason)
 {
+	if (Payload.IsFreshInstall())
+	{
+		if (!Payload.Validate(Item, OutFailureReason) || !FacilityPlacement
+			|| !FacilityPlacement->IsStagedPlacement()
+			|| FacilityPlacement->GetDefinition() != Payload.Definition
+			|| Payload.Definition->PlacedFacilityClass.Get() != GetClass())
+		{
+			if (OutFailureReason.IsEmpty())
+			{
+				OutFailureReason = LOCTEXT("InvalidFreshTowelMachinePayload", "신규 수건 처리기 변환 데이터가 올바르지 않습니다.");
+			}
+			return false;
+		}
+		return true;
+	}
 	const UTowelMachinePlacementInstanceData* Data =
 		Cast<UTowelMachinePlacementInstanceData>(Payload.InstanceData);
 	if (!Data || !Payload.Validate(Item, OutFailureReason)

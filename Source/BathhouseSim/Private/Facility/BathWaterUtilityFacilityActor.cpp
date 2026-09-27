@@ -327,6 +327,30 @@ bool ABathWaterUtilityFacilityActor::ImportPlacementPayload(
 	const FFacilityPlacementPayload& Payload,
 	FText& OutFailureReason)
 {
+	if (Payload.IsFreshInstall())
+	{
+		if (!Payload.Validate(Item, OutFailureReason) || !Capacity || !FacilityPlacement
+			|| !FacilityPlacement->IsStagedPlacement()
+			|| FacilityPlacement->GetDefinition() != Payload.Definition
+			|| Payload.Definition->PlacedFacilityClass.Get() != GetClass()
+			|| !HasValidUtilityAuthoring(OutFailureReason))
+		{
+			if (OutFailureReason.IsEmpty())
+			{
+				OutFailureReason = LOCTEXT("InvalidFreshUtilityPayload", "신규 설비 용량 변환 데이터가 올바르지 않습니다.");
+			}
+			return false;
+		}
+		if (RequiresLaborOperation())
+		{
+			UUtilityOperationComponent* Operation = GetUtilityOperation();
+			if (!Operation || !Operation->ImportOperationState(0.0f, OutFailureReason))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
 	const UBathWaterUtilityPlacementInstanceData* Data =
 		Cast<UBathWaterUtilityPlacementInstanceData>(Payload.InstanceData);
 	if (!Data || !Payload.Validate(Item, OutFailureReason) || !Capacity || !FacilityPlacement

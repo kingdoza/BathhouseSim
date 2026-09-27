@@ -173,7 +173,7 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 
 1. placement 가능한 설비 아이템을 들고 Zone을 조준한다. 현재 Definition과 compatible인 Zone만 표시되는지 확인한다.
 2. 조준 Zone을 바꾸고 LCtrl을 누르고 떼는 동안 compatible grid 집합이 유지되는지 확인한다.
-3. minor line이 실제 10cm snap과 일치하고, 10칸마다 major line이 나타나는지 확인한다. grid 한 장이 `ZoneBounds` 전체를 덮고 셀 내부에는 line과 분리된 fill이 보여야 한다.
+3. minor line이 Project Settings grid 간격의 실제 snap과 일치하고, 10칸마다 major line이 나타나는지 확인한다. grid 한 장이 `ZoneBounds` 전체를 덮고 셀 내부에는 line과 분리된 fill이 보여야 한다.
 4. confirm 성공, cancel, preview 실패, held item 교체, interaction suppression과 PIE 종료 각각에서 모든 grid가 즉시 숨는지 확인한다.
 5. 기존 초록/빨강 preview, wheel yaw, LCtrl snap, LMB confirm, E/G/Q 입력과 prompt가 그대로 동작하는지 확인한다.
 6. grid가 collision/overlap/physics/NavMesh를 만들지 않고 벽과 설비 뒤에서는 가려지는지 확인한다.
@@ -231,63 +231,40 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 - 기존 Circulator actor에 SceneTools.save_actor를 실행했으나 /Game/__ExternalActors__/Maps/DefaultMap/5/YZ/KRUXF2RNGDHA3WNR999GN3 패키지가 없다는 오류로 실패했다. 신규 DryIceSupply 외부 actor 저장 오류와 같은 종류의 blocker다.
 - 따라서 현재 MCP toolset으로는 모든 stale WP component override를 instance에서 복구·저장할 수 있다고 확인되지 않았다. BP CDO authoring은 가능하며, actor component별 property는 개별 편집 가능 여부가 다르다. 이 단계는 수동 Editor authoring 또는 WP external actor package 생성·저장 지원이 필요하다.
 
-# 컴퓨터 포커스 CMP-001~020 — Unreal MCP 재시도 인계 (2026-09-26)
+# 컴퓨터 포커스 CMP-001~020 — MCP 작업 결과 및 남은 수동 수용 (2026-09-27)
 
-## 현재 상태
+## MCP 작업 완료
 
-- 코드 단계 승인을 받은 현재 작업은 .md/PROMPT_UNREAL.md의 컴퓨터 포커스 진입·이탈 authoring이다. 이번 시도에서는 Content, Config, Level asset을 수정하거나 저장하지 않았다.
-- 대상 프로젝트에 실행 중인 Editor가 없어 UE 5.8 작업용 백그라운드 Editor PID 33284를 시작했다. Saved/Logs/BathhouseSim.log는 14.26.08 UTC의 LogTurnkeySupport VerifySdk 호출 뒤 진행 로그가 없었고 Intermediate/TurnkeyLog_0.log 및 TurnkeyReport_0.log도 생성되지 않았다. 8000 포트는 열리지 않았다.
-- Unreal MCP list_toolsets transport 호출이 http://127.0.0.1:8000/mcp 연결 실패를 반환했다. 실제 Unreal tool 호출 성공/세션 초기화에 도달하지 못했다. Turnkey 정지 원인은 확인되지 않았다.
-- 해당 Editor는 MainWindowHandle=0이라 정상 종료와 CloseMainWindow가 실패했다. 소유권을 확인한 PID와 그 실행으로 생성된 cmd/dotnet 자식만 종료했으며 현재 Editor와 8000 listener는 없다.
+- CDO FocusExitPoint와 Escape 취소 입력을 authoring했다. 저장·새 프로세스 재로드로 확인된 위치는 (1500,0,-228.5714285714), 회전 yaw 180이며 SearchRadius는 100cm다. FocusExitArrow는 FocusExitPoint의 자식이고 local origin/zero rotation, editor-only, 길이 80cm다. Level 인스턴스도 동일 transform을 읽었다. actor transform (-470,0,160), scale (0.12,1.2,0.7) 기준 세계 발 위치는 (-290,0,0), 바라보는 방향은 -X다. 이전 인계의 X=1000 값은 현재 fresh-process readback과 달라 최신 저장 상태로 정정한다.
+- BP_FirstPersonCharacter.CancelAction은 IA_Cancel, 기존 InteractAction은 IA_Interact다. IA_Cancel ValueType은 Boolean이다. IMC_FirstPerson의 기존 7개 mapping을 보존하고 Escape → IA_Cancel을 추가해 8개이며, BP_FirstPersonController.DefaultMappingContext는 IMC_FirstPerson이다.
+- BP_BathhouseComputer, BP_FirstPersonCharacter, BP_FirstPersonController는 warnings-as-errors Compile을 통과했다. 네 변경 에셋(BP_BathhouseComputer, BP_FirstPersonCharacter, IMC_FirstPerson, IA_Cancel)은 개별 Save 후 fresh-process reload에서 모두 dirty=false였다. Controller는 변경하지 않았다.
+- 현재 Level은 /Game/Maps/DefaultMap이다. exact computer actor의 ScreenWidget과 ManagedBathPlacementZone 참조가 유지되고 FocusExitPoint가 CDO와 같은 값으로 재로드됐다. Map dirty=false이며 성공한 map/external actor Save는 없었다. 앞선 SceneTools.save_actor 호출은 external actor asset registry 경로 오류로 실패했다.
+- Focus foot point에서 아래로 한 trace는 바닥 Z=0을 가리켰다. 반경 30cm, 반높이 96cm capsule의 보수적 AABB query는 landscape tiles와 ManagedPlacementZone만 돌려줬고 컴퓨터 mesh/다른 blocker는 반환하지 않았다. 이 AABB 조회는 Pawn capsule의 실제 collision response test가 아니므로 blocker 수용 통과로 간주하지 않는다.
+- MCP StartPIE는 in-viewport PIE를 시작했고 PIE server login 및 월드 초기화가 로그에 남았다. StopPIE 뒤 IsPIERunning=false였다. task 관련 로그에서 gameplay error/ensure는 확인되지 않았다. Editor MapCheck의 0 error/0 warning 로그는 있었지만 Data Validation 실행 결과는 아니다. PIE에서 키보드/마우스 입력 시나리오는 수행하지 않았다.
 
-## 재개할 Editor 작업
+## 연결과 종료 기록
 
-MCP 연결이 실제 읽기 전용 조회까지 성공하면 .md/PROMPT_UNREAL.md allowlist 안에서 다음 authoring을 진행한다.
-
-1. /Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer의 FocusExitPoint와 FocusExitSearchRadiusCm class default를 정하고 Editor-only Arrow 방향을 확인한다. 고정 exit 위치는 player capsule이 주변 구조물과 겹치지 않아야 한다.
-2. 필요하면 exact Level actor /Game/Maps/DefaultMap.DefaultMap:PersistentLevel.BP_BathhouseComputer_C_UAID_F02F7433CA3690F802_2051456727에만 instance override를 authoring하고, 기존 ScreenWidget, ManagedBathPlacementZone과 blend 값 0.35/0.25초를 보존한다.
-3. /Game/Input/Actions/IA_Cancel이 없으면 Digital bool Input Action으로 만들고, /Game/FirstPersonCharacter/BP_FirstPersonCharacter의 CancelAction과 /Game/Input/IMC_FirstPerson의 Escape mapping에 연결한다. /Game/FirstPersonCharacter/BP_FirstPersonController의 DefaultMappingContext가 IMC_FirstPerson인지 확인한다.
-4. 대상 Blueprint만 Compile하고 allowlist asset만 개별 Save한다. Data Validation, 새 Editor session 재로드와 CMP-001~020 중 PIE 수용 항목은 현재 미실행 상태다.
-
-## 재개 조건
-
-- Turnkey VerifySdk가 반환하고 Editor startup log가 Slate/asset load까지 진행한다.
-- MCP 서버가 127.0.0.1:8000에서 대상 PID 소유로 listen하며 Unreal read-only 조회가 성공한다.
-- authoring 후 allowlist 개별 Save와 새 세션 재로드 결과를 기록한다. 작업 종료 시 에이전트가 시작한 백그라운드 Editor와 MCP 하위 프로세스를 종료한다.
-### 연결 실패 원인 비교 — 2026-09-27
-
-- 이전 성공 로그와 실패 시도의 실행 인자는 둘 다 `-NoSplash -log`이며 Turnkey VerifySdk 호출도 같은 명령이다. 이전 Editor는 Turnkey 호출(09:40:18 UTC) 후 11초 안에 MCP listener를 127.0.0.1:8000에 열고 세션 초기화 및 tool 목록 조회까지 진행했다.
-- 이번 재시도는 Turnkey 호출(14:57:30 UTC) 이후 60초 넘게 로그가 갱신되지 않았고 `Intermediate/TurnkeyLog_0.log`, `TurnkeyReport_0.log`, MCP listener가 생성되지 않았다. 따라서 관찰된 연결 실패는 MCP plugin 통신보다 앞선 Editor/Turnkey startup 정지의 결과다.
-- `-WaitForUATMutex` 또는 다른 Turnkey 단계 중 무엇이 대기 원인인지는 아직 증명되지 않았다. 작업용 Editor PID 27704와 이번 실행에서 시작된 UE 5.8 UAT 하위 프로세스를 종료했다. 현재 Editor/listener는 없고 에셋 변경도 없다. 이전 로그의 `resources/templates/list` 미지원 응답은 MCP 세션 초기화 후 나온 별도 프로토콜 요청 오류다.
-# 컴퓨터 포커스 CMP-001~020 — authoring 및 재로드 재개 상태 (2026-09-27)
-
-## 이전 인계 갱신
-
-위의 2026-09-26 MCP 실패 기록은 당시 상태의 이력이다. 이후 최초 authoring 세션은 AutomationTool 로그 경로에 대한 sandbox UnauthorizedAccessException 때문에 시작하지 못했으나, 승인된 권한으로 재실행한 Turnkey는 ExitCode=0을 반환했고 MCP 연결·편집이 진행됐다. 따라서 이 작업의 최신 차단점은 Turnkey 권한이나 포트 개방 실패가 아니다.
-
-## 저장된 MCP authoring 상태
-
-- /Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer CDO의 FocusExitPoint.relativeLocation을 (1000, 0, -228.5714285714)로 설정했다. 기존 SearchRadius 100cm, editor-only Arrow의 +X 방향을 유지했다. 수치 bounds와 floor trace에서는 고정 발 위치 (-350, 0, 0)가 컴퓨터 mesh와 capsule을 겹치지 않는 후보로 계산됐다. 화면 캡처는 승인 검토에서 거부되어 시각 배치는 확인하지 못했다.
-- /Game/Input/Actions/IA_Cancel이 없어서 ValueType Boolean인 action을 생성했다.
-- /Game/FirstPersonCharacter/BP_FirstPersonCharacter의 CancelAction을 IA_Cancel로 설정했고 기존 InteractAction은 유지했다.
-- /Game/Input/IMC_FirstPerson에 Escape → IA_Cancel을 추가했다. 기존 7개 mapping을 보존해 총 8개다.
-- /Game/FirstPersonCharacter/BP_FirstPersonController의 DefaultMappingContext가 IMC_FirstPerson을 참조하는 것을 확인했다.
-- BP_BathhouseComputer, BP_FirstPersonCharacter, BP_FirstPersonController를 warnings-as-errors Compile했다. Compile 결과 오류를 받지 않았고 LogBlueprint 조회에서 새 항목이 없었다.
-- allowlist 네 asset인 BP_BathhouseComputer, BP_FirstPersonCharacter, IMC_FirstPerson, IA_Cancel을 각각 Save해 성공 응답과 dirty=false를 확인했다. Controller는 변경하지 않아 저장하지 않았다.
-- DefaultMap exact computer actor 저장은 SceneTools.save_actor가 external actor asset registry path를 찾지 못해 실패했다. 대응하는 .uasset 파일은 디스크에 있었지만 MCP registry에서는 external package가 확인되지 않았다. Map/actor를 저장하지 않았다. Blueprint Compile 뒤 같은 세션의 actor는 CDO FocusExitPoint를 상속했지만 새 프로세스에서 재로드된 Level 인스턴스 결과는 아직 모른다.
-
-## 새 프로세스 재로드 시도와 연결 원인
-
-- 작업용 UE 5.8 Editor PID 4284는 Turnkey ExitCode=0, Engine initialized, 127.0.0.1:8000 listener 시작 및 MCP client 연결까지 진행했다.
-- 로그에는 MCP 메타 도구 검색 가능 표시가 최대 3개뿐이고 Python init_unreal.py 실행이나 Editor 작업 toolset 등록이 없었다. DDC maintenance 종료 후 로그가 더 진행하지 않았다.
-- 해당 상태에서 list_toolsets 단일 호출은 시간 초과했다. 포트와 client TCP 연결은 있었으므로 이는 이전의 포트 연결 실패와 다른 증상이다. 현재 근거만으로 초기화가 멈춘 구체 원인은 확정할 수 없다.
-- 동일 작업 재로드 확인의 두 번째 시도도 성공하지 않아 추가 재시도는 중단했다. CloseMainWindow는 false였고 이 작업이 시작한 정확한 PID 4284를 종료했다. 종료 확인 시 UnrealEditor 프로세스와 8000 listener가 없었다.
+- 제한된 최초 실행에서 AutomationTool이 사용자 AppData 로그 경로에 쓸 때 UnauthorizedAccessException이 발생했다. 승인된 elevated 실행 후 Turnkey와 MCP가 정상 동작했다.
+- 그 뒤 PID 20416/4284 재로드 실행은 MCP 리스너까지 열거나 TCP 연결을 맺었지만 Python 초기화/에디터 toolset 응답에 도달하지 못했다. 이 정지 원인은 확인되지 않았다.
+- 최신 PID 22480에서는 에디터 toolset 19개가 등록됐다. 현재 대화의 도구 catalog에는 Unreal wrapper가 노출되지 않았지만, 저장소 지침에 따른 직접 MCP initialize → tools/list → list_toolsets와 read-only 조회가 성공했다. project MCP 설정은 바꾸지 않았다.
+- MCP 작업 후 PID 22480의 정상 창 종료 요청은 실패해 작업 소유 PID만 종료했다. 확인 결과 UnrealEditor 프로세스와 8000 listener가 없다.
 
 ## 남은 Editor 수용
 
-1. 정상 초기화되어 Editor toolset이 완전히 등록된 새 MCP 세션에서 저장된 네 asset을 읽기 전용 재로드 확인한다. 특히 BP_BathhouseComputer CDO와 DefaultMap exact actor의 FocusExitPoint 상속을 구분해 기록한다. 새 세션에 작업용 Editor를 다시 시작했다면 마무리 후 종료한다.
-2. 현재 MCP registry에는 Data Validation 호출 tool이 없어 assets의 Data Validation을 실행하지 못했다. Editor에서 allowlist assets의 Validate Assets 결과와 오류를 기록한다.
-3. MCP는 PIE 시작/종료를 제공하지만 게임 입력을 주입할 수 없다. 화면·키보드·마우스가 필요한 수용은 별도 Editor 플레이에서 .md/PROMPT_UNREAL.md의 PIE 수용 절차를 수행한다. E/ESC 이탈과 진입 E release, 버튼/slider drag 중 LMB release, cursor 중앙 복귀, 고정 exit 위치/방향, blocker 및 forced 경로, 바닥 낙하 조건, placement/lever/recovery ESC 비간섭과 재진입을 기록한다.
-4. Editor screenshot capture 호출은 automatic approval review에서 프로젝트 UI/asset 정보를 MCP로 전송할 수 있다는 사유로 거부됐다. 시각 기준은 Editor에서 직접 확인한다.
+1. Editor의 Asset Actions에서 allowlist 에셋 Data Validation을 실행하고 결과를 기록한다. 현재 MCP toolset에는 Data Validation 호출 도구가 없다.
+2. 실제 플레이 입력·시각 수용은 직접 수행한다: E 진입·release, Escape 이탈, 화면 버튼/slider drag 중 LMB release, 커서 중앙 복귀, 서로 다른 진입 위치에서 고정 발 위치·방향, blocker/forced 경로, 바닥 낙하 조건, placement/lever/recovery 입력과 재진입. MCP에는 keyboard/mouse 입력 주입 기능이 없다.
+3. FocusExitArrow 및 실제 화면 배치는 Editor viewport에서 육안 확인한다. CaptureEditorImage 요청은 프로젝트 UI/asset 정보가 MCP로 전송될 수 있다는 사유로 automatic approval review에서 거부됐다. 캡처 우회는 하지 않는다.
 
-재로드, Data Validation, 직접 PIE 및 시각 수용이 끝나기 전까지 완료로 판정하지 않는다. 다음 재개는 우선 새 Editor의 MCP Python/toolset 초기화 및 read-only 호출 성공을 확인한 뒤 진행한다.
+위 직접 입력·시각 수용과 Data Validation이 끝나기 전까지 전체 CMP-001~020 통합 완료로 판정하지 않는다. MCP로 가능한 authoring, compile, save, reload, PIE start/stop은 수행했다.
+
+# 상점 주문·배송 UI — MCP 미지원 후속
+
+다음 Editor 작업은 현재 MCP toolset으로 끝내지 못했다.
+
+1. /Game/Bathhouse/UI/WBP_ComputerScreenRoot, /Game/Bathhouse/UI/Shop/WBP_ShopScreen, /Game/Bathhouse/UI/Shop/WBP_ShopProductCard, /Game/Bathhouse/UI/Shop/WBP_ShopCartLine, /Game/Bathhouse/UI/Shop/WBP_ShopOrderLine, /Game/Bathhouse/UI/WBP_MoneyHud, /Game/Bathhouse/UI/WBP_ShopNotice의 Widget hierarchy와 BindWidget 이름을 .md/PROMPT_UNREAL.md대로 authoring한다. 현재 MCP에 Widget tree 편집 tool이 없다. 이후 BP_BathhouseComputer.ScreenWidget.WidgetClass, BP_BathhouseHUD의 money/notice widget class도 연결해 저장한다.
+2. Project Settings > Bathhouse Shop에서 Catalog를 /Game/Bathhouse/Data/Shop/DA_ShopCatalog, DeliveryBoxClass를 /Game/Bathhouse/Blueprints/Shop/BP_ShopDeliveryBox로 지정해 영속 저장한다. ObjectTools memory setter는 시험 뒤 원복했고 config-save tool이 없어 Config/DefaultGame.ini는 변경되지 않았다.
+3. /Game/Maps/DefaultMap에 BP_ShopDeliveryPoint 한 개와 BP_TrashBin 한 개 이상을 놓고 바닥, 상자 stack 공간, 낮은 천장 공간을 구성한다. DeliveryPoint 후보는 (1800,650,0)이었다. 임시 actor의 save는 World Partition external package /Game/__ExternalActors__/Maps/DefaultMap/C/FD/PZ6HQFYUX7L4RVM1PXG25B 부재로 실패했고 해당 actor는 제거됐다. 사용 가능한 Editor 저장 절차로 external actor가 생성·저장되는지 확인한다.
+4. Data Validation을 Catalog, 세 Shop Blueprint, 관련 Definition에 실행한다. 현재 MCP toolset에 Data Validation 호출 tool이 없다. Catalog save-time 로그는 “Every shop product requires a valid placement definition.”였으므로 원인을 확인하고 통과 결과를 기록한다.
+5. 직접 PIE 입력과 시각 수용을 한다: 관리/상점 탭 전환, 상품 추가·수량 상한·부족액·주문·FIFO 알림, E로 배송 상자 pickup/drop/re-pick, LMB 개봉과 막힌 구석, 쓰레기통 버리기, 잔액/HUD 표시. 현재 MCP toolset에는 keyboard/mouse 입력 주입이 없어 이 시나리오를 대신 실행할 수 없다. 실제 상자 배치와 화면 레이아웃도 viewport에서 확인한다.
+
+확인 후 각 변경 asset을 개별 저장하고 DefaultMap 및 config를 재로드한다. 새 프로세스 재로드, Data Validation, 직접 수용까지 끝난 뒤 통합 검토를 재개한다.

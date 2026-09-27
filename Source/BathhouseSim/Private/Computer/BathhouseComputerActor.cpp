@@ -1,4 +1,7 @@
 #include "Computer/BathhouseComputerActor.h"
+#include "Computer/ComputerScreenContext.h"
+#include "Blueprint/UserWidget.h"
+#include "GameFramework/Pawn.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/ArrowComponent.h"
@@ -8,7 +11,8 @@
 #include "Computer/PlayerComputerUseComponent.h"
 #include "Interaction/PlayerCarryComponent.h"
 #include "Facility/BathWaterOperationsSubsystem.h"
-#include "UI/BathWaterManagementScreenWidget.h"
+#include "Placement/FacilityPlacementZoneActor.h"
+
 
 DEFINE_LOG_CATEGORY(LogBathhouseComputer);
 
@@ -47,12 +51,16 @@ void ABathhouseComputerActor::BeginPlay()
 	if (ScreenWidget)
 	{
 		ScreenWidget->InitWidget();
-		if (UBathWaterManagementScreenWidget* Management =
-			Cast<UBathWaterManagementScreenWidget>(ScreenWidget->GetUserWidgetObject()))
+		if (IComputerScreenContextReceiver* Receiver =
+			Cast<IComputerScreenContextReceiver>(ScreenWidget->GetUserWidgetObject()))
 		{
-			Management->InitializeManagementContext(
-				GetWorld() ? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>() : nullptr,
-				ManagedBathPlacementZone);
+			FComputerScreenContext ScreenContext;
+			ScreenContext.Computer = this;
+			ScreenContext.Operations = GetWorld()
+				? GetWorld()->GetSubsystem<UBathWaterOperationsSubsystem>()
+				: nullptr;
+			ScreenContext.ManagedZone = ManagedBathPlacementZone;
+			Receiver->InitializeComputerScreen(ScreenContext);
 		}
 	}
 }
@@ -128,6 +136,15 @@ FPlayerInteractionResult ABathhouseComputerActor::ExecuteInteraction(const FPlay
 			ReleaseReservation(PlayerComputerUse);
 		}
 		return FPlayerInteractionResult::Failed(LOCTEXT("FocusFailed", "컴퓨터 사용을 시작할 수 없습니다."));
+	}
+	if (ScreenWidget)
+	{
+		if (IComputerScreenContextReceiver* Receiver =
+			Cast<IComputerScreenContextReceiver>(ScreenWidget->GetUserWidgetObject()))
+		{
+			APawn* UserPawn = Cast<APawn>(Context.Interactor);
+			Receiver->NotifyComputerUserChanged(UserPawn ? UserPawn->GetPlayerState() : nullptr);
+		}
 	}
 
 	return FPlayerInteractionResult::Succeeded();

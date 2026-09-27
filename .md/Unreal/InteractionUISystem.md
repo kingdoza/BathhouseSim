@@ -21,8 +21,13 @@ Summary의 접두사별 이름은 표기된 접두사에 `CapacityText`, `Capaci
 ## 컴퓨터 연결
 
 - `/Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer`의 inherited `ScreenWidget.WidgetClass`는 `/Game/Bathhouse/UI/WBP_BathWaterManagementScreen.WBP_BathWaterManagementScreen_C`다.
-- `ScreenWidget`은 World Space, Draw Size `(1024,576)`, Receive Hardware Input `false`를 유지한다. Focus camera와 입력 설정은 변경하지 않았다.
+- ScreenWidget은 World Space, Draw Size (1024,576), Receive Hardware Input false를 유지한다. Focus camera 기본값은 변경하지 않았다.
+- 새 Editor 프로세스 재로드에서 BP_BathhouseComputer CDO의 FocusExitPoint 위치는 (1500,0,-228.5714285714), 회전은 (0,180,0), SearchRadius는 100cm였다. FocusExitArrow는 이 컴포넌트 자식이며 local 원점/회전 0, editor-only, 길이 80cm다. DefaultMap 컴퓨터 인스턴스도 동일한 상대 transform을 재로드했다. Actor transform은 위치 (-470,0,160), yaw 0, scale (0.12,1.2,0.7)이며 계산된 world 발 위치는 (-290,0,0), 방향은 컴퓨터를 향하는 -X다. 이전 MCP 인계의 X=1000은 stale한 값이며 새 프로세스 재로드 결과를 현재 저장 상태로 본다.
+- Level computer instance의 ManagedBathPlacementZone은 BP_FacilityPlacementZone_C_UAID_F02F7433CA36D1FF02_1155169559를 참조한다. CDO 속성은 None이므로 class default와 Level instance 참조를 구분한다.
+- BP_FirstPersonCharacter.CancelAction은 IA_Cancel이고 기존 InteractAction은 IA_Interact다. IA_Cancel은 Boolean Input Action이다. IMC_FirstPerson은 기존 7개 mapping과 Escape → IA_Cancel을 포함해 8개다. BP_FirstPersonController.DefaultMappingContext는 IMC_FirstPerson이다.
+- 변경된 네 asset(BP_BathhouseComputer, BP_FirstPersonCharacter, IMC_FirstPerson, IA_Cancel)은 각각 저장한 뒤 새 프로세스에서 다시 읽었고 모두 clean이었다. DefaultMap도 clean이며 성공한 map/external actor 저장은 없었다. 앞선 SceneTools.save_actor 시도는 external actor registry 경로 오류로 실패했다.
+
 - `/Game/Maps/DefaultMap.DefaultMap:PersistentLevel.BP_BathhouseComputer_C_UAID_F02F7433CA3690F802_2051456727`의 `ManagedBathPlacementZone`은 같은 Level의 `BP_FacilityPlacementZone_C_UAID_F02F7433CA36D1FF02_1155169559`를 참조한다.
 - Level reference는 World Partition external actor `/Game/__ExternalActors__/Maps/DefaultMap/7/EH/E4FLO971KSWUJ40H7W7PHK`에 저장됐다. `DefaultMap.umap` 자체는 이 연결 때문에 변경하지 않았다.
 
-UE 5.8 DLL 빌드 후 새 Editor에서 다섯 WBP와 컴퓨터 BP의 Data Validation 6/6 `VALID`를 확인했다. PIE의 1024×576 RenderTarget에는 Zone 격자·경계, Bath 타일 2개, utility summary와 detail이 표시됐다. 타일 Button의 `OnClicked` 이벤트를 호출하면 선택·detail·slider 활성화가 갱신된다. 실제 플레이어 LMB 조준/클릭과 물 제어·회수 전체 시나리오는 아직 직접 플레이 검증이 필요하며 [USER_UNREAL.md](../USER_UNREAL.md)에 남겼다.
+UE 5.8 DLL 빌드 후 새 Editor에서 다섯 WBP와 컴퓨터 BP의 Data Validation 6/6 `VALID`를 확인했다. PIE의 1024×576 RenderTarget에는 Zone 격자·경계, Bath 타일 2개, utility summary와 detail이 표시됐다. 타일 Button의 `OnClicked` 이벤트를 호출하면 선택·detail·slider 활성화가 갱신된다. 실제 플레이어 LMB 조준/클릭과 물 제어·회수 전체 시나리오는 아직 직접 플레이 검증이 필요하며 [USER_UNREAL.md](../USER_UNREAL.md)에 남겼다. 이번 FocusExitPoint/취소 입력 변경은 fresh-process reload와 PIE 시작·종료까지만 확인했고, Data Validation과 E/ESC/마우스 입력 수용은 미완료다.

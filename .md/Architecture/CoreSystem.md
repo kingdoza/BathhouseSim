@@ -95,6 +95,7 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 - `UtilityLaborSystem.md`: `Public/Utility`, `Private/Utility`의 설비 노동 hub(계층·Operation·용량·계기·회수).
 - `UtilityFuelSystem.md`: Utility 하위 재료·공급함·삽·연료 설비·투입 Volume·문 경계.
 - `UtilityLeverSystem.md`: Utility 하위 순환기 조작부·레버 왕복 경계.
+- `ShopSystem.md`: `Public/Shop`, `Private/Shop`의 상품 목록·장바구니·주문·배송·상자·개봉·쓰레기통 경계.
 - `PlacementSystem.md`: 설비 mode/preview/placement/recovery, 확장 단계와 락커 capacity lease 경계
 - `EconomySystem.md`: wallet과 cash claim 경계
 - `CustomerSystem.md`: StateTree routine과 customer session 경계
@@ -129,6 +130,7 @@ Cleaning/Towel/Computer, Combat/Customer Recovery, Physical Carry와 Bath Water 
 - 순환기·보일러·쿨러는 customer slot을 가진 범용 `ABathhouseFacilityActor`에 조건 분기를 추가하지 않고 placement/recovery 계약을 구현한 독립 utility Actor로 둔다.
 - utility base에 연료·계기·문·레버 로직을 누적하지 않는다. Operation과 바늘은 labor intermediate, 투입 Volume·문은 fuel intermediate, 조작부·레버는 circulator가 조립한다. 연료 transaction, pivot 회전 baseline과 owner input guard는 private helper가 맡는다. 문 열림은 전용 표현 component, 레버 왕복은 레버 노동 component가 소유한다.
 - 설치 락커 용량, customer lease와 임시 action-slot 후보는 `ULockerCapacitySubsystem`에 두며 Customer Session이나 설비 Actor에 전역 합계를 복제하지 않는다.
+- 상점: cart는 PlayerState component, 주문·배송은 world subsystem, 개봉 위치·transaction은 private helper가 맡는다. 이미 600줄을 넘은 `UPlayerCarryComponent`에는 기존 placement 소모를 일반화한 consume commit만 추가하고 상점 판정을 넣지 않는다. Widget은 cart·주문·돈을 보관하지 않는다.
 
 ## Manual Review Points
 

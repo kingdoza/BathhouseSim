@@ -171,6 +171,14 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - focus-out은 widget을 파괴하지 않아 같은 computer Actor lifetime 동안 선택과 표시 상태를 유지한다.
 - 기존 `UComputerSampleScreenWidget`과 WBP는 rename/delete하지 않는다. 관리 WBP assignment는 Editor 단계에서 수행한다.
 
+## Computer Tab Root, Shop And Money HUD
+
+2026-09-27 설계, Source 미반영. 계약은 [ShopSystem.md](ShopSystem.md) UI 절이 정본이다.
+
+- `UComputerScreenRootWidget`: 관리·상점 탭과 `UWidgetSwitcher`, 컴퓨터 context·사용자 전달. 탭 index는 표시 상태다.
+- `UShopScreenWidget`과 행 widget 3종: domain API 호출과 표시만 한다. cart·주문·돈을 보관하지 않는다.
+- `ABathhouseHUD`는 `UMoneyHudWidget`(잔액·2초 변화량)과 `UShopNoticeWidget`(배송 도착)을 추가로 생성한다. 두 widget은 PlayerState wallet과 order subsystem delegate를 구독하고 EndPlay에 대칭 해제한다.
+
 ## Blueprint/API Contracts
 
 - Blueprint가 사용해야 하는 API와 event만 `BlueprintCallable`, `BlueprintPure` 또는 `BlueprintImplementableEvent`로 노출한다.

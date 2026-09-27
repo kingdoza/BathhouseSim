@@ -1,5 +1,6 @@
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/FacilityPlacementComponent.h"
+#include "Placement/FacilityPlacementTypes.h"
 #include "Placement/PlaceableFacility.h"
 #include "Placement/PlaceableFacilityItemActor.h"
 
@@ -159,6 +160,10 @@ EDataValidationResult UFacilityPlacementDefinition::IsDataValid(FDataValidationC
 	if (LockerSlotCount < 0)
 	{
 		Invalidate(NSLOCTEXT("FacilityPlacementDefinition", "InvalidLockerCount", "Locker slot count cannot be negative."));
+	}
+	if (LockerSlotCount > 0 && FacilityTags.HasTag(TAG_Facility_Discardable))
+	{
+		Invalidate(NSLOCTEXT("FacilityPlacementDefinition", "DiscardableLocker", "Locker placement definitions cannot be marked discardable."));
 	}
 	return Result == EDataValidationResult::NotValidated
 		? EDataValidationResult::Valid

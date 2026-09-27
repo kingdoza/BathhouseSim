@@ -57,12 +57,17 @@ Computer Use는 사용자가 별도 작업으로 명시적으로 요청했을 �
 
 1. [UNREAL_MCP_CONNECTION.md](UNREAL_MCP_CONNECTION.md)의 절차로 대상 Editor를 선택하고 실제 MCP 조회 호출까지 확인한다.
 2. 연결 문서의 성공 기준을 충족한 세션에서 PIE 상태를 확인한다.
-3. 현재 작업에 필요한 MCP tool을 열거하고 조회·수정·저장·검증 가능 여부를 작업 전에 판정한다.
+3. 현재 작업에 필요한 MCP tool을 열거하고 조회·수정·저장·검증 가능 여부를 작업 전에 판정한다. 현재 인계와 관련 Unreal 정본에서 동일 도구·대상의 알려진 실패 및 재개 조건을 먼저 확인한다.
 4. `git status`, 대상 asset의 기존 변경과 Editor dirty package를 기준선으로 기록한다.
 5. startup log의 Blueprint compile, missing component/property와 load error를 확인한다.
 6. 필요한 tool이 없으면 가능한 항목과 불가능한 항목을 즉시 분리한다.
 
 연결 실패와 현재 대화의 도구 미노출은 연결 문서에 따라 구분한다. 연결 확인 후에도 필요한 Editor 기능이 없으면 해당 작업을 `USER_UNREAL.md`로 인계한다. 읽기 전용 Source 분석으로 Editor 결과를 추측하지 않는다.
+
+### 호출 전 스키마 확인
+
+- 각 편집·생성·저장 도구의 최초 사용 전에 현재 세션의 `describe_toolset` 설명과 인자 스키마를 읽는다. 재연결·도구 변경 시 다시 확인한다. 인자명만으로 asset 유형, 부모 클래스, object/class 참조와 경로 형식을 추측하지 않는다.
+- 인자 오류는 정확한 요청·오류와 스키마를 대조해 수정한 뒤 제한 내에서 재시도한다. 스키마에 맞는 호출의 내부 실패와 구분하며, 인자를 무작위로 바꾸거나 지원 여부를 모르는 요청을 묶어 실행하지 않는다.
 
 ## 세션 정책
 
@@ -92,6 +97,15 @@ Editor 소유권, 중복 실행 방지, 재시작·종료와 sharing violation �
 
 `Save All`을 사용하지 않고 allowlist asset만 개별 저장한다. 임시 actor/asset은 MCP로 안전하게 생성·제거할 수 있을 때만 사용하며 사용자 map 변경과 합쳐 저장하지 않는다.
 
+### Level actor·World Partition 저장
+
+- 배치·수정 전 대상 Level의 World Partition 여부, 개별 actor/package 저장 도구와 기존 실패 조건을 확인한다. 도구 존재만으로 저장 지원을 확정하지 않는다. 지원이 미확인이고 알려진 동일 차단점이 없다면 승인된 대상 하나로 저장·재로드를 확인한 뒤 나머지를 진행한다. 읽기 전용 조사에서는 생성·저장 시험을 하지 않는다.
+- `save_actor`의 `Asset does not exist: /Game/__ExternalActors__/...` 오류는 과거 신규·기존 actor 모두에서 관찰됐다. 현재 도구·저장 경로가 같은 경우 다른 actor를 계속 생성해 재시험하지 않는다. 도구 수정, 지원되는 다른 개별 저장 경로, 해당 패키지 상태 변화 등 관련 조건이 바뀐 근거가 있을 때만 재확인한다.
+- 오류에 나온 package 경로, 디스크 파일 존재, registry 조회 결과와 dirty 상태를 가능한 범위에서 구분한다. registry 조회 실패만으로 디스크 파일 부재나 MCP 구현 결함을 확정하지 않는다. 조회 불가는 미확인으로 기록한다.
+- 저장 완료는 해당 external actor package의 저장 결과·dirty 해소와 디스크에서 재로드한 actor의 존재·핵심값 유지로 확인한다. 파일 존재, 메모리 readback, Map Save 성공 또는 Map dirty=false만으로 완료 처리하지 않는다. 미저장 사용자 상태를 잃는 reload는 수행하지 않는다.
+- 저장 실패 시 배치 확대를 중단하고 현재 스키마가 지원하는 allowlist 내 개별 저장 경로를 확인한다. 지원 경로가 없거나 실패가 지속되면 exact actor/package, 도구·오류, 메모리/디스크 상태, 필요한 저장 조작과 재개 조건을 `USER_UNREAL.md`에 남긴다. 현재 실패를 모든 MCP 버전의 영구적인 저장 불가로 일반화하지 않는다.
+- 이번 작업이 만든 미저장 임시 actor만 참조·기준선을 확인해 안전하게 정리한다. 사용자 actor·기존 변경을 삭제하거나 `Save All`로 해결하지 않는다. 실제 작업 상태의 유지·손실 및 작업용 Editor 종료는 연결 문서의 세션 정책을 따른다.
+
 ## Unreal 정본 갱신
 
 - exact asset path, Parent Class, 핵심 component hierarchy와 C++ 계약 연결을 기록한다.
@@ -118,9 +132,13 @@ MCP가 수행할 수 없는 각 항목을 한국어로 작성한다.
 - 프로젝트 오류: native/Blueprint 계약, compile, validation, PIE와 gameplay 문제
 - Editor 상태 오류: stale class, dirty package, World Partition과 sharing violation
 - 실행 환경 오류: engine/MCP mismatch, timeout, DDC/Zen과 세션 문제
+- 호출 오류: 현재 스키마와 다른 인자·참조 형식. 올바른 요청으로 정정하기 전에는 기능 부족으로 판정하지 않는다.
+- 권한·승인 거부: 실행·네트워크·화면 캡처 등 요청이 정책 또는 승인 검토에서 차단됨. 연결 실패나 도구 부재와 구분한다.
 - 기능 부족: 현재 MCP toolset에 필요한 조회·편집·시각 기능이 없음
 
-같은 실패는 원인 확인을 포함해 두 번까지만 시도한다. 프로젝트 오류는 저장하지 않고 소유 단계로 돌려보내며, 기능 부족은 `USER_UNREAL.md`로 인계한다.
+같은 실패는 원인 확인을 포함해 두 번까지만 시도하되, 재시도에는 바뀐 조건과 근거가 필요하다. 프로젝트 오류는 저장하지 않고 소유 단계로 돌려보내며, 기능 부족은 `USER_UNREAL.md`로 인계한다.
+
+승인 거부는 동일 요청 반복·직접 HTTP·다른 캡처 경로로 우회하지 않는다. 차단된 요청과 반환된 사유를 보고하고 독립적으로 허용된 작업을 계속한다. MCP 캡처 도구가 있어도 호출이 거부됐다면 시각 확인은 미완료로 남긴다. 향후 정식 권한 변경 또는 정책상 허용된 승인 경로가 있을 때 재개하며, 지침 문서가 실행 권한을 대신하지 않는다.
 
 ## 결과물
 

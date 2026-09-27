@@ -5,6 +5,7 @@
 #include "Interaction/PlayerCarryComponent.h"
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/FacilityPlacementSettings.h"
+#include "Placement/FacilityPlacementTypes.h"
 #include "UObject/ConstructorHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PlaceableFacilityItemActor"
@@ -228,6 +229,56 @@ bool APlaceableFacilityItemActor::InitializeStaged(
 	return true;
 }
 
+APlaceableFacilityItemActor* APlaceableFacilityItemActor::SpawnFreshItem(
+	UWorld& World,
+	UFacilityPlacementDefinition& Definition,
+	const FTransform& WorldTransform,
+	FText& OutFailureReason)
+{
+	if (WorldTransform.ContainsNaN() || !Definition.ValidateRuntime(OutFailureReason))
+	{
+		return nullptr;
+	}
+	APlaceableFacilityItemActor* Item = World.SpawnActorDeferred<APlaceableFacilityItemActor>(
+		Definition.RecoveryItemClass,
+		WorldTransform,
+		nullptr,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!Item)
+	{
+		OutFailureReason = LOCTEXT("FreshItemSpawnFailed", "신규 설비 아이템 생성을 시작할 수 없습니다.");
+		return nullptr;
+	}
+	auto Fail = [&]() -> APlaceableFacilityItemActor*
+	{
+		if (IsValid(Item))
+		{
+			Item->Destroy();
+		}
+		if (OutFailureReason.IsEmpty())
+		{
+			OutFailureReason = LOCTEXT("FreshItemInitializationFailed", "신규 설비 아이템을 초기화할 수 없습니다.");
+		}
+		return nullptr;
+	};
+	if (!Item->InitializeStaged(Definition, OutFailureReason))
+	{
+		return Fail();
+	}
+	FFacilityPlacementPayload Payload;
+	Payload.Definition = &Definition;
+	if (!Item->SetPlacementPayload(Payload, OutFailureReason))
+	{
+		return Fail();
+	}
+	Item->FinishSpawning(WorldTransform);
+	if (!IsValid(Item) || !Item->ValidatePlacementPayload(OutFailureReason))
+	{
+		return Fail();
+	}
+	return Item;
+}
 bool APlaceableFacilityItemActor::SetPlacementPayload(
 	const FFacilityPlacementPayload& InPayload,
 	FText& OutFailureReason)
@@ -325,6 +376,30 @@ bool APlaceableFacilityItemActor::IsHeldForPlacement() const
 		&& Carrier->GetHeldObject() == this;
 }
 
+bool APlaceableFacilityItemActor::CanDiscardCarriedObject(FText& OutFailureReason) const
+{
+	if (Lifecycle != ELifecycle::Held || !Carrier.IsValid() || Carrier->GetHeldObject() != this
+		|| !IsValid(Payload.Definition.Get())
+		|| !Payload.Definition->FacilityTags.HasTag(TAG_Facility_Discardable)
+		|| Payload.Definition->LockerSlotCount > 0)
+	{
+		OutFailureReason = LOCTEXT("FacilityItemNotDiscardable", "이 설비 아이템은 버릴 수 없습니다.");
+		return false;
+	}
+	return true;
+}
+
+void APlaceableFacilityItemActor::HandleDiscardCommitted()
+{
+	if (Lifecycle != ELifecycle::Held)
+	{
+		return;
+	}
+	Carrier.Reset();
+	Payload.Reset();
+	Lifecycle = ELifecycle::PlacementConsumed;
+	Destroy();
+}
 void APlaceableFacilityItemActor::SetFreeWorldPhysics(const bool bEnabled)
 {
 	if (!ItemRoot)

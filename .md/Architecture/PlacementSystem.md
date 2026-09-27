@@ -89,7 +89,7 @@ Placement는 설비 contents, 목욕탕 물, customer 행동, key 상태와 UI h
 
 `UFacilityPlacementSettings : UDeveloperSettings`가 Project Settings의 공통 authoring 정본이다.
 
-- `GridSizeCm = 10.0`
+- `GridSizeCm`: 실제 값은 Project Settings(`Facility Placement > Grid Size Cm`, `Config/DefaultGame.ini`)가 정본이며 문서에 수치를 기록하지 않는다. C++ 기본값은 설정이 없을 때의 예비값이다. 값을 바꾸면 모든 Definition footprint가 새 간격의 정수배인지 Data Validation으로 확인한다. 자동화는 이 값에 의존하지 않도록 필요한 간격을 test 범위 안에서 고정한다.
 - `RotationStepDegrees`
 - `RecoveryHoldSeconds`
 - `RecoveryDropZOffsetCm`
@@ -219,6 +219,13 @@ recovery hold 시작은 side-effect-free query 성공 뒤 `TryBeginFacilityRecov
 
 Actor collision restore는 실패 가능한 domain rollback 뒤에 수행한다. callback 재진입과 Actor 파괴 보상, held identity/Root scale/payload와 기존 회수 조건은 현재 transaction 계약을 유지한다.
 
+## Fresh Install Payload And Discard Tag
+
+- 상점 구매 아이템은 `Definition`만 있고 `InstanceData`가 null인 **신규 설치 payload**를 가진다. `FFacilityPlacementPayload::Validate`는 null `InstanceData`를 허용하고 `IsFreshInstall()`로 구분한다. 회수 export는 항상 domain data를 채우므로 둘이 섞이지 않는다.
+- 세 import 구현(목욕탕 설비, utility, 수건 처리기)은 신규 설치 payload면 domain import를 건너뛰고 class 기본값을 유지한다. utility는 잔량 0 신규 상태, 목욕탕 설비는 번호 없음·기본 가중치다.
+- 생성은 Placement 소유 factory `APlaceableFacilityItemActor::SpawnFreshItem(World, Definition, Transform, OutFailure)`만 사용한다. 회수 경로와 같은 deferred spawn → `InitializeStaged` → payload 설정 → `FinishSpawning` → 검증 순서이며, free-world 활성화는 호출자가 한다.
+- native gameplay tag `Facility.Discardable`(`TAG_Facility_Discardable`)을 `FacilityTags`에 둔 Definition의 아이템만 버릴 수 있다. `LockerSlotCount > 0`인 Definition에 이 태그가 있으면 Data Validation 오류다. 아이템은 `IPhysicalCarryDiscardable`을 구현한다. 규칙과 사용처는 [ShopSystem.md](ShopSystem.md)에 있다.
+
 ## Preserved Domain Contracts
 
 - `IPlaceableFacility`은 side-effect-free placement/recovery query, default no-op recovery-hold begin/cancel, typed payload export/import와 silent domain stage/rollback을 제공한다. `IPhysicalCarryable`은 별도 recovery item만 구현한다.
@@ -294,6 +301,7 @@ Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후�
 
 ## Dependencies
 
+- Shop -> Placement Definition·fresh item factory·collision helper
 - Placement -> Interaction carry/query/result contract
 - Facility/Towel -> Placement placeable-facility contract
 - Bath Water Operations utility -> Placement placeable-facility/typed-payload contract

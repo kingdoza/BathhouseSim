@@ -70,6 +70,8 @@ native default subobject:
 Actor는 `IPlayerInteractable`을 직접 구현한다.
 
 - `BeginPlay`에서 `ScreenWidget->InitWidget()`을 한 번 보장하고 실제 user widget 생성 여부를 사용 가능 조건에 포함한다.
+- 2026-09-27 상점: screen root user widget이 `IComputerScreenContextReceiver`(Computer, C++ 전용)를 구현하면 BeginPlay에 `InitializeComputerScreen(Context{Computer, OperationsSubsystem, ManagedBathPlacementZone})`를 호출한다. 관리 화면을 직접 cast하던 경로는 이 interface로 바꾸고 `UBathWaterManagementScreenWidget`도 구현해 기존 WBP 직접 사용을 호환한다.
+- reservation과 session 시작이 성공하면 `NotifyComputerUserChanged(PlayerState)`를 호출한다. 사용 종료 때 사용자를 지우지 않아 화면이 마지막 사용자 기준을 유지한다. Computer는 Shop을 알지 못한다.
 - `QueryInteraction`은 carry context가 유효하고 `IsHandEmpty()`이며 screen/focus camera가 사용 가능하고 다른 user가 없을 때 `컴퓨터 사용`을 허용한다.
 - 손에 key, wet mop 또는 towel basket이 있으면 `손에 든 물건을 내려놓아야 합니다`를 반환한다.
 - `ExecuteInteraction`은 같은 조건을 다시 검증하고 interactor의 `UPlayerComputerUseComponent`에 시작을 요청한다.
@@ -197,6 +199,7 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
 - `AFirstPersonCharacter::PlayerComputerUse`, `ComputerWidgetInteraction`, `ComputerClickAction`
 - `AFirstPersonCharacter::PrimaryUseAction`을 canonical LMB로 사용하고 `ComputerClickAction`은 deprecated fallback으로 유지
 - `ABathhouseComputerActor::ManagedBathPlacementZone` instance reference
+- `IComputerScreenContextReceiver`와 `FComputerScreenContext`(2026-09-27). `BP_BathhouseComputer.ScreenWidget.WidgetClass`는 탭 root WBP로 교체한다([ShopSystem.md](ShopSystem.md))
 - `UComputerSampleScreenWidget` native parent와 `TestButton`, `ClickResultText` BindWidget
 - computer focus camera/blend와 widget interaction distance/debug authoring 값
 - 2026-09-26 신규: `ABathhouseComputerActor::FocusExitPoint`, editor-only `FocusExitArrow`, `FocusExitSearchRadiusCm`, `AFirstPersonCharacter::CancelAction`, Content `IA_Cancel`

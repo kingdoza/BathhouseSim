@@ -1,161 +1,161 @@
-# 구현 프롬프트 — 컴퓨터 포커스 진입·이탈 수정
+# 구현 프롬프트 — 상점 주문·배송 상자·쓰레기통 수직(샤워기)
 
 ## 단계와 입력
 
-- 2026-09-26 사용자가 기능 계약 `.md/PROMPT_ARCHITECTURE.md`(컴퓨터 포커스 진입·이탈 수정, CMP-001~020)를 승인했다. 기능 계약 머리의 "승인 대기" 문구는 기능 명세 단계 소유라 이 단계에서 고치지 않는다.
-- 현재 단계: 수직 구현. 대표 시나리오가 전체 범위와 같아 CMP-001~020 전체를 한 단계에서 완성한다.
+- 2026-09-27 사용자가 기능 계약 `.md/PROMPT_ARCHITECTURE.md`(상점 주문·배송 상자·쓰레기통, Q1~Q25)의 설계 진행을 지시했다. 계약서 머리의 "승인 대기" 문구는 기능 명세 단계 소유라 이 단계에서 고치지 않는다.
+- 현재 단계: **수직 구현**. 판매 상품은 샤워기 하나다. 대상은 SHOP-001~031, 036, 037이고, SHOP-032~035(확장)는 완료로 보고하지 않는다.
 - `.md/AGENT_WORKFLOW.md` → `.md/AGENT_IMPLEMENTATION.md`를 읽고 C++ 구현 단계만 수행한다.
-- 설계 정본(전체 읽기):
-  - `.md/Architecture/ComputerSystem.md`
-  - `.md/Architecture/CharacterSystem.md`의 `CancelAction`
-  - `.md/Architecture/CoreSystem.md`의 Core Redirect·Module Rules
-  - 이 문서와 정본이 다르면 구현을 멈추고 보고한다.
-- 작업 트리에는 쿨러·순환기 확장의 미커밋 변경이 있고 그 통합 리뷰가 진행 중이다. Utility 관련 파일은 수정하지 않는다.
+- 설계 정본(전체 읽기): `.md/Architecture/ShopSystem.md`.
+- 관련 절:
+  - `EconomySystem.md` wallet
+  - `PlacementSystem.md` Fresh Install Payload And Discard Tag
+  - `PhysicalCarrySystem.md` Consume And Discard Extension
+  - `ComputerSystem.md` screen context
+  - `UISystem.md` Computer Tab Root·HUD
+  - `CoreSystem.md` Core Redirect·Class Growth
+- 이 문서와 정본이 다르면 구현을 멈추고 보고한다.
+- headless 실행은 `.md/AGENT_WORKFLOW.md` UE 5.8 Headless Automation Policy(`-DDC-ForceMemoryCache` 포함) 형식을 따른다. git은 `--no-optional-locks`로 실행한다.
 
 ## 현재 → 목표
 
-| 항목 | 현재 Source | 목표 |
+| 영역 | 현재 Source | 목표 |
 |---|---|---|
-| Active 입력 초점 | `FInputModeGameAndUI.SetWidgetToFocus(ScreenWidget->TakeWidget())`. keyboard focus가 viewport 밖 world widget으로 가서 클릭 전까지 E가 Enhanced Input에 닿지 않음 | widget focus 없이 GameAndUI, `UWidgetBlueprintLibrary::SetFocusToGameViewport()` |
-| ESC | 없음 | 범용 `IA_Cancel` / `AFirstPersonCharacter::CancelAction`, computer capture 중에만 focus-out |
-| 커서 | 표시만 함 | Active 진입마다 viewport 중앙 `SetMouseLocation`, 그 뒤 hit testing on |
-| 정상 이탈 | 이전 view target으로 blend, 진입 직전 자리 | 고정 발바닥 위치·방향으로 teleport 후 pawn으로 blend |
-| 막힘 | 해당 없음 | 최대 반경 안 도달 가능한 가장 가까운 빈자리, 없으면 강제 |
-| 비정상 종료 | 즉시 복구 | 동일, teleport 없음 |
+| 돈 | 시작 0, 증가만 | `StartingMoney` 100,000, `TrySpendMoney` |
+| 설비 아이템 | 회수로만 생성, payload에 domain data 필수 | 신규 설치 payload(null `InstanceData`)와 factory |
+| 버리기 | 없음 | `Facility.Discardable` 태그, `IPhysicalCarryDiscardable`, 쓰레기통 |
+| 손에서 소모 | 배치 전용 commit | 범용 `CommitConsumeHeldObject`, 배치 경로는 wrapper |
+| 상점 | 없음 | catalog·settings·cart·주문 subsystem·배송 지점·상자·개봉 |
+| 컴퓨터 화면 | 관리 화면 직접 cast | `IComputerScreenContextReceiver`, 탭 root |
+| HUD | 상호작용 prompt만 | 잔액·변화량, 배송 도착 알림 |
 
 ## 0. 사전 조건과 백업
 
 - UnrealEditor가 모두 종료됐는지 확인한다.
-- git 명령은 `--no-optional-locks`로 실행해 `.git/index.lock`을 남기지 않는다.
-- 다음 두 파일을 `Saved/MigrationBackup/20260926_computer/`에 파일 복사한다.
+- `Saved/MigrationBackup/20260927_shop/`에 파일 복사한다:
   - `Content/Bathhouse/Blueprints/Computer/BP_BathhouseComputer.uasset`
-  - DefaultMap 컴퓨터 외부 actor `Content/__ExternalActors__/Maps/DefaultMap/7/EH/E4FLO971KSWUJ40H7W7PHK.uasset`
-- Content·Config·Level을 저장하지 않는다.
+  - `Content/Bathhouse/Blueprints/Game/BP_BathhousePlayerState.uasset`
+  - `Content/Bathhouse/Blueprints/Game/BP_BathhouseHUD.uasset`
+  - `Content/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem.uasset`
+- Content·Config·Level을 저장하지 않는다(아래 8의 복사본 확인만 예외).
 
-## 1. `ABathhouseComputerActor`
+## 1. Economy
 
-- `FocusExitPoint : USceneComponent`를 root 하위에 추가한다.
-- `CreateEditorOnlyDefaultSubobject`로 `FocusExitArrow : UArrowComponent`를 `FocusExitPoint` 하위에 추가한다(표시 전용). null일 수 있으므로 runtime 코드는 참조하지 않는다.
-- `UPROPERTY(EditAnywhere, meta=(ClampMin=0)) float FocusExitSearchRadiusCm = 100.f;`
-- `FTransform GetFocusExitFootTransform() const`: `FocusExitPoint` 월드 위치, rotation은 `(Pitch, Yaw, 0)`.
-- getter `GetFocusExitSearchRadiusCm()`. 값이 nonfinite거나 음수면 0으로 취급하고 경고를 남긴다.
-- 기존 `ComputerMesh`, `ScreenWidget`, `FocusCamera`, `ManagedBathPlacementZone`, blend 값의 이름·기본값은 유지한다.
+- `UPlayerWalletComponent`:
+  - `StartingMoney`(EditDefaultsOnly, 기본 100000, ClampMin 0) 추가.
+  - `bWantsInitializeComponent`와 `InitializeComponent`에서 `CurrentMoney = StartingMoney`를 적용한다. 방송하지 않는다.
+- `CanSpendMoney`, `TrySpendMoney`(C++ 전용): 양수, 잔액 이하, 한 번 차감, `OnMoneyChanged(Previous, Current)`.
+- 기존 cash claim과 `TryAddMoney` 동작은 유지한다. 시작 0을 가정한 기존 Economy test는 harness에서 `StartingMoney`를 0으로 두거나 기대값을 시작 금액 기준으로 바꾼다. 의미 변경 없이 맞춘다.
 
-## 2. 이탈 위치 helper
+## 2. Placement
 
-- 신규 `Private/Computer/ComputerFocusExitPlacement.h/.cpp`에 비-UObject `FComputerFocusExitPlacement`를 둔다.
-- 알고리즘은 `ComputerSystem.md` Focus Exit Placement 1~7을 그대로 따른다.
-  - 고리 간격 10cm, 고리당 각도 수 `max(8, ceil(2πr/10))`, 시작 각도는 고정 yaw.
-  - player capsule의 object type·channel response로 overlap과 sweep을 수행한다.
-  - sweep은 `C0`에서 겹친 blocking component와 player를 무시한다.
-- 결과 구조: `CapsuleCenter`, `EPath { Fixed, Searched, Forced }`, `SearchDistanceCm`.
-- world query 외 상태나 side effect가 없다.
+- `FFacilityPlacementPayload::Validate`는 `InstanceData == nullptr`을 허용하고, 추가하는 `IsFreshInstall()`로 구분한다. non-null이면 기존 소유·값 검사를 그대로 한다.
+- import 세 곳에서 신규 설치면 domain import를 건너뛰고 class 기본값을 유지한다. 그 밖의 Definition·class·staged 검사는 유지한다.
+  - `Private/Facility/BathhouseFacilityPlacementDomain.cpp`
+  - `Private/Facility/BathWaterUtilityFacilityActor.cpp`: utility는 operation state 미보유와 같은 신규 0 상태
+  - `Private/Towel/TowelProcessingMachinePlacement.cpp`
+- `static APlaceableFacilityItemActor* APlaceableFacilityItemActor::SpawnFreshItem(UWorld&, UFacilityPlacementDefinition&, const FTransform&, FText& OutFailure)`
+  - 순서: `FacilityActorConversionTransaction`의 회수 item 생성과 같은 deferred spawn(RecoveryItemClass) → `InitializeStaged` → 신규 설치 payload → `FinishSpawning` → `ValidatePlacementPayload`.
+  - 실패 시 만든 Actor를 제거하고 null을 반환한다. free-world 활성화는 호출자가 한다.
+- native tag `TAG_Facility_Discardable`("Facility.Discardable")를 `UE_DEFINE_GAMEPLAY_TAG`로 Placement type 파일에 선언한다. Config 파일은 수정하지 않는다.
+- `UFacilityPlacementDefinition` Data Validation: 이 태그와 `LockerSlotCount > 0`이 함께 있으면 오류.
+- `APlaceableFacilityItemActor`가 `IPhysicalCarryDiscardable`을 구현한다.
+  - `CanDiscard`: Definition이 태그를 갖고 `LockerSlotCount == 0`이며 배치 staged·소모 중이 아닐 때.
+  - `HandleDiscardCommitted`: payload 정리 후 Actor 제거.
 
-## 3. `UPlayerComputerUseComponent`
+## 3. Interaction과 Carry
 
-**`CompleteFocusIn` 순서:**
+- 신규 `Public/Interaction/PhysicalCarryDiscardable.h`: `UINTERFACE(MinimalAPI, meta=(CannotImplementInterfaceInBlueprint))`.
+  - `virtual bool CanDiscardCarriedObject(FText& OutFailureReason) const = 0;`
+  - `virtual void HandleDiscardCommitted() = 0;`
+- `UPlayerCarryComponent::CommitConsumeHeldObject(AActor*, TFunctionRef<bool()>)`: 현재 `CommitReleasePhysicalObjectForPlacement`의 본문(guard, equipment cancel, silent clear, domain commit, 실패 복원, publish)을 옮긴다. 기존 함수는 이를 호출하는 wrapper로 남긴다. 다른 상태·Tick을 추가하지 않는다.
+- `EPhysicalCarryKind::DeliveryBox`를 enum 끝에 append한다.
 
-1. cursor를 켠다.
-2. `FInputModeGameAndUI`에 `DoNotLock`과 `SetHideCursorDuringCapture(false)`를 적용한다. `SetWidgetToFocus` 호출은 제거한다.
-3. `SetFocusToGameViewport()`를 호출한다.
-4. `GetViewportSize` 중앙으로 `SetMouseLocation`한다.
-5. `WidgetInteraction->bEnableHitTesting = true`.
+## 4. Shop
 
-기존 AA override 적용 위치는 유지한다.
+`.md/Architecture/ShopSystem.md` Source Scope와 각 절을 그대로 구현한다.
 
-**`RequestEndComputerUse`**(`FocusingIn`·`Active`에서만, 그 밖은 기존처럼 무시):
+- `ShopTypes.h`: `FShopOrderLine { FName ProductId; TObjectPtr<UFacilityPlacementDefinition> PlacementDefinition; FText DisplayName; int32 Quantity; }`, 주문 snapshot, 결과·실패 enum.
+- `UShopCatalog`, `FShopProductEntry`, Data Validation. `UShopSettings`(Config=Game, defaultconfig, 기본값 표 그대로).
+- `UShopCartComponent`: `ABathhousePlayerState` 생성자의 default subobject(`ShopCart`). 모든 API와 `OnCartChanged`.
+- `UShopOrderSubsystem : UTickableWorldSubsystem`: Game·PIE world에서만 생성(`DoesSupportWorldType`).
+  - `EvaluatePlaceOrder`, `TryPlaceOrder`, 0.25초 throttle 배송 Tick, `OnOrdersChanged`, `OnOrderDelivered`, `GetOrderSnapshots`.
+  - 배송 지점 등록·해제.
+- `AShopDeliveryPointActor`: `FindDropTransform` 1~4. editor-only billboard·arrow는 `CreateEditorOnlyDefaultSubobject`.
+- `AShopDeliveryBoxActor`: 4개 interface, `InitializeContents`, 요약 문구, LMB → 개봉. 삽·설비 아이템의 carry 구현을 참고하되 공통 carry base를 만들지 않는다.
+- `FShopUnboxingPlacement`, `FShopUnboxingTransaction`: 1~3단계 배치, 생성 → free-world 활성 → carry consume → 상자 제거 순서와 실패 rollback.
+- `ABathhouseTrashBinActor`: 판정 표와 실행 순서.
+- 금액 계산은 int64로 누적하고 int32 범위를 넘으면 `InvalidProduct`로 거부한다.
 
-1. timer를 정리하고, AA override를 해제하고, pointer를 release하고, hit testing을 끄고, cursor를 숨기고, `FInputModeGameOnly`를 적용한다.
-2. `ActiveComputer`와 owner `ACharacter`의 capsule로 `FComputerFocusExitPlacement`를 계산한다. 이어서 actor를 `SetActorLocationAndRotation(Center, FRotator(0,Yaw,0), false, nullptr, ETeleportType::TeleportPhysics)`로 옮기고, controller를 `SetControlRotation(FRotator(Pitch,Yaw,0))`로 둔다.
-3. owner pawn을 view target으로 `FocusBlendOutSeconds` blend한다. `ResolveReturnViewTarget`은 비정상 경로 전용으로 남긴다.
-4. `Phase = FocusingOut`. 이후 흐름(timer → `CompleteFocusOut`)은 기존과 같다.
+## 5. Computer
 
-- computer가 이미 invalid이거나 capsule을 얻을 수 없으면 teleport 없이 기존 `ForceCleanup` 경로를 쓴다.
-- `HandleComputerUnavailable`, `ForceCleanup`, `EndPlay`는 teleport하지 않는다(CMP-017).
-- 이탈 경로가 Fixed가 아니면 `LogBathhouseComputer` Verbose 로그를 남긴다. 해당 log category가 없으면 Computer 파일 안에 정의한다.
+- 신규 `Public/Computer/ComputerScreenContext.h`:
+  - `FComputerScreenContext { TWeakObjectPtr<ABathhouseComputerActor> Computer; TWeakObjectPtr<UBathWaterOperationsSubsystem> Operations; TWeakObjectPtr<AFacilityPlacementZoneActor> ManagedZone; }`
+  - `IComputerScreenContextReceiver`: `InitializeComputerScreen(const FComputerScreenContext&)`, `NotifyComputerUserChanged(APlayerState*)`
+- `ABathhouseComputerActor::BeginPlay`: user widget이 interface를 구현하면 context를 전달한다. 기존 관리 화면 직접 cast를 제거하고, `UBathWaterManagementScreenWidget`이 interface를 구현해 기존 `InitializeManagementContext`로 위임한다.
+- 사용 시작 성공 시(reservation + session begin 성공 직후) `NotifyComputerUserChanged(Controller의 PlayerState)`. 종료 시에는 호출하지 않는다.
+- 컴퓨터 포커스·이탈 로직은 바꾸지 않는다.
 
-## 4. Character와 입력
+## 6. UI
 
-- `AFirstPersonCharacter`에 `UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> CancelAction;`을 추가한다.
-- `CancelAction`의 Started만 `CancelInput()`에 bind한다.
-- `CancelInput()`: `PlayerComputerUse && IsCapturingInput()`이면 `RequestEndComputerUse()`, 아니면 아무것도 하지 않는다.
-- E 경로(`InteractStartInput`/`InteractEndInput`과 `bComputerOwnsInteractPress`)는 바꾸지 않는다. 진입 E를 떼도 나가지 않는 동작(CMP-006)을 유지한다.
-- 새 Input Action asset과 IMC 매핑은 Editor 단계에서 한다. Source는 `CancelAction`이 null이어도 동작한다.
+- `UComputerScreenRootWidget`: BindWidget 5개. 탭 버튼이 `ScreenSwitcher` index를 바꾸고, 활성 탭 버튼은 비활성 표시한다. context·사용자를 자식에 전달한다.
+- `UShopScreenWidget`과 행 widget 3종: `ShopSystem.md` UI 절의 BindWidget과 구독·갱신 규칙.
+  - 구독은 `NativeConstruct`·`NotifyComputerUserChanged`에서 하고 `NativeDestruct`·사용자 변경에서 해제한다.
+  - 행 widget 재생성은 cart·주문 변경 시에만 한다. 남은 시간 표시는 1초 간격으로만 갱신한다.
+- `UMoneyHudWidget`, `UShopNoticeWidget`.
+- `ABathhouseHUD`: `MoneyHudWidgetClass`, `ShopNoticeWidgetClass` 추가, 생성·bind·EndPlay 해제.
+  - wallet bind는 PlayerController의 PlayerState가 생길 때까지 possession 변경과 짧은 timer로 재시도한다.
+  - notice는 order subsystem을 구독한다.
 
-## 5. 금지
-
-- world screen widget이나 다른 UMG widget에 keyboard focus를 주는 것. Slate/SlateCore module 추가.
-- 커서 lock behavior 변경, 게임 메뉴·일시정지, ESC를 다른 모드 취소에 연결하는 것.
-- 바닥 높이 자동 맞춤, 다른 actor를 옮기는 depenetration 코드.
-- 포커스인 시점의 캐릭터 이동.
-- 기존 reflected 이름 rename·delete. Core Redirect 추가.
-- Utility·Interaction·UI 등 무관한 시스템 수정.
-- Content·Config·Level 저장과 Editor authoring.
-
-## 6. 빌드
+## 7. 빌드
 
 - `.md/AGENT_WORKFLOW.md`의 UE 5.8 `Build.bat`만 사용한다.
 
-## 7. 로드 검증 — 복사본 먼저
+## 8. 로드 검증 — 복사본 먼저
 
-신규 영구 automation `BathhouseSim.Computer.BlueprintLoad`를 만든다.
+기존 Blueprint load automation 형식을 따라 `BathhouseSim.Shop.BlueprintLoad`를 추가한다.
 
-- 기본 대상 `/Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer`, `-BathhouseComputerLoadPath=`로 단일 package를 지정한다.
-- `LoadPackage` 뒤 package 안의 `UBlueprint`를 찾는다. 저장하지 않는다.
+- 대상: 기본 4개 Blueprint, `-BathhouseShopLoadPath=`로 단일 package 지정.
 - 확인:
-  - native parent가 `ABathhouseComputerActor`다.
-  - CDO에 `FocusExitPoint`가 있다.
-  - `ScreenWidget` WidgetClass가 비어 있지 않다.
-  - blend 값이 유지된다.
-  - world에 컴퓨터 instance가 있으면 `ManagedBathPlacementZone` 참조가 유지되고 `FocusExitPoint`가 존재한다.
+  - native parent
+  - PlayerState의 `ShopCart`·wallet `StartingMoney` 기본값
+  - 컴퓨터 `ScreenWidget` WidgetClass 비어 있지 않음
+  - HUD 기존 `InteractionPromptWidgetClass` 유지
+- 저장하지 않는다.
 
-순서. 어느 단계든 Fatal·crash·`Serial size mismatch`·`Failed to load`가 나오면 즉시 멈추고 보고한다.
+순서(Fatal·`Serial size mismatch`·`Failed to load`면 즉시 멈춤):
 
-1. `BP_BathhouseComputer.uasset`을 `Content/Developers/MigrationCheck/BP_BathhouseComputer_LoadCheck.uasset`으로 복사한다. Template 맵 headless로 비저장 로드한다.
-2. 복사본 폴더를 삭제하고 `git --no-optional-locks status`로 Content 무변경을 확인한다.
-3. 원본을 비저장 로드한다(Template 맵).
-4. DefaultMap 맵 인자로 같은 test를 실행한다.
-5. Content·Config 무변경을 다시 확인한다.
+1. 4개를 `Content/Developers/MigrationCheck/`에 복사하고 Template 맵으로 로드한다.
+2. 복사본을 삭제하고 Content 무변경을 확인한다.
+3. 원본을 로드한다.
+4. DefaultMap으로 로드한다.
+5. 다시 무변경을 확인한다.
 
-## 8. 자동화
+## 9. 자동화
 
-신규·확장 test. 기존 `ComputerAutomationTests.cpp`의 harness를 재사용한다.
+`ShopSystem.md` Verification 표 전체를 구현한다. 추가 조건:
 
-| ID | 검증 |
-|---|---|
-| CMP-001, 003, 004, 009 | Active·FocusingIn에서 `RequestEndComputerUse` → pawn capsule 중심이 이탈 결과, actor yaw·control `(Pitch,Yaw,0)`. 서로 다른 시작 위치·방향 3곳에서 같은 결과 |
-| CMP-002, 014, 015 | `CancelInput`: capturing이면 E와 같은 결과, `FocusingOut` 중 무시, 비사용 시 호출 없음·placement 등 다른 상태 불변 |
-| CMP-005 | pointer down 상태에서 이탈 → release 1회, 이후 PressPointer 거부, 이후 hit testing off |
-| CMP-006 | 기존 E press ownership test 유지 |
-| CMP-011~013 | helper geometry: 고정 자리 free / capsule 장애물 → 가장 가까운 free 자리 / 벽 너머가 더 가까워도 같은 쪽 / 반경 안 전부 막힘 → Forced / R=0. 장애물 actor 위치 불변 |
-| CMP-016 | 정상 이탈 완료 뒤 저장한 movement mode 복구, interaction suppression 해제, reservation 해제, 같은 컴퓨터 재진입 성공 |
-| CMP-017 | `HandleComputerUnavailable`·EndPlay → teleport 없음, 입력·movement 복구 |
-| CMP-019, 020 | 높이 보정 없음: 결과 Z = 발바닥 Z + half height. 낙하와 눈높이는 PIE |
-| 회귀 | 기존 `BathhouseSim.Computer.*` 전부 |
+- 신규 설치 샤워기(SHOP-022): `SpawnFreshItem` → 기존 배치 transaction으로 배치 → class 기본값(번호 없음·가중치 1) 확인 → 회수 → 재배치 가능.
+- 보일러 신규 설치 payload: 배치 시 잔량 0. 확장 SHOP-034의 사전 확인이며 완료로 보고하지 않는다.
+- 쓰레기통: 샤워기·회수 보일러(SHOP-037)는 가능. 락커 1·4·8(SHOP-036), 열쇠, 걸레, 렌치, 바구니, 삽은 거부. 빈손 거부.
+- 개봉 배치: 트인 바닥, 50cm 앞 벽(벽 너머 없음), 사방이 막힌 구석(위로 쌓기). 아이템이 Pawn을 무시함.
+- 배송 지점: 빈 지점, 상자 위에 쌓기, 낮은 천장으로 대기 뒤 상자 제거 시 도착, 두 주문 FIFO, 딜레이 0.
+- carry consume: 성공 시 `OnHeldObjectChanged` 1회, domain 실패 시 원래 소지 복원, 배치 session 종료.
+- 기존 회귀(유지 필수): Economy, Placement 회수·배치 전체, Computer, Utility, Interaction.
+- 전체 회귀: `Automation RunTests BathhouseSim`. 수치와 실패 이름을 보고하고, 실패는 스스로 무관 판정하지 않는다.
 
-- Slate keyboard focus와 실제 커서 위치(CMP-001, 002, 007, 008, 010)는 headless로 판정할 수 없다. 코드 경로를 test로 확인하고 수용은 PIE로 인계한다.
-- 전체 회귀: `Automation RunTests BathhouseSim`(Template 맵 headless). 총/성공/실패/건너뜀 수와 실패 이름을 보고하고, 실패는 스스로 무관 판정하지 않는다.
+## 금지
+
+- 기존 export를 가진 class·property·subobject rename·삭제·class 변경, native `Serialize` 변경, Core Redirect 추가.
+- Config 파일 수정(gameplay tag는 native 선언, Project Settings 값은 Editor 단계).
+- Widget에 cart·주문·돈 보관, generic Interaction/Character에 상점 concrete 분기.
+- 확장 상품 판매 활성화, 락커 판매·버리기 허용.
+- Content·Level 저장과 Editor authoring.
 
 ## 단계 결과물
 
-- `.md/PROMPT_REVIEW.md`: 변경 파일, 원인 수정 설명(widget focus 제거), 로드 검증 5단계 결과, automation 수치와 CMP별 대응, 미검증(PIE 전용 항목).
-- `.md/PROMPT_UNREAL.md`: 아래 Editor 인계를 실제 결과에 맞게 구체화한다.
-- `.md/Architecture/*`는 수정하지 않는다.
-
-## 후속 Editor 인계 — 지금 실행하지 않음
-
-- **입력 asset:**
-  - `/Game/Input/Actions/IA_Cancel`(Digital bool) 생성.
-  - `IA_Interact`를 매핑한 기존 IMC에 Escape → `IA_Cancel` 추가.
-  - 플레이어 Character Blueprint의 `CancelAction` 지정.
-  - 사용자 Editor의 PIE 종료 키 F2는 사용자 설정이며 프로젝트 파일로 바꾸지 않는다.
-- **`BP_BathhouseComputer`:**
-  - DefaultMap 컴퓨터용 `FocusExitPoint`를 모니터 앞 바닥 높이·모니터를 보는 방향으로 둔다. Arrow로 확인한다.
-  - 컴퓨터가 한 대이므로 class 기본값으로 정해 World Partition 외부 actor 저장을 피하는 것을 우선한다. instance override가 필요하면 `USER_UNREAL.md`의 외부 actor 저장 기준을 따른다.
-  - Compile, 개별 Save, 재로드 뒤 ScreenWidget, 관리 Zone, blend 값 유지를 확인한다(CMP-018).
-- **PIE:**
-  - 클릭 없이 E·ESC 이탈, 전환 중 이탈, 슬라이더 drag 중 이탈.
-  - 커서 중앙과 재진입 시 다시 중앙, 세 위치에서 진입 → 같은 자리.
-  - 0.25초 blend 외형, 손님·벽·전부 막힘.
-  - 비사용 ESC 무반응(배치·레버·회수 중), 30cm 위 authoring 뒤 낙하, 바닥 높이.
-- MCP로 불가한 작업은 exact path와 근거를 `USER_UNREAL.md`에 인계하고, `.md/Unreal/InteractionUISystem.md`는 Editor 단계가 갱신한다.
+- `.md/PROMPT_REVIEW.md`: 변경 파일, 영역별 요약, 8의 결과와 로그 위치, automation 수치와 SHOP별 대응, 미검증(PIE 전용).
+- `.md/PROMPT_UNREAL.md`: `ShopSystem.md` Blueprint/API Contracts의 Editor 목록을 실제 결과에 맞게 구체화한다.
+  - 수직 가격은 Editor에서 정한다.
+  - 샤워기 외 6종은 catalog에 `bForSale=false`로 등록할 수 있다.
+  - `Facility.Discardable` 태그는 7종 Definition 모두에 단다.
+- `.md/Architecture/*`는 수정하지 않는다. 설계와 달라야 하면 멈추고 보고한다.

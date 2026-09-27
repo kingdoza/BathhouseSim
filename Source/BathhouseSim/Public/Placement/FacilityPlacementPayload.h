@@ -17,6 +17,7 @@ struct BATHHOUSESIM_API FFacilityPlacementPayload
 {
 	GENERATED_BODY()
 
+	bool IsFreshInstall() const { return InstanceData == nullptr; }
 	bool Validate(const APlaceableFacilityItemActor& ExpectedOuter, FText& OutFailureReason) const;
 	void Reset();
 

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
+#include "Shop/ShopCartComponent.h"
 #include "BathhousePlayerState.generated.h"
 
 class UPlayerWalletComponent;
@@ -17,7 +18,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Economy")
 	UPlayerWalletComponent* GetWallet() const { return Wallet; }
 
+	UShopCartComponent* GetShopCart() const { return ShopCart; }
+
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Economy", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPlayerWalletComponent> Wallet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Shop", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UShopCartComponent> ShopCart;
 };

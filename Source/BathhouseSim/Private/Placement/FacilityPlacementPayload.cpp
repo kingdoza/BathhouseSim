@@ -121,8 +121,16 @@ bool FFacilityPlacementPayload::Validate(
 	const APlaceableFacilityItemActor& ExpectedOuter,
 	FText& OutFailureReason) const
 {
-	if (!IsValid(Definition.Get()) || !IsValid(InstanceData.Get())
-		|| InstanceData->GetOuter() != &ExpectedOuter)
+	if (!IsValid(Definition.Get()))
+	{
+		OutFailureReason = LOCTEXT("InvalidPayloadDefinition", "설비 변환 정의를 찾을 수 없습니다.");
+		return false;
+	}
+	if (IsFreshInstall())
+	{
+		return true;
+	}
+	if (!IsValid(InstanceData.Get()) || InstanceData->GetOuter() != &ExpectedOuter)
 	{
 		OutFailureReason = LOCTEXT("InvalidPayloadOwnership", "설비 변환 데이터의 소유 관계가 올바르지 않습니다.");
 		return false;

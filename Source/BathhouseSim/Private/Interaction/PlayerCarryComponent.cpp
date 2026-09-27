@@ -170,6 +170,13 @@ bool UPlayerCarryComponent::CommitReleasePhysicalObjectForPlacement(
 	AActor* Object,
 	TFunctionRef<bool()> DomainCommit)
 {
+	return CommitConsumeHeldObject(Object, DomainCommit);
+}
+
+bool UPlayerCarryComponent::CommitConsumeHeldObject(
+	AActor* Object,
+	TFunctionRef<bool()> DomainCommit)
+{
 	if (bPhysicalDropCommitInProgress || !IsValid(Object) || HeldObject != Object)
 	{
 		return false;
@@ -185,7 +192,7 @@ bool UPlayerCarryComponent::CommitReleasePhysicalObjectForPlacement(
 	if (!DomainCommit())
 	{
 		const bool bRestored = CommitHeldObjectWithoutNotification(Object);
-		ensureMsgf(bRestored, TEXT("Failed to restore HeldObject after facility placement commit failed."));
+		ensureMsgf(bRestored, TEXT("Failed to restore HeldObject after held-object consumption failed."));
 		return false;
 	}
 

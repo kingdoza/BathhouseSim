@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "NativeGameplayTags.h"
 #include "FacilityPlacementTypes.generated.h"
 
 namespace BathhousePlacementCollision
@@ -68,3 +69,5 @@ struct BATHHOUSESIM_API FFacilityPlacementTransactionResult
 		return Result;
 	}
 };
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Facility_Discardable);

@@ -2,7 +2,7 @@
 
 ## 전역 설정과 Preview 재질
 
-- 전역 grid 기본값은 `10cm`다.
+- 전역 grid 간격은 Project Settings `Facility Placement > Grid Size Cm`가 정본이며 이 문서에 수치를 기록하지 않는다.
 - `UFacilityPlacementSettings.FacilityItemHeldTransform`은 위치·회전만 담당하며 런타임은 scale을 1로 정규화한다. 현재 저장값은 Location `(30,-50,0)`, Rotation identity, Scale `(1,1,1)`이다.
 - 아래 Material 두 개가 저장돼 있다.
   - `/Game/Bathhouse/Materials/Placement/MI_FacilityPreview_Valid`: Surface, Translucent, Unlit, Two Sided, Emissive `(0.05,1,0.05)`, Opacity `0.35`
@@ -38,7 +38,7 @@
 
 ## Blueprint footprint와 body
 
-모든 footprint는 actor local install floor `Z=0`을 기준으로 한다. `PlacementFootprint`는 Navigation 비활성, Collision `NoCollision`이다. scaled full X/Y는 10cm grid의 양의 정수배다.
+모든 footprint는 actor local install floor `Z=0`을 기준으로 한다. `PlacementFootprint`는 Navigation 비활성, Collision `NoCollision`이다. scaled full X/Y는 Project Settings grid 간격의 양의 정수배여야 하며 Data Validation이 검사한다.
 
 | Blueprint | Parent Class | Footprint Extent | Footprint Relative Z | body mesh 계약 |
 |---|---|---|---:|---|

@@ -52,6 +52,31 @@
 
 #include <limits>
 
+namespace
+{
+struct FScopedFacilityPlacementGridOverride
+{
+	UFacilityPlacementSettings* Settings = GetMutableDefault<UFacilityPlacementSettings>();
+	const float SavedGridSizeCm = Settings ? Settings->GridSizeCm : 10.0f;
+
+	FScopedFacilityPlacementGridOverride()
+	{
+		if (Settings)
+		{
+			Settings->GridSizeCm = 10.0f;
+		}
+	}
+
+	~FScopedFacilityPlacementGridOverride()
+	{
+		if (Settings)
+		{
+			Settings->GridSizeCm = SavedGridSizeCm;
+		}
+	}
+};
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FBathhouseFacilityPlacementMathTest,
 	"BathhouseSim.Placement.SettingsZoneLeaseAndCompatibility",
@@ -59,6 +84,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBathhouseFacilityPlacementMathTest::RunTest(const FString& Parameters)
 {
+	FScopedFacilityPlacementGridOverride GridOverride;
 	(void)Parameters;
 	UFacilityPlacementSettings* Settings = NewObject<UFacilityPlacementSettings>();
 	TestEqual(TEXT("Default placement grid is ten centimetres"), Settings->GridSizeCm, 10.0f);
@@ -394,6 +420,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBathhouseFacilityPlacementRuntimeTest::RunTest(const FString& Parameters)
 {
+	FScopedFacilityPlacementGridOverride GridOverride;
 	(void)Parameters;
 	UFacilityPlacementSettings* RuntimeSettings = GetMutableDefault<UFacilityPlacementSettings>();
 	const TSoftObjectPtr<UMaterialInterface> SavedValidPreviewMaterial = RuntimeSettings->ValidPreviewMaterial;
@@ -1103,6 +1130,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBathhouseFacilityConversionSafetyTest::RunTest(const FString& Parameters)
 {
+	FScopedFacilityPlacementGridOverride GridOverride;
 	(void)Parameters;
 	if (!GEngine)
 	{

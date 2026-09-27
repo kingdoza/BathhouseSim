@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Computer/ComputerScreenContext.h"
 #include "BathWaterManagementScreenWidget.generated.h"
 
 class ABathhouseBathFacilityActor;
@@ -12,11 +13,14 @@ class UBathWaterMapWidget;
 class UBathWaterOperationsSubsystem;
 
 UCLASS()
-class BATHHOUSESIM_API UBathWaterManagementScreenWidget : public UUserWidget
+class BATHHOUSESIM_API UBathWaterManagementScreenWidget : public UUserWidget, public IComputerScreenContextReceiver
 {
 	GENERATED_BODY()
 
 public:
+	virtual void InitializeComputerScreen(const FComputerScreenContext& Context) override;
+	virtual void NotifyComputerUserChanged(APlayerState* PlayerState) override { (void)PlayerState; }
+
 	void InitializeManagementContext(
 		UBathWaterOperationsSubsystem* InOperations,
 		AFacilityPlacementZoneActor* InZone);

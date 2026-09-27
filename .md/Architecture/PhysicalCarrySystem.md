@@ -230,6 +230,13 @@ fixed-slot placement는 cleaning, combat 또는 towel transaction이 아니다. 
 - held item의 payload와 placement preview/confirm은 Placement가 소유하고 Physical Carry는 item identity, attachment와 release transaction만 소유한다.
 - Q facility recovery는 기존 held Actor를 바꾸지 않고 별도 item을 무충격 free-world 상태로 만든다.
 
+## Consume And Discard Extension
+
+- `UPlayerCarryComponent::CommitConsumeHeldObject(Object, DomainCommit)`은 손에 든 물건을 알림 없이 떼고 `DomainCommit`이 성공하면 `OnHeldObjectChanged`를 한 번 방송하는 범용 commit이다. 실패하면 원래대로 되돌린다. 기존 `CommitReleasePhysicalObjectForPlacement`는 이 함수를 쓰는 wrapper로 남긴다(이름·동작 유지).
+- 상자 개봉과 쓰레기통이 이 경로를 쓴다. Actor 제거는 호출자가 commit 뒤에 한다. carry 상태에 제거 예정 Actor를 남기지 않는다.
+- `IPhysicalCarryDiscardable`(Interaction, C++ 전용, 선택): `CanDiscardCarriedObject(OutFailure)`, `HandleDiscardCommitted()`. 설비 아이템과 배송 상자만 구현한다. 열쇠와 exact 거치대 도구는 구현하지 않아 버릴 수 없다.
+- 배송 상자는 `EPhysicalCarryKind::DeliveryBox`(enum 끝 append), capability `FreeDrop`만 쓴다. 상세는 [ShopSystem.md](ShopSystem.md)에 있다.
+
 ## Recovery And EndPlay
 
 fixed-slot capability가 있는 item의 carrier EndPlay와 `FellOutOfWorld`는 유효하고 비어 있는 exact fixed slot을 먼저 사용하고, 불가능하면 last-safe world transform에 physics 상태로 복구한다. fixed-slot이 없는 설비 아이템은 last-safe free-world transform만 사용한다. 이 physical recovery는 새 Actor나 배치 설비를 spawn하지 않는다.
@@ -263,6 +270,7 @@ EndPlay, fall recovery와 transaction retry는 delegate, timer, attachment와 sl
 
 ## Dependencies
 
+- Shop -> Physical Carry consume·discard 계약
 - Physical Carry는 Interaction Source package와 Engine collision/physics를 사용한다.
 - Cleaning/Towel/Combat은 concrete item state에서 Physical Carry public 계약을 구현한다.
 - Placement의 전용 facility item Actor가 같은 public carry 계약과 기존 transaction helper를 사용한다.
