@@ -2,8 +2,8 @@
 
 ## 문서 기준
 
-- 기준일: 2026-09-27(KST), 상점 주문·배송 상자·쓰레기통 설계 반영
-- 상태: 보일러 노동 수직은 완료·승인됐다. 쿨러·순환기 확장은 Source 구현 뒤 통합 승인 전이다. 컴퓨터 포커스 수정은 구현됐다. 2026-09-27 상점 주문·배송 상자·쓰레기통 수직(샤워기)을 설계했으며 Source·Content에 미반영이다.
+- 기준일: 2026-09-28(KST), 상점 확장 통합 승인, 설비 회수 아이템 scale 읽기 수정 설계 반영
+- 상태: 보일러 노동 수직은 완료·승인됐다. 쿨러·순환기 확장은 Source 구현 뒤 통합 승인 전이다. 컴퓨터 포커스 수정은 구현됐다. 상점 주문·배송 상자·쓰레기통 수직(샤워기)은 2026-09-28 구현됐다(`94f0f11`). 같은 날 상점 확장(7종 판매·개봉 물품 흩어짐·배송 상자 scale 정책)이 구현되고 사용자가 통합 승인했다. 설비 회수 아이템 scale 읽기 수정(Placement)은 설계만 확정됐다.
 - 정본 문서: `.md/0_ARCHITECTURE.md`와 `.md/Architecture/*.md`
 
 ## 분석 범위
@@ -33,7 +33,7 @@
 - [UtilityLaborSystem.md](Architecture/UtilityLaborSystem.md): 설비 노동 hub — class 계층, Operation·시간, 설치/가동 용량, 바늘 계기, 회수 payload
 - [UtilityFuelSystem.md](Architecture/UtilityFuelSystem.md): 석탄·드라이아이스, 공급함, 삽, 보일러·쿨러 투입 Volume·자동 열림 문
 - [UtilityLeverSystem.md](Architecture/UtilityLeverSystem.md): 순환기 조작부, 레버 왕복·취소·복귀와 E 진행 표시
-- [ShopSystem.md](Architecture/ShopSystem.md): 상품 목록, 장바구니, 주문·배송 FIFO, 배송 지점·상자, LMB 개봉 위치, 쓰레기통
+- [ShopSystem.md](Architecture/ShopSystem.md): 상품 목록, 장바구니, 주문·배송 FIFO, 배송 지점·상자, LMB 개봉 무리 배치, 쓰레기통
 - [CharacterSystem.md](Architecture/CharacterSystem.md): 1인칭 입력, 컨트롤러 입력 매핑, 이동, 점프, sprint, 캐릭터 조립
 - [CameraSystem.md](Architecture/CameraSystem.md): 이동/착지 기반 카메라 셰이크, camera manager 기반 pitch limit
 - [InteractionSystem.md](Architecture/InteractionSystem.md): camera trace, primary/secondary intent와 equipment-use routing
@@ -124,7 +124,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - Facility는 다중 use slot, check-in/checkout 독립 FIFO와 revision을 소유한다. queue point는 Location/Yaw 전체를 사용하고 checkout visible capacity를 넘은 entry는 같은 FIFO 순번을 유지한 채 전용 NavMesh volume assignment를 받는다.
 - Placement는 placed Actor↔전용 item transaction, 설비 preview, 명시적 zone floor/footprint 파생 snap과 Q Hold 회수를 조율한다. preview 세션은 호환 Zone 전체의 native 중립 grid를 표시하며 전역 셀·Held·preview material은 Settings, Zone별 선 두께·Z offset·강조 간격과 DMI는 PlacementZone이 소유한다.
 - Economy는 PlayerState wallet을 소유하고 cash claim을 한 번만 반영한다.
-- Shop은 PlayerState cart와 world 주문 subsystem을 소유한다. 주문은 wallet 차감·주문 생성·cart 비우기를 한 transaction으로 처리하고, 게임시간 딜레이 뒤 배송 지점에 상자를 FIFO로 쌓는다. 상자 LMB 개봉은 Placement factory로 신규 설치 설비 아이템을 만들고, 쓰레기통은 `IPhysicalCarryDiscardable`로 판정해 carry consume으로 제거한다. 컴퓨터 화면은 관리·상점 탭 root widget이다.
+- Shop은 PlayerState cart와 world 주문 subsystem을 소유한다. 주문은 wallet 차감·주문 생성·cart 비우기를 한 transaction으로 처리하고, 게임시간 딜레이 뒤 배송 지점에 상자를 FIFO로 쌓는다. 상자 LMB 개봉은 Placement factory로 신규 설치 설비 아이템을 정면 무작위 무리(물품끼리만 겹침, 엔진 충돌 해소로 튐)로 만들고, 쓰레기통은 `IPhysicalCarryDiscardable`로 판정해 carry consume으로 제거한다. 컴퓨터 화면은 관리·상점 탭 root widget이다.
 - Customer StateTree는 routine을 조율하고 session/queue/facility/key/wallet API에 실행을 위임한다. 신발 단계와 key-locker 대응은 제거하고 탈의·착의마다 임의의 unnumbered locker action slot을 잠시 사용한다.
 - Customer bath stay는 pre-shower 완료부터 고정 60초다. 각 탐색 구간은 최대 10초이며 전역 설정 임계 수위 이상 Bath만 예약·이동·입욕하고 실제 입욕 시간만 별도 누적한다.
 - Bath Water는 욕탕별 순유량, control mesh E interaction, 수면 위치와 회수 동결을 소유하고 임계 하락을 이용 Customer에게 알린다. Operations는 utility 공용 용량과 욕탕 예약 요구량을 원자적으로 관리하며 condition은 수온·오염도·실제 입욕자 identity, UI는 snapshot/request만 사용한다.
@@ -212,4 +212,5 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - placed facility↔전용 item 교체, global Held/material, derived footprint, explicit floor, generic preview, collision snapshot, locker reconciliation과 native `GridVisual`/DMI·호환 Zone grid session은 구현됐다. 기존 migration과 전용 grid material·Plane authoring은 Unreal 단계에서 함께 검증한다.
 - Bath Water 수직과 Operations 용량 설비, condition, flow mixing, actual-bather 연계, management Widget은 Source/focused automation까지 구현돼 Editor 통합 대기다. deficit no-op transaction, 실제 네-corner 지도 투영, child presentation cache와 utility/bath actor transaction 회귀는 `.md/PROMPT_IMPLEMENTATION_R.md` 기준으로 보강됐다.
 - 보일러 노동 수직(Operation, 삽·석탄 공급함, 투입 Volume·문, 계기, 설치/가동 용량, 회수 잔량 보존)은 구현·승인됐다. 2026-09-26 설계로 labor·fuel intermediate class, 쿨러·드라이아이스, 순환기 레버, native `GaugeFace` 삭제와 legacy 항상 공급 제거가 추가되며 `.md/PROMPT_IMPLEMENTATION.md`가 다음 Source 입력이다.
-- 상점(ShopSystem): 2026-09-27 설계만 확정, Source·Content 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
+- 상점(ShopSystem): 수직(`94f0f11`)과 확장 모두 구현·통합 승인(2026-09-28).
+- 설비 회수 아이템 scale 읽기 수정(PlacementSystem): 2026-09-28 설계 확정, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.

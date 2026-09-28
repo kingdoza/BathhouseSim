@@ -235,7 +235,7 @@ fixed-slot placement는 cleaning, combat 또는 towel transaction이 아니다. 
 - `UPlayerCarryComponent::CommitConsumeHeldObject(Object, DomainCommit)`은 손에 든 물건을 알림 없이 떼고 `DomainCommit`이 성공하면 `OnHeldObjectChanged`를 한 번 방송하는 범용 commit이다. 실패하면 원래대로 되돌린다. 기존 `CommitReleasePhysicalObjectForPlacement`는 이 함수를 쓰는 wrapper로 남긴다(이름·동작 유지).
 - 상자 개봉과 쓰레기통이 이 경로를 쓴다. Actor 제거는 호출자가 commit 뒤에 한다. carry 상태에 제거 예정 Actor를 남기지 않는다.
 - `IPhysicalCarryDiscardable`(Interaction, C++ 전용, 선택): `CanDiscardCarriedObject(OutFailure)`, `HandleDiscardCommitted()`. 설비 아이템과 배송 상자만 구현한다. 열쇠와 exact 거치대 도구는 구현하지 않아 버릴 수 없다.
-- 배송 상자는 `EPhysicalCarryKind::DeliveryBox`(enum 끝 append), capability `FreeDrop`만 쓴다. 상세는 [ShopSystem.md](ShopSystem.md)에 있다.
+- 배송 상자는 `EPhysicalCarryKind::DeliveryBox`(enum 끝 append), capability `FreeDrop`만 쓴다. 다른 held 물품처럼 class 소유 `HeldTransform`의 location/rotation만 적용하고 CDO root scale을 모든 전이에서 보존한다. 상세는 [ShopSystem.md](ShopSystem.md)에 있다.
 
 ## Recovery And EndPlay
 

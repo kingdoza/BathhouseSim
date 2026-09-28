@@ -155,7 +155,7 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 5. confirm 전 preview가 collision/NavMesh를 만들지 않고, confirm 뒤 body collision에 따라 NavMesh가 갱신되는지 확인한다.
 6. 빈 설비 회수 시 source collision/NavMesh가 사라지고, rollback이면 복구되며, 회수 item 재배치 뒤 NavMesh가 다시 생성되는지 확인한다.
 7. Clean Towel Stack과 Used Towel Bin에 placement/recovery prompt가 생기지 않는지 확인한다.
-8. 설비 회수 아이템이 공통 `/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem`의 `ItemRoot` Scale `(0.3,0.3,0.3)`로 생성되고 E pickup/G drop 뒤에도 같은 크기를 유지하는지 확인한다.
+8. 설비 회수 아이템이 공통 `/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem`의 `ItemRoot`에 지정한 Scale(asset 값) 그대로 생성되고 E pickup/G drop 뒤에도 같은 크기를 유지하는지 확인한다.
 
 깨끗한 재시작 상태에서 기본 PIE 2회는 이미 통과했으며 duplicate RegistrationId, locker capacity/expansion 오류, removed property/component, Blueprint compile 오류와 Ensure는 없었다.
 

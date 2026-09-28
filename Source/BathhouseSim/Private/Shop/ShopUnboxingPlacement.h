@@ -20,6 +20,8 @@ public:
 		float ViewYaw,
 		const TArray<UFacilityPlacementDefinition*>& Definitions,
 		float ForwardDistanceCm,
+		FRandomStream& RandomStream,
+		float OverlapDepthCm,
 		TArray<FTransform>& OutTransforms,
 		FText& OutFailureReason);
 };

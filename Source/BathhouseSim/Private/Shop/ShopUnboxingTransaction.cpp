@@ -77,6 +77,7 @@ bool FShopUnboxingTransaction::Open(
 	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
 	const FVector FootLocation = PlayerPawn->GetActorLocation() - FVector::UpVector * HalfHeight;
 	const float ViewYaw = Context.CameraDirection.Rotation().Yaw;
+	FRandomStream RandomStream(FMath::Rand());
 	TArray<FTransform> SpawnTransforms;
 	if (!FShopUnboxingPlacement::FindSpawnTransforms(
 		*World,
@@ -87,6 +88,8 @@ bool FShopUnboxingTransaction::Open(
 		ViewYaw,
 		Definitions,
 		Settings->GetUnboxForwardDistanceCm(),
+		RandomStream,
+		Settings->GetUnboxOverlapDepthCm(),
 		SpawnTransforms,
 		OutFailureReason))
 	{

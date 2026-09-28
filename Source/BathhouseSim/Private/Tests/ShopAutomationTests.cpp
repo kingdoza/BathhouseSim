@@ -5,6 +5,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Cleaning/WetMopActor.h"
@@ -16,6 +17,7 @@
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Interaction/HeldEquipmentUsable.h"
@@ -30,6 +32,7 @@
 #include "Misc/PackageName.h"
 #include "Placement/FacilityActorConversionTransaction.h"
 #include "Placement/FacilityPlacementComponent.h"
+#include "Placement/FacilityPlacementCollisionUtils.h"
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/FacilityPlacementSettings.h"
 #include "Placement/FacilityPlacementZoneActor.h"
@@ -63,6 +66,7 @@ struct FScopedShopSettingsOverride
 	int32 CartTotalQuantityLimit = Settings->CartTotalQuantityLimit;
 	int32 PerProductQuantityLimit = Settings->PerProductQuantityLimit;
 	float DeliveryDelaySeconds = Settings->DeliveryDelaySeconds;
+	float UnboxOverlapDepthCm = Settings->UnboxOverlapDepthCm;
 
 	~FScopedShopSettingsOverride()
 	{
@@ -71,6 +75,7 @@ struct FScopedShopSettingsOverride
 		Settings->CartTotalQuantityLimit = CartTotalQuantityLimit;
 		Settings->PerProductQuantityLimit = PerProductQuantityLimit;
 		Settings->DeliveryDelaySeconds = DeliveryDelaySeconds;
+		Settings->UnboxOverlapDepthCm = UnboxOverlapDepthCm;
 	}
 };
 
@@ -244,6 +249,11 @@ const FShopBlueprintLoadSpec ShopBlueprintSpecs[] =
 		TEXT("/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem"),
 		TEXT("/Game/Developers/MigrationCheck/BP_PlaceableFacilityItem"),
 		APlaceableFacilityItemActor::StaticClass()
+	},
+	{
+		TEXT("/Game/Bathhouse/Blueprints/Shop/BP_ShopDeliveryBox"),
+		TEXT("/Game/Developers/MigrationCheck/BP_ShopDeliveryBox"),
+		AShopDeliveryBoxActor::StaticClass()
 	}
 };
 }
@@ -678,15 +688,49 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	const FVector FootLocation = Player->GetActorLocation() - FVector::UpVector * HalfHeight;
 	TArray<UFacilityPlacementDefinition*> Definitions = { Definition };
 	TArray<FTransform> SpawnTransforms;
+	FRandomStream RandomStream(1001);
 	TestTrue(TEXT("Open floor chooses the configured forward row"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			Definitions, 100.0f, SpawnTransforms, FailureReason));
+			Definitions, 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
 	TestEqual(TEXT("Open floor returns one spawn transform"), SpawnTransforms.Num(), 1);
 	if (SpawnTransforms.Num() == 1)
 	{
-		TestTrue(TEXT("Open floor uses the configured 100 cm forward position"),
-			FMath::IsNearlyEqual(SpawnTransforms[0].GetLocation().X, Player->GetActorLocation().X + 100.0f, 0.1f));
+		FVector ShapeCenter = FVector::ZeroVector;
+		FQuat ShapeRotation = FQuat::Identity;
+		FCollisionShape Shape;
+		const UPrimitiveComponent* CollisionTemplate = nullptr;
+		TestTrue(TEXT("Open-floor spawn uses the definition collision query"),
+			APlaceableFacilityItemActor::BuildDefinitionCollisionQuery(
+				*Definition, SpawnTransforms[0], ShapeCenter, ShapeRotation, Shape, CollisionTemplate, FailureReason));
+		TestTrue(TEXT("Open floor aligns cluster bounds center at the configured 100 cm forward position"),
+			FMath::IsNearlyEqual(ShapeCenter.X, FootLocation.X + 100.0f, 0.1f));
+		TestTrue(TEXT("Open floor keeps the lowest shape surface 20 cm above the feet"),
+			FMath::IsNearlyEqual(ShapeCenter.Z - Shape.GetExtent().Z, FootLocation.Z + 20.0f, 0.1f));
+
+		APlaceableFacilityItemActor* SpawnedOpenFloorItem = APlaceableFacilityItemActor::SpawnFreshItem(
+			*World, *Definition, SpawnTransforms[0], FailureReason);
+		TestNotNull(TEXT("Open-floor candidate spawns as a real facility item"), SpawnedOpenFloorItem);
+		if (SpawnedOpenFloorItem)
+		{
+			TestTrue(TEXT("Open-floor item activates in the world"),
+				SpawnedOpenFloorItem->ActivateFreeWorld(SpawnedOpenFloorItem->GetActorTransform(), FailureReason));
+			UStaticMeshComponent* ItemRoot = SpawnedOpenFloorItem->GetItemRoot();
+			UStaticMesh* ItemMesh = ItemRoot ? ItemRoot->GetStaticMesh() : nullptr;
+			TestNotNull(TEXT("Spawned item has its collision mesh"), ItemMesh);
+			if (ItemRoot && ItemMesh)
+			{
+				const FBoxSphereBounds MeshBounds = ItemMesh->GetBounds();
+				const FVector ActualBoundsCenter = ItemRoot->GetComponentTransform().TransformPosition(MeshBounds.Origin);
+				const FVector ActualBoundsExtent = MeshBounds.BoxExtent * ItemRoot->GetComponentScale().GetAbs();
+				const float ActualCollisionBottom = ActualBoundsCenter.Z - ActualBoundsExtent.Z;
+				TestTrue(TEXT("Spawned actor preserves the definition item scale"),
+					SpawnedOpenFloorItem->GetActorScale3D().Equals(SpawnTransforms[0].GetScale3D(), 1.0e-3f));
+				TestTrue(TEXT("Spawned actor collision bottom stays 20 cm above the feet"),
+					FMath::IsNearlyEqual(ActualCollisionBottom, FootLocation.Z + 20.0f, 0.5f));
+			}
+			SpawnedOpenFloorItem->Destroy();
+		}
 	}
 
 	auto SpawnBlockingBox = [World](const TCHAR* Name, const FVector& Center, const FVector& HalfExtent) -> UBoxComponent*
@@ -712,13 +756,14 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	FQuat ItemCollisionRotation = FQuat::Identity;
 	FCollisionShape ItemCollisionShape;
 	const UPrimitiveComponent* ItemCollisionTemplate = nullptr;
-	const APlaceableFacilityItemActor* RecoveryItemCDO = Definition->RecoveryItemClass
-		? Definition->RecoveryItemClass->GetDefaultObject<APlaceableFacilityItemActor>()
-		: nullptr;
+	FVector ItemDefaultScale = FVector::OneVector;
+	TestTrue(TEXT("Definition item scale comes from its default root"),
+		APlaceableFacilityItemActor::GetDefinitionItemScale(
+			*Definition, ItemDefaultScale, FailureReason));
 	const FTransform ItemQueryTransform(
 		FRotator::ZeroRotator,
 		FVector::ZeroVector,
-		RecoveryItemCDO ? RecoveryItemCDO->GetActorScale3D() : FVector::OneVector);
+		ItemDefaultScale);
 	TestTrue(TEXT("Definition collision dimensions are queryable at the recovery item default scale"),
 		APlaceableFacilityItemActor::BuildDefinitionCollisionQuery(
 			*Definition,
@@ -732,15 +777,34 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	const FVector WallCenter(PlayerCenter.X + 50.0f, PlayerCenter.Y, PlayerCenter.Z);
 	UBoxComponent* Wall = SpawnBlockingBox(TEXT("ShopUnboxWall"), WallCenter, FVector(10.0f, 200.0f, 150.0f));
 	TestNotNull(TEXT("Fifty-centimetre wall blocker is created"), Wall);
+	RandomStream.Initialize(1002);
 	TestTrue(TEXT("A wall in front keeps the item on the near side"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			Definitions, 100.0f, SpawnTransforms, FailureReason));
+			Definitions, 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
 	if (SpawnTransforms.Num() == 1 && Wall)
 	{
-		const float NearWallEdge = Wall->GetComponentLocation().X - Wall->GetScaledBoxExtent().X;
-		const FVector SpawnLocation = SpawnTransforms[0].GetLocation();
-		TestTrue(TEXT("No unboxed item center is placed beyond the near face of the wall"), SpawnLocation.X <= NearWallEdge);
+		TestTrue(TEXT("Wall candidate uses the definition collision query"),
+			APlaceableFacilityItemActor::BuildDefinitionCollisionQuery(
+				*Definition, SpawnTransforms[0], ItemCollisionLocation, ItemCollisionRotation,
+				ItemCollisionShape, ItemCollisionTemplate, FailureReason));
+		FCollisionQueryParams WallClearanceParams(SCENE_QUERY_STAT(ShopUnboxWallClearanceAssertion), false);
+		WallClearanceParams.AddIgnoredActor(Player);
+		WallClearanceParams.AddIgnoredActor(BoxForQuery);
+		const FVector WallCandidateHalfExtent = ItemCollisionShape.GetExtent().GetAbs();
+		const FVector WallClearanceCenter = ItemCollisionLocation + FVector(0.0f, 0.0f, 4.0f);
+		const FVector WallClearanceExtent(
+			WallCandidateHalfExtent.X + 8.0f,
+			WallCandidateHalfExtent.Y + 8.0f,
+			WallCandidateHalfExtent.Z + 4.0f);
+		TestFalse(TEXT("Wall candidate clears blocking geometry with horizontal and upper 8 cm clearance"),
+			FacilityPlacementCollision::HasBlockingOverlap(
+				*World,
+				WallClearanceCenter,
+				ItemCollisionRotation,
+				FCollisionShape::MakeBox(WallClearanceExtent),
+				*ItemCollisionTemplate,
+				WallClearanceParams));
 	}
 
 	if (Wall && Wall->GetOwner()) Wall->GetOwner()->Destroy();
@@ -753,15 +817,20 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 		BlockedRowCenter,
 		FVector(150.0f, 80.0f, ItemHalfExtent.Z + 5.0f));
 	TestNotNull(TEXT("Ground-level forward candidates are blocked"), FloorBlocker);
+	RandomStream.Initialize(1003);
 	TestTrue(TEXT("Blocked forward row safely stacks above the capsule"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			Definitions, 100.0f, SpawnTransforms, FailureReason));
+			Definitions, 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
 	if (SpawnTransforms.Num() == 1)
 	{
 		const float CapsuleTopZ = PlayerCenter.Z + Capsule->GetScaledCapsuleHalfHeight();
+		TestTrue(TEXT("Vertical fallback shape uses the definition collision query"),
+			APlaceableFacilityItemActor::BuildDefinitionCollisionQuery(
+				*Definition, SpawnTransforms[0], ItemCollisionLocation, ItemCollisionRotation,
+				ItemCollisionShape, ItemCollisionTemplate, FailureReason));
 		TestTrue(TEXT("Safe vertical fallback is above the player capsule"),
-			SpawnTransforms[0].GetLocation().Z > CapsuleTopZ);
+			ItemCollisionLocation.Z - ItemCollisionShape.GetExtent().Z > CapsuleTopZ);
 	}
 
 	if (FloorBlocker && FloorBlocker->GetOwner()) FloorBlocker->GetOwner()->Destroy();
@@ -782,14 +851,19 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	TestNotNull(TEXT("Back cage blocker exists"), BackCage);
 	TestNotNull(TEXT("Left cage blocker exists"), LeftCage);
 	TestNotNull(TEXT("Right cage blocker exists"), RightCage);
+	RandomStream.Initialize(1004);
 	TestTrue(TEXT("A four-sided blocked corner stacks items above the capsule safely"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			Definitions, 100.0f, SpawnTransforms, FailureReason));
+			Definitions, 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
 	if (SpawnTransforms.Num() == 1)
 	{
 		const float CapsuleTopZ = PlayerCenter.Z + CageHalfHeight;
-		const float ItemBottomZ = SpawnTransforms[0].GetLocation().Z - ItemHalfExtent.Z;
+		TestTrue(TEXT("Caged fallback shape uses the definition collision query"),
+			APlaceableFacilityItemActor::BuildDefinitionCollisionQuery(
+				*Definition, SpawnTransforms[0], ItemCollisionLocation, ItemCollisionRotation,
+				ItemCollisionShape, ItemCollisionTemplate, FailureReason));
+		const float ItemBottomZ = ItemCollisionLocation.Z - ItemCollisionShape.GetExtent().Z;
 		TestTrue(TEXT("Four-sided corner fallback is entirely above the capsule"), ItemBottomZ > CapsuleTopZ);
 	}
 	for (UBoxComponent* Cage : { FrontCage, BackCage, LeftCage, RightCage })
@@ -1158,6 +1232,28 @@ bool FShopBlueprintLoadAutomationTest::RunTest(const FString& Parameters)
 				? Cast<UClass>(PromptClassProperty->GetObjectPropertyValue_InContainer(HUDCDO))
 				: nullptr;
 			TestTrue(TEXT("HUD Blueprint retains an interaction prompt widget class"), IsValid(PromptWidgetClass));
+		}
+		else if (Spec->NativeParent == AShopDeliveryBoxActor::StaticClass())
+		{
+			const AShopDeliveryBoxActor* BoxCDO = Cast<AShopDeliveryBoxActor>(CDO);
+			TestTrue(TEXT("Delivery box Blueprint CDO has its BoxMesh root"),
+				BoxCDO && BoxCDO->GetBoxMesh() && BoxCDO->GetRootComponent() == BoxCDO->GetBoxMesh());
+			const FVector RootScale = BoxCDO && BoxCDO->GetBoxMesh()
+				? BoxCDO->GetBoxMesh()->GetRelativeScale3D()
+				: FVector::ZeroVector;
+			TestTrue(TEXT("Delivery box CDO root scale is finite and positive"),
+				FMath::IsFinite(RootScale.X) && FMath::IsFinite(RootScale.Y) && FMath::IsFinite(RootScale.Z)
+				&& RootScale.X > KINDA_SMALL_NUMBER && RootScale.Y > KINDA_SMALL_NUMBER
+				&& RootScale.Z > KINDA_SMALL_NUMBER);
+			const FStructProperty* HeldTransformProperty = FindFProperty<FStructProperty>(
+				AShopDeliveryBoxActor::StaticClass(), TEXT("HeldTransform"));
+			TestNotNull(TEXT("Delivery box class exposes HeldTransform"), HeldTransformProperty);
+			const AShopDeliveryBoxActor* NativeBoxCDO = GetDefault<AShopDeliveryBoxActor>();
+			const FTransform* NativeHeldTransformValue = NativeBoxCDO && HeldTransformProperty
+				? HeldTransformProperty->ContainerPtrToValuePtr<FTransform>(NativeBoxCDO)
+				: nullptr;
+			TestTrue(TEXT("Native delivery box HeldTransform defaults to identity"),
+				NativeHeldTransformValue && NativeHeldTransformValue->Equals(FTransform::Identity));
 		}
 	}
 	return bSucceeded;

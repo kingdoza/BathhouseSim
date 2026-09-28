@@ -244,7 +244,8 @@ APlaceableFacilityItemActor* APlaceableFacilityItemActor::SpawnFreshItem(
 		WorldTransform,
 		nullptr,
 		nullptr,
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn,
+		ESpawnActorScaleMethod::OverrideRootScale);
 	if (!Item)
 	{
 		OutFailureReason = LOCTEXT("FreshItemSpawnFailed", "신규 설비 아이템 생성을 시작할 수 없습니다.");
@@ -272,7 +273,11 @@ APlaceableFacilityItemActor* APlaceableFacilityItemActor::SpawnFreshItem(
 	{
 		return Fail();
 	}
-	Item->FinishSpawning(WorldTransform);
+	Item->FinishSpawning(
+		WorldTransform,
+		false,
+		nullptr,
+		ESpawnActorScaleMethod::OverrideRootScale);
 	if (!IsValid(Item) || !Item->ValidatePlacementPayload(OutFailureReason))
 	{
 		return Fail();

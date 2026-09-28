@@ -131,7 +131,7 @@ footprint authoring 계약:
 
 Recovery item collision과 설치 footprint는 서로 대체하지 않는다. `RecoveryItemMesh`는 기존 동일 규격 직육면체/simple-box/physics 계약을 유지한다.
 
-활성 Definition은 하나의 공통 Blueprint 파생 클래스를 `RecoveryItemClass`로 공유할 수 있다. runtime/Data Validation은 `APlaceableFacilityItemActor` 자체 또는 그 자식 클래스만 허용한다. 선택된 class CDO의 `ItemRoot`/Actor scale이 설비 회수 아이템의 공통 물리·표현 scale 정본이며, 회수 collision query와 실제 spawn이 같은 CDO scale을 사용한다. `FacilityItemHeldTransform` scale은 계속 무시하고 위치·회전만 적용한다.
+활성 Definition은 하나의 공통 Blueprint 파생 클래스를 `RecoveryItemClass`로 공유할 수 있다. runtime/Data Validation은 `APlaceableFacilityItemActor` 자체 또는 그 자식 클래스만 허용한다. 선택된 class CDO의 `ItemRoot` relative scale(`APlaceableFacilityItemActor::GetDefinitionItemScale`, 유한한 양수)이 설비 회수 아이템의 공통 물리·표현 scale 정본이며, 회수 collision query와 실제 spawn이 같은 값을 사용한다. Blueprint CDO는 component-to-world를 갱신하지 않으므로 CDO `GetActorScale3D()`로 읽지 않는다. 이 scale을 담은 transform으로 spawn할 때는 `SpawnActorDeferred`와 `FinishSpawning` 모두 `ESpawnActorScaleMethod::OverrideRootScale`을 써 root scale이 두 번 곱해지지 않게 한다. `FacilityItemHeldTransform` scale은 계속 무시하고 위치·회전만 적용한다.
 
 ## Placement Zone And Candidate Transform
 
@@ -313,6 +313,7 @@ Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후�
 ## Verification
 
 - 공통 Held transform이 모든 facility item에 같고 Scale은 보존되는지 확인한다.
+- 회수 collision query와 회수 spawn이 CDO `ItemRoot` relative scale을 한 번만 쓰는지, component-to-world가 갱신되지 않은 Blueprint식 CDO에서도 확인한다. 수치는 단언하지 않고 asset·fixture의 authored 값과 비교한다.
 - grid/footprint 변경 시 파생 cell과 non-multiple validation을 확인한다.
 - preview 시작 시 조준과 무관하게 compatible Zone 전체만 grid가 표시되고 종료 경로마다 모두 숨겨지는지 확인한다.
 - GridVisual 한 개가 Bounds 전체를 덮고 전역 cell 간격, Zone별 line thickness/Z offset/major interval을 DMI와 transform에 반영하는지 확인한다.

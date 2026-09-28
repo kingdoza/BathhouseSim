@@ -32,7 +32,7 @@
 
 `BP_Boiler`의 inherited `FacilityPlacement.Definition`은 `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler`로 저장됐다. `DefaultMap`의 기존 보일러 인스턴스는 별도 override 없이 재시작 후 같은 Definition을 상속한다. 다른 utility Blueprint의 Definition 연결 여부는 이 변경으로 보장하지 않는다.
 
-공통 설비 아이템 Blueprint의 parent는 `/Script/BathhouseSim.PlaceableFacilityItemActor`다. 상속된 `ItemRoot`의 기본 Relative Scale은 `(0.3,0.3,0.3)`이며, 설비 회수 아이템의 공통 크기는 이 값에서 조정한다. Project Settings의 `FacilityItemHeldTransform.Scale`로는 크기를 조정하지 않는다.
+공통 설비 아이템 Blueprint의 parent는 `/Script/BathhouseSim.PlaceableFacilityItemActor`다. 설비 회수·신규 설치 아이템의 공통 크기는 상속된 `ItemRoot`의 Relative Scale에서 조정한다. 이 값은 사용자 조정값이며 정본은 이 Blueprint asset 자체다. 문서에 수치를 기록하지 않고, 각 축은 유한한 양수여야 한다. Project Settings의 `FacilityItemHeldTransform.Scale`로는 크기를 조정하지 않는다.
 
 구형 `/Game/Bathhouse/Blueprints/Placement/Preview/BP_FacilityPreview_*` 9개는 Definition 재저장 뒤 참조가 0임을 확인하고 삭제됐다. 현재 preview는 native `AFacilityPlacementPreviewActor` 경로만 사용한다.
 

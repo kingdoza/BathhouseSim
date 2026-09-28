@@ -23,6 +23,13 @@ float UShopSettings::GetUnboxForwardDistanceCm() const
 	return FMath::IsFinite(UnboxForwardDistanceCm) ? FMath::Max(0.0f, UnboxForwardDistanceCm) : 100.0f;
 }
 
+float UShopSettings::GetUnboxOverlapDepthCm() const
+{
+	return FMath::IsFinite(UnboxOverlapDepthCm)
+		? FMath::Clamp(UnboxOverlapDepthCm, 0.0f, 50.0f)
+		: 8.0f;
+}
+
 float UShopSettings::GetDeliveryNoticeSeconds() const
 {
 	return FMath::IsFinite(DeliveryNoticeSeconds) ? FMath::Max(0.01f, DeliveryNoticeSeconds) : 3.0f;

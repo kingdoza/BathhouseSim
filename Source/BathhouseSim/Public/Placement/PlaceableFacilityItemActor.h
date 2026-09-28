@@ -70,6 +70,10 @@ public:
 	UStaticMeshComponent* GetItemRoot() const { return ItemRoot; }
 	bool IsHeldForPlacement() const;
 
+	static bool GetDefinitionItemScale(
+		const UFacilityPlacementDefinition& Definition,
+		FVector& OutScale,
+		FText& OutFailureReason);
 	static UStaticMesh* ResolveRecoveryMesh(const UFacilityPlacementDefinition& Definition);
 	static bool ValidateRecoveryMesh(const UStaticMesh& Mesh, FText& OutFailureReason);
 	static bool BuildDefinitionCollisionQuery(

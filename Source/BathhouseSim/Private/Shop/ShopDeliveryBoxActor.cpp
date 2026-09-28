@@ -6,7 +6,6 @@
 #include "Interaction/PlayerCarryComponent.h"
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/FacilityPlacementTypes.h"
-#include "Placement/FacilityPlacementSettings.h"
 #include "Misc/DataValidation.h"
 #include "Shop/ShopSettings.h"
 #include "Shop/ShopUnboxingTransaction.h"
@@ -97,7 +96,12 @@ bool AShopDeliveryBoxActor::ActivateFreeWorld(
 		OutFailureReason = LOCTEXT("InvalidBoxActivation", "배송 상자 초기화 상태가 올바르지 않습니다.");
 		return false;
 	}
-	SetActorTransform(WorldTransform, false, nullptr, ETeleportType::TeleportPhysics);
+	SetActorLocationAndRotation(
+		WorldTransform.GetLocation(),
+		WorldTransform.Rotator(),
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics);
 	SetFreeWorldPhysics(true);
 	if (!BoxMesh->IsSimulatingPhysics())
 	{
@@ -119,8 +123,7 @@ FVector AShopDeliveryBoxActor::GetBoxHalfExtent() const
 		return FVector::ZeroVector;
 	}
 	return BoxMesh->GetStaticMesh()->GetBounds().BoxExtent
-		* BoxMesh->GetRelativeScale3D().GetAbs()
-		* GetActorScale3D().GetAbs();
+		* BoxMesh->GetRelativeScale3D().GetAbs();
 }
 
 FText AShopDeliveryBoxActor::GetContentsSummary() const
@@ -169,7 +172,9 @@ FPlayerInteractionResult AShopDeliveryBoxActor::ExecuteInteraction(const FPlayer
 
 FTransform AShopDeliveryBoxActor::GetHeldTransform() const
 {
-	return GetDefault<UFacilityPlacementSettings>()->GetFacilityItemHeldTransform();
+	FTransform Result = HeldTransform;
+	Result.SetScale3D(FVector::OneVector);
+	return Result;
 }
 
 bool AShopDeliveryBoxActor::CanBeTakenBy(
@@ -204,12 +209,17 @@ bool AShopDeliveryBoxActor::HandleTakenBy(
 		DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		Carrier.Reset();
 		Lifecycle = ELifecycle::FreeWorld;
-		SetActorTransform(LastSafeTransform, false, nullptr, ETeleportType::TeleportPhysics);
+		SetActorLocationAndRotation(
+			LastSafeTransform.GetLocation(),
+			LastSafeTransform.Rotator(),
+			false,
+			nullptr,
+			ETeleportType::TeleportPhysics);
 		SetFreeWorldPhysics(true);
 		return false;
 	}
-	const FTransform HeldTransform = GetHeldTransform();
-	BoxMesh->SetRelativeLocationAndRotation(HeldTransform.GetLocation(), HeldTransform.GetRotation());
+	const FTransform HeldPose = GetHeldTransform();
+	BoxMesh->SetRelativeLocationAndRotation(HeldPose.GetLocation(), HeldPose.GetRotation());
 	return true;
 }
 
@@ -264,7 +274,12 @@ void AShopDeliveryBoxActor::RecoverPhysicalCarryable(UPlayerCarryComponent* Prev
 	Carrier.Reset();
 	Lifecycle = ELifecycle::FreeWorld;
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	SetActorTransform(LastSafeTransform, false, nullptr, ETeleportType::TeleportPhysics);
+	SetActorLocationAndRotation(
+		LastSafeTransform.GetLocation(),
+		LastSafeTransform.Rotator(),
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics);
 	SetFreeWorldPhysics(true);
 	BoxMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
 	BoxMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
@@ -366,16 +381,28 @@ EDataValidationResult AShopDeliveryBoxActor::IsDataValid(FDataValidationContext&
 		Context.AddError(Message);
 		Result = EDataValidationResult::Invalid;
 	};
-	if (!BoxMesh || !BoxMesh->GetStaticMesh()
+	const FVector RootScale = BoxMesh ? BoxMesh->GetRelativeScale3D() : FVector::ZeroVector;
+	const bool bValidRootScale = FMath::IsFinite(RootScale.X)
+		&& FMath::IsFinite(RootScale.Y)
+		&& FMath::IsFinite(RootScale.Z)
+		&& RootScale.X > KINDA_SMALL_NUMBER
+		&& RootScale.Y > KINDA_SMALL_NUMBER
+		&& RootScale.Z > KINDA_SMALL_NUMBER;
+	if (!BoxMesh || GetRootComponent() != BoxMesh || !BoxMesh->GetStaticMesh()
 		|| BoxMesh->GetCollisionEnabled() != ECollisionEnabled::QueryAndPhysics
 		|| !BoxMesh->BodyInstance.bUseCCD
 		|| BoxMesh->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Ignore
-		|| !GetActorScale3D().Equals(FVector::OneVector)
 		|| !BoxMesh->GetRelativeLocation().IsNearlyZero()
 		|| !BoxMesh->GetRelativeRotation().IsNearlyZero()
-		|| !BoxMesh->GetRelativeScale3D().Equals(FVector::OneVector))
+		|| !bValidRootScale)
 	{
-		Invalidate(NSLOCTEXT("ShopDeliveryBox", "InvalidBoxAuthoring", "Delivery box requires a mesh root with QueryAndPhysics, CCD, Pawn Ignore, and unit scale."));
+		Invalidate(NSLOCTEXT("ShopDeliveryBox", "InvalidBoxAuthoring", "Delivery box requires a mesh root with QueryAndPhysics, CCD, Pawn Ignore, zero relative location/rotation, and a positive finite scale."));
+	}
+	if (!HeldTransform.GetScale3D().Equals(FVector::OneVector))
+	{
+		Context.AddWarning(LOCTEXT(
+			"HeldTransformScaleIgnored",
+			"HeldTransform scale is ignored at runtime. Author a unit scale and use location/rotation only."));
 	}
 	return Result == EDataValidationResult::NotValidated ? EDataValidationResult::Valid : Result;
 }

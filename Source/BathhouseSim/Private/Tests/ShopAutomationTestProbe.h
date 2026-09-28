@@ -5,7 +5,9 @@
 class AActor;
 #include "Economy/PlayerWalletComponent.h"
 #include "Interaction/PlayerCarryComponent.h"
+#include "Shop/ShopDeliveryBoxActor.h"
 #include "Shop/ShopCartComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Shop/ShopOrderSubsystem.h"
 #include "ShopAutomationTestProbe.generated.h"
 
@@ -53,4 +55,21 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPlayerCarryComponent> Carry = nullptr;
+};
+
+UCLASS(Transient, NotBlueprintable)
+class AShopDeliveryBoxScaleAutomationActor final : public AShopDeliveryBoxActor
+{
+	GENERATED_BODY()
+
+public:
+	AShopDeliveryBoxScaleAutomationActor()
+	{
+		GetBoxMesh()->SetRelativeScale3D(FVector(0.8f));
+	}
+
+	void SetHeldTransformForTest(const FTransform& InTransform)
+	{
+		HeldTransform = InTransform;
+	}
 };

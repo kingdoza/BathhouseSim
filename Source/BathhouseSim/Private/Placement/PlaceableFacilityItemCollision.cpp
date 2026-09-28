@@ -56,6 +56,39 @@ bool APlaceableFacilityItemActor::ValidateRecoveryMesh(
 	return true;
 }
 
+bool APlaceableFacilityItemActor::GetDefinitionItemScale(
+	const UFacilityPlacementDefinition& Definition,
+	FVector& OutScale,
+	FText& OutFailureReason)
+{
+	OutScale = FVector::OneVector;
+	OutFailureReason = FText::GetEmpty();
+	const APlaceableFacilityItemActor* ItemCDO = Definition.RecoveryItemClass
+		? Definition.RecoveryItemClass->GetDefaultObject<APlaceableFacilityItemActor>()
+		: nullptr;
+	const USceneComponent* Root = ItemCDO ? ItemCDO->GetRootComponent() : nullptr;
+	if (!Root)
+	{
+		OutFailureReason = LOCTEXT(
+			"InvalidRecoveryItemRoot",
+			"설비 회수 아이템 클래스의 기본 루트를 확인할 수 없습니다.");
+		return false;
+	}
+
+	const FVector RootScale = Root->GetRelativeScale3D();
+	if (!FMath::IsFinite(RootScale.X) || !FMath::IsFinite(RootScale.Y) || !FMath::IsFinite(RootScale.Z)
+		|| RootScale.X <= 0.0f || RootScale.Y <= 0.0f || RootScale.Z <= 0.0f)
+	{
+		OutFailureReason = LOCTEXT(
+			"InvalidRecoveryItemScale",
+			"설비 회수 아이템 클래스의 기본 루트 스케일은 유한한 양수여야 합니다.");
+		return false;
+	}
+
+	OutScale = RootScale;
+	return true;
+}
+
 bool APlaceableFacilityItemActor::BuildDefinitionCollisionQuery(
 	const UFacilityPlacementDefinition& Definition,
 	const FTransform& ItemWorldTransform,

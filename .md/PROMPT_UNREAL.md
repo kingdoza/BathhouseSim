@@ -1,83 +1,78 @@
-# Unreal Editor 인계 — 상점 주문·배송 상자·쓰레기통
+# Unreal Editor 인계 — 상점 확장
 
-## 현재 상태와 경계
+## 현재 상태와 단계
 
-- Source 구현과 headless 검증은 앞 단계에서 완료했다. UE 5.8 Build, Blueprint load gate, Shop/Economy/Placement focused automation과 전체 BathhouseSim 회귀가 통과했다.
-- [완료, MCP 저장·재로드 확인] DA_ShopCatalog에는 Shower 상품(판매 가능, 표시명 샤워기, 가격 10000, Shower Placement Definition 참조)이 저장돼 있다. 일곱 Placement Definition은 Facility.Placeable 및 Facility.Discardable 태그를 가지고 LockerSlotCount=0이다.
-- [완료, Compile·개별 Save] BP_ShopDeliveryBox, BP_ShopDeliveryPoint, BP_TrashBin을 지정 native class의 자식으로 만들었다. 각 asset은 compile 및 개별 저장을 마쳤고 생성 세션에서 parent/CDO 기본값을 확인했다. 새 Editor 프로세스 재로드는 아직 확인되지 않았다.
-- [완료, Compile/load gate] BP_BathhousePlayerState와 BP_PlaceableFacilityItem을 compile/load 확인했고 dirty 상태가 아니었다.
-- [미완료, MCP 기능 부재] Data Validation 도구가 없다. 저장 과정에서 Catalog validation 로그가 “Every shop product requires a valid placement definition.”를 반환했다. Definition 참조는 재로드로 확인했지만 원인을 해소하거나 validation 통과로 판정하지 않았다.
-- [미완료, MCP 기능 부족·저장 실패] 위젯 계층 편집 및 Project Settings config 저장 tool이 없다. World Partition actor 저장 호출은 external actor package 경로가 없어 실패했다. 실제 결과와 수동 작업은 .md/USER_UNREAL.md의 상점 인계에 있다.
-- [재개 필요, MCP 재시작 차단] 새 Editor 프로세스에서 방금 저장한 세 Blueprint의 재로드와 PIE 시작·종료를 확인하지 못했다. 마지막 작업용 Editor는 toolset 초기화가 두 차례 시간 초과되어 종료했다. 작업용 Editor와 MCP listener는 현재 닫혀 있다.
-- 이번 Shop MCP 작업에서는 Config나 DefaultMap에 변경을 저장하지 않았다. 임시로 생성한 DeliveryPoint는 제거했고 Map은 clean 상태였다. 기존 사용자의 다른 변경은 보존한다.
-- 샤워기만 판매한다. 혼합 주문과 7종 판매 확장은 이 단계의 대상이 아니다.
+- R1/P3 구현 후 UE 5.8 Editor 빌드, Shop 집중 자동화 11/11, 전체 회귀 69/69(실패 0)가 통과했다. 전체 회귀는 경고가 있는 성공 7건을 포함한다.
+- Physics sanity는 통과했다. 요청 D=2/8/20의 실제 초기 깊이는 정본의 쌍별 상한으로 2/8/15cm, 최고 분리 속도는 9.319/40.096/22.022cm/s였다. 자동화의 D20>D2 endpoint gate는 통과했지만 세 값의 단조 증가는 확인되지 않았다.
+- depenetration 설정과 개봉 impulse는 바꾸지 않았다. 이 실행에서는 Editor authoring, Blueprint compile/save, PIE를 수행하지 않았다. 기존 승인된 Editor/PIE 계약은 아래에 유지한다.
+- 최종 Content/Config/Level 변경은 없다. load gate 임시 BP 사본은 제거했고 원본 Blueprint SHA-256은 193B9701268E607C9574F4E12E0BA1B3F173C967F052A84C42CF4DE4561047D7로 유지됐다.
 
-## 새 asset 경로와 API 계약
+## 완료된 Source 검증
 
-| 종류 | 경로 | Parent/API |
-|---|---|---|
-| Catalog | /Game/Bathhouse/Data/Shop/DA_ShopCatalog | UShopCatalog; Products 배열 순서가 카드 순서 |
-| 배송 상자 | /Game/Bathhouse/Blueprints/Shop/BP_ShopDeliveryBox | AShopDeliveryBoxActor |
-| 배송 지점 | /Game/Bathhouse/Blueprints/Shop/BP_ShopDeliveryPoint | AShopDeliveryPointActor |
-| 쓰레기통 | /Game/Bathhouse/Blueprints/Shop/BP_TrashBin | ABathhouseTrashBinActor |
-| 컴퓨터 root | /Game/Bathhouse/UI/WBP_ComputerScreenRoot | UComputerScreenRootWidget |
-| 상점 화면 | /Game/Bathhouse/UI/Shop/WBP_ShopScreen | UShopScreenWidget |
-| 상품 카드 | /Game/Bathhouse/UI/Shop/WBP_ShopProductCard | UShopProductCardWidget |
-| cart 행 | /Game/Bathhouse/UI/Shop/WBP_ShopCartLine | UShopCartLineWidget |
-| 주문 행 | /Game/Bathhouse/UI/Shop/WBP_ShopOrderLine | UShopOrderLineWidget |
-| 잔액 HUD | /Game/Bathhouse/UI/WBP_MoneyHud | UMoneyHudWidget |
-| 배송 알림 | /Game/Bathhouse/UI/WBP_ShopNotice | UShopNoticeWidget |
+| 확인 | 실제 결과 |
+|---|---|
+| UE 5.8 BathhouseSimEditor Win64 Development | Build.bat 성공 |
+| 복사본 load gate | Template_Default에서 1/1 성공, 이후 복사본 제거 |
+| 원본 load gate | Template_Default 1/1 성공 |
+| 원본 load gate | /Game/Maps/DefaultMap 1/1 성공 |
+| Shop focused automation | 11 total, 11 pass, 0 warning, 0 fail, 0 notRun |
+| physics endpoint gate | sanity pass; effective D=2/8/15cm, D20 peak 22.022 > D2 9.319cm/s; intermediate D8 peak is higher, so monotonic trend remains unverified |
+| 전체 Automation RunTests BathhouseSim | 69 total, 62 success, 7 success with warnings, 0 fail, 0 notRun |
 
-Shop 및 Data/Shop 폴더는 MCP로 생성했다. 모든 위젯은 아래 BindWidget 이름·native class를 그대로 사용한다.
+세 load gate 자동화 보고서에는 경고·실패가 없었다. BP native parent, BoxMesh root, CDO 양수 finite root scale 및 HeldTransform property가 확인됐다. Fatal, asset load failure 또는 Serial size mismatch는 확인되지 않았다.
 
-## Widget hierarchy와 BindWidget
+백업은 Saved/MigrationBackup/20260928_shop_ext/BP_ShopDeliveryBox.uasset에 보관했다. SHA-256: 193B9701268E607C9574F4E12E0BA1B3F173C967F052A84C42CF4DE4561047D7.
 
-- WBP_ComputerScreenRoot: ManagementTabButton(UButton), ShopTabButton(UButton), ScreenSwitcher(UWidgetSwitcher), ManagementScreen(기존 WBP_BathWaterManagementScreen; UBathWaterManagementScreenWidget), ShopScreen(WBP_ShopScreen). Switcher 순서는 관리 index 0, 상점 index 1. 두 탭 버튼과 Switcher를 같은 root에 둔다.
-- WBP_ShopScreen: ProductScroll(UScrollBox) 안에 ProductGrid(UWrapBox); BalanceText, CartList(UVerticalBox), CartQuantityText, CartTotalText, OrderButton, OrderFeedbackText, OrderList(UVerticalBox). native defaults에 ProductCardWidgetClass, CartLineWidgetClass, OrderLineWidgetClass를 연결한다.
-- WBP_ShopProductCard: NameText, PriceText, IconImage, AddButton.
-- WBP_ShopCartLine: NameText, QuantityText, LineTotalText, PlusButton, MinusButton, RemoveButton.
-- WBP_ShopOrderLine: SummaryText, StatusText.
-- WBP_MoneyHud: MoneyText, DeltaText. DeltaDisplaySeconds는 2초.
-- WBP_ShopNotice: NoticeText. 스타일·레이아웃만 Blueprint에서 authoring하고 domain 상태·버튼 처리는 native에 둔다.
+## 후속 Editor authoring 계약
 
-## 상품·Project Settings
+아래는 기존 승인 범위의 Editor authoring 계약이다. 이번 실행에서는 Source 구현과 자동화만 수행했으며 asset 저장·재로드와 PIE는 진행하지 않았다.
 
-- [완료] DA_ShopCatalog의 샤워기 entry는 ProductId=Shower, bForSale=true, DisplayName=샤워기, PlacementDefinition=/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Shower, Price=10000이다. 단, Data Validation 로그의 placement-definition 오류는 미해결이다.
-- 선택적으로 Bath, Washer, Dryer, Boiler, Cooler, Circulator entry를 추가할 수 있다. 각각 unique ProductId와 해당 Definition 참조를 사용하고 이 단계에서는 bForSale=false로 둔다. Catalog Data Validation은 비판매 entry도 유효한 Definition과 가격을 요구한다.
-- [미완료] Project Settings > Bathhouse Shop의 Catalog와 DeliveryBoxClass를 각각 위 DA와 BP_ShopDeliveryBox로 지정하고 config에 저장한다. 현재 MCP 시도는 memory만 바꿀 수 있어 Catalog를 None으로 되돌렸고 DefaultGame.ini는 변경되지 않았다. 기본값은 CartTotalQuantityLimit=10, PerProductQuantityLimit=99, DeliveryDelaySeconds=10초, UnboxForwardDistanceCm=100cm, DeliveryNoticeSeconds=3초다.
-- [완료, 저장·새 프로세스 재로드 확인] 다음 일곱 Placement Definition 모두 Facility.Discardable native gameplay tag를 가진다: /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Bath, DA_FacilityPlacement_Shower, DA_FacilityPlacement_Washer, DA_FacilityPlacement_Dryer, DA_FacilityPlacement_Boiler, DA_FacilityPlacement_Cooler, DA_FacilityPlacement_Circulator. LockerSlotCount는 모두 0이다. ClothesLocker에는 이 태그를 추가하지 않았다.
+### Catalog와 상품
 
-## Actor defaults와 기존 Blueprint 연결
+- Asset: /Game/Bathhouse/Data/Shop/DA_ShopCatalog (DA_ShopCatalog). 기존 Shower entry를 보존한다.
+- Bath, Washer, Dryer, Boiler, Cooler, Circulator 6개 entry를 추가한다. 각 entry의 ProductId는 영문 고유 ID, bForSale=true, DisplayName은 해당 설비명, PlacementDefinition은 아래 기존 Definition을 연결한다. 가격은 양의 정수로 Editor에서 결정한다. Icon은 선택이다.
+- Definition asset 경로:
+  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Bath
+  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Washer
+  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Dryer
+  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler
+  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Cooler
+  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Circulator
+  - 기존 Shower: /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Shower
+- Save allowlist: DA_ShopCatalog만 해당 변경이 있을 때 개별 저장한다. Data Validation에서 중복 ID, 양수 가격, discard tag와 locker 조건을 확인한다.
 
-- [완료, 새 프로세스 재로드 대기] BP_ShopDeliveryBox의 BoxMesh root에 Engine BasicShapes Cube가 연결됐고 relative transform은 zero/unit이다. native 기본값 QueryAndPhysics, CCD, Pawn Ignore는 parent contract에서 읽었다. Data Validation은 미실행.
-- [완료, 새 프로세스 재로드 대기] BP_ShopDeliveryPoint parent에는 SceneRoot와 editor-only billboard/arrow가 있다. MaxSearchHeightCm=1000, DropGapCm=10이며 arrow는 표시 전용이다.
-- [완료, 새 프로세스 재로드 대기] BP_TrashBin의 BinMesh root에 Engine BasicShapes Cube가 연결됐고 relative transform은 zero/unit이다. native parent가 collision 및 carry/placement 제외 동작을 소유한다.
-- [미완료] BP_BathhouseComputer의 ScreenWidget.WidgetClass를 WBP_ComputerScreenRoot로 지정한다. 기존 관리 화면과 ManagedBathPlacementZone 연결은 root 하위 ManagementScreen에서 보존한다.
-- [미완료] BP_BathhouseHUD의 MoneyHudWidgetClass=WBP_MoneyHud, ShopNoticeWidgetClass=WBP_ShopNotice로 설정한다. 기존 InteractionPromptWidgetClass는 유지한다.
-- [완료] BP_BathhousePlayerState와 BP_PlaceableFacilityItem은 이번 authoring에서 변경할 native property가 없으며 compile/load gate를 통과했다.
+### 배송 상자 Blueprint
 
-## Level, 저장, 재검증 순서
+- Asset: /Game/Bathhouse/Blueprints/Shop/BP_ShopDeliveryBox.
+- Parent: AShopDeliveryBoxActor (/Script/BathhouseSim.ShopDeliveryBoxActor). BoxMesh가 root이고 유효한 cube mesh를 유지한다.
+- BoxMesh Relative Location/Rotation은 zero, Relative Scale은 (0.8, 0.8, 0.8)로 authoring한다. Collision은 QueryAndPhysics, CCD On, Pawn Ignore를 확인한다. Native validation은 모든 축의 양수 finite scale을 허용한다.
+- HeldTransform: Translation (10, 50, -60), Rotation identity, Scale (1, 1, 1). Runtime은 scale을 무시하므로 표시 위치/회전만 조정한다.
+- Save allowlist: CDO/default를 실제로 바꾼 경우 BP_ShopDeliveryBox만 개별 저장한다. Parent 변경·새 component·Blueprint logic은 추가하지 않는다.
 
-1. 원본 4개는 Source gate 시작 전 개별 백업했다. 경로는 `Saved/MigrationBackup/20260927_shop/`이며 현재 원본과 SHA-256이 모두 일치한다. Editor save 전에 원본 상태가 바뀌었다면 새 백업을 먼저 만든다. 무관한 기존 dirty Content는 저장하지 않는다.
-   | 원본 | SHA-256 |
-   |---|---|
-   | BP_BathhouseComputer.uasset | `1FABD0E9693BAEEF1DAD96FC82C611393304F9FB44D63E5F3C6557A87F8E4375` |
-   | BP_BathhousePlayerState.uasset | `C0B4376DC79770D7AEEF65CC7F6F0179B2E50E08CBB90A0AD93AA760CB5DB003` |
-   | BP_BathhouseHUD.uasset | `B1E1BECD8EE2FC91AC6F38BB2A3A5F176E722EE7037A03BEE25964557601002D` |
-   | BP_PlaceableFacilityItem.uasset | `6B83D9F5B2CE3F341DEEAE9356A5572F38574AD1C2DC41A3B4B5B98A84AC7471` |
-2. [미완료] DefaultMap에 BP_ShopDeliveryPoint 하나와 BP_TrashBin 하나 이상을 저장 배치한다. 후보 위치 (1800,650,0)은 floor trace상 바닥 Z=0이고 주변이 열려 있다. 이전 SaveActor는 World Partition external package 경로가 없어 실패했고 임시 actor는 제거했다. 낙하 위치에 바닥, stack 공간과 낮은 천장 검증용 공간을 둔다.
-3. [부분 완료] 세 Shop Actor Blueprint는 compile 및 개별 Save 완료다. Catalog와 7 Definition도 저장·재로드 확인했다. WBP, BP_BathhouseComputer/HUD wiring, Project Settings, DefaultMap external actor는 미완료다. Save All은 금지하며 변경하지 않은 dirty package는 저장하지 않는다.
-4. Source gate load check는 2026-09-27에 완료했다. 복사본 4개를 단일 package gate로 각각 통과시킨 뒤 삭제했고, Content 무변경을 확인했다. 이어 원본 4개를 Template_Default와 DefaultMap에서 모두 통과시켰다. 각 보고서는 1/1 success, warning/fail 0이다.
-   - 복사본: `Saved/Automation/Reports/20260927/Shop_Copy_Computer/`, `Shop_Copy_PlayerState/`, `Shop_Copy_HUD/`, `Shop_Copy_PlaceableItem/`.
-   - 원본: `Saved/Automation/Reports/20260927/Shop_Originals_Template/`, `Shop_Originals_DefaultMap/`.
-   Editor authoring/save 이후에는 다시 실행한다. Fatal, Serial size mismatch, Failed to load가 보이면 멈춘다.
-   Catalog Project Settings 저장이 필요하면 Editor가 관리하는 Game config에만 기록하고, Source 구현 단계의 Config는 수정하지 않는다.
-5. Source automation은 2026-09-27에 완료했다.
-   - Shop focused: `Shop_Focused_Final/index.json` — 4 success, 0 warning, 0 fail.
-   - Economy: `Economy_Fixture_Final/index.json` — 2 success, 0 warning, 0 fail.
-   - Placement: `Placement_Final/index.json` — 5 success, 0 fail, 2 warning 상태 테스트.
-   - 전체: `All_Regression_Final3/index.json` — 56 success, 6 succeeded-with-warnings, 0 fail, 0 notRun.
-   전체 보고서 폴더는 `Saved/Automation/Reports/20260927/`이다. PIE와 Blueprint asset compile/save/reload는 Editor pass에서 실행한다.
-6. [미완료] MCP 재연결이 정상화되면 PIE 시작·종료를 수행하고, 지원되는 로그/runtime 확인을 실행한다. 관리/상점 탭 전환과 상품·주문·배송·쓰레기통의 키보드/마우스 입력 및 화면 수용은 직접 입력 도구가 없어 별도 수용이 필요하다.
+### Project Settings와 UI
 
-Shop catalog와 Definition의 재로드 확인 상태는 .md/Unreal/ShopSystem.md에 기록한다. Actor Blueprint의 새 프로세스 재로드가 확인된 뒤에만 Unreal 정본에 parent/CDO hierarchy를 추가한다. WBP/project settings/level actor 연결은 실제 저장으로 확인된 범위만 기록한다. 화면 배치, 충돌 수용, 실제 입력 우선순위는 수용 근거 전까지 완료로 기록하지 않는다.
+- Project Settings > Bathhouse Shop에서 Catalog=DA_ShopCatalog, DeliveryBoxClass=BP_ShopDeliveryBox를 확인한다. UnboxOverlapDepthCm 기본값은 8cm이며 허용 범위는 0~50cm다. Config 저장이 필요하면 Editor의 정상 Save Config 흐름으로 Config/DefaultGame.ini만 저장한다.
+- WBP: /Game/Bathhouse/UI/Shop/WBP_ShopScreen, parent UShopScreenWidget. ProductScroll만 상품 목록을 세로 스크롤하고 cart/order panel은 그 바깥 형제로 남아 항상 보이는지 확인한다.
+- WBP hierarchy가 계약과 일치하면 수정/저장하지 않는다. 필요한 경우에도 승인된 layout 조정만 하고 Save allowlist에 WBP_ShopScreen을 추가한다. Domain 상태, 가격 계산, 입력·상점 로직은 Blueprint로 옮기지 않는다.
+
+## 재진입 후 Compile, Save, reload
+
+physics 동작 계약에 대한 다음 지시 전에는 이 절차를 시작하지 않는다. 재개가 승인되면 아래 순서로 진행한다.
+
+1. UnrealEditor를 종료한 상태에서 UE 5.8 Build.bat 결과와 재검토된 automation을 확인한다.
+2. dirty package를 확인한다. 이번 단계의 save allowlist에 있는 승인 변경만 대상으로 삼고 Save All, Level 배치, 광범위한 Content 변경은 하지 않는다.
+3. 승인된 변경 Blueprint를 개별 Compile한다. BP_ShopDeliveryBox의 native parent, root, scale, HeldTransform과 Catalog reference를 확인한다.
+4. 실제 변경한 allowlist asset만 개별 Save한다. Project Settings 변경은 필요할 때만 Config에 저장한다.
+5. Editor를 재시작해 저장한 asset을 다시 로드한다. Fatal, Failed to load, Serial size mismatch가 나오면 중단하고 로그를 남긴다.
+
+## 재진입 후 PIE 수용 절차
+
+| 확인 | 절차와 기대 결과 |
+|---|---|
+| SHOP-018~020, 038~042 | 한 개·혼합 주문을 개봉한다. 정면·벽 앞·사방이 좁은 위치에서 생성물이 벽/천장을 통과하지 않고 guest Pawn을 밀지 않는다. 막힌 경우 안전한 후보 또는 deterministic fallback으로 나온다. |
+| SHOP-032 | 상품 목록을 길게 만든 뒤 ProductScroll을 움직인다. Cart와 order/status 영역은 계속 보인다. |
+| SHOP-034~035, 044 | 7종을 주문·배송·개봉하고 각 fresh-install 아이템을 기존 Placement에 배치한다. 주문 요약과 Definition 참조가 맞고 신규 Boiler operation 잔량은 0이다. |
+| SHOP-043 | Shower 주문으로 overlap depth 2cm, 기본 8cm, 20cm를 비교한다. depth가 커질수록 실제 반발 속도가 강해지는지 확인한다. 튐이 없거나 크기 비교가 성립하지 않으면 depenetration 설정을 바꾸지 말고 멈춘다. |
+| 상자 scale/held pose | delivery spawn, pickup, free drop, last-safe recovery 뒤 root scale이 0.8로 유지되고 HeldTransform 위치/회전만 반영되는지 확인한다. |
+
+저장 후 정본 갱신은 실제 저장·재로드 근거가 생긴 다음에만 .md/Unreal/ShopSystem.md에 반영한다. CDO hierarchy, catalog 판매 상태, Project Settings, WBP scroll hierarchy와 PIE 결과를 확인하지 않았다.
