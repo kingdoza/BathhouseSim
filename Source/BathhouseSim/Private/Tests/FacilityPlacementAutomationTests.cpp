@@ -610,8 +610,12 @@ bool FBathhouseFacilityPlacementRuntimeTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Recovery spawns the configured derived facility item class"),
 		ShowerItem->IsA(AFacilityPlacementItemAutomationActor::StaticClass()));
+	const FVector ShowerItemAuthoredRootScale =
+		AFacilityPlacementItemAutomationActor::StaticClass()
+			->GetDefaultObject<AFacilityPlacementItemAutomationActor>()
+			->GetItemRoot()->GetRelativeScale3D();
 	TestTrue(TEXT("Recovery uses the derived facility item CDO scale"),
-		ShowerItem->GetActorScale3D().Equals(FVector(0.25f)));
+		ShowerItem->GetActorScale3D().Equals(ShowerItemAuthoredRootScale));
 	const UBathhouseFacilityPlacementInstanceData* ShowerPayload =
 		Cast<UBathhouseFacilityPlacementInstanceData>(ShowerItem->GetPlacementPayload().InstanceData);
 	TestTrue(TEXT("Facility payload preserves authoritative values"), ShowerPayload

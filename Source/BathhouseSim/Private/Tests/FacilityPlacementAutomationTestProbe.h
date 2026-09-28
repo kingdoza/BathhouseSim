@@ -27,6 +27,15 @@ public:
 	AFacilityPlacementItemAutomationActor();
 };
 
+UCLASS(Transient, NotBlueprintable)
+class AFacilityRecoveryScaleAutomationItemActor final : public APlaceableFacilityItemActor
+{
+	GENERATED_BODY()
+
+public:
+	AFacilityRecoveryScaleAutomationItemActor();
+};
+
 USTRUCT()
 struct FFacilityPlacementNestedReferenceTestData
 {
@@ -77,6 +86,15 @@ protected:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> AutomationPreviewBodySecondary;
+};
+
+UCLASS(Transient, NotBlueprintable)
+class AFacilityRecoveryScaleAutomationFacilityActor final : public AFacilityPlacementAutomationActor
+{
+	GENERATED_BODY()
+
+public:
+	AFacilityRecoveryScaleAutomationFacilityActor();
 };
 
 UCLASS(Transient, NotBlueprintable)

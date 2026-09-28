@@ -8,10 +8,24 @@
 #include "Interaction/PlayerCarryComponent.h"
 #include "Placement/FacilityPlacementComponent.h"
 #include "Placement/FacilityPlacementDefinition.h"
+#include "Placement/FacilityPlacementSettings.h"
 
 AFacilityPlacementItemAutomationActor::AFacilityPlacementItemAutomationActor()
 {
 	SetActorScale3D(FVector(0.25f));
+}
+
+AFacilityRecoveryScaleAutomationItemActor::AFacilityRecoveryScaleAutomationItemActor()
+{
+	// Reproduce a Blueprint CDO relative scale without updating ComponentToWorld.
+	ItemRoot->SetRelativeScale3D_Direct(FVector(0.4f, 0.6f, 0.8f));
+}
+
+AFacilityRecoveryScaleAutomationFacilityActor::AFacilityRecoveryScaleAutomationFacilityActor()
+{
+	const float HalfGridSize = GetDefault<UFacilityPlacementSettings>()->GetGridSizeCm() * 0.5f;
+	PlacementFootprint->SetBoxExtent(FVector(HalfGridSize, HalfGridSize, 50.0f));
+	PlacementFootprint->SetRelativeLocation(FVector(0.0f, 0.0f, 50.0f));
 }
 
 AFacilityPlacementAutomationActor::AFacilityPlacementAutomationActor()

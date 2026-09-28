@@ -257,14 +257,14 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 
 위 직접 입력·시각 수용과 Data Validation이 끝나기 전까지 전체 CMP-001~020 통합 완료로 판정하지 않는다. MCP로 가능한 authoring, compile, save, reload, PIE start/stop은 수행했다.
 
-# 상점 주문·배송 UI — MCP 미지원 후속
+# 상점 Editor 미지원 작업 — 현재 인계
 
-다음 Editor 작업은 현재 MCP toolset으로 끝내지 못했다.
+## 남은 MCP 미지원 authoring
 
-1. /Game/Bathhouse/UI/WBP_ComputerScreenRoot, /Game/Bathhouse/UI/Shop/WBP_ShopScreen, /Game/Bathhouse/UI/Shop/WBP_ShopProductCard, /Game/Bathhouse/UI/Shop/WBP_ShopCartLine, /Game/Bathhouse/UI/Shop/WBP_ShopOrderLine, /Game/Bathhouse/UI/WBP_MoneyHud, /Game/Bathhouse/UI/WBP_ShopNotice의 Widget hierarchy와 BindWidget 이름을 .md/PROMPT_UNREAL.md대로 authoring한다. 현재 MCP에 Widget tree 편집 tool이 없다. 이후 BP_BathhouseComputer.ScreenWidget.WidgetClass, BP_BathhouseHUD의 money/notice widget class도 연결해 저장한다.
-2. Project Settings > Bathhouse Shop에서 Catalog를 /Game/Bathhouse/Data/Shop/DA_ShopCatalog, DeliveryBoxClass를 /Game/Bathhouse/Blueprints/Shop/BP_ShopDeliveryBox로 지정해 영속 저장한다. ObjectTools memory setter는 시험 뒤 원복했고 config-save tool이 없어 Config/DefaultGame.ini는 변경되지 않았다.
-3. /Game/Maps/DefaultMap에 BP_ShopDeliveryPoint 한 개와 BP_TrashBin 한 개 이상을 놓고 바닥, 상자 stack 공간, 낮은 천장 공간을 구성한다. DeliveryPoint 후보는 (1800,650,0)이었다. 임시 actor의 save는 World Partition external package /Game/__ExternalActors__/Maps/DefaultMap/C/FD/PZ6HQFYUX7L4RVM1PXG25B 부재로 실패했고 해당 actor는 제거됐다. 사용 가능한 Editor 저장 절차로 external actor가 생성·저장되는지 확인한다.
-4. Data Validation을 Catalog, 세 Shop Blueprint, 관련 Definition에 실행한다. 현재 MCP toolset에 Data Validation 호출 tool이 없다. Catalog save-time 로그는 “Every shop product requires a valid placement definition.”였으므로 원인을 확인하고 통과 결과를 기록한다.
-5. 직접 PIE 입력과 시각 수용을 한다: 관리/상점 탭 전환, 상품 추가·수량 상한·부족액·주문·FIFO 알림, E로 배송 상자 pickup/drop/re-pick, LMB 개봉과 막힌 구석, 쓰레기통 버리기, 잔액/HUD 표시. 현재 MCP toolset에는 keyboard/mouse 입력 주입이 없어 이 시나리오를 대신 실행할 수 없다. 실제 상자 배치와 화면 레이아웃도 viewport에서 확인한다.
+1. `/Game/Bathhouse/UI/WBP_ComputerScreenRoot`, `/Game/Bathhouse/UI/Shop/WBP_ShopProductCard`, `/Game/Bathhouse/UI/Shop/WBP_ShopCartLine`, `/Game/Bathhouse/UI/Shop/WBP_ShopOrderLine`, `/Game/Bathhouse/UI/WBP_MoneyHud`, `/Game/Bathhouse/UI/WBP_ShopNotice`의 Widget hierarchy와 BindWidget 이름을 해당 구현 프롬프트대로 authoring한다. 현재 MCP에 Widget tree 편집 tool이 없다. 필요한 class 연결 후 변경 asset만 Compile·개별 Save한다.
+2. `/Game/Bathhouse/UI/Shop/WBP_ShopScreen`을 열어 `ProductScroll`이 상품 목록만 포함하고 cart/order panel은 바깥 형제로 남는지 확인한다. MCP는 `WidgetTree`를 조회·편집하지 못한다. 계층이 이미 맞으면 수정·저장하지 않고, 다르면 승인된 layout만 조정해 WBP를 저장한다.
+3. `/Game/Maps/DefaultMap`에 `BP_ShopDeliveryPoint` 한 개와 `BP_TrashBin` 한 개 이상을 authoring하고 바닥, 상자 stack 공간, 낮은 천장 공간을 구성한다. DeliveryPoint 후보는 `(1800,650,0)`이었다. 이전 임시 actor의 World Partition external package 저장은 `/Game/__ExternalActors__/Maps/DefaultMap/C/FD/PZ6HQFYUX7L4RVM1PXG25B` 부재 오류로 실패했다. 현재 actor package 개별 저장 지원을 확인한 뒤에만 배치를 확대한다.
+4. Catalog, Shop Blueprint, 관련 Definition에 Data Validation을 실행한다. 현재 MCP toolset에는 Data Validation 실행 tool이 없다. 이전 Catalog save-time 로그에는 “Every shop product requires a valid placement definition.”가 남았다. 명시적 검증은 별도 승인 뒤 수행한다.
+5. 실제 keyboard/mouse 입력과 시각 수용은 MCP 입력 주입 tool이 없어 자동 수행할 수 없다. 상점 tab·상품 추가·수량 상한·주문·FIFO 알림, 배송 상자 pickup/drop/re-pick, LMB 개봉, 막힌 구석, 쓰레기통 discard, 잔액/HUD 및 화면 layout을 직접 확인한다. PIE 수용은 사용자 승인 후 진행한다.
 
-확인 후 각 변경 asset을 개별 저장하고 DefaultMap 및 config를 재로드한다. 새 프로세스 재로드, Data Validation, 직접 수용까지 끝난 뒤 통합 검토를 재개한다.
+Project Settings의 Shop Catalog, DeliveryBoxClass 참조와 `UnboxOverlapDepthCm=8`은 이번 MCP 작업에서 CDO 및 Config 기준으로 이미 일치함을 확인했으므로 미완료 작업 큐에서 제외했다.

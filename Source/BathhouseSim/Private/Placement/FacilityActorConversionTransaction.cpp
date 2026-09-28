@@ -72,7 +72,12 @@ bool FFacilityActorConversionTransaction::ValidateRecoveryCandidate(
 		OutFailureReason = LOCTEXT("MissingRecoveryItemCDO", "회수 아이템 기본 설정을 찾을 수 없습니다.");
 		return false;
 	}
-	OutItemTransform.SetScale3D(ItemCDO->GetActorScale3D());
+	FVector ItemScale;
+	if (!APlaceableFacilityItemActor::GetDefinitionItemScale(*Definition, ItemScale, OutFailureReason))
+	{
+		return false;
+	}
+	OutItemTransform.SetScale3D(ItemScale);
 
 	FVector QueryLocation;
 	FQuat QueryRotation;
@@ -145,7 +150,8 @@ APlaceableFacilityItemActor* FFacilityActorConversionTransaction::RecoverFacilit
 		ItemTransform,
 		nullptr,
 		nullptr,
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn,
+		ESpawnActorScaleMethod::OverrideRootScale);
 	if (!Item)
 	{
 		Placement->EndTransition();
@@ -177,7 +183,11 @@ APlaceableFacilityItemActor* FFacilityActorConversionTransaction::RecoverFacilit
 	{
 		return Fail();
 	}
-	Item->FinishSpawning(ItemTransform);
+	Item->FinishSpawning(
+		ItemTransform,
+		false,
+		nullptr,
+		ESpawnActorScaleMethod::OverrideRootScale);
 	if (!IsValid(Item) || !Item->ValidatePlacementPayload(OutFailureReason))
 	{
 		return Fail();

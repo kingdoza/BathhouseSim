@@ -80,7 +80,7 @@ bool APlaceableFacilityItemActor::GetDefinitionItemScale(
 		|| RootScale.X <= 0.0f || RootScale.Y <= 0.0f || RootScale.Z <= 0.0f)
 	{
 		OutFailureReason = LOCTEXT(
-			"InvalidRecoveryItemScale",
+			"InvalidRecoveryItemRootScale",
 			"설비 회수 아이템 클래스의 기본 루트 스케일은 유한한 양수여야 합니다.");
 		return false;
 	}
