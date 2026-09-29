@@ -1,6 +1,8 @@
 # Interaction System
 
-2026-09-26 Utility Labor: 삽 퍼담기·반환·투입은 공급함·투입 판정 Volume target의 E primary이고 삽 LMB·공급함 F는 없다. 보일러·쿨러 문은 generic `IPlayerInteractionFocusObserver`를 쓴다. 순환기 레버 왕복은 Instant E로 시작하는 시간 작업이며, 진행 표시를 위해 query에 `bPrimaryProgressVisible`을 추가한다. generic router에는 concrete 설비 분기를 넣지 않는다.
+2026-09-28 Held Target Use: 들고 있는 물건으로 대상에 하는 일은 LMB(Apply)·RMB(Take) held-use다. 삽 퍼담기·반환·투입과 수건 이동이 E/F에서 옮겨졌고 F는 예약으로 비워 둔다. 계약·입력 소유·연속 실행·HUD 데이터는 [HeldTargetUseSystem.md](HeldTargetUseSystem.md)가 정본이다.
+
+2026-09-26 Utility Labor(2026-09-28 대체): 삽 퍼담기·반환·투입은 공급함·투입 판정 Volume target의 E primary였다. 보일러·쿨러 문은 generic `IPlayerInteractionFocusObserver`를 쓴다. 순환기 레버 왕복은 Instant E로 시작하는 시간 작업이며, 진행 표시를 위해 query에 `bPrimaryProgressVisible`을 추가한다. generic router에는 concrete 설비 분기를 넣지 않는다.
 
 ## Implementation Status
 
@@ -21,6 +23,7 @@ Source/BathhouseSim/Public/Interaction/
   PlayerInteractionComponent.h
   PlayerCarryComponent.h
   PlayerEquipmentUseComponent.h
+  PlayerHeldTargetUseComponent.h
   HeldEquipmentMotionComponent.h
   BathhouseKeyActor.h
   BathhouseKeyHookActor.h
@@ -32,6 +35,7 @@ Source/BathhouseSim/Private/Interaction/
   PhysicalCarryPlacementTransaction.cpp
   PlayerCarryComponent.cpp
   PlayerEquipmentUseComponent.cpp
+  PlayerHeldTargetUseComponent.cpp
   HeldEquipmentMotionComponent.cpp
   BathhouseKeyActor.cpp
   BathhouseKeyHookActor.cpp
@@ -52,6 +56,7 @@ Source/BathhouseSim/Private/Tests/
 - inventory/hotbar 없는 single physical carry의 입력·query 연결
 - 공용 held anchor, item별 local held transform, fixed-slot/free-drop 계약 연결
 - LMB 장비 사용의 side-effect-free query, Begin/Update/End/Cancel routing
+- 장비가 아닌 들고 있는 물건의 LMB Apply·RMB Take held-use routing과 연속 실행([HeldTargetUseSystem.md](HeldTargetUseSystem.md))
 - one-shot/hold equipment use 공통 lifecycle와 held Actor transform 표현
 - E/F world target과 별도인 LMB equipment-use prompt/result 표시 데이터
 - key token/hook lifecycle과 physical placement 연결; locker 번호 topology에는 의존하지 않음
@@ -70,7 +75,8 @@ Interaction은 cleaning progress, attack/damage/health, towel count/machine, cus
 - 기존 `bCanInteract`, `ActionName`, `FailureReason`은 primary 의미를 유지한다.
 - target은 optional secondary 표시/가능 여부, action name과 failure reason을 추가로 반환할 수 있다.
 - primary는 `Instant` 또는 `Hold` activation mode를 선언할 수 있다. 기존 target의 default는 `Instant`다.
-- secondary는 현재 계약에서 Started 한 번의 instant 실행만 사용한다.
+- secondary는 현재 계약에서 Started 한 번의 instant 실행만 사용한다. 2026-09-28부터 secondary를 제공하는 대상은 없고 계약은 예약으로 유지한다.
+- target은 optional held-use Apply·Take 필드와 `ExecuteHeldTargetUse(Context, Direction)`을 제공할 수 있다. 상세는 [HeldTargetUseSystem.md](HeldTargetUseSystem.md) Contract Types다.
 - 기존 `ExecuteInteraction(Context)`는 primary API로 유지하고 optional secondary execute와 hold begin/update/cancel 계약을 추가한다.
 
 `IPlayerInteractionFocusObserver`는 target이 선택적으로 구현하는 C++ 전용 표현 계약이다(`CannotImplementInterfaceInBlueprint`).
@@ -97,7 +103,7 @@ Interaction은 cleaning progress, attack/damage/health, towel count/machine, cus
 
 context는 user/carry, camera origin/forward과 현재 focus hit를 제공한다. held equipment가 실제 domain owner API를 호출하며 `UPlayerEquipmentUseComponent`는 concrete wrench/mop을 cast하지 않는다.
 
-Equipment row 합성은 현재 held Actor가 `IHeldEquipmentUsable`이면 해당 query를 authoritative하게 사용한다. 사용 가능한 held equipment가 없을 때만 focus target이 `물걸레가 필요합니다` 같은 disabled equipment action/failure를 광고할 수 있다. 두 source를 두 LMB row로 동시 표시하지 않으며 focus target은 target name/hit context를 제공한다.
+Equipment row 합성은 현재 held Actor가 `IHeldEquipmentUsable`이면 해당 query를 authoritative하게 사용하고, 대상이 채운 held-use Apply·Take 필드를 비운다. `HasUsableHeldEquipment()`는 Character owner 선택용 C++ 조회다. 사용 가능한 held equipment가 없을 때만 focus target이 `물걸레가 필요합니다` 같은 disabled equipment action/failure를 광고할 수 있다. 두 source를 두 LMB row로 동시 표시하지 않으며 focus target은 target name/hit context를 제공한다.
 
 ## `UPlayerInteractionComponent`
 
@@ -110,6 +116,7 @@ Equipment row 합성은 현재 held Actor가 `IHeldEquipmentUsable`이면 해당
 - 기존 `TryInteract()`는 instant primary 호환 wrapper로 유지한다.
 - E Started/Completed/Canceled를 primary begin/end로 받고 active hold 동안 같은 target, focus, carry와 query 조건을 매 Tick 재검증한다.
 - F Started는 secondary query/execute를 호출하고 target에 secondary가 없으면 mutation하지 않는다.
+- C++ 전용 `ResolveFocusedInteraction`은 기존 `BuildInteraction`에 위임해 held-use component에 fresh focus를 제공한다. 이 component는 held-use 상태·Tick을 갖지 않는다.
 - G Started는 view intent를 carry component에 전달하고 반환 결과를 동일 attempt notification으로 방송한다.
 - `TryInteract()`의 대상 없음, query 실행 불가, execute 성공·실패는 모두 `FPlayerInteractionResult` 하나를 반환하고 `OnInteractionAttemptFinishedNative`를 정확히 한 번 방송한다.
 - execute 뒤에는 query를 먼저 refresh한 다음 attempt result를 방송하므로 UI는 최신 지속 상태 위에 일시 실행 피드백을 표시할 수 있다.
@@ -160,10 +167,11 @@ Cash는 carry 대상이 아니며 Economy System의 즉시 획득 interaction으
 - `UPlayerInteractionComponent`
 - `UPlayerCarryComponent`
 - `UPlayerEquipmentUseComponent`
+- `UPlayerHeldTargetUseComponent`
 - target `UPlayerFacilityPlacementComponent`
 - first-person camera 하위 `HeldKeyAnchor`
 - E Started/Completed/Canceled, F/G Started, Q Started/Completed/Canceled, LCtrl Started/Completed, MouseWheel axis와 LMB lifecycle을 Interaction/Carry/Placement/Equipment에 의도로 전달한다. Q hold elapsed와 자동 commit은 입력 반복 이벤트가 아니라 Placement Component Tick이 소유한다.
-- LMB owner는 `Computer > Placement > Equipment` 순서로 하나만 선택한다.
+- LMB owner는 `Computer > Placement > Equipment(장비를 든 경우) > HeldTargetUse` 순서로 하나만 선택한다. RMB(`SecondaryUseAction`)는 HeldTargetUse Take만 쓴다. 상세 순서는 [HeldTargetUseSystem.md](HeldTargetUseSystem.md) Input Ownership이다.
 - computer session이 input을 capture하면 해당 session이 E lifecycle을 소비하고 Interaction에는 전달하지 않는다.
 
 Character는 focus 규칙과 key transaction을 직접 구현하지 않는다. PlayerController는 mapping context 등록·해제 책임을 유지한다.
@@ -186,6 +194,7 @@ Blueprint 조회·표현 API:
 - generic held object와 held kind 조회, `OnHeldObjectChanged`
 - exact fixed-slot take/store와 actual-held-pose free-drop result
 - combined equipment-use query/result의 optional LMB action/failure/mode/progress
+- held-use Apply·Take의 visible/can/action/failure/mode 필드와 `HeldApply`·`HeldTake` result intent
 - combined placement LMB action/failure와 recovery Q action/failure/hold progress
 - `ABathhouseKeyActor::OnKeyStateChanged`
 - `ABathhouseKeyActor::OnHeldPresentationChanged`
@@ -197,6 +206,8 @@ Editor authoring 값:
 - `AFirstPersonCharacter::SecondaryInteractAction`
 - `AFirstPersonCharacter::DropCarryAction`
 - `AFirstPersonCharacter::PrimaryUseAction`
+- `AFirstPersonCharacter::SecondaryUseAction`(RMB)
+- `UPlayerHeldTargetUseComponent::RepeatIntervalSeconds`(기본 0.15)
 - `AFirstPersonCharacter::RecoverFacilityAction`
 - `AFirstPersonCharacter::PlacementSnapAction`
 - `AFirstPersonCharacter::PlacementRotateAction`
@@ -217,9 +228,9 @@ Editor authoring 값:
 - Placement -> Interaction의 supplemental intent-source/query-result 계약
 - Cleaning -> Interaction public query/equipment-use/motion/carry 계약
 - Combat -> Interaction public carry/equipment-use/motion 계약
-- Towel -> Interaction public intent/carry 계약
+- Towel -> Interaction public intent/carry/held-use target 계약
 - Shop -> Interaction public interactable/carry/equipment-use/discardable 계약
-- Utility -> Interaction public interactable/carry/focus-observer 계약
+- Utility -> Interaction public interactable/carry/focus-observer/held-use target 계약
 - Character -> Interaction
 - Computer -> Interaction public query/carry/suppression 계약
 - UI -> Interaction

@@ -79,12 +79,12 @@ struct FScopedShopSettingsOverride
 	}
 };
 
-struct FScopedFacilityPlacementGridOverride
+struct FScopedShopFacilityPlacementGridOverride
 {
 	UFacilityPlacementSettings* Settings = GetMutableDefault<UFacilityPlacementSettings>();
 	float SavedGridSizeCm = Settings ? Settings->GridSizeCm : 10.0f;
 
-	FScopedFacilityPlacementGridOverride()
+	FScopedShopFacilityPlacementGridOverride()
 	{
 		if (Settings)
 		{
@@ -92,7 +92,7 @@ struct FScopedFacilityPlacementGridOverride
 		}
 	}
 
-	~FScopedFacilityPlacementGridOverride()
+	~FScopedShopFacilityPlacementGridOverride()
 	{
 		if (Settings)
 		{
@@ -267,7 +267,7 @@ bool FShopWalletAndCartAutomationTest::RunTest(const FString& Parameters)
 {
 	(void)Parameters;
 	FScopedShopSettingsOverride SavedSettings;
-	FScopedFacilityPlacementGridOverride PlacementGridOverride;
+	FScopedShopFacilityPlacementGridOverride PlacementGridOverride;
 	UShopSettings& Settings = *SavedSettings.Settings;
 	Settings.CartTotalQuantityLimit = 3;
 	Settings.PerProductQuantityLimit = 99;
@@ -431,7 +431,7 @@ bool FShopOrderDelayWaitingAndFifoAutomationTest::RunTest(const FString& Paramet
 {
 	(void)Parameters;
 	FScopedShopSettingsOverride SavedSettings;
-	FScopedFacilityPlacementGridOverride PlacementGridOverride;
+	FScopedShopFacilityPlacementGridOverride PlacementGridOverride;
 	UShopSettings& Settings = *SavedSettings.Settings;
 	Settings.DeliveryBoxClass = TSoftClassPtr<AShopDeliveryBoxActor>(AShopDeliveryBoxActor::StaticClass());
 	Settings.DeliveryDelaySeconds = 10.0f;
@@ -578,7 +578,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Parameters)
 {
 	(void)Parameters;
-	FScopedFacilityPlacementGridOverride PlacementGridOverride;
+	FScopedShopFacilityPlacementGridOverride PlacementGridOverride;
 	UFacilityPlacementDefinition* Definition = MakeShopTestDefinition();
 	if (!Definition)
 	{

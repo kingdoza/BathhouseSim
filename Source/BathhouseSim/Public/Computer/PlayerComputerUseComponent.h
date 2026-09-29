@@ -53,6 +53,7 @@ public:
 
 private:
 	friend class FBathhouseComputerSessionTest;
+	friend class FBathhouseHeldTargetUseOwnerRoutingTest;
 
 	APlayerController* ResolvePlayerController() const;
 	AActor* ResolveReturnViewTarget(APlayerController* PlayerController) const;

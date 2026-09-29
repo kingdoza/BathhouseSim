@@ -22,6 +22,9 @@ public:
 
 	virtual FPlayerInteractionQuery QueryInteraction(const FPlayerInteractionContext& Context) const override;
 	virtual FPlayerInteractionResult ExecuteInteraction(const FPlayerInteractionContext& Context) override;
+	virtual FPlayerInteractionResult ExecuteHeldTargetUse(
+		const FPlayerInteractionContext& Context,
+		EPlayerHeldTargetUseDirection Direction) override;
 	virtual void NotifyInteractionFocusChanged(
 		const UPlayerInteractionComponent& Source,
 		const FPlayerInteractionQuery& Query) override;

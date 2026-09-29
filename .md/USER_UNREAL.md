@@ -268,3 +268,25 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 5. 실제 keyboard/mouse 입력과 시각 수용은 MCP 입력 주입 tool이 없어 자동 수행할 수 없다. 상점 tab·상품 추가·수량 상한·주문·FIFO 알림, 배송 상자 pickup/drop/re-pick, LMB 개봉, 막힌 구석, 쓰레기통 discard, 잔액/HUD 및 화면 layout을 직접 확인한다. PIE 수용은 사용자 승인 후 진행한다.
 
 Project Settings의 Shop Catalog, DeliveryBoxClass 참조와 `UnboxOverlapDepthCm=8`은 이번 MCP 작업에서 CDO 및 Config 기준으로 이미 일치함을 확인했으므로 미완료 작업 큐에서 제외했다.
+
+# Held target use — MCP 미지원 authoring 인계 (2026-09-28)
+
+## 1. Input Mapping Context
+
+- 대상: `/Game/Input/IMC_FirstPerson`
+- MCP readback 기준 기존 유효 binding 8개는 IA_Interact/E, IA_SecondaryInteract/F, IA_DropCarry/G, IA_PrimaryUse/LeftMouseButton, IA_RecoverFacility/Q, IA_PlacementSnap/LeftControl, IA_PlacementRotate/MouseWheelAxis, IA_Cancel/Escape다. 모두 보존한다.
+- `RightMouseButton → /Game/Input/Actions/IA_SecondaryUse` binding을 추가한다. `IA_SecondaryInteract/F`는 이동·삭제하지 않는다.
+- `defaultKeyMappings` readback의 기존 유효 row 15개를 보존하고 끝의 빈 None/None row만 제거한다. 앞선 저장 로그에 빈 Input Action mapping 오류가 남아 있다. 현재 에디터 표시가 다르면 전체를 덮어쓰지 말고 실제 rows를 먼저 비교한다.
+- 현 MCP ObjectTools 배열 편집은 삽입 지점을 특정할 수 없다며 추가·삭제를 모두 거부했다. MCP 실패 뒤 package는 dirty=false였고 이번 MCP 작업에서는 수정·저장하지 않았다. Editor에서 변경 후 이 에셋만 개별 Save한다.
+
+## 2. Interaction Prompt Widget hierarchy
+
+- 대상: `/Game/Bathhouse/UI/WBP_InteractionPrompt`
+- 기존 native parent와 다음 15개 필수 BindWidget을 보존한다: `PromptRoot`, `TargetNameText`, `ActionNameText`, `FailureReasonText`, `SecondaryActionNameText`, `SecondaryFailureReasonText`, `InteractionProgressBar`, `EquipmentActionNameText`, `EquipmentFailureReasonText`, `EquipmentProgressBar`, `PlacementActionNameText`, `PlacementFailureReasonText`, `RecoveryActionNameText`, `RecoveryFailureReasonText`, `RecoveryProgressBar`.
+- 다음 다섯 TextBlock을 정확한 이름으로 적절한 키 행에 추가한다: `HeldTakeActionNameText`, `HeldTakeFailureReasonText`, `PrimaryKeyText`, `LmbKeyText`, `RmbKeyText`. HeldTake 텍스트는 RMB 행에 두고, key label은 E/LMB/RMB 행에 배치한다.
+- Event Graph gameplay logic은 추가하지 않는다. 고정 키 글자가 native key label과 중복되면 정리한다. 변경된 경우에만 이 WBP를 개별 Save한다.
+- 현 MCP toolset에는 WidgetTree/hierarchy authoring 기능이 없어서 미완료다. WBP는 이번 작업에서 수정·저장하지 않았다.
+
+## 재개 및 범위
+
+위 두 에셋의 MCP 미지원 authoring이 실제 Editor에서 완료됐다고 사용자가 알리면, 이후 명시된 MCP 작업에서 실제 asset 상태를 읽어 인계 항목을 확인·정리한다. 이번 요청에서 제외된 Compile, Data Validation, 새 Editor reload와 PIE는 수행하지 않았다. 해당 검증 범위는 사용자가 다시 승인하기 전까지 제외한다.

@@ -20,7 +20,9 @@ public:
 	virtual bool SupportsFacilityActorConversion() const override { return false; }
 	virtual FPlayerInteractionQuery QueryInteraction(const FPlayerInteractionContext& Context) const override;
 	virtual FPlayerInteractionResult ExecuteInteraction(const FPlayerInteractionContext& Context) override;
-	virtual FPlayerInteractionResult ExecuteSecondaryInteraction(const FPlayerInteractionContext& Context) override;
+	virtual FPlayerInteractionResult ExecuteHeldTargetUse(
+		const FPlayerInteractionContext& Context,
+		EPlayerHeldTargetUseDirection Direction) override;
 
 	UFUNCTION(BlueprintPure, Category = "Towel")
 	UTowelInventoryComponent* GetInventory() const { return Inventory; }
@@ -35,6 +37,5 @@ protected:
 private:
 	FPlayerInteractionResult TransferFromHeldBasket(
 		const FPlayerInteractionContext& Context,
-		int32 RequestedCount,
-		EPlayerInteractionIntent Intent);
+		EPlayerHeldTargetUseDirection Direction);
 };

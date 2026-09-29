@@ -19,6 +19,9 @@ public:
 	AUtilityFuelSupplyActor();
 	virtual FPlayerInteractionQuery QueryInteraction(const FPlayerInteractionContext& Context) const override;
 	virtual FPlayerInteractionResult ExecuteInteraction(const FPlayerInteractionContext& Context) override;
+	virtual FPlayerInteractionResult ExecuteHeldTargetUse(
+		const FPlayerInteractionContext& Context,
+		EPlayerHeldTargetUseDirection Direction) override;
 
 	UStaticMeshComponent* GetSupplyMesh() const { return SupplyMesh; }
 	EUtilityFuelKind GetFuelKind() const { return FuelKind; }

@@ -73,6 +73,30 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction Prompt", meta = (ClampMin = "0.1", UIMin = "0.1"))
 	float FailureDisplayDurationSeconds = 1.5f;
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> HeldTakeActionNameText = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> HeldTakeFailureReasonText = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> PrimaryKeyText = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> LmbKeyText = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> RmbKeyText = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction Prompt")
+	FText PrimaryKeyLabel = NSLOCTEXT("InteractionPromptWidget", "PrimaryKeyLabel", "E");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction Prompt")
+	FText LmbKeyLabel = NSLOCTEXT("InteractionPromptWidget", "LmbKeyLabel", "LMB");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction Prompt")
+	FText RmbKeyLabel = NSLOCTEXT("InteractionPromptWidget", "RmbKeyLabel", "RMB");
+
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction Prompt")
 	void OnInteractionPromptChanged(
@@ -121,6 +145,8 @@ private:
 	void HandleInteractionAttemptFinished(const FPlayerInteractionResult& Result);
 	void HandlePrimaryTransientFailureExpired();
 	void HandleSecondaryTransientFailureExpired();
+	void HandleHeldApplyTransientFailureExpired();
+	void HandleHeldTakeTransientFailureExpired();
 	void HandleEquipmentTransientFailureExpired();
 	void HandlePlacementTransientFailureExpired();
 	void HandleRecoveryTransientFailureExpired();
@@ -144,6 +170,12 @@ private:
 	FText SecondaryTransientFailureReason;
 
 	UPROPERTY(Transient)
+	FText HeldApplyTransientFailureReason;
+
+	UPROPERTY(Transient)
+	FText HeldTakeTransientFailureReason;
+
+	UPROPERTY(Transient)
 	FText EquipmentTransientFailureReason;
 
 	UPROPERTY(Transient)
@@ -155,6 +187,8 @@ private:
 	FDelegateHandle InteractionResultHandle;
 	FTimerHandle PrimaryFailureTimerHandle;
 	FTimerHandle SecondaryFailureTimerHandle;
+	FTimerHandle HeldApplyFailureTimerHandle;
+	FTimerHandle HeldTakeFailureTimerHandle;
 	FTimerHandle EquipmentFailureTimerHandle;
 	FTimerHandle PlacementFailureTimerHandle;
 	FTimerHandle RecoveryFailureTimerHandle;

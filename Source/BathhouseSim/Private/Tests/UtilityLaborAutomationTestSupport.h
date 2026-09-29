@@ -20,6 +20,7 @@
 #include "Interaction/PhysicalCarryFixedSlotActor.h"
 #include "Interaction/PlayerEquipmentUseComponent.h"
 #include "Interaction/PlayerInteractionComponent.h"
+#include "Interaction/PlayerInteractable.h"
 #include "Placement/FacilityActorConversionTransaction.h"
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/FacilityPlacementComponent.h"
@@ -66,6 +67,50 @@ void BeginActorPlayIfNeeded(AActor* Actor)
 	{
 		Actor->DispatchBeginPlay();
 	}
+}
+
+FPlayerInteractionResult ExecuteFocusedHeldTargetUse(
+	UPlayerInteractionComponent* Interaction,
+	const EPlayerHeldTargetUseDirection Direction)
+{
+	const EPlayerInteractionIntent Intent = Direction == EPlayerHeldTargetUseDirection::Apply
+		? EPlayerInteractionIntent::HeldApply
+		: EPlayerInteractionIntent::HeldTake;
+	if (!Interaction)
+	{
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), Intent);
+	}
+
+	FPlayerInteractionContext Context;
+	IPlayerInteractable* Interactable = nullptr;
+	UObject* TargetObject = nullptr;
+	if (!Interaction->ResolveFocusedInteraction(Context, Interactable, TargetObject)
+		|| !Interactable || !IsValid(TargetObject))
+	{
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), Intent);
+	}
+
+	const FPlayerInteractionQuery Query = Interactable->QueryInteraction(Context);
+	const bool bVisible = Direction == EPlayerHeldTargetUseDirection::Apply
+		? Query.bHeldApplyVisible : Query.bHeldTakeVisible;
+	const bool bCanUse = Direction == EPlayerHeldTargetUseDirection::Apply
+		? Query.bCanHeldApply : Query.bCanHeldTake;
+	const FText& FailureReason = Direction == EPlayerHeldTargetUseDirection::Apply
+		? Query.HeldApplyFailureReason : Query.HeldTakeFailureReason;
+	if (!bVisible && FailureReason.IsEmpty())
+	{
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), Intent);
+	}
+	if (!bCanUse)
+	{
+		return Interaction->ReportExternalInteractionAttempt(
+			FPlayerInteractionResult::Failed(FailureReason, Intent));
+	}
+
+	FPlayerInteractionResult Result = Interactable->ExecuteHeldTargetUse(Context, Direction);
+	Result.Intent = Intent;
+	Interaction->RefreshInteractionQuery();
+	return Interaction->ReportExternalInteractionAttempt(Result);
 }
 
 class FScopedUtilityLaborWorld

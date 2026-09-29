@@ -33,14 +33,19 @@ FPlayerInteractionQuery AUtilityFuelSupplyActor::QueryInteraction(
 	Query.bVisible = true;
 	const FText FuelName = GetUtilityFuelKindDisplayName(FuelKind);
 	Query.TargetName = FText::Format(LOCTEXT("SupplyName", "{0} 공급함"), FuelName);
-	Query.ActionName = FText::Format(LOCTEXT("SupplyPrimaryName", "{0} 퍼담기"), FuelName);
+	Query.ActionName = FText::GetEmpty();
+	Query.bCanInteract = false;
+	Query.FailureReason = FText::GetEmpty();
+	Query.bHeldApplyVisible = true;
+	Query.HeldApplyActionName = FText::Format(LOCTEXT("SupplyPrimaryName", "{0} 퍼담기"), FuelName);
+	Query.HeldApplyActivationMode = EPlayerInteractionActivationMode::Instant;
 
 	AUtilityShovelActor* Shovel = Context.CarryComponent
 		? Cast<AUtilityShovelActor>(Context.CarryComponent->GetHeldObject())
 		: nullptr;
 	if (!IsValid(Shovel))
 	{
-		Query.FailureReason = LOCTEXT("UseShovel", "삽을 들고 있어야 합니다.");
+		Query.HeldApplyFailureReason = LOCTEXT("UseShovel", "삽을 들고 있어야 합니다.");
 		return Query;
 	}
 
@@ -50,41 +55,56 @@ FPlayerInteractionQuery AUtilityFuelSupplyActor::QueryInteraction(
 		: FUtilityFuelTransaction::EvaluateReturn(Context, *this);
 	if (!Load.IsEmpty() && Load.Kind == FuelKind)
 	{
-		Query.ActionName = FText::Format(LOCTEXT("ReturnFuel", "{0} 반환"), FuelName);
+		Query.HeldApplyActionName = FText::Format(LOCTEXT("ReturnFuel", "{0} 반환"), FuelName);
 	}
-	Query.bCanInteract = Evaluation.bSucceeded;
-	Query.FailureReason = Evaluation.FailureReason;
+	Query.bCanHeldApply = Evaluation.bSucceeded;
+	Query.HeldApplyFailureReason = Evaluation.FailureReason;
 	return Query;
 }
 
 FPlayerInteractionResult AUtilityFuelSupplyActor::ExecuteInteraction(
 	const FPlayerInteractionContext& Context)
 {
+	return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::Primary);
+}
+
+FPlayerInteractionResult AUtilityFuelSupplyActor::ExecuteHeldTargetUse(
+	const FPlayerInteractionContext& Context,
+	const EPlayerHeldTargetUseDirection Direction)
+{
+	const EPlayerInteractionIntent Intent = Direction == EPlayerHeldTargetUseDirection::Apply
+		? EPlayerInteractionIntent::HeldApply
+		: EPlayerInteractionIntent::HeldTake;
+	if (Direction != EPlayerHeldTargetUseDirection::Apply)
+	{
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), Intent);
+	}
 	AUtilityShovelActor* Shovel = Context.CarryComponent
 		? Cast<AUtilityShovelActor>(Context.CarryComponent->GetHeldObject())
 		: nullptr;
 	if (!IsValid(Shovel))
 	{
 		return FPlayerInteractionResult::Failed(
-			LOCTEXT("ReturnNeedsShovel", "삽을 들고 있어야 합니다."));
+			LOCTEXT("ReturnNeedsShovel", "삽을 들고 있어야 합니다."),
+			Intent);
 	}
 	const FUtilityFuelLoad Load = Shovel->GetFuelLoad();
 	if (Load.IsEmpty())
 	{
 		const FUtilityFuelResult Result = FUtilityFuelTransaction::Scoop(*Shovel, *this, Context);
 		return Result.bSucceeded
-			? FPlayerInteractionResult::Succeeded()
-			: FPlayerInteractionResult::Failed(Result.FailureReason);
+			? FPlayerInteractionResult::Succeeded(Intent)
+			: FPlayerInteractionResult::Failed(Result.FailureReason, Intent);
 	}
 	if (Load.Kind == FuelKind)
 	{
 		const FUtilityFuelResult Result = FUtilityFuelTransaction::Return(*Shovel, *this, Context);
 		return Result.bSucceeded
-			? FPlayerInteractionResult::Succeeded()
-			: FPlayerInteractionResult::Failed(Result.FailureReason);
+			? FPlayerInteractionResult::Succeeded(Intent)
+			: FPlayerInteractionResult::Failed(Result.FailureReason, Intent);
 	}
 	const FUtilityFuelResult Evaluation = FUtilityFuelTransaction::EvaluateReturn(Context, *this);
-	return FPlayerInteractionResult::Failed(Evaluation.FailureReason);
+	return FPlayerInteractionResult::Failed(Evaluation.FailureReason, Intent);
 }
 
 bool AUtilityFuelSupplyActor::HasValidAuthoring(FText& OutFailureReason) const

@@ -53,16 +53,28 @@ bool FUtilityFuelDoorPresentationTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
-	const FQuat AuthoredClosedRotation = FRotator(13.0f, -21.0f, 7.0f).Quaternion();
-	Pivot->SetRelativeRotation(AuthoredClosedRotation);
+	// The authored pose is the component template's. A stale instance rotation (e.g. a saved preview pose)
+	// must not become the baseline.
+	const USceneComponent* PivotTemplate = Cast<USceneComponent>(Pivot->GetArchetype());
+	if (!TestNotNull(TEXT("Door pivot has a component template"), PivotTemplate))
+	{
+		return false;
+	}
+	const FQuat AuthoredClosedRotation = PivotTemplate->GetRelativeRotation().Quaternion();
+	Pivot->SetRelativeRotation(FRotator(13.0f, -21.0f, 7.0f));
 	UStaticMeshComponent* NeedleMesh = FindNamedMeshComponent(Boiler, TEXT("GaugeNeedleMesh"));
 	USceneComponent* NeedlePivot = NeedleMesh ? NeedleMesh->GetAttachParent() : nullptr;
 	if (!TestNotNull(TEXT("Gauge needle pivot exists before BeginPlay"), NeedlePivot))
 	{
 		return false;
 	}
-	const FQuat AuthoredNeedleRotation = FRotator(-8.0f, 17.0f, 4.0f).Quaternion();
-	NeedlePivot->SetRelativeRotation(AuthoredNeedleRotation);
+	const USceneComponent* NeedlePivotTemplate = Cast<USceneComponent>(NeedlePivot->GetArchetype());
+	if (!TestNotNull(TEXT("Gauge needle pivot has a component template"), NeedlePivotTemplate))
+	{
+		return false;
+	}
+	const FQuat AuthoredNeedleRotation = NeedlePivotTemplate->GetRelativeRotation().Quaternion();
+	NeedlePivot->SetRelativeRotation(FRotator(-8.0f, 17.0f, 4.0f));
 	TestTrue(TEXT("Boiler test fixture assigns door and gauge meshes"), SetBoilerTestMeshes(Boiler, CubeMesh));
 	Boiler->FinishSpawning(FTransform::Identity);
 	BeginActorPlayIfNeeded(Boiler);
@@ -336,17 +348,23 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Second boiler starts its operation clock"), SecondBoiler->GetOperation()->IsPlacedClockActive());
 
 	Interaction->RefreshInteractionQuery();
-	TestTrue(TEXT("Camera trace focuses the supply before scooping"), Interaction->GetCurrentInteractionQuery().bCanInteract);
-	TestTrue(TEXT("One focused E action scoops a coal load"), Interaction->BeginPrimaryInteraction().bSucceeded);
+	TestTrue(TEXT("Camera trace focuses the supply before scooping"), Interaction->GetCurrentInteractionQuery().bCanHeldApply);
+	TestTrue(TEXT("One focused LMB held Apply scoops a coal load"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	TestTrue(TEXT("Scoop fills the held shovel with 25 coal points"),
 		Shovel->GetFuelLoad().Kind == EUtilityFuelKind::Coal
 		&& FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, 25.0f));
+	const float FuelBeforeLegacyInputs = Shovel->GetFuelLoad().Points;
+	TestFalse(TEXT("E no longer scoops or returns fuel"), Interaction->BeginPrimaryInteraction().bSucceeded);
+	TestFalse(TEXT("F has no shovel fuel action"), Interaction->TrySecondaryInteract().bSucceeded);
+	TestFalse(TEXT("RMB has no fuel Take action"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Take).bSucceeded);
+	TestTrue(TEXT("Legacy E, F, and RMB preserve the loaded shovel"), FMath::IsNearlyEqual(
+		Shovel->GetFuelLoad().Points, FuelBeforeLegacyInputs));
 
 	Supply->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("A camera trace reaches the fixed FuelIntakeVolume"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->GetCurrentInteractionQuery().ActionName.ToString() == TEXT("석탄 투입"));
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& Interaction->GetCurrentInteractionQuery().HeldApplyActionName.ToString() == TEXT("석탄 투입"));
 	FHitResult Hit;
 	TestTrue(TEXT("The real camera trace hits the query volume component"),
 		Interaction->GetCurrentFocusHit(Hit)
@@ -385,15 +403,15 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 		&& FMath::IsNearlyEqual(Boiler->GetOperation()->GetRemainingPoints(), 50.0f, 0.25f));
 
 	TestTrue(TEXT("E inserts through query, execution, and the fresh camera trace"),
-		Interaction->BeginPrimaryInteraction().bSucceeded);
+		ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	TestTrue(TEXT("A single 석탄 투입 action empties the shovel and raises operation to 75"),
 		Shovel->IsLoadEmpty()
 		&& FMath::IsNearlyEqual(Boiler->GetOperation()->GetRemainingPoints(), 75.0f, 0.25f));
 	Interaction->RefreshInteractionQuery();
 	TestFalse(TEXT("Next focus query rejects insertion with an empty shovel"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract);
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply);
 	TestTrue(TEXT("Empty shovel query exposes its failure reason"),
-		Interaction->GetCurrentInteractionQuery().FailureReason.ToString() == TEXT("삽에 연료가 없습니다."));
+		Interaction->GetCurrentInteractionQuery().HeldApplyFailureReason.ToString() == TEXT("삽에 연료가 없습니다."));
 	TestEqual(TEXT("Empty shovel focus targets the door closed"),
 		Boiler->GetFuelDoorPresentation()->GetTargetAlpha(), 0.0f);
 	const float AlphaBeforeCloseStep = Boiler->GetFuelDoorPresentation()->GetOpenAlpha();
@@ -406,11 +424,11 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Empty shovel reason remains visible below boiler capacity"),
 		Boiler->GetOperation()->GetRemainingPoints() < 100.0f
-		&& !Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->GetCurrentInteractionQuery().FailureReason.ToString() == TEXT("삽에 연료가 없습니다."));
+		&& !Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& Interaction->GetCurrentInteractionQuery().HeldApplyFailureReason.ToString() == TEXT("삽에 연료가 없습니다."));
 	TestEqual(TEXT("Empty shovel keeps the door closed"), Boiler->GetFuelDoorPresentation()->GetTargetAlpha(), 0.0f);
 
-	const FPlayerInteractionResult EmptyShovelAttempt = Interaction->BeginPrimaryInteraction();
+	const FPlayerInteractionResult EmptyShovelAttempt = ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply);
 	TestFalse(TEXT("E is rejected while the held shovel is empty"), EmptyShovelAttempt.bSucceeded);
 	TestTrue(TEXT("Rejected empty-shovel E reports the same reason"),
 		EmptyShovelAttempt.FailureReason.ToString() == TEXT("삽에 연료가 없습니다."));
@@ -418,8 +436,8 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 		Interaction->TryDropCarry(FVector::ForwardVector).bSucceeded);
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Empty hand reports that a shovel is required"),
-		!Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->GetCurrentInteractionQuery().FailureReason.ToString() == TEXT("삽을 들고 있어야 합니다."));
+		!Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& Interaction->GetCurrentInteractionQuery().HeldApplyFailureReason.ToString() == TEXT("삽을 들고 있어야 합니다."));
 	TestEqual(TEXT("Empty hand keeps the door closed"), Boiler->GetFuelDoorPresentation()->GetTargetAlpha(), 0.0f);
 
 	AMonkeyWrenchActor* Wrench = World->SpawnActor<AMonkeyWrenchActor>();
@@ -431,8 +449,8 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A wrench can replace the empty hand"), Carry->TryTakePhysicalObject(Wrench, FailureReason));
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Other carry cannot enable coal insertion"),
-		!Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->GetCurrentInteractionQuery().FailureReason.ToString() == TEXT("삽을 들고 있어야 합니다."));
+		!Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& Interaction->GetCurrentInteractionQuery().HeldApplyFailureReason.ToString() == TEXT("삽을 들고 있어야 합니다."));
 	TestEqual(TEXT("Other carry keeps the door closed"), Boiler->GetFuelDoorPresentation()->GetTargetAlpha(), 0.0f);
 	TestTrue(TEXT("Wrench can be safely released after the negative query"),
 		Carry->RecoverHeldPhysicalObject(Wrench));
@@ -443,19 +461,19 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	Supply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("E scoops coal again before focus-loss cases"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->BeginPrimaryInteraction().bSucceeded);
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	Supply->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 	TickFixed(1);
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Capacity decay restores an insertion-ready focus"),
 		Boiler->GetOperation()->GetRemainingPoints() < 100.0f
-		&& Interaction->GetCurrentInteractionQuery().bCanInteract
+		&& Interaction->GetCurrentInteractionQuery().bCanHeldApply
 		&& Boiler->GetFuelDoorPresentation()->GetTargetAlpha() == 1.0f);
 	TestTrue(TEXT("Opening progress retains the same intake focus before E"),
 		TickFixed(1, Boiler->GetFuelIntakeVolume()));
 	const float AlphaBeforeMidTransitionInsert = Boiler->GetFuelDoorPresentation()->GetOpenAlpha();
-	TestTrue(TEXT("E succeeds during the open transition"), Interaction->BeginPrimaryInteraction().bSucceeded);
+	TestTrue(TEXT("E succeeds during the open transition"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Insert empties the shovel and targets close during animation"),
 		Shovel->IsLoadEmpty()
@@ -470,8 +488,8 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	Supply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("The shovel is loaded for the full-capacity case"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->BeginPrimaryInteraction().bSucceeded);
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	Supply->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 	User->SetActorLocation(FVector(300.0f, 0.0f, 0.0f));
 	Camera->SetWorldRotation(FRotator::ZeroRotator);
@@ -481,7 +499,7 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 		&& Hit.GetActor() == SecondBoiler
 		&& Hit.GetComponent() == SecondBoiler->GetFuelIntakeVolume());
 	TestFalse(TEXT("Loaded shovel cannot interact with the full 100 point boiler"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract);
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply);
 	TestEqual(TEXT("The full second boiler targets closed"), SecondBoiler->GetFuelDoorPresentation()->GetTargetAlpha(), 0.0f);
 	TestEqual(TEXT("The untargeted first boiler stays closed"), Boiler->GetFuelDoorPresentation()->GetTargetAlpha(), 0.0f);
 	DecayPointsProperty->SetPropertyValue_InContainer(SecondBoiler->GetOperation(), 1.0f);
@@ -489,7 +507,7 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Decay below 100 enables insertion without re-aiming"),
 		SecondBoiler->GetOperation()->GetRemainingPoints() < 100.0f
-		&& Interaction->GetCurrentInteractionQuery().bCanInteract
+		&& Interaction->GetCurrentInteractionQuery().bCanHeldApply
 		&& SecondBoiler->GetFuelDoorPresentation()->GetTargetAlpha() == 1.0f);
 	TestEqual(TEXT("Only the focused boiler door opens"), Boiler->GetFuelDoorPresentation()->GetTargetAlpha(), 0.0f);
 	SecondBoiler->GetOperation()->StopPlacedClock(false);
@@ -510,12 +528,12 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("E begins with the exact second volume still under the camera trace"),
 		Interaction->GetCurrentFocusHit(Hit)
 		&& Hit.GetComponent() == SecondBoiler->GetFuelIntakeVolume());
-	const FPlayerInteractionResult SecondBoilerInsertResult = Interaction->BeginPrimaryInteraction();
+	const FPlayerInteractionResult SecondBoilerInsertResult = ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply);
 	TestTrue(FString::Printf(TEXT("E executes for the second boiler (reason=%s)"),
 		*SecondBoilerInsertResult.FailureReason.ToString()), SecondBoilerInsertResult.bSucceeded);
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Fuel insertion to capacity targets the second door closed"),
-		!Interaction->GetCurrentInteractionQuery().bCanInteract
+		!Interaction->GetCurrentInteractionQuery().bCanHeldApply
 		&& SecondBoiler->GetFuelDoorPresentation()->GetTargetAlpha() == 0.0f);
 	TestTrue(TEXT("Focus stays on the second volume while the door closes"),
 		TickFixed(1, SecondBoiler->GetFuelIntakeVolume()));
@@ -528,8 +546,8 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 		Camera->SetWorldRotation(FRotator::ZeroRotator);
 		Interaction->RefreshInteractionQuery();
 		TestTrue(TEXT("An empty shovel refills before the door-reversal case"),
-			Interaction->GetCurrentInteractionQuery().bCanInteract
-			&& Interaction->BeginPrimaryInteraction().bSucceeded);
+			Interaction->GetCurrentInteractionQuery().bCanHeldApply
+			&& ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 		Supply->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 		User->SetActorLocation(FVector(300.0f, 0.0f, 0.0f));
 		Camera->SetWorldRotation(FRotator::ZeroRotator);
@@ -539,14 +557,14 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	const FPlayerInteractionQuery SecondReadyQuery = Interaction->GetCurrentInteractionQuery();
 	TestTrue(FString::Printf(
 		TEXT("Insertion-ready focus reverses the closing target (query=%d, reason=%s, points=%.3f, max=%.3f, load=%.3f, clock=%d, blocked=%d)"),
-		SecondReadyQuery.bCanInteract,
-		*SecondReadyQuery.FailureReason.ToString(),
+		SecondReadyQuery.bCanHeldApply,
+		*SecondReadyQuery.HeldApplyFailureReason.ToString(),
 		SecondBoiler->GetOperation()->GetRemainingPoints(),
 		SecondBoiler->GetOperation()->GetMaximumPoints(),
 		Shovel->GetFuelLoad().Points,
 		SecondBoiler->GetOperation()->IsPlacedClockActive(),
 		SecondBoiler->GetOperation()->IsLaborBlocked()),
-		SecondReadyQuery.bCanInteract
+		SecondReadyQuery.bCanHeldApply
 		&& SecondBoiler->GetFuelDoorPresentation()->GetTargetAlpha() == 1.0f);
 	TestTrue(TEXT("Reopening rises from its current alpha and preserves the same focus hit"),
 		TickFixed(1, SecondBoiler->GetFuelIntakeVolume())
@@ -570,17 +588,17 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 		const bool bHasPrimaryFocusHit = Interaction->GetCurrentFocusHit(PrimaryFocusHit);
 		TestTrue(FString::Printf(
 			TEXT("Primary boiler is actionable before opening (query=%d, reason=%s, points=%.3f, max=%.3f, held=%s, action=%s, doorTarget=%.2f, hit=%s.%s, hitOK=%d)"),
-			PrimaryQuery.bCanInteract,
-			*PrimaryQuery.FailureReason.ToString(),
+			PrimaryQuery.bCanHeldApply,
+			*PrimaryQuery.HeldApplyFailureReason.ToString(),
 			Boiler->GetOperation()->GetRemainingPoints(),
 			Boiler->GetOperation()->GetMaximumPoints(),
 			*GetNameSafe(Carry->GetHeldObject()),
-			*PrimaryQuery.ActionName.ToString(),
+			*PrimaryQuery.HeldApplyActionName.ToString(),
 			Boiler->GetFuelDoorPresentation()->GetTargetAlpha(),
 			*GetNameSafe(PrimaryFocusHit.GetActor()),
 			*GetNameSafe(PrimaryFocusHit.GetComponent()),
 			bHasPrimaryFocusHit),
-			Interaction->GetCurrentInteractionQuery().bCanInteract
+			Interaction->GetCurrentInteractionQuery().bCanHeldApply
 			&& Boiler->GetFuelDoorPresentation()->GetTargetAlpha() == 1.0f);
 		TestTrue(TEXT("Primary door opens in fixed 0.05 second steps"),
 			TickFixed(4, Boiler->GetFuelIntakeVolume()));
@@ -602,13 +620,13 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	OpenPrimaryDoor();
 	Camera->SetWorldRotation(FRotator(0.0f, 90.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
-	TestFalse(TEXT("Looking away removes actionable intake focus"), Interaction->GetCurrentInteractionQuery().bCanInteract);
+	TestFalse(TEXT("Looking away removes actionable intake focus"), Interaction->GetCurrentInteractionQuery().bCanHeldApply);
 	VerifyClosedWithoutFuelMutation();
 	Camera->SetWorldRotation(FRotator::ZeroRotator);
 	OpenPrimaryDoor();
 	User->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
-	TestFalse(TEXT("Leaving trace range removes actionable intake focus"), Interaction->GetCurrentInteractionQuery().bCanInteract);
+	TestFalse(TEXT("Leaving trace range removes actionable intake focus"), Interaction->GetCurrentInteractionQuery().bCanHeldApply);
 	VerifyClosedWithoutFuelMutation();
 	User->SetActorLocation(FVector::ZeroVector);
 	OpenPrimaryDoor();
@@ -664,7 +682,7 @@ bool FUtilityFuelDoorFocusIntegrationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Installed boiler accepts the existing recovery-hold API"),
 		Boiler->TryBeginFacilityRecoveryHold(FailureReason));
 	Interaction->RefreshInteractionQuery();
-	TestFalse(TEXT("Recovery hold blocks the actual intake query"), Interaction->GetCurrentInteractionQuery().bCanInteract);
+	TestFalse(TEXT("Recovery hold blocks the actual intake query"), Interaction->GetCurrentInteractionQuery().bCanHeldApply);
 	VerifyClosedWithoutFuelMutation();
 	Boiler->CancelFacilityRecoveryHold();
 	TestTrue(TEXT("Recovery hold preserves boiler operation points"),

@@ -26,6 +26,7 @@ public:
 		UHeldEquipmentMotionComponent* InMotion);
 
 	FPlayerInteractionQuery MergeEquipmentQuery(const FPlayerInteractionQuery& BaseQuery) const;
+	bool HasUsableHeldEquipment() const;
 	FPlayerInteractionResult BeginEquipmentUse();
 	void UpdateEquipmentUse(float DeltaTime);
 	void EndEquipmentUse();

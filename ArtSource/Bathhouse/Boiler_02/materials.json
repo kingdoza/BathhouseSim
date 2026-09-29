@@ -1,0 +1,26 @@
+{
+  "M_Boiler02": {
+    "slot": 0,
+    "base_color_texture": "textures/T_Boiler02_BaseColor.png",
+    "orm_texture": "textures/T_Boiler02_ORM.png",
+    "orm_channels": {"R": "AmbientOcclusion", "G": "Roughness", "B": "Metallic"},
+    "normal_texture": "textures/T_Boiler02_Normal.png",
+    "normal_format": "DirectX (Unreal default, no green flip needed)",
+    "unreal_texture_settings": {
+      "T_Boiler02_BaseColor": "Compression Default, sRGB on",
+      "T_Boiler02_ORM": "Compression Masks, sRGB off",
+      "T_Boiler02_Normal": "Compression Normalmap, sRGB off, Flip Green off"
+    },
+    "baked_from_source_materials": {
+      "SRC_Boiler02_Paint": "chipped red enamel (ref albedo sRGB ~168/71/54), rust halo, dark iron under-layer, floor grime",
+      "SRC_Boiler02_Iron": "dark cast iron with light rust (legs, chimney, base plate, door frame, hinges)",
+      "SRC_Boiler02_IronDoor": "firebox door plate",
+      "SRC_Boiler02_DarkSteel": "gauge bezel, knob base",
+      "SRC_Boiler02_Steel": "bolts, gauge hub",
+      "SRC_Boiler02_Brass": "valve fittings",
+      "SRC_Boiler02_RedEnamel": "top valve wheel, burner knob",
+      "SRC_Boiler02_BlueEnamel": "bottom valve wheel",
+      "SRC_Boiler02_Dial": "0-4 bar gauge dial (textures/T_Boiler02_Dial_Src.png)"
+    }
+  }
+}

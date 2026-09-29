@@ -1,0 +1,22 @@
+{
+  "asset": "SM_Boiler_02",
+  "blender": "5.2.0 LTS",
+  "checked_on_reopen": true,
+  "checks": {
+    "transform_applied (loc 0 / rot 0 / scale 1)": "PASS",
+    "pivot_bottom_centre (min z = 0.0)": "PASS",
+    "unit_system_metric_scale_1.0": "PASS",
+    "single_material_slot M_Boiler02": "PASS",
+    "uv_channels UV0 + UV1_Lightmap (bake-only UV_Src removed)": "PASS",
+    "UV0 in 0-1, no overlap (1024 raster)": "PASS (coverage 63.9%, 0 overlap px)",
+    "UV1_Lightmap in 0-1, no overlap (1024 raster)": "PASS (coverage 47.8%, 0 overlap px)",
+    "no n-gons (26 boolean n-gons triangulated)": "PASS",
+    "no degenerate faces / loose verts": "PASS",
+    "hard edges marked (sharp by angle 35 deg) for FBX smoothing groups": "PASS (4199 sharp edges)",
+    "UCX collision naming UCX_SM_Boiler_02_00..03, convex, unparented": "PASS",
+    "textures exist on disk + relative paths in .blend": "PASS",
+    "baked albedo vs reference paint (sRGB median)": "PASS (158/66/51 vs ref 168/71/54)"
+  },
+  "stats": {"vertices": 14424, "triangles": 28016, "dimensions_m": [0.824, 0.532, 1.368]},
+  "not_done_by_request": ["FBX export"]
+}

@@ -333,6 +333,14 @@ void UPlayerInteractionComponent::ClearInteractionQuery()
 	CommitQuery(nullptr, FPlayerInteractionQuery());
 }
 
+bool UPlayerInteractionComponent::ResolveFocusedInteraction(
+	FPlayerInteractionContext& OutContext,
+	IPlayerInteractable*& OutInteractable,
+	UObject*& OutTargetObject) const
+{
+	return BuildInteraction(OutContext, OutInteractable, OutTargetObject);
+}
+
 bool UPlayerInteractionComponent::BuildInteraction(
 	FPlayerInteractionContext& OutContext,
 	IPlayerInteractable*& OutInteractable,

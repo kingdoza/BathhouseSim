@@ -21,6 +21,7 @@ Character System은 범용 1인칭 조작 템플릿의 플레이어 조작을 �
 - player computer-use component와 widget interaction 조립
 - computer focus 중 1인칭 입력 gate와 click action 라우팅
 - player equipment-use component 조립과 LMB Started/Triggered/Completed/Canceled routing
+- player held-target-use component 조립과 LMB·RMB(`SecondaryUseAction`) held-use owner routing([HeldTargetUseSystem.md](HeldTargetUseSystem.md))
 - player facility-placement component 조립과 Q/LCtrl/MouseWheel intent routing
 
 현재 문서화된 Character 책임 밖의 도메인 gameplay logic은 Character System 책임이 아니다.
@@ -53,14 +54,15 @@ Source/BathhouseSim/Private/Character/
 - `bSprintToggle`에 따라 sprint 입력을 toggle 방식 또는 hold 방식으로 처리한다.
 - `UPlayerInteractionComponent`, `UPlayerCarryComponent`와 camera 하위 `HeldKeyAnchor`를 조립한다.
 - `InteractAction` E의 Started/Completed/Canceled를 primary begin/end intent로 전달한다. 기존 instant target은 Started에서 한 번 실행하고 hold target은 release까지 유지한다.
-- `SecondaryInteractAction` F의 Started를 secondary intent로 전달한다.
+- `SecondaryInteractAction` F의 Started를 secondary intent로 전달한다. 2026-09-28부터 F를 제공하는 대상이 없으며 binding과 계약은 이후 용도로 예약한다.
 - `DropCarryAction` G의 Started를 camera forward와 함께 generic held-item free-drop intent로 전달한다.
 - `CancelAction`(신규, `IA_Cancel`, 기본 ESC)의 Started를 범용 취소/뒤로 intent로 받는다. 현재는 computer session이 input을 capture 중일 때만 focus-out 요청으로 전달하고, 그 밖에는 아무 domain에도 전달하지 않는다. 계약은 [ComputerSystem.md](ComputerSystem.md)를 따른다.
 - `UPlayerComputerUseComponent`와 mouse-source `UWidgetInteractionComponent`를 조립한다.
 - `UPlayerEquipmentUseComponent`를 조립하고 camera, carry와 interaction query/result context를 주입한다.
 - target `UPlayerFacilityPlacementComponent`를 조립하고 camera, carry와 interaction에 context를 주입한다.
 - computer session이 capture 중이면 E Started는 focus-out으로, LMB는 widget pointer로 보내고 Move/Look/Jump/Sprint/F/G/Q/LCtrl/휠을 차단한다.
-- 일반 상태 LMB는 active placement가 있으면 placement confirm, 없으면 held Actor의 equipment-use lifecycle로 전달한다.
+- 일반 상태 LMB는 active placement가 있으면 placement confirm, 장비를 들었으면 equipment-use lifecycle, 장비 아닌 물건을 들었거나 대상이 Apply를 광고하면 held-target-use Apply로 전달한다. 순서는 [HeldTargetUseSystem.md](HeldTargetUseSystem.md) Input Ownership이 정본이다.
+- `SecondaryUseAction`(신규, `IA_SecondaryUse`, RMB)의 Started/Completed/Canceled는 held-target-use Take로 전달한다. Computer capture·Placement active·held-use 진행 중·장비를 든 상태에서는 press만 소비한다.
 - 진입에 사용한 E의 Completed/Canceled가 즉시 focus-out 또는 기존 hold lifecycle로 재전달되지 않도록 press ownership을 보존한다.
 - Character는 towel, stain, mop, basket, monkey wrench의 사용 가능 여부와 key drop 가능 여부를 직접 판정하지 않는다.
 
@@ -143,8 +145,10 @@ Source/BathhouseSim/Private/Character/
 1. `PrimaryUseAction` Started에서 현재 input owner를 Computer, Placement 또는 Equipment으로 정확히 한 번 결정한다.
 2. Computer Active이면 pointer press를 시작하고 해당 press의 Completed/Canceled만 pointer release로 소비한다.
 3. held facility-item preview가 active면 Placement confirm으로 전달한다.
-4. 나머지는 `UPlayerEquipmentUseComponent` Begin/Update/End로 전달한다. 몽키스패너는 Started 한 번, 물걸레는 Hold lifecycle을 사용한다.
-5. press owner를 중간에 바꾸지 않고 End/Cancel을 시작 owner에만 전달한다.
+4. held-target-use가 다른 버튼으로 진행 중이면 이 press를 무시한다.
+5. 들고 있는 Actor가 장비면 `UPlayerEquipmentUseComponent` Begin/Update/End로 전달한다. 몽키스패너는 Started 한 번, 물걸레는 Hold lifecycle을 사용한다.
+6. 장비 아닌 물건을 들었거나 focus 대상이 Apply 행·이유를 광고하면 `UPlayerHeldTargetUseComponent` Apply로 전달한다. 나머지는 기존 equipment fallback이다.
+7. press owner를 중간에 바꾸지 않고 End/Cancel을 시작 owner에만 전달한다.
 
 Native reflected property 이관은 `PrimaryUseAction`을 최우선으로 사용하되 기존 `ComputerClickAction`을 deprecated fallback으로 한 migration cycle 보존한다. 둘 다 설정되면 `PrimaryUseAction`만 binding하여 LMB를 중복 처리하지 않는다.
 
@@ -176,6 +180,7 @@ Blueprint에서 접근 가능한 주요 API:
 - `AFirstPersonCharacter::GetPlayerInteraction`
 - `AFirstPersonCharacter::GetPlayerCarry`
 - `AFirstPersonCharacter::GetPlayerEquipmentUse`
+- `AFirstPersonCharacter::GetPlayerHeldTargetUse`(신규)
 - `AFirstPersonCharacter::GetPlayerComputerUse`
 - `UFirstPersonMovementComponent::StartSprinting`
 - `UFirstPersonMovementComponent::StopSprinting`
@@ -195,6 +200,7 @@ Blueprint/Editor에서 설정해야 하는 주요 property:
 - `AFirstPersonCharacter::DropCarryAction`
 - `AFirstPersonCharacter::CancelAction`
 - `AFirstPersonCharacter::PrimaryUseAction`
+- `AFirstPersonCharacter::SecondaryUseAction`(신규, RMB)
 - `AFirstPersonCharacter::RecoverFacilityAction`
 - `AFirstPersonCharacter::PlacementSnapAction`
 - `AFirstPersonCharacter::PlacementRotateAction`

@@ -87,6 +87,7 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 - `CharacterSystem.md`: `Source/BathhouseSim/Public/Character`, `Source/BathhouseSim/Private/Character`
 - `CameraSystem.md`: `Source/BathhouseSim/Public/Camera`, `Source/BathhouseSim/Private/Camera`
 - `InteractionSystem.md`: player trace, primary/secondary intent와 equipment-use 경계
+- `HeldTargetUseSystem.md`: Interaction 하위 LMB Apply·RMB Take held-use 계약, 입력 소유, 연속 실행과 HUD 데이터
 - `PhysicalCarrySystem.md`: Interaction Source 안의 fixed slot, free-drop transaction과 physical item recovery 경계
 - `FacilitySystem.md`: facility slot과 counter queue 경계
 - `BathWaterSystem.md`: 욕탕 급수·배수 상태, control/수면 표현과 Customer 입욕 가능성 경계
@@ -121,7 +122,7 @@ Cleaning/Towel/Computer, Combat/Customer Recovery, Physical Carry와 Bath Water 
 - input Character에 damage, cleaning, carry, computer와 customer routine 상태를 복제하지 않는다.
 - `UCustomerSessionComponent`는 domain resource/timer owner로 유지하고 ragdoll physics와 StateTree pause/restart lifecycle은 신규 Customer component에 둔다.
 - queue MoveTo/도착 회전/overflow wander와 recovery gate의 async lifecycle은 `UCustomerSessionComponent`나 이미 400줄을 넘은 `CustomerStateTreeTasks` 구현에 누적하지 않고 `UCustomerQueueNavigationComponent`와 `CustomerQueueStateTreeTasks` 파일로 분리한다. Counter는 FIFO/assignment owner로만 유지한다.
-- `UPlayerInteractionComponent`는 focus/query/result 표시 경계를 유지하고 concrete weapon/cleaning mutation은 equipment actor와 domain owner에 위임한다. 이미 500줄을 넘었으므로 추가는 commit 지점의 generic focus observer 알림에 한정하고 concrete target 판별·표현 상태·Tick을 넣지 않는다.
+- `UPlayerInteractionComponent`는 focus/query/result 표시 경계를 유지하고 concrete weapon/cleaning mutation은 equipment actor와 domain owner에 위임한다. 이미 500줄을 넘었으므로 추가는 commit 지점의 generic focus observer 알림과 held-use component용 C++ focus 조회 위임(`ResolveFocusedInteraction`)에 한정하고 concrete target 판별·표현 상태·Tick을 넣지 않는다. held-use press·반복 lifecycle은 `UPlayerHeldTargetUseComponent`가 소유한다.
 - 모든 소지품을 통합하는 공통 physical carry Actor/Component는 만들지 않고 `IPhysicalCarryable`을 유지한다. Placement 전용 `APlaceableFacilityItemActor`는 허용하되 다른 item domain의 기반 클래스로 확장하지 않는다. generic fixed slot은 world interaction Actor로, carry reference commit owner는 `UPlayerCarryComponent`에 두고 Actor 교체와 snapshot/rollback mechanics는 Placement의 private non-UObject helper로 분리한다.
 - 재사용 가능한 held motion은 carry 소유권과 분리된 표현 Component로 유지한다.
 - 설비 placement/recovery의 session·preview·rollback은 `UPlayerFacilityPlacementComponent`에 두고 contents/water/slot 조건은 원래 domain owner가 판정한다.

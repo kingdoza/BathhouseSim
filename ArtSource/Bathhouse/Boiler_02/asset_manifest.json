@@ -1,0 +1,34 @@
+{
+  "asset": "Boiler_02",
+  "source_blend": "Boiler_02.blend",
+  "reference": "8-view turnaround sheet (red vintage industrial boiler)",
+  "export_status": "FBX not exported yet (scripts/export_fbx_boiler_02.py ready)",
+  "static_mesh": {
+    "name": "SM_Boiler_02",
+    "vertices": 14424,
+    "triangles": 28016,
+    "ngons": 0,
+    "materials": ["M_Boiler02"],
+    "uv_channels": ["UV0", "UV1_Lightmap"],
+    "pivot": "bottom centre (0,0,0)",
+    "transform": "location 0, rotation 0, scale 1 (applied)",
+    "front_axis": "Blender -Y (valves on +X side)"
+  },
+  "collision_hulls": [
+    "UCX_SM_Boiler_02_00 (shell + legs, 24 verts)",
+    "UCX_SM_Boiler_02_01 (chimney, 24 verts)",
+    "UCX_SM_Boiler_02_02 (valves, 8 verts)",
+    "UCX_SM_Boiler_02_03 (front hardware, 8 verts)"
+  ],
+  "dimensions_m": {
+    "overall_incl_valves_and_hardware": [0.824, 0.532, 1.368],
+    "painted_shell": [0.70, 0.455, 1.135],
+    "leg_height": 0.09,
+    "chimney_top": 1.368
+  },
+  "textures": {
+    "T_Boiler02_BaseColor.png": "2048, sRGB",
+    "T_Boiler02_ORM.png": "2048, linear (R=AO, G=Roughness, B=Metallic)",
+    "T_Boiler02_Normal.png": "2048, linear, DirectX (green -Y)"
+  }
+}

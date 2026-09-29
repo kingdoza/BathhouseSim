@@ -1,67 +1,54 @@
-# 코드 리뷰 입력 — Placement 설비 회수 아이템 scale 읽기 수정
+# 코드 리뷰 입력 — 들고 있는 물건 조작 LMB/RMB 통일
 
 ## 단계와 범위
 
-- 현재 단계: C++ 구현과 자동화 검증 완료. Editor authoring은 없으며 PIE의 사용자 확인 전이다.
-- 입력: 2026-09-28 구현 프롬프트의 A1 회수 scale 수정과 A2 LOCTEXT 키 분리.
-- Placement 정본과 구현 프롬프트의 scale 계약이 일치한다. 기능·Architecture 변경은 필요하지 않았다.
-- 구현 QNA 미해결 사항은 없다.
-- Source 외 Content, Config, Level은 수정하지 않았다. PROMPT_UNREAL.md는 생성하거나 수정하지 않았다.
+- 2026-09-28 승인된 기능 계약 Q1~Q7과 설계 정본을 기준으로 전체 C++ 구현을 완료했다. 구현 QNA 미해결 항목은 없다.
+- 삽은 LMB held Apply 단발, 수건 이동은 LMB Apply/RMB Take 1장 단위와 Repeat로 변경했다. E의 손동작, F binding, 기존 equipment LMB는 유지했다.
+- 이 구현 단계에서 Content, Config, Level, Architecture 정본을 수정·저장하지 않았다. Editor authoring과 PIE는 다음 단계다.
+- 이전 작업 상태는 Character 복사본 BlueprintLoad 성공 직후였다. 첫 실행은 PowerShell 인수 인용 때문에 ReportExportPath가 문자 그대로 변수명으로 전달되어 report 파일을 만들지 못했다. 이것은 자동화 실패나 Blueprint 로드 실패가 아니며, 올바른 경로로 복사본을 다시 만들어 테스트와 report를 완료했다. 당시 남은 WBP/원본/맵/회귀 검증을 이 재개 작업에서 마쳤다.
 
-## 요구사항 추적
+## CTRL 요구사항 추적
 
-| 항목 | 구현 및 검증 |
+| CTRL | 구현·자동화 근거 |
 |---|---|
-| A1 회수 collision query scale | ValidateRecoveryCandidate가 GetDefinitionItemScale의 Definition ItemRoot relative scale을 읽는다. helper 실패 시 후보 검증을 실패시킨다. |
-| A1 회수 spawn scale | SpawnActorDeferred와 FinishSpawning 모두 OverrideRootScale을 명시한다. 배치 spawn 경로는 변경하지 않았다. |
-| 회수 blocker 회귀 | unit-scale query가 막히고 authored scale query가 통과하는 blocker를 자동화에서 확인한 뒤 실제 회수를 완료한다. |
-| Blueprint식 CDO | 직접 relative-scale setter를 쓰는 fixture CDO의 actor scale과 root relative scale을 로그로 남기고 둘이 다른 조건에서 검증한다. |
-| 실제 공통 BP | BP_PlaceableFacilityItem CDO helper scale과 실제 회수 actor의 world scale이 ItemRoot relative scale과 일치한다. |
-| 회수 후 carry | physics, CCD, Pawn Ignore를 확인하고 E pickup 후 G drop에서도 world scale이 유지되는지 확인한다. |
-| 기존 scale assertion | 기존 “Recovery uses the derived facility item CDO scale” 검증을 fixture CDO root relative scale 비교로 바꿨다. |
-| A2 LOCTEXT key | GetDefinitionItemScale의 key만 InvalidRecoveryItemRootScale로 바꿨다. BuildDefinitionCollisionQuery의 InvalidRecoveryItemScale은 유지했다. |
+| 001~005 | FuelInteractionAtomicity, CoolerDryIceIntegration, FuelDoorFocusIntegration: supply/volume에서 기존 scoop·return·insert transaction을 Apply로 실행한다. 삽은 단발이며 초과분·재료 일치·가득 참·문 상태를 검증한다. |
+| 006 | 연료 supply와 intake volume에서 E·F·RMB Take가 실패하고 삽 적재량을 보존한다. |
+| 007 | InputOwners에서 빈 focus에 held target owner 동작이 시작되지 않고 기존 빈 공간 LMB fallback만 남는 것을 확인한다. |
+| 008, 022, 028 | fixed-slot E, 수건바구니 거치와 기존 key/drop·trash 회귀를 보존한다. FuelDoorFocusIntegration 및 기존 Interaction/Shop 전체 회귀가 통과했다. |
+| 009~018 | TowelRuleMatrix의 6개 대상 조건 × 6개 바구니 상태 × Apply/Take 표를 검증한다. AtomicTransferMachineAndRecovery와 CleaningTowelAutomationTests에서 한 장 이동, 토큰 보존, 기계 전이, 바닥 수건 소모, E/F 무변화를 확인한다. |
+| 019~020 | RepeatLifecycle이 간격·한 Tick 1회·full stop·조준 이탈·자동 재개 금지·release 후 재시작·held object 변경·suppression과 이미 이동된 수량 유지를 확인한다. |
+| 021~024 | 수건 대상 E/F 무변화, 거치대 E 유지, 다른 대상·작동 중 기계의 방향별 거부를 towel 회귀와 규칙 표에서 검증한다. |
+| 025 | InteractionPromptPrimarySecondaryCapability, BlueprintLoad와 widget property metadata가 E 접힘, prompt root 조건, 선택적 RMB text widget, 기존 필수 BindWidget 보존을 확인한다. 실제 WBP의 신규 행·키 라벨 시각 배치는 PIE 미검증이다. |
+| 026~027 | InputOwners가 equipment LMB 우선권과 RMB 무시, Computer/Placement 우선권, held-use 중 반대 버튼 무시를 확인한다. |
+| 029 | RepeatLifecycle에서 interval을 0.3초로 바꿔 동일 실행 경로를 확인한다. |
 
-## Drop 위치와 Source 검색
+## 변경 파일과 구현
 
-- GetRecoveryDropTransform은 PlacementFootprint world bounds의 하단과 RecoveryDropZOffsetCm으로 위치를 계산한다. recovery item extent는 참조하지 않으므로 변경하지 않았다.
-- Source 전체에서 테스트를 제외하고 authored CDO scale 읽기를 검색했다. 해당 CDO GetActorScale3D 읽기는 구현에서 제거됐다.
-- 남은 production GetActorScale3D 사용은 CheckoutKeyPlacementUtils.cpp:81의 runtime Key transform 처리다. CDO authored scale 사용이 아니어서 변경하지 않았다.
+- Interaction 계약/소유권: Public InteractionTypes, PlayerInteractable, PlayerInteractionComponent, PlayerEquipmentUseComponent와 구현 파일, Character의 Primary/RMB owner routing 및 SecondaryUseAction.
+- 신규 lifecycle: Public/Private Interaction/PlayerHeldTargetUseComponent. Tick·press owner·반복·중단은 이 component가 보유한다. PlayerInteractionComponent에는 fresh focused interaction accessor만 추가했다.
+- Target 변경: TowelHeldTransferRules helper와 clean stack, used bin, transfer port, floor towel target. FuelSupply 및 FuelIntakeVolume은 Apply query/execute와 기존 atomic transaction을 연결했다.
+- HUD: InteractionPromptWidget에 E/LMB/RMB label, optional Take row, 방향별 transient failure와 visibility 규칙을 추가했다.
+- 자동화: 신규 HeldTargetUseAutomationTests와 CleaningTowel, UtilityCoolerAndLever, UtilityFuelDoor, UtilityLaborFuel 및 test support를 갱신했다. ShopAutomationTests의 scoped fixture 이름 변경은 Unity 빌드 중 test helper symbol 충돌을 방지한다. TowelInventoryComponent/Computer/Placement 헤더의 test friend 변경은 테스트 접근 전용이다.
 
-## Fixture 기록
+## 책임과 호환성
 
-자동화 로그의 사전 기록:
+- 신규 PlayerHeldTargetUseComponent는 header 49줄/cpp 225줄, 순수 TowelHeldTransferRules는 49줄/154줄이다.
+- FirstPersonCharacter.cpp는 485줄, InteractionPromptWidget.cpp는 436줄이다. Component tick/repeat 상태를 이미 571줄인 PlayerInteractionComponent에 추가하지 않았다.
+- enum 값은 끝에만 추가했다. PlayerHeldTargetUse default subobject 이름과 기존 reflected property, PrimaryUseAction/InteractAction/SecondaryInteractAction을 유지했다. reflected rename/class 변경, native Serialize 변경, Core Redirect는 없다.
+- BlueprintLoad가 native parent, default subobject와 0.15초 기본값, 기존 Character action 참조, WBP 필수 BindWidget 목록을 검사했다. 두 원본 Content asset은 저장하지 않았다.
 
-- Fixture CDO GetActorScale3D: X=1.000, Y=1.000, Z=1.000
-- Fixture ItemRoot relative scale: X=0.400, Y=0.600, Z=0.800
-- 두 값은 다르며 equal=false로 Blueprint CDO의 갱신되지 않은 component-to-world 상황을 재현했다.
-- scale 기대값은 fixture 또는 BP_PlaceableFacilityItem의 ItemRoot relative scale에서 읽는다.
+## 빌드·복사본 로드·회귀 검증
 
-## 변경 파일과 책임
+- UE 5.8 BathhouseSimEditor Win64 Development Build.bat: 최신 테스트 변경 후 6 actions 성공.
+- Copy-first load gate: BP_FirstPersonCharacter 복사본 1/1, WBP_InteractionPrompt 복사본 1/1. 복사본만 제거했다. 개별 report는 Saved/Automation/Reports/2026-09-28/HeldTargetUseCopyCharacter/index.json, HeldTargetUseCopyWBP/index.json.
+- 원본 BP_FirstPersonCharacter 및 WBP_InteractionPrompt 개별 로드: 각각 1/1 성공. DefaultMap 시작 맵 로드와 BlueprintLoad: 1/1 성공. Fatal, Serial size mismatch, package Failed to load가 없었다.
+- 복사본 전·후 및 최종 Content 상태는 깨끗하다. 원본 BP SHA-256 678E8D88193605449213F34993F545417BED3165C0B901DF226885B818C8A215, WBP SHA-256 41827D52BEAF385FF5D9390F4EBBF363C996E6ECC2B27D3774943DF2B166F337. 두 값은 사전 백업과도 같다.
+- HeldTargetUse focused: 4/4 성공, 경고 0, 실패 0. UI prompt focused: 1/1 성공. Utility Labor focused: 8 total, 성공 5, 경고 포함 성공 3, 실패 0.
+- 전체 Automation RunTests BathhouseSim: 74 total, 성공 68, 경고 포함 성공 6, 실패 0, 미실행 0. 경고 이벤트 16건은 Placement 설정/locker, towel presentation, Boiler Blueprint CDO fallback, fuel test mobility, invalid provider 회귀가 기록한 진단이다. 경고가 있는 테스트도 모두 Success다.
+- 전체 report: Saved/Automation/Reports/2026-09-28/BathhouseSimFull/index.json. 집중 report: HeldTargetUseFocused, BathhouseSimUIPrompt, BathhouseSimUtilityLabor 폴더의 index.json. 로그는 Saved/Logs/HeldTargetUse_Focused.log, BathhouseSimUIPrompt.log, BathhouseSimUtilityLabor.log, BathhouseSim_Full.log 및 개별 copy/original log에 있다. 구현 산출물과 인계 문서의 diff 검사는 통과했다. 전체 working tree 검사에서 변경 상태였던 범위 밖 문서 `.md/NextWork/QNA_FEATURE_SPEC.md:503`의 EOF 빈 줄 지적 1건은 남아 있다.
 
-- Source/BathhouseSim/Private/Placement/FacilityActorConversionTransaction.cpp: 회수 후보 scale 읽기와 회수 deferred spawn scale method 수정.
-- Source/BathhouseSim/Private/Placement/PlaceableFacilityItemCollision.cpp: recovery root scale 실패 LOCTEXT key 분리.
-- Source/BathhouseSim/Private/Tests/FacilityPlacementAutomationTestProbe.h/.cpp: CDO stale scale fixture와 grid-valid recovery facility fixture 추가.
-- Source/BathhouseSim/Private/Tests/FacilityPlacementAutomationTests.cpp: 기존 회수 scale assertion만 수정.
-- Source/BathhouseSim/Private/Tests/FacilityRecoveryScaleAutomationTests.cpp: 신규 전용 회수 scale 자동화.
-- .md/PROMPT_REVIEW.md: 현재 구현 작업의 코드 리뷰 입력과 검증 결과.
-- 테스트 전용 fixture 외에 production UPROPERTY, UFUNCTION, component, class API, serialization 변경은 없다. Core Redirect는 필요하지 않다.
-- FacilityActorConversionTransaction.cpp는 458→468줄, 테스트 probe header 149→163줄, probe cpp 176→188줄이다. 기존 대형 Placement 테스트에는 기존 assertion만 4줄 추가했고 새 테스트는 별도 322줄 파일에 두었다.
+## 미검증과 리뷰 중점
 
-## 빌드와 자동화
-
-- UE 5.8 BathhouseSimEditor Win64 Development Build.bat: 성공.
-- Placement 최종 재실행: 6개 완료, 경고 없는 성공 4개, 경고 있는 성공 2개, 실패 0개.
-- Shop: 11/11 성공, 실패 0개.
-- Interaction: 12/12 성공, 실패 0개.
-- 전체 BathhouseSim: 70개 완료, 경고 없는 성공 62개, 경고 있는 성공 8개, 실패 0개, 미실행 0개.
-- 전체 report: Saved/Automation/Reports/2026-09-28/BathhouseSim_RecoveryScale/index.json.
-- 집중 Placement, Shop, Interaction report는 각각 Placement_RecoveryScale_Retry1, Shop_RecoveryScale, InteractionCarry_RecoveryScale 폴더의 index.json에 있다.
-- 첫 Placement 실행에서 테스트 facility footprint가 프로젝트 grid와 맞지 않아 Definition validation이 실패했다. 전용 fixture가 현재 grid 설정에 맞는 footprint를 쓰도록 수정하고 재실행한 결과는 위와 같이 통과했다.
-- 전체 report의 경고 있는 성공 8개에는 테스트 진단 로그와 Shop BlueprintLoad의 외부 HTTP 연결 불가 로그가 포함된다. 실패 테스트는 없다.
-- tracked diff에서 git diff --check를 실행했다.
-
-## Architecture 및 Editor
-
-- Architecture 정본은 변경하지 않았다. 이미 ItemRoot relative scale을 공통 scale 정본으로 정의하며 이는 내부 버그 수정 범위다.
-- Content/Editor Compile·Save·PIE는 수행하지 않았다.
-- 사용자 PIE 확인 항목: 좁은 곳에서 설비 회수가 가능하고, 회수 아이템 크기가 변하지 않는지 확인한다.
+- 아직 IA_SecondaryUse 생성, IMC_FirstPerson RMB 연결, BP_FirstPersonCharacter SecondaryUseAction 지정, WBP optional widget authoring을 하지 않았다. PROMPT_UNREAL.md에 정확한 경로와 저장 범위를 인계했다.
+- PIE 입력 감각, 방향별 HUD 행과 키 라벨, 실제 0.15초 연속 동작, target 전환·drop·Computer/Placement 우선순위는 직접 확인하지 않았다.
+- 리뷰는 fresh focus 재검증/transaction, one action per Tick, release 전 재개 금지, held equipment field clearing, E/F compatibility, reflected property와 Blueprint asset load gate를 확인한다.

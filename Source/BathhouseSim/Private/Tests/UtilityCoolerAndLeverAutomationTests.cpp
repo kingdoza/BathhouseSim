@@ -87,19 +87,25 @@ bool FUtilityCoolerDryIceIntegrationTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Shovel load visual exists"), LoadVisual);
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Dry ice supply advertises its own fuel kind"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->GetCurrentInteractionQuery().ActionName.ToString() == TEXT("드라이아이스 퍼담기"));
-	TestTrue(TEXT("E scoops dry ice through the interaction trace"), Interaction->BeginPrimaryInteraction().bSucceeded);
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& Interaction->GetCurrentInteractionQuery().HeldApplyActionName.ToString() == TEXT("드라이아이스 퍼담기"));
+	TestTrue(TEXT("LMB held Apply scoops dry ice through the interaction trace"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	TestTrue(TEXT("Dry ice load preserves its kind and points"),
 		Shovel->GetFuelLoad().Kind == EUtilityFuelKind::DryIce
 		&& FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, 25.0f));
+	const float FuelBeforeLegacyInputs = Shovel->GetFuelLoad().Points;
+	TestFalse(TEXT("E no longer acts on the held shovel target"), Interaction->BeginPrimaryInteraction().bSucceeded);
+	TestFalse(TEXT("F has no shovel fuel action"), Interaction->TrySecondaryInteract().bSucceeded);
+	TestFalse(TEXT("RMB has no fuel Take action"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Take).bSucceeded);
+	TestTrue(TEXT("Legacy E, F, and RMB preserve the dry ice load"),
+		FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, FuelBeforeLegacyInputs));
 	TestTrue(TEXT("Dry ice applies the configured material while retaining the fallback mesh"),
 		LoadVisual && LoadVisual->GetStaticMesh() == CubeMesh && LoadVisual->GetMaterial(0) == DryIceMaterial);
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Matching supply advertises dry ice return"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->GetCurrentInteractionQuery().ActionName.ToString() == TEXT("드라이아이스 반환"));
-	TestTrue(TEXT("E returns the matching dry ice load"), Interaction->BeginPrimaryInteraction().bSucceeded);
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& Interaction->GetCurrentInteractionQuery().HeldApplyActionName.ToString() == TEXT("드라이아이스 반환"));
+	TestTrue(TEXT("LMB held Apply returns the matching dry ice load"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	TestTrue(TEXT("Returning fuel restores the authored empty shovel appearance"),
 		Shovel->IsLoadEmpty() && LoadVisual && LoadVisual->GetStaticMesh() == CubeMesh);
 
@@ -160,28 +166,28 @@ bool FUtilityCoolerDryIceIntegrationTest::RunTest(const FString& Parameters)
 
 	DryIceSupply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
-	TestTrue(TEXT("Initial dry ice batch loads for the 90 plus 25 cap"), Interaction->BeginPrimaryInteraction().bSucceeded);
+	TestTrue(TEXT("Initial dry ice batch loads for the 90 plus 25 cap"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	DryIceSupply->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("An installed cooler accepts the initial dry ice batch"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply
 		&& Cooler->GetFuelDoorPresentation()->GetTargetAlpha() == 1.0f);
 	TestTrue(TEXT("First insert clamps 90 plus 25 to 100"),
-		Interaction->BeginPrimaryInteraction().bSucceeded
+		ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded
 		&& Shovel->IsLoadEmpty()
 		&& FMath::IsNearlyEqual(Cooler->GetOperation()->GetRemainingPoints(), 100.0f));
 
 	DryIceSupply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
-	TestTrue(TEXT("A second dry ice scoop succeeds"), Interaction->BeginPrimaryInteraction().bSucceeded);
+	TestTrue(TEXT("A second dry ice scoop succeeds"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	DryIceSupply->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
 	const FPlayerInteractionQuery FullLoadQuery = Interaction->GetCurrentInteractionQuery();
 	TestTrue(FString::Printf(TEXT("Full cooler refuses loaded shovel (can=%d points=%.3f max=%.3f load=%d/%.3f action=%s failure=%s)"),
-		FullLoadQuery.bCanInteract, Cooler->GetOperation()->GetRemainingPoints(),
+		FullLoadQuery.bCanHeldApply, Cooler->GetOperation()->GetRemainingPoints(),
 		Cooler->GetOperation()->GetMaximumPoints(), static_cast<int32>(Shovel->GetFuelLoad().Kind),
-		Shovel->GetFuelLoad().Points, *FullLoadQuery.ActionName.ToString(), *FullLoadQuery.FailureReason.ToString()),
-		!FullLoadQuery.bCanInteract);
+		Shovel->GetFuelLoad().Points, *FullLoadQuery.HeldApplyActionName.ToString(), *FullLoadQuery.HeldApplyFailureReason.ToString()),
+		!FullLoadQuery.bCanHeldApply);
 	TestTrue(TEXT("Full refusal preserves the dry ice batch"), Shovel->GetFuelLoad().Kind == EUtilityFuelKind::DryIce);
 	TestEqual(TEXT("Full cooler closes its door target"), Cooler->GetFuelDoorPresentation()->GetTargetAlpha(), 0.0f);
 	DecayProperty->SetPropertyValue_InContainer(Cooler->GetOperation(), 1.0f);
@@ -194,10 +200,10 @@ bool FUtilityCoolerDryIceIntegrationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The same focused, loaded shovel becomes insertable as capacity decays"),
 		Cooler->GetOperation()->GetRemainingPoints() < 100.0f
 		&& Cooler->GetOperation()->GetRemainingPoints() > 80.0f
-		&& Interaction->GetCurrentInteractionQuery().bCanInteract
+		&& Interaction->GetCurrentInteractionQuery().bCanHeldApply
 		&& Cooler->GetFuelDoorPresentation()->GetTargetAlpha() == 1.0f);
 	TestTrue(TEXT("The retained 25 points cap a decayed 90 point cooler back at 100"),
-		Interaction->BeginPrimaryInteraction().bSucceeded
+		ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded
 		&& Shovel->IsLoadEmpty()
 		&& FMath::IsNearlyEqual(Cooler->GetOperation()->GetRemainingPoints(), 100.0f));
 	TestTrue(TEXT("Second cooler operation remains untouched"),
@@ -205,21 +211,21 @@ bool FUtilityCoolerDryIceIntegrationTest::RunTest(const FString& Parameters)
 
 	CoalSupply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
-	TestTrue(TEXT("Coal remains scoopable for cross-fuel validation"), Interaction->BeginPrimaryInteraction().bSucceeded);
+	TestTrue(TEXT("Coal remains scoopable for cross-fuel validation"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	TestTrue(TEXT("Coal load clears the dry ice material override"),
 		Shovel->GetFuelLoad().Kind == EUtilityFuelKind::Coal
 		&& LoadVisual->GetMaterial(0) == CubeMesh->GetMaterial(0));
 	CoalSupply->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
 	TestTrue(TEXT("Coal cannot insert and does not open the cooler door"),
-		!Interaction->GetCurrentInteractionQuery().bCanInteract
+		!Interaction->GetCurrentInteractionQuery().bCanHeldApply
 		&& Cooler->GetFuelDoorPresentation()->GetTargetAlpha() == 0.0f);
 	TestTrue(TEXT("Rejected cross-fuel insertion preserves the coal batch"),
 		Shovel->GetFuelLoad().Kind == EUtilityFuelKind::Coal
 		&& FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, 25.0f));
 	DryIceSupply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
-	TestFalse(TEXT("Cross-fuel return to dry ice supply is rejected"), Interaction->GetCurrentInteractionQuery().bCanInteract);
+	TestFalse(TEXT("Cross-fuel return to dry ice supply is rejected"), Interaction->GetCurrentInteractionQuery().bCanHeldApply);
 	TestTrue(TEXT("Rejected cross-fuel return preserves coal load"),
 		Shovel->GetFuelLoad().Kind == EUtilityFuelKind::Coal
 		&& FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, 25.0f));
@@ -228,18 +234,18 @@ bool FUtilityCoolerDryIceIntegrationTest::RunTest(const FString& Parameters)
 	Interaction->RefreshInteractionQuery();
 	TestTrue(FString::Printf(TEXT("Matching coal return succeeds (target=%s can=%d load=%d/%.1f)"),
 		*Interaction->GetCurrentInteractionQuery().TargetName.ToString(),
-		Interaction->GetCurrentInteractionQuery().bCanInteract,
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply,
 		static_cast<int32>(Shovel->GetFuelLoad().Kind), Shovel->GetFuelLoad().Points),
-		Interaction->BeginPrimaryInteraction().bSucceeded);
+		ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 
 	DecayProperty->SetPropertyValue_InContainer(Cooler->GetOperation(), 100.0f);
 	DryIceSupply->SetActorLocation(FVector(100.0f, 0.0f, 0.0f));
 	CoalSupply->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
-	TestTrue(TEXT("Dry ice can be scooped for an exhausted cooler"), Interaction->BeginPrimaryInteraction().bSucceeded);
+	TestTrue(TEXT("Dry ice can be scooped for an exhausted cooler"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded);
 	DryIceSupply->SetActorLocation(FVector(1000.0f, 0.0f, 0.0f));
 	Interaction->RefreshInteractionQuery();
-	TestFalse(TEXT("Full cooler initially refuses that retained dry ice"), Interaction->GetCurrentInteractionQuery().bCanInteract);
+	TestFalse(TEXT("Full cooler initially refuses that retained dry ice"), Interaction->GetCurrentInteractionQuery().bCanHeldApply);
 	for (int32 Index = 0; Index < 20; ++Index)
 	{
 		++GFrameCounter;
@@ -251,8 +257,8 @@ bool FUtilityCoolerDryIceIntegrationTest::RunTest(const FString& Parameters)
 		&& Cooler->GetFacilityPlacementComponent()->IsPlacedDomainActive()
 		&& !Cooler->GetOperation()->IsProvidingCapacity());
 	TestTrue(TEXT("The still-focused dry ice inserts and restarts exhausted Cooling"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->BeginPrimaryInteraction().bSucceeded
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply).bSucceeded
 		&& FMath::IsNearlyEqual(Cooler->GetOperation()->GetRemainingPoints(), 25.0f)
 		&& Cooler->GetOperation()->IsProvidingCapacity());
 

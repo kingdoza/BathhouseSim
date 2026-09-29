@@ -125,6 +125,7 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - placement 필수 계약은 `PlacementActionNameText: UTextBlock`, `PlacementFailureReasonText: UTextBlock`이다.
 - recovery 필수 계약은 `RecoveryActionNameText: UTextBlock`, `RecoveryFailureReasonText: UTextBlock`, `RecoveryProgressBar: UProgressBar`다.
 - input label은 E/F/LMB/LMB/Q presentation 값이며 domain action name에 hard-code하지 않는다. equipment와 placement LMB 행은 input owner에 따라 하나만 표시한다.
+- held-use(2026-09-28): LMB 행은 equipment가 visible이면 equipment, 아니면 held Apply 필드를 쓴다. RMB 행은 held Take 필드다(`BindWidgetOptional` `HeldTakeActionNameText`, `HeldTakeFailureReasonText`). 키 라벨은 `BindWidgetOptional` `PrimaryKeyText`, `LmbKeyText`, `RmbKeyText`와 EditDefaultsOnly `PrimaryKeyLabel`, `LmbKeyLabel`, `RmbKeyLabel`이다. E 행은 `ActionName`이 비면 접는다. intent `HeldApply`·`HeldTake` transient failure는 LMB·RMB 행에 표시한다. 상세는 [HeldTargetUseSystem.md](HeldTargetUseSystem.md) HUD Data다.
 - query 실패 이유는 query가 유지되는 동안 지속 표시하고, 실행 실패와 대상 없음 결과는 기본 1.5초 동안 transient failure로 우선 표시한다.
 - `FailureDisplayDurationSeconds`는 `EditDefaultsOnly`, 최소 0.1초인 presentation authoring 값이다.
 - transient failure는 실패 result마다 timer를 재시작하며 성공 result, query 변경, context 해제, timer 만료와 widget destruct에서 지운다.

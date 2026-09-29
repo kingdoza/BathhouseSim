@@ -58,6 +58,10 @@ public:
 	void ClearInteractionQuery();
 	bool GetCurrentFocusHit(FHitResult& OutHit) const;
 	FPlayerInteractionResult ReportExternalInteractionAttempt(const FPlayerInteractionResult& Result);
+	bool ResolveFocusedInteraction(
+		FPlayerInteractionContext& OutContext,
+		IPlayerInteractable*& OutInteractable,
+		UObject*& OutTargetObject) const;
 
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")
 	FOnInteractionQueryChanged OnInteractionQueryChanged;

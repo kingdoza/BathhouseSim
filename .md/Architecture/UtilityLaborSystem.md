@@ -109,6 +109,8 @@ reflected `FBathWaterCapacitySnapshot`은 기존 필드를 보존한다.
 `UUtilityGaugeComponent : UActorComponent`는 labor intermediate가 Operation과 `GaugeNeedlePivot`을 주입한다. 세 설비가 같은 규칙을 쓴다.
 
 - authored pivot relative rotation을 baseline으로 두고 표시 회전과 구분한다. 규칙은 private `UtilityPivotRotation` helper가 소유하며 문·레버와 공유한다. construction preview, 반복 construction, BeginPlay, 같은 pivot 재구성에서 이미 적용한 표시 자세를 baseline으로 다시 저장하지 않는다.
+- baseline 원천은 pivot의 component template(Blueprint 또는 native default subobject) relative rotation이다. template이 없는 컴포넌트만 현재 인스턴스 값을 쓴다. Compile 재인스턴싱, 레벨 저장·로드, PIE 복제 뒤 인스턴스에 남은 표시 자세와 레벨 인스턴스별 pivot 회전 override는 baseline이 되지 않는다.
+- 회전 update 전후 pivot relative location·scale은 부모 transform과 무관하게 bit 단위로 유지한다.
 - `LocalRotationAxis`, `ZeroAngleDegrees`, `MaxAngleDegrees`, `ActiveStartRatio=1/3`을 EditAnywhere로 노출한다. axis finite/nonzero, ratio [0,1), 각도 finite를 검증하며 축은 normalize하고 음의 축도 지원한다.
 - `v==0 ? p=0 : p=a+(1-a)*v/Max`, `Angle=Lerp(ZeroAngle,MaxAngle,p)`를 적용한다. 회전은 `Baseline * AxisAngle(LocalAxis, Angle)`로 매번 산출하며 누적하지 않는다.
 - pivot location이 회전 중심이며 NeedleMesh relative location으로 바늘 길이/중심을 맞춘다. 위치와 scale은 회전 update가 바꾸지 않는다. tween/noise는 없다.

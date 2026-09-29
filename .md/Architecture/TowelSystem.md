@@ -109,7 +109,7 @@ Towel은 player input mapping, customer StateTree hierarchy, facility reservatio
 
 검증 실패 시 remove/add 어느 쪽도 실행하지 않는다. Unreal game thread serialization과 revision 재검증으로 completion/interaction 동시점과 반복 입력을 처리한다.
 
-Primary E는 requested count 1, Secondary F는 가능한 최대 수량을 요청한다. Secondary는 무조건 전량이 아니라 destination capacity까지 이동한다.
+player 수건 이동은 held-use 한 단위로 requested count 1만 요청한다. LMB(Apply)는 바구니 → 대상, RMB(Take)는 대상 → 바구니이며 누르고 있으면 간격마다 한 장씩 반복한다. E·F는 수건을 옮기지 않는다(2026-09-28, [HeldTargetUseSystem.md](HeldTargetUseSystem.md) Towel Targets). 방향별 가능 여부와 이유는 `FTowelHeldTransferRules`가 만든다.
 
 ## Physical Towel Basket
 
@@ -131,7 +131,7 @@ Primary E는 requested count 1, Secondary F는 가능한 최대 수량을 요청
 `ACleanTowelStackActor`는 clean towel inventory와 customer facility slot을 가진다.
 
 - player Clean basket -> stack 이동
-- E 한 장, F 가능한 수량
+- LMB 한 장, 누르고 있으면 반복
 - customer가 한 장을 towel-use token으로 획득
 - `EBathhouseFacilityType::TowelShelf`로 customer navigation에 등록
 
@@ -139,7 +139,7 @@ Primary E는 requested count 1, Secondary F는 가능한 최대 수량을 요청
 
 - customer Used towel return
 - bin -> player Used basket 이동
-- E 한 장, F 가능한 수량
+- RMB 한 장, 누르고 있으면 반복
 - bin capacity가 가득 차면 customer towel을 보유하지 않고 floor overflow로 전환
 
 bin 내부 visible towels는 count 기반 presentation 전용이며 개별 collision/interaction을 갖지 않는다.
@@ -169,13 +169,13 @@ Return flow:
 
 후보 또는 spawn에 실패하면 token을 `PendingSpill` ledger로 원자 이전하고 customer를 진행시킨다. Circulation Subsystem이 bin 유효 시 재시도한다.
 
-World towel interaction은 개별 Primary E만 지원한다.
+World towel은 held-use Take(RMB) 한 장만 지원한다. E·LMB로는 줍지 않는다.
 
 - held object가 compatible basket인지 확인
 - basket이 empty/Used이며 여유가 있는지 확인
 - actor token 감소와 basket Used +1을 한 transaction으로 commit
 - 성공 후 actor를 `Consumed`로 표시하고 제거
-- Secondary F는 숨김
+- F와 E 이동은 없음
 
 비정상 EndPlay의 unconsumed world towel은 PendingSpill/recovery ledger로 돌아가며, consumed actor는 다시 recovery하지 않는다.
 
@@ -183,7 +183,7 @@ World towel interaction은 개별 Primary E만 지원한다.
 
 `ATowelProcessingMachineActor`는 inventory, machine state와 process end time을 소유한다.
 
-- transfer port: basket과 E/F towel 이동
+- transfer port: basket과 LMB(넣기)·RMB(빼기) towel 이동
 - separate control component: E로 processing 시작
 - `Waiting`에서만 correct input towel 투입
 - count > 0일 때만 control interaction으로 시작
@@ -207,14 +207,14 @@ machine Actor는 canonical target에서 `IPlaceableFacility`만 구현하고 `IP
 | Target | Direction |
 |---|---|
 | Used bin | bin Used -> held basket |
-| World used towel | actor token -> held basket, E only |
+| World used towel | actor token -> held basket, RMB only |
 | Waiting washer | held basket Used -> washer |
 | Complete washer | washer Wet -> held basket |
 | Waiting dryer | held basket Wet -> dryer |
 | Complete dryer | dryer Clean -> held basket |
 | Clean stack | held basket Clean -> stack |
 
-Port/interactable가 held basket과 target snapshot으로 방향을 결정한다. Character, Widget과 input action은 towel type을 판별하지 않는다.
+held basket → 대상 방향은 LMB(Apply), 대상 → held basket 방향은 RMB(Take)다. Port/interactable가 held basket과 target snapshot으로 가능 여부를 결정한다. Character, Widget과 input action은 towel type을 판별하지 않는다.
 
 ## Customer Token And Fallback
 
@@ -263,8 +263,8 @@ Towel actor 표현 event:
 
 ## Manual Review Points
 
-- 모든 E/F transfer 전후 총 towel token 수가 보존되는지 확인한다.
-- bin 내부 towel은 container 단위 E/F이고 overflow towel만 개별 E인지 확인한다.
+- 모든 LMB/RMB transfer 전후 총 towel token 수가 보존되는지 확인한다.
+- bin 내부 towel은 container 단위 RMB이고 overflow towel만 개별 RMB인지 확인한다.
 - mixed state, full capacity, processing state와 repeated input이 양쪽 endpoint를 변경하지 않는지 확인한다.
 - count가 남았거나 `Processing`/`Complete`인 machine의 Q 회수가 정확한 이유로 실패하는지 확인한다.
 - bulk stack presentation 중단 뒤 C++ count와 visible count가 재동기화되는지 확인한다.

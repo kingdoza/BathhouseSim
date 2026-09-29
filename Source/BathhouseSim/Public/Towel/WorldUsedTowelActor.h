@@ -21,6 +21,9 @@ public:
 
 	virtual FPlayerInteractionQuery QueryInteraction(const FPlayerInteractionContext& Context) const override;
 	virtual FPlayerInteractionResult ExecuteInteraction(const FPlayerInteractionContext& Context) override;
+	virtual FPlayerInteractionResult ExecuteHeldTargetUse(
+		const FPlayerInteractionContext& Context,
+		EPlayerHeldTargetUseDirection Direction) override;
 
 	void SetPreferredBin(AUsedTowelBinActor* InBin) { PreferredBin = InBin; }
 	void CommitStagedToken();

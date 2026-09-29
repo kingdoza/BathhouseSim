@@ -19,12 +19,12 @@
 - `FUtilityFuelLoad`는 None/0 또는 Coal·DryIce 중 하나의 finite 양수 한 회분이다. 혼합과 추가 적재는 없다.
 - `AUtilityFuelSupplyActor`: `SupplyMesh`가 query target이다. `FuelKind`(Coal 또는 DryIce)와 `ScoopPoints=25`는 EditDefaultsOnly이며 공급함 class가 한 삽 양의 정본이다. 무제한이고 이동·회수·carry 기능이 없다.
 - `BP_CoalSupply`와 신규 `BP_DryIceSupply`는 같은 native class의 Blueprint 자식이다. 재료별 native class를 만들지 않는다.
-- E primary 한 번은 held 삽 상태로 행동 하나를 고른다. 빈 삽이면 퍼담기, 같은 kind 적재면 전량 반환, 다른 kind 적재면 재료 불일치 거부·내용 보존이다. secondary(F) 행동은 없다.
+- LMB held-use Apply 한 번(`Instant`)은 held 삽 상태로 행동 하나를 고른다(2026-09-28 E에서 이동). 빈 삽이면 퍼담기, 같은 kind 적재면 전량 반환, 다른 kind 적재면 재료 불일치 거부·내용 보존이다. secondary(F) 행동은 없다.
 - TargetName은 재료 표시 이름(석탄 공급함 / 드라이아이스 공급함)을 쓴다. validation은 FuelKind가 Coal 또는 DryIce, ScoopPoints finite 양수, SupplyMesh QueryOnly·Visibility Block·Navigation off다.
 
 ## Shovel
 
-`AUtilityShovelActor`는 `IPlayerInteractable`, `IPhysicalCarryable`만 구현한다. 삽 LMB 장비 사용은 없다.
+`AUtilityShovelActor`는 `IPlayerInteractable`, `IPhysicalCarryable`만 구현한다. 삽은 장비(`IHeldEquipmentUsable`)가 아니다. 삽 LMB는 대상의 held-use Apply로 처리되며 빈 공간에서는 아무 일도 없다.
 
 - `WorldMesh` physical root, `LoadVisual` collision-free child. 기존 carry·FreeDrop·exact FixedSlot·CCD·Pawn Ignore·약한 release 계약을 유지한다.
 - `CanAcceptLoad`는 빈 삽에 Coal 또는 DryIce 한 회분을 허용한다.
@@ -44,10 +44,10 @@
 
 ## Input And Trace
 
-- 삽 월드 작업은 target의 E primary `Instant` 상호작용이다. E `Started` 한 번이 fresh trace/query/execute 한 번이며 누르고 있어도 반복하지 않는다.
+- 삽 월드 작업은 target의 held-use Apply(LMB, `Instant`)다. LMB `Started` 한 번이 fresh trace/query/execute 한 번이며 누르고 있어도 반복하지 않는다. 계약은 [HeldTargetUseSystem.md](HeldTargetUseSystem.md) Shovel Targets다.
 - 공급함 `SupplyMesh`와 `FuelIntakeVolume`이 focus target이다. query는 transaction 평가 결과만 사용하고 상태를 바꾸지 않는다.
 - 실패 문구는 삽 필요(빈손·다른 도구), 빈 삽, 재료 불일치, 가득 참, 회수 중, 미설치, 조준 불일치를 구분한다. 문구의 재료·설비 이름은 target 설비와 재료 종류에서 만든다.
-- LMB·F는 삽 작업을 실행하지 않는다. 삽 E pickup과 exact slot E take/store는 기존 carry coordinator를 쓴다.
+- E·F·RMB는 삽 작업을 실행하지 않는다. 대상의 E primary는 이름만 보이고 행동이 없다. 삽 E pickup과 exact slot E take/store는 기존 carry coordinator를 쓴다.
 - generic Interaction/Character에 concrete cast나 연료 mutation을 넣지 않는다. target이 held object를 판별하는 target-side 패턴을 유지한다.
 - execute는 같은 Interaction trace 거리·channel로 fresh single-hit를 재검증한다. 기대 component는 공급함 `SupplyMesh`, 투입은 해당 설비의 `FuelIntakeVolume`이다.
 - owner input 검사(컴퓨터 capture, 배치 모드)는 `UtilityLaborInputGuard`를 쓴다.
@@ -67,7 +67,7 @@
 `UUtilityFuelDoorComponent`는 보일러·쿨러 공통이며 문 자세만 표현한다. domain 상태, 투입 판단과 collision을 소유하지 않는다.
 
 - `FuelIntakeVolume`이 `IPlayerInteractionFocusObserver`로 받은 알림을 자기 설비의 문에 전달한다. 다른 설비 문에는 전달하지 않는다.
-- source별 최신 query의 `bVisible && bCanInteract`를 weak key로 저장하고, 하나라도 true면 목표 열림이다. `bCanInteract`는 `EvaluateInsert` 성공이므로 문 열림과 지금 E 투입 가능이 같은 판정이다. 가득 참은 닫힘, 자연 감소로 공간이 생기면 다음 query refresh에서 열린다.
+- source별 최신 query의 `bHeldApplyVisible && bCanHeldApply`를 weak key로 저장하고, 하나라도 true면 목표 열림이다. `bCanHeldApply`는 `EvaluateInsert` 성공이므로 문 열림과 지금 LMB 투입 가능이 같은 판정이다. 가득 참은 닫힘, 자연 감소로 공간이 생기면 다음 query refresh에서 열린다.
 - 투입 성공 후 빈 삽, 도구 변경·거치·drop, 시선·거리 이탈, 회수 Hold 시작은 query 변화나 focus 종료로 닫힘을 만든다. 컴퓨터 진입은 suppression의 query clear가 focus 종료를 보낸다.
 - alpha [0,1] 선형 이동. 열기 `1/OpenSeconds`, 닫기 `1/CloseSeconds`, 목표 전환 시 현재 alpha에서 방향 전환, 0초는 즉시. alpha ≠ target일 때만 Tick한다.
 - 회전은 `Baseline * AxisAngle(LocalRotationAxis, OpenAngleDegrees * alpha)`, baseline은 배치한 닫힘 자세다.

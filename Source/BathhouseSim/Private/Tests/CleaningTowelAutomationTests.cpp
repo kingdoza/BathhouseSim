@@ -364,10 +364,12 @@ bool FBathhouseTowelTransferTest::RunTest(const FString& Parameters)
 	BeginActorForTest(WorldTowel);
 	WorldTowel->CommitStagedToken();
 	const FPlayerInteractionQuery WorldTowelQuery = WorldTowel->QueryInteraction(CollectionContext);
-	TestTrue(TEXT("A committed floor towel supports individual primary collection"), WorldTowelQuery.bCanInteract);
-	TestFalse(TEXT("A floor towel never exposes bulk secondary interaction"), WorldTowelQuery.bSecondaryVisible);
-	TestTrue(TEXT("Individual floor towel collection commits one Used token"),
-		WorldTowel->ExecuteInteraction(CollectionContext).bSucceeded);
+	TestTrue(TEXT("A committed floor towel exposes individual RMB collection"), WorldTowelQuery.bCanHeldTake);
+	TestFalse(TEXT("A floor towel has no E primary action"), WorldTowelQuery.bCanInteract);
+	TestFalse(TEXT("A floor towel never exposes F bulk interaction"), WorldTowelQuery.bSecondaryVisible);
+	TestFalse(TEXT("E does not collect the floor towel"), WorldTowel->ExecuteInteraction(CollectionContext).bSucceeded);
+	TestTrue(TEXT("RMB collection commits one Used token"),
+		WorldTowel->ExecuteHeldTargetUse(CollectionContext, EPlayerHeldTargetUseDirection::Take).bSucceeded);
 	TestEqual(TEXT("Floor collection adds one Used towel to the basket"),
 		UsedBasket->GetInventory()->GetSnapshot().Count, 1);
 
@@ -377,16 +379,19 @@ bool FBathhouseTowelTransferTest::RunTest(const FString& Parameters)
 	TransferBin->GetInventory()->State = ETowelState::Used;
 	TransferBin->GetInventory()->Count = 3;
 	const FPlayerInteractionQuery BinQuery = TransferBin->QueryInteraction(CollectionContext);
-	TestTrue(TEXT("Used bin exposes one-towel primary transfer"), BinQuery.bCanInteract);
-	TestTrue(TEXT("Used bin exposes max-possible secondary transfer"), BinQuery.bCanSecondaryInteract);
-	TestTrue(TEXT("Used bin primary moves one towel"), TransferBin->ExecuteInteraction(CollectionContext).bSucceeded);
-	TestEqual(TEXT("Used bin primary decrements container count by one"),
-		TransferBin->GetInventory()->GetSnapshot().Count, 2);
-	const FPlayerInteractionResult BinSecondaryResult = TransferBin->ExecuteSecondaryInteraction(CollectionContext);
-	TestTrue(TEXT("Used bin secondary moves the remaining capacity-limited amount"), BinSecondaryResult.bSucceeded);
-	TestEqual(TEXT("Bulk transfer result preserves the F intent"),
-		BinSecondaryResult.Intent, EPlayerInteractionIntent::Secondary);
-	TestEqual(TEXT("Used bin secondary empties this two-towel remainder"),
+	TestTrue(TEXT("Used bin exposes one-towel RMB transfer"), BinQuery.bCanHeldTake);
+	TestFalse(TEXT("Used bin has no E transfer action"), BinQuery.bCanInteract);
+	TestFalse(TEXT("Used bin no longer exposes F bulk transfer"), BinQuery.bSecondaryVisible);
+	TestFalse(TEXT("E does not move a towel from the bin"), TransferBin->ExecuteInteraction(CollectionContext).bSucceeded);
+	TestFalse(TEXT("F does not move a towel from the bin"), TransferBin->ExecuteSecondaryInteraction(CollectionContext).bSucceeded);
+	TestEqual(TEXT("Legacy E and F leave all three towels in the bin"),
+		TransferBin->GetInventory()->GetSnapshot().Count, 3);
+	for (int32 Index = 0; Index < 3; ++Index)
+	{
+		TestTrue(FString::Printf(TEXT("RMB moves used towel %d individually"), Index + 1),
+			TransferBin->ExecuteHeldTargetUse(CollectionContext, EPlayerHeldTargetUseDirection::Take).bSucceeded);
+	}
+	TestEqual(TEXT("Three individual RMB transfers empty the bin"),
 		TransferBin->GetInventory()->GetSnapshot().Count, 0);
 	TestEqual(TEXT("Container and individual collection conserve four Used towels"),
 		UsedBasket->GetInventory()->GetSnapshot().Count, 4);
@@ -1040,15 +1045,23 @@ bool FBathhouseInteractionPromptPresentationTest::RunTest(const FString& Paramet
 	SecondaryOnlyQuery.bCanSecondaryInteract = true;
 	TestTrue(TEXT("A secondary-only query keeps the native prompt root enabled"),
 		UInteractionPromptWidget::IsPromptRootEnabled(SecondaryOnlyQuery));
+	SecondaryOnlyQuery.bHeldTakeVisible = true;
+	SecondaryOnlyQuery.bCanHeldTake = true;
+	SecondaryOnlyQuery.HeldTakeActionName = FText::FromString(TEXT("빼기"));
+	TestTrue(TEXT("A held Take row keeps the prompt root enabled"),
+		UInteractionPromptWidget::IsPromptRootEnabled(SecondaryOnlyQuery));
 	TestFalse(TEXT("A secondary-only query remains disabled in the legacy primary hook"),
 		UInteractionPromptWidget::IsLegacyPrimaryEnabled(SecondaryOnlyQuery));
 
 	SecondaryOnlyQuery.bCanInteract = true;
+	SecondaryOnlyQuery.ActionName = FText::FromString(TEXT("사용"));
 	TestTrue(TEXT("An executable primary query enables the legacy primary hook"),
 		UInteractionPromptWidget::IsLegacyPrimaryEnabled(SecondaryOnlyQuery));
 
 	SecondaryOnlyQuery.bCanInteract = false;
 	SecondaryOnlyQuery.bCanSecondaryInteract = false;
+	SecondaryOnlyQuery.bHeldTakeVisible = false;
+	SecondaryOnlyQuery.bCanHeldTake = false;
 	TestFalse(TEXT("A query with no executable action disables the native prompt root"),
 		UInteractionPromptWidget::IsPromptRootEnabled(SecondaryOnlyQuery));
 
@@ -1061,6 +1074,12 @@ bool FBathhouseInteractionPromptPresentationTest::RunTest(const FString& Paramet
 		UInteractionPromptWidget::IsPromptRootEnabled(EquipmentOnlyQuery));
 	TestFalse(TEXT("An LMB-only query does not enable the legacy E hook"),
 		UInteractionPromptWidget::IsLegacyPrimaryEnabled(EquipmentOnlyQuery));
+	FPlayerInteractionQuery EmptyPrimaryQuery;
+	EmptyPrimaryQuery.bVisible = true;
+	EmptyPrimaryQuery.bCanInteract = true;
+	EmptyPrimaryQuery.TargetName = FText::FromString(TEXT("대상"));
+	TestFalse(TEXT("An empty E action folds the legacy E row"),
+		UInteractionPromptWidget::IsLegacyPrimaryEnabled(EmptyPrimaryQuery));
 	FPlayerInteractionQuery DifferentEquipmentProgress = EquipmentOnlyQuery;
 	DifferentEquipmentProgress.EquipmentUseProgress = 0.75f;
 	TestFalse(TEXT("Equipment progress participates in query equality"),

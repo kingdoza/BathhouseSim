@@ -40,10 +40,8 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 	Carry->ConfigureHeldAnchor(Camera);
 	Interaction->Configure(Camera, Carry);
 	const auto ExecutePrimary = [Interaction]()
-	{
-		const FPlayerInteractionResult Result = Interaction->BeginPrimaryInteraction();
-		Interaction->EndPrimaryInteraction();
-		return Result;
+{
+		return ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Apply);
 	};
 
 	AUtilityFuelSupplyActor* Supply = World->SpawnActor<AUtilityFuelSupplyActor>(FVector(100.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
@@ -144,11 +142,18 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 		Shovel->GetFuelLoad().Kind == EUtilityFuelKind::Coal
 		&& FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, 25.0f));
 	Interaction->RefreshInteractionQuery();
-	TestTrue(TEXT("A loaded shovel advertises E return at the supply"),
-		Interaction->GetCurrentInteractionQuery().bCanInteract
-		&& Interaction->GetCurrentInteractionQuery().ActionName.ToString() == TEXT("석탄 반환"));
-	TestTrue(TEXT("A second E press returns the existing batch instead of scooping again"), ExecutePrimary().bSucceeded);
-	TestTrue(TEXT("E return leaves the shovel empty"), Shovel->IsLoadEmpty());
+	TestTrue(TEXT("A loaded shovel advertises LMB held Apply return at the supply"),
+		Interaction->GetCurrentInteractionQuery().bCanHeldApply
+		&& Interaction->GetCurrentInteractionQuery().HeldApplyActionName.ToString() == TEXT("석탄 반환"));
+
+	const float FuelBeforeLegacyInputs = Shovel->GetFuelLoad().Points;
+	TestFalse(TEXT("E no longer returns fuel from the supply"), Interaction->BeginPrimaryInteraction().bSucceeded);
+	TestFalse(TEXT("F has no fuel return action"), Interaction->TrySecondaryInteract().bSucceeded);
+	TestFalse(TEXT("RMB has no fuel Take action"), ExecuteFocusedHeldTargetUse(Interaction, EPlayerHeldTargetUseDirection::Take).bSucceeded);
+	TestTrue(TEXT("Legacy E, F, and RMB leave the shovel load unchanged"),
+		FMath::IsNearlyEqual(Shovel->GetFuelLoad().Points, FuelBeforeLegacyInputs));
+	TestTrue(TEXT("A second LMB held Apply returns the existing batch instead of scooping again"), ExecutePrimary().bSucceeded);
+	TestTrue(TEXT("LMB held Apply return leaves the shovel empty"), Shovel->IsLoadEmpty());
 	TestTrue(TEXT("An empty shovel can scoop one new batch"), ExecutePrimary().bSucceeded);
 	TestFalse(TEXT("The shovel has no LMB equipment-use behavior"),
 		Shovel->GetClass()->ImplementsInterface(UHeldEquipmentUsable::StaticClass()));
@@ -350,10 +355,8 @@ bool FUtilityLaborFuelInteractionTest::RunTest(const FString& Parameters)
 	ReentrantCarry->ConfigureHeldAnchor(ReentrantCamera);
 	ReentrantInteraction->Configure(ReentrantCamera, ReentrantCarry);
 	const auto ExecuteReentrantPrimary = [ReentrantInteraction]()
-	{
-		const FPlayerInteractionResult Result = ReentrantInteraction->BeginPrimaryInteraction();
-		ReentrantInteraction->EndPrimaryInteraction();
-		return Result;
+{
+		return ExecuteFocusedHeldTargetUse(ReentrantInteraction, EPlayerHeldTargetUseDirection::Apply);
 	};
 	AUtilityShovelActor* ReentrantShovel = World->SpawnActor<AUtilityShovelActor>();
 	TestTrue(TEXT("Reentrant shovel has valid authoring"), SetShovelTestMeshes(ReentrantShovel, CubeMesh));

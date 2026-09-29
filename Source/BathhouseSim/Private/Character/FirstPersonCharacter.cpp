@@ -16,6 +16,7 @@
 #include "Interaction/PlayerCarryComponent.h"
 #include "Interaction/HeldEquipmentMotionComponent.h"
 #include "Interaction/PlayerEquipmentUseComponent.h"
+#include "Interaction/PlayerHeldTargetUseComponent.h"
 #include "Interaction/PlayerInteractionComponent.h"
 #include "Placement/PlayerFacilityPlacementComponent.h"
 
@@ -43,6 +44,7 @@ AFirstPersonCharacter::AFirstPersonCharacter(const FObjectInitializer& ObjectIni
 	PlayerEquipmentUse->Configure(FirstPersonCamera, PlayerCarry, PlayerInteraction, HeldEquipmentMotion);
 	PlayerInteraction->ConfigureEquipmentUse(PlayerEquipmentUse);
 	PlayerCarry->ConfigureEquipmentUse(PlayerEquipmentUse);
+	PlayerHeldTargetUse = CreateDefaultSubobject<UPlayerHeldTargetUseComponent>(TEXT("PlayerHeldTargetUse"));
 	PlayerFacilityPlacement = CreateDefaultSubobject<UPlayerFacilityPlacementComponent>(TEXT("PlayerFacilityPlacement"));
 	PlayerFacilityPlacement->Configure(FirstPersonCamera, PlayerCarry, PlayerInteraction);
 	PlayerInteraction->ConfigureSupplementalIntentSource(PlayerFacilityPlacement);
@@ -96,6 +98,10 @@ void AFirstPersonCharacter::BeginPlay()
 	{
 		PlayerInteraction->ConfigureSupplementalIntentSource(PlayerFacilityPlacement);
 	}
+	if (PlayerHeldTargetUse)
+	{
+		PlayerHeldTargetUse->Configure(PlayerInteraction, PlayerCarry, PlayerEquipmentUse);
+	}
 }
 
 void AFirstPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -144,6 +150,24 @@ void AFirstPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 			ETriggerEvent::Started,
 			this,
 			&AFirstPersonCharacter::SecondaryInteractInput);
+	}
+	if (SecondaryUseAction)
+	{
+		EnhancedInputComponent->BindAction(
+			SecondaryUseAction,
+			ETriggerEvent::Started,
+			this,
+			&AFirstPersonCharacter::SecondaryUseStartInput);
+		EnhancedInputComponent->BindAction(
+			SecondaryUseAction,
+			ETriggerEvent::Completed,
+			this,
+			&AFirstPersonCharacter::SecondaryUseEndInput);
+		EnhancedInputComponent->BindAction(
+			SecondaryUseAction,
+			ETriggerEvent::Canceled,
+			this,
+			&AFirstPersonCharacter::SecondaryUseEndInput);
 	}
 
 	if (DropCarryAction)
@@ -332,6 +356,29 @@ void AFirstPersonCharacter::PrimaryUseStartInput()
 		PlayerFacilityPlacement->ConfirmPlacement();
 		return;
 	}
+	if (PlayerHeldTargetUse && PlayerHeldTargetUse->IsUseActive())
+	{
+		PrimaryUsePressOwner = EPrimaryUsePressOwner::Ignored;
+		return;
+	}
+
+	const bool bHasUsableEquipment = PlayerEquipmentUse && PlayerEquipmentUse->HasUsableHeldEquipment();
+	const bool bHasHeldObject = PlayerCarry && IsValid(PlayerCarry->GetHeldObject());
+	const FPlayerInteractionQuery FocusQuery = PlayerInteraction
+		? PlayerInteraction->GetCurrentInteractionQuery()
+		: FPlayerInteractionQuery();
+	const bool bApplyHasRowOrReason = FocusQuery.bHeldApplyVisible
+		|| !FocusQuery.HeldApplyFailureReason.IsEmpty();
+	if (!bHasUsableEquipment && (bHasHeldObject || bApplyHasRowOrReason))
+	{
+		PrimaryUsePressOwner = EPrimaryUsePressOwner::HeldTargetUse;
+		if (PlayerHeldTargetUse)
+		{
+			PlayerHeldTargetUse->BeginUse(EPlayerHeldTargetUseDirection::Apply);
+		}
+		return;
+	}
+
 	PrimaryUsePressOwner = EPrimaryUsePressOwner::Equipment;
 	if (PlayerEquipmentUse)
 	{
@@ -348,7 +395,6 @@ void AFirstPersonCharacter::PrimaryUseTriggeredInput()
 }
 
 void AFirstPersonCharacter::PrimaryUseEndInput()
-
 {
 	const EPrimaryUsePressOwner PreviousOwner = PrimaryUsePressOwner;
 	PrimaryUsePressOwner = EPrimaryUsePressOwner::None;
@@ -364,6 +410,42 @@ void AFirstPersonCharacter::PrimaryUseEndInput()
 	if (PreviousOwner == EPrimaryUsePressOwner::Equipment && PlayerEquipmentUse)
 	{
 		PlayerEquipmentUse->EndEquipmentUse();
+	}
+	else if (PreviousOwner == EPrimaryUsePressOwner::HeldTargetUse && PlayerHeldTargetUse)
+	{
+		PlayerHeldTargetUse->EndUse();
+	}
+}
+
+void AFirstPersonCharacter::SecondaryUseStartInput()
+{
+	if (SecondaryUsePressOwner != ESecondaryUsePressOwner::None)
+	{
+		return;
+	}
+	if ((PlayerComputerUse && PlayerComputerUse->IsCapturingInput())
+		|| (PlayerFacilityPlacement && PlayerFacilityPlacement->IsPlacementActive())
+		|| (PlayerHeldTargetUse && PlayerHeldTargetUse->IsUseActive())
+		|| (PlayerEquipmentUse && PlayerEquipmentUse->HasUsableHeldEquipment()))
+	{
+		SecondaryUsePressOwner = ESecondaryUsePressOwner::Ignored;
+		return;
+	}
+
+	SecondaryUsePressOwner = ESecondaryUsePressOwner::HeldTargetUse;
+	if (PlayerHeldTargetUse)
+	{
+		PlayerHeldTargetUse->BeginUse(EPlayerHeldTargetUseDirection::Take);
+	}
+}
+
+void AFirstPersonCharacter::SecondaryUseEndInput()
+{
+	const ESecondaryUsePressOwner PreviousOwner = SecondaryUsePressOwner;
+	SecondaryUsePressOwner = ESecondaryUsePressOwner::None;
+	if (PreviousOwner == ESecondaryUsePressOwner::HeldTargetUse && PlayerHeldTargetUse)
+	{
+		PlayerHeldTargetUse->EndUse();
 	}
 }
 

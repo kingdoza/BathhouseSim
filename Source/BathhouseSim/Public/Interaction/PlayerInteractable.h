@@ -18,6 +18,16 @@ class BATHHOUSESIM_API IPlayerInteractable
 public:
 	virtual FPlayerInteractionQuery QueryInteraction(const FPlayerInteractionContext& Context) const = 0;
 	virtual FPlayerInteractionResult ExecuteInteraction(const FPlayerInteractionContext& Context) = 0;
+	virtual FPlayerInteractionResult ExecuteHeldTargetUse(
+		const FPlayerInteractionContext& Context,
+		EPlayerHeldTargetUseDirection Direction)
+	{
+		return FPlayerInteractionResult::Failed(
+			FText::GetEmpty(),
+			Direction == EPlayerHeldTargetUseDirection::Apply
+				? EPlayerInteractionIntent::HeldApply
+				: EPlayerInteractionIntent::HeldTake);
+	}
 	virtual FPlayerInteractionResult ExecuteSecondaryInteraction(const FPlayerInteractionContext& Context)
 	{
 		return FPlayerInteractionResult::Failed(

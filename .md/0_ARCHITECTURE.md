@@ -2,8 +2,8 @@
 
 ## 문서 기준
 
-- 기준일: 2026-09-28(KST), 상점 확장 통합 승인, 설비 회수 아이템 scale 읽기 수정 설계 반영
-- 상태: 보일러 노동 수직은 완료·승인됐다. 쿨러·순환기 확장은 Source 구현 뒤 통합 승인 전이다. 컴퓨터 포커스 수정은 구현됐다. 상점 주문·배송 상자·쓰레기통 수직(샤워기)은 2026-09-28 구현됐다(`94f0f11`). 같은 날 상점 확장(7종 판매·개봉 물품 흩어짐·배송 상자 scale 정책)이 구현되고 사용자가 통합 승인했다. 설비 회수 아이템 scale 읽기 수정(Placement)은 설계만 확정됐다.
+- 기준일: 2026-09-28(KST), 들고 있는 물건 조작 LMB·RMB 통일(held-use) 설계 반영
+- 상태: 보일러 노동 수직은 완료·승인됐다. 쿨러·순환기 확장은 Source 구현 뒤 통합 승인 전이다. 컴퓨터 포커스 수정은 구현됐다. 상점 주문·배송 상자·쓰레기통 수직(샤워기)은 2026-09-28 구현됐다(`94f0f11`). 같은 날 상점 확장(7종 판매·개봉 물품 흩어짐·배송 상자 scale 정책)이 구현되고 사용자가 통합 승인했다. 설비 회수 아이템 scale 읽기 수정(Placement)은 구현됐다. 들고 있는 물건 조작 LMB·RMB 통일은 설계만 확정됐다.
 - 정본 문서: `.md/0_ARCHITECTURE.md`와 `.md/Architecture/*.md`
 
 ## 분석 범위
@@ -37,6 +37,7 @@
 - [CharacterSystem.md](Architecture/CharacterSystem.md): 1인칭 입력, 컨트롤러 입력 매핑, 이동, 점프, sprint, 캐릭터 조립
 - [CameraSystem.md](Architecture/CameraSystem.md): 이동/착지 기반 카메라 셰이크, camera manager 기반 pitch limit
 - [InteractionSystem.md](Architecture/InteractionSystem.md): camera trace, primary/secondary intent와 equipment-use routing
+- [HeldTargetUseSystem.md](Architecture/HeldTargetUseSystem.md): 들고 있는 물건의 LMB Apply·RMB Take, 입력 소유, 연속 실행과 HUD 데이터
 - [PhysicalCarrySystem.md](Architecture/PhysicalCarrySystem.md): exact fixed slot, held-position free drop와 fixed-slot 미지원 설비 아이템
 - [FacilitySystem.md](Architecture/FacilitySystem.md): 다중 facility slot, transform 기반 counter queue assignment, checkout overflow와 key drop point
 - [BathWaterSystem.md](Architecture/BathWaterSystem.md): 욕탕 급수·배수, 평면 수면 표현, 공통 입욕 임계치와 Customer BathLoop 연계
@@ -44,7 +45,7 @@
 - [PlacementSystem.md](Architecture/PlacementSystem.md): 배치 설비와 전용 회수 아이템 변환, preview/Q 회수와 locker capacity lease
 - [EconomySystem.md](Architecture/EconomySystem.md): PlayerState wallet과 일회성 cash 획득
 - [CustomerSystem.md](Architecture/CustomerSystem.md): UE 5.8 StateTree customer routine, session과 cleanup
-- [UISystem.md](Architecture/UISystem.md): native Widget/Widget Blueprint 경계와 E/F/LMB interaction prompt 계약
+- [UISystem.md](Architecture/UISystem.md): native Widget/Widget Blueprint 경계와 E/LMB/RMB interaction prompt 계약
 - [CleaningSystem.md](Architecture/CleaningSystem.md): water stain spawn, wet mop hold cleaning과 presentation
 - [TowelSystem.md](Architecture/TowelSystem.md): towel circulation, atomic transfer, overflow와 processing machine
 - [TowelPresentationSystem.md](Architecture/TowelPresentationSystem.md): towel quantity mesh profile과 Stack/Pile/Slot world presentation
@@ -118,7 +119,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - Camera는 owner의 이동 상태, sprint 상태, falling/landing 상태를 읽고 camera shake 재생/중단을 결정한다.
 - Camera는 player camera manager를 통해 상하 시야각 제한 기본값을 제공하고, Blueprint 파생 class에서 값을 조정할 수 있게 한다.
 - Camera는 비로컬 플레이어에서 Tick interval 조정과 shake 중단으로 비용을 줄인다.
-- Character는 E/F/G/Q, LCtrl/MouseWheel과 범용 LMB를 의도로 전달한다. LMB owner는 `Computer > Placement > Equipment` 순서이며 Character가 domain 상태를 변경하지 않는다.
+- Character는 E/F/G/Q, LCtrl/MouseWheel과 범용 LMB·RMB를 의도로 전달한다. LMB owner는 `Computer > Placement > Equipment(장비) > HeldTargetUse` 순서, RMB는 HeldTargetUse Take이며 Character가 domain 상태를 변경하지 않는다. 들고 있는 물건으로 대상에 하는 일은 LMB(물건 → 대상)·RMB(대상 → 물건), 손으로 하는 일은 E, 내려놓기는 G다. F는 예약이다.
 - Interaction은 camera trace, equipment/placement/recovery prompt 합성과 held motion 표현을 소유한다. Physical Carry는 key/wet mop/towel basket/monkey wrench/전용 설비 아이템 중 하나의 held state, exact fixed slot과 free-drop transaction을 소유한다.
 - 모든 일반 carryable은 별도 예외가 없으면 G free drop과 exact assigned fixed slot을 지원한다. 전용 설비 아이템은 명시적 `FreeDrop` 전용 예외이며, free drop은 actual held pose에서 질량 무시 약한 velocity change로 시작하고 free-world item은 Pawn을 무시하며 CCD를 사용한다.
 - Facility는 다중 use slot, check-in/checkout 독립 FIFO와 revision을 소유한다. queue point는 Location/Yaw 전체를 사용하고 checkout visible capacity를 넘은 entry는 같은 FIFO 순번을 유지한 채 전용 NavMesh volume assignment를 받는다.
@@ -213,4 +214,5 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - Bath Water 수직과 Operations 용량 설비, condition, flow mixing, actual-bather 연계, management Widget은 Source/focused automation까지 구현돼 Editor 통합 대기다. deficit no-op transaction, 실제 네-corner 지도 투영, child presentation cache와 utility/bath actor transaction 회귀는 `.md/PROMPT_IMPLEMENTATION_R.md` 기준으로 보강됐다.
 - 보일러 노동 수직(Operation, 삽·석탄 공급함, 투입 Volume·문, 계기, 설치/가동 용량, 회수 잔량 보존)은 구현·승인됐다. 2026-09-26 설계로 labor·fuel intermediate class, 쿨러·드라이아이스, 순환기 레버, native `GaugeFace` 삭제와 legacy 항상 공급 제거가 추가되며 `.md/PROMPT_IMPLEMENTATION.md`가 다음 Source 입력이다.
 - 상점(ShopSystem): 수직(`94f0f11`)과 확장 모두 구현·통합 승인(2026-09-28).
-- 설비 회수 아이템 scale 읽기 수정(PlacementSystem): 2026-09-28 설계 확정, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
+- 설비 회수 아이템 scale 읽기 수정(PlacementSystem): 2026-09-28 구현(`72f85ec`).
+- 들고 있는 물건 조작 LMB·RMB 통일(HeldTargetUseSystem): 2026-09-28 설계 확정, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.

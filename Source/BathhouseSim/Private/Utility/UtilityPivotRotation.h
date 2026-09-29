@@ -4,7 +4,7 @@
 
 class USceneComponent;
 
-/** Preserves an authored pivot baseline while applying a local axis-angle presentation. */
+/** Preserves an authored pivot baseline (the component template pose when one exists) while applying a local axis-angle presentation. */
 class FUtilityPivotRotation
 {
 public:

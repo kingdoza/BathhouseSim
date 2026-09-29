@@ -1,85 +1,58 @@
-# Unreal Editor 인계 — 상점 확장
+# Unreal Editor 인계 — held target use
 
-## 현재 상태와 단계
+## 단계와 현재 상태
 
-- R1/P3 구현 후 UE 5.8 Editor 빌드, Shop 집중 자동화 11/11, 전체 회귀 69/69(실패 0)가 통과했다. 전체 회귀는 경고가 있는 성공 7건을 포함한다.
-- Physics gate는 코드 리뷰에서 통과했고 이번 Editor 작업 대기는 해제됐다. 요청 D=2/8/20의 실제 초기 깊이는 2/8/15cm, 최고 분리 속도는 9.319/40.096/22.022cm/s이며 D20>D2와 닫힌 방 정착을 통과 근거로 삼았다. 세 값의 단조 증가는 확인하지 않았다.
-- MCP로 `DA_ShopCatalog`의 Shower를 보존하고 6종을 추가해 개별 저장했다. `BP_ShopDeliveryBox`의 root scale과 `HeldTransform`을 authoring하고 warnings-as-errors Compile 및 개별 저장을 마쳤다.
-- Project Settings의 Catalog, DeliveryBoxClass, UnboxOverlapDepthCm=8은 이미 계약값이었다. Config는 변경하지 않았다. WBP hierarchy는 현재 MCP에서 읽을 수 없어 수정하지 않았다.
-- 저장 후 새 Editor PID 24300은 Turnkey SDK 확인 지점에서 10분간 로그·MCP 포트가 진행되지 않아 종료했다. 새 프로세스 reload는 미완료다. 저장된 값과 같은 세션 readback을 fresh-process 확인으로 간주하지 않는다.
-- 사용자 지시에 따라 PIE와 명시적 Data Validation은 실행하지 않았다. 이번 저장에서 엔진 로그의 `AssetCheck: Validating asset` 메시지가 발생했으나 별도 Data Validation 실행 결과로 취급하지 않는다.
-- Content 변경은 `DA_ShopCatalog`과 `BP_ShopDeliveryBox` 두 자산뿐이다. Config, Level, WBP는 변경하지 않았다. load gate 임시 BP 사본은 제거했고 원본 백업 SHA-256은 `193B9701268E607C9574F4E12E0BA1B3F173C967F052A84C42CF4DE4561047D7` 그대로다.
+- C++ 구현·UE 5.8 build·copy-first load gate·Automation 검증은 성공했다. 총 74개 전체 회귀: 성공 68, 경고 포함 성공 6, 실패 0, 미실행 0.
+- C++ 구현 단계에서는 Content/Config/Level을 저장하지 않았고, 그 단계 시작 시 BP_FirstPersonCharacter/WBP_InteractionPrompt의 원본 hash가 같았다. 이후 MCP Editor authoring에서 IA_SecondaryUse와 BP_FirstPersonCharacter를 저장했다.
+- 2026-09-28 MCP 작업 결과: IA_SecondaryUse 생성·Boolean 설정·개별 저장 완료. BP_FirstPersonCharacter의 SecondaryUseAction 설정·개별 저장 완료. IMC_FirstPerson의 RMB mapping과 WBP_InteractionPrompt hierarchy는 MCP 도구 한계로 미완료다.
+- 사용자가 제외한 PIE와 검증은 수행하지 않았다. Compile, Data Validation, 새 Editor 프로세스 reload도 수행하지 않았으며 완료로 표시하지 않는다.
+- 작업용 백그라운드 Editor는 MCP 작업 후 종료했고, 종료 확인 시 UnrealEditor 프로세스와 8000 listener가 없었다.
+- Save allowlist: 아래 IA_SecondaryUse, IMC_FirstPerson, BP_FirstPersonCharacter, WBP_InteractionPrompt만 계약에 필요한 변경이 있을 때 각각 개별 저장한다. Config와 Level은 저장하지 않는다.
 
-## 완료된 Source 검증
+## Input Action 및 Mapping Context
 
-| 확인 | 실제 결과 |
+| Asset | 현재 위치·상태 | authoring |
+|---|---|---|
+| Input Action | /Game/Input/Actions/IA_SecondaryUse 생성, Boolean, trigger/modifier 없음, 개별 Save 완료. 기존 /Game/Input/Actions/IA_SecondaryInteract는 F 계약으로 유지했다. | 완료. Compile·검증·reload는 제외 지시에 따라 미수행이다. |
+| Mapping Context | /Game/Input/IMC_FirstPerson. MCP readback에서 유효 mapping 8개를 확인했다. `defaultKeyMappings`에는 기존 유효 row 15개와 끝의 빈 None/None row가 있었다. | 미완료. ObjectTools 배열 편집은 모호한 삽입·삭제 오류로 거부됐다. 기존 mapping을 보존하고 RightMouseButton → IA_SecondaryUse를 추가하며 빈 row를 제거해야 한다. 이번 작업에서 수정·Save하지 않았다. 시작 시점부터 Git 변경 상태였으므로 이번 변경으로 귀속하지 않는다. |
+
+Input Action은 저장했지만 IMC mapping은 도구 오류로 미완료다. IMC를 수정·Save하지 않았으므로 이 단계의 입력 연결은 완료되지 않았다.
+
+## Character Blueprint
+
+- Asset: /Game/FirstPersonCharacter/BP_FirstPersonCharacter
+- Parent는 /Script/BathhouseSim.FirstPersonCharacter로 유지한다.
+- Class Defaults의 SecondaryUseAction에 /Game/Input/Actions/IA_SecondaryUse를 지정한다.
+- PrimaryUseAction, InteractAction, SecondaryInteractAction의 기존 asset 참조는 그대로 둔다.
+- PlayerHeldTargetUse default subobject 이름과 RepeatIntervalSeconds 0.15를 유지한다. interval을 조정하는 별도 지시가 없으므로 기본값은 변경하지 않는다.
+- SecondaryUseAction 참조를 설정하고 BP를 개별 Save했다. Blueprint Compile과 새 Editor 프로세스 reload는 사용자의 검증 제외 지시에 따라 미수행이다. PrimaryUseAction, InteractAction, SecondaryInteractAction은 유지했다.
+
+## Interaction Prompt Widget Blueprint
+
+- Asset: /Game/Bathhouse/UI/WBP_InteractionPrompt
+- Existing native parent와 기존 필수 BindWidget 이름·타입을 보존한다: PromptRoot, TargetNameText, ActionNameText, FailureReasonText, SecondaryActionNameText, SecondaryFailureReasonText, InteractionProgressBar, EquipmentActionNameText, EquipmentFailureReasonText, EquipmentProgressBar, PlacementActionNameText, PlacementFailureReasonText, RecoveryActionNameText, RecoveryFailureReasonText, RecoveryProgressBar.
+- 다음 다섯 TextBlock을 정확한 이름으로 추가해 적절한 키 행에 배치한다: HeldTakeActionNameText, HeldTakeFailureReasonText, PrimaryKeyText, LmbKeyText, RmbKeyText. Native BindWidgetOptional이므로 표시의 visibility/enabled 상태는 C++가 관리한다.
+- 새 Event Graph gameplay logic은 추가하지 않는다. E 행은 action name이 없을 때 접히고, equipment가 없으면 LMB는 held Apply를 표시한다. RMB는 held Take와 해당 방향 실패 이유를 표시한다. F는 held target use에 쓰지 않는다. 기존 고정 E/LMB/RMB 글자가 중복되면 정리하고 native key label과 중복되지 않게 한다.
+- 현재 MCP에는 WidgetTree/hierarchy authoring tool이 없어 다섯 TextBlock을 추가하지 못했다. WBP는 수정·Save하지 않았다. Compile과 새 Editor reload도 검증 제외 지시에 따라 미수행이다.
+
+## PIE 수용 시나리오
+
+사용자 지시에 따라 이번 Editor 작업에서는 PIE 및 검증을 수행하지 않는다. 아래는 후속 수용 기준이며 이번 단계의 실행 결과가 아니다.
+
+| CTRL | 직접 확인 |
 |---|---|
-| UE 5.8 BathhouseSimEditor Win64 Development | Build.bat 성공 |
-| 복사본 load gate | Template_Default에서 1/1 성공, 이후 복사본 제거 |
-| 원본 load gate | Template_Default 1/1 성공 |
-| 원본 load gate | /Game/Maps/DefaultMap 1/1 성공 |
-| Shop focused automation | 11 total, 11 pass, 0 warning, 0 fail, 0 notRun |
-| physics endpoint gate | sanity pass; effective D=2/8/15cm, D20 peak 22.022 > D2 9.319cm/s; intermediate D8 peak is higher, so monotonic trend remains unverified |
-| 전체 Automation RunTests BathhouseSim | 69 total, 62 success, 7 success with warnings, 0 fail, 0 notRun |
+| 003 | Boiler/Cooler 투입구 조준 시 문 안내가 LMB 가능 상태와 함께 보이고, LMB Apply만 연료를 넣으며 기존 clamp/refusal이 유지된다. |
+| 010, 011, 014 | RMB Take 및 LMB Apply를 누르고 있을 때 약 0.15초 단위로 수건 1장씩 이동한다. 통/바구니가 비거나 대상이 차면 멈춘다. |
+| 019 | RMB 반복 중 target을 바꾸면 focus 이탈 시 멈추고 새 target에서 자동 재개되지 않는다. release 후 다시 누르면 새 반복이 시작된다. |
+| 020 | 반복 중 basket drop 또는 Computer 진입 시 즉시 중단된다. 먼저 이동된 수건은 유지된다. |
+| 025 | 여러 target/state에서 E/LMB/RMB key label, 가능한 action, 방향별 failure, empty E 행 접힘, target 이름과 F 비표시를 확인한다. |
+| 026 | Monkey wrench, mop, delivery box 등 equipment/held item에서 기존 LMB 사용은 유지되고 RMB는 held target use를 시작하지 않는다. |
+| 027 | Computer 입력 capture와 placement mode가 각각 LMB/RMB held-use보다 우선한다. |
 
-세 load gate 자동화 보고서에는 경고·실패가 없었다. BP native parent, BoxMesh root, CDO 양수 finite root scale 및 HeldTransform property가 확인됐다. Fatal, asset load failure 또는 Serial size mismatch는 확인되지 않았다.
+추가로 CTRL-001~018의 supply, intake, shelf/bin/machine/floor towel 방향과 수량, CTRL-021/022/028의 기존 E·F 동작 보존을 실제 입력으로 표본 확인한다. Full automation은 해당 source 경로를 검사했지만 화면/입력 수용을 대신하지 않는다.
 
-백업은 Saved/MigrationBackup/20260928_shop_ext/BP_ShopDeliveryBox.uasset에 보관했다. SHA-256: 193B9701268E607C9574F4E12E0BA1B3F173C967F052A84C42CF4DE4561047D7.
+## 완료 후 기록
 
-## 후속 Editor authoring 계약
-
-아래는 기존 승인 범위의 Editor authoring 계약이다. 이번 실행에서 Catalog와 Blueprint를 authoring·저장하고 Compile했으며, 새 프로세스 reload는 미완료다. PIE와 명시적 Data Validation은 사용자 지시로 제외했다.
-
-### Catalog와 상품
-
-- Asset: /Game/Bathhouse/Data/Shop/DA_ShopCatalog (DA_ShopCatalog). 기존 Shower entry를 보존한다.
-- Bath, Washer, Dryer, Boiler, Cooler, Circulator 6개 entry를 추가한다. 각 entry의 ProductId는 영문 고유 ID, bForSale=true, DisplayName은 해당 설비명, PlacementDefinition은 아래 기존 Definition을 연결한다. 가격은 양의 정수로 Editor에서 결정한다. Icon은 선택이다.
-- Definition asset 경로:
-  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Bath
-  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Washer
-  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Dryer
-  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler
-  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Cooler
-  - /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Circulator
-  - 기존 Shower: /Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Shower
-- Save allowlist: DA_ShopCatalog만 해당 변경이 있을 때 개별 저장한다. Data Validation에서 중복 ID, 양수 가격, discard tag와 locker 조건을 확인한다.
-- 현재 결과: Shower 항목을 유지하고 Bath, Washer, Dryer, Boiler, Cooler, Circulator를 순서대로 추가했다. ID는 각 영문 설비명, 표시 이름은 욕조·세탁기·건조기·보일러·쿨러·순환기, 모두 판매 중·가격 10,000·Icon 없음이며 각각 대응 Definition을 참조한다. Catalog 개별 Save 성공. Data Validation은 사용자 지시로 실행하지 않았다.
-
-### 배송 상자 Blueprint
-
-- Asset: /Game/Bathhouse/Blueprints/Shop/BP_ShopDeliveryBox.
-- Parent: AShopDeliveryBoxActor (/Script/BathhouseSim.ShopDeliveryBoxActor). BoxMesh가 root이고 유효한 cube mesh를 유지한다.
-- BoxMesh Relative Location/Rotation은 zero, Relative Scale은 (0.8, 0.8, 0.8)로 authoring한다. Collision은 QueryAndPhysics, CCD On, Pawn Ignore를 확인한다. Native validation은 모든 축의 양수 finite scale을 허용한다.
-- HeldTransform: Translation (10, 50, -60), Rotation identity, Scale (1, 1, 1). Runtime은 scale을 무시하므로 표시 위치/회전만 조정한다.
-- Save allowlist: CDO/default를 실제로 바꾼 경우 BP_ShopDeliveryBox만 개별 저장한다. Parent 변경·새 component·Blueprint logic은 추가하지 않는다.
-- 현재 결과: 기존 parent `/Script/BathhouseSim.ShopDeliveryBoxActor`와 BoxMesh root·메시 참조·충돌 설정을 보존했다. BoxMesh relative location/rotation은 0, scale은 0.8, QueryAndPhysics·CCD·Pawn Ignore다. HeldTransform은 계약값이다. Compile 및 개별 Save 성공. 새 프로세스 reload는 미완료다.
-
-### Project Settings와 UI
-
-- Project Settings > Bathhouse Shop에서 Catalog=DA_ShopCatalog, DeliveryBoxClass=BP_ShopDeliveryBox를 확인한다. UnboxOverlapDepthCm 기본값은 8cm이며 허용 범위는 0~50cm다. Config 저장이 필요하면 Editor의 정상 Save Config 흐름으로 Config/DefaultGame.ini만 저장한다.
-- 현재 결과: CDO와 `Config/DefaultGame.ini`에서 Catalog/DeliveryBoxClass 참조 및 기본값 8을 확인했다. 모두 이미 일치해 Config는 저장하지 않았다.
-- WBP: /Game/Bathhouse/UI/Shop/WBP_ShopScreen, parent UShopScreenWidget. ProductScroll만 상품 목록을 세로 스크롤하고 cart/order panel은 그 바깥 형제로 남아 항상 보이는지 확인한다.
-- WBP hierarchy가 계약과 일치하면 수정/저장하지 않는다. 필요한 경우에도 승인된 layout 조정만 하고 Save allowlist에 WBP_ShopScreen을 추가한다. Domain 상태, 가격 계산, 입력·상점 로직은 Blueprint로 옮기지 않는다.
-- 현재 결과: parent는 `/Script/BathhouseSim.ShopScreenWidget`으로 확인했다. MCP toolset에 Widget tree 조회·편집 기능이 없고 `WidgetTree`를 generic object query로 읽지 못해 ProductScroll·cart/order 계층은 미확인이다. WBP는 수정·저장하지 않았다.
-
-## Compile, Save, reload 결과
-
-1. UE 5.8 Build와 기존 Shop automation/전체 회귀 gate는 위 표에 기록된 성공 결과를 사용했다. 이번 Editor 단계에서 테스트를 다시 실행하지 않았다.
-2. 변경 Blueprint `BP_ShopDeliveryBox`를 warnings-as-errors로 Compile했다. 오류나 warning 없이 성공 응답을 받았다.
-3. `DA_ShopCatalog`과 `BP_ShopDeliveryBox`를 각각 개별 Save했다. 두 Save 모두 성공 응답과 package 저장 로그를 반환했다. package 경로 기준 두 asset은 dirty=false였다.
-4. 새 Editor PID 24300은 `LogTurnkeySupport`의 SDK 확인 다음 단계로 진행하지 않았다. 10분 동안 `127.0.0.1:8000` listener와 새 Turnkey log가 없었고 Editor log도 갱신되지 않아 task-owned PID를 종료했다. 저장 뒤 fresh-process asset reload는 확인되지 않았다.
-5. 사용자 요청 범위에 따라 Data Validation과 PIE 수용 절차는 실행하지 않았다. 이 항목들을 통과했다고 표시하지 않는다.
-
-## 이번 요청에서 제외한 PIE 수용 절차
-
-이번 실행에서는 사용자 지시에 따라 아래 시나리오를 시작하지 않았다.
-
-| 확인 | 절차와 기대 결과 |
-|---|---|
-| SHOP-018~020, 038~042 | 한 개·혼합 주문을 개봉한다. 정면·벽 앞·사방이 좁은 위치에서 생성물이 벽/천장을 통과하지 않고 guest Pawn을 밀지 않는다. 막힌 경우 안전한 후보 또는 deterministic fallback으로 나온다. |
-| SHOP-032 | 상품 목록을 길게 만든 뒤 ProductScroll을 움직인다. Cart와 order/status 영역은 계속 보인다. |
-| SHOP-034~035, 044 | 7종을 주문·배송·개봉하고 각 fresh-install 아이템을 기존 Placement에 배치한다. 주문 요약과 Definition 참조가 맞고 신규 Boiler operation 잔량은 0이다. |
-| SHOP-043 | Shower 주문으로 overlap depth 2cm, 기본 8cm, 20cm를 비교한다. depth가 커질수록 실제 반발 속도가 강해지는지 확인한다. 튐이 없거나 크기 비교가 성립하지 않으면 depenetration 설정을 바꾸지 말고 멈춘다. |
-| 상자 scale/held pose | delivery spawn, pickup, free drop, last-safe recovery 뒤 root scale이 0.8로 유지되고 HeldTransform 위치/회전만 반영되는지 확인한다. |
-
-저장 후 정본 갱신은 실제 저장 asset의 새 프로세스 reload 근거가 생긴 다음에만 .md/Unreal/ShopSystem.md에 반영한다. 이번 reload는 미완료다. Catalog·BP CDO와 Project Settings는 같은 세션 readback만 있으며 WBP scroll hierarchy와 PIE 결과는 확인하지 않았다.
+- 입력 asset과 Blueprint를 저장했다면 새 Editor 프로세스에서 reload를 확인한 뒤 실제 저장 상태만 .md/Unreal/InteractionUISystem.md에 반영한다.
+- Compile, 개별 Save, reload와 PIE 수행 결과를 .md/PROMPT_INTEGRATION_REVIEW.md에 기록한다. 미확인 시나리오를 통과로 표시하지 않는다.
+- 변경 asset 외에는 Save하지 않는다. 현재 PIE에서 확인되지 않은 기능을 완료로 표시하지 않는다.

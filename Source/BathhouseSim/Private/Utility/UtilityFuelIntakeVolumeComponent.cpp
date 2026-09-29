@@ -30,29 +30,49 @@ FPlayerInteractionQuery UUtilityFuelIntakeVolumeComponent::QueryInteraction(
 	const FText FacilityName = FuelFacility ? FuelFacility->GetFuelFacilityDisplayName() : FText::GetEmpty();
 	const FText FuelName = FuelFacility ? GetUtilityFuelKindDisplayName(FuelFacility->GetAcceptedFuelKind()) : FText::GetEmpty();
 	Query.TargetName = FText::Format(LOCTEXT("IntakeTarget", "{0} 투입구"), FacilityName);
-	Query.ActionName = FText::Format(LOCTEXT("IntakeAction", "{0} 투입"), FuelName);
+	Query.ActionName = FText::GetEmpty();
+	Query.bCanInteract = false;
+	Query.FailureReason = FText::GetEmpty();
+	Query.bHeldApplyVisible = true;
+	Query.HeldApplyActionName = FText::Format(LOCTEXT("IntakeAction", "{0} 투입"), FuelName);
+	Query.HeldApplyActivationMode = EPlayerInteractionActivationMode::Instant;
 	const FUtilityFuelResult Evaluation = FUtilityFuelTransaction::EvaluateInsert(Context, *this);
-	Query.bCanInteract = Evaluation.bSucceeded;
-	Query.FailureReason = Evaluation.FailureReason;
+	Query.bCanHeldApply = Evaluation.bSucceeded;
+	Query.HeldApplyFailureReason = Evaluation.FailureReason;
 	return Query;
 }
 
 FPlayerInteractionResult UUtilityFuelIntakeVolumeComponent::ExecuteInteraction(
 	const FPlayerInteractionContext& Context)
 {
+	return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::Primary);
+}
+
+FPlayerInteractionResult UUtilityFuelIntakeVolumeComponent::ExecuteHeldTargetUse(
+	const FPlayerInteractionContext& Context,
+	const EPlayerHeldTargetUseDirection Direction)
+{
+	const EPlayerInteractionIntent Intent = Direction == EPlayerHeldTargetUseDirection::Apply
+		? EPlayerInteractionIntent::HeldApply
+		: EPlayerInteractionIntent::HeldTake;
+	if (Direction != EPlayerHeldTargetUseDirection::Apply)
+	{
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), Intent);
+	}
 	AUtilityShovelActor* Shovel = Context.CarryComponent
 		? Cast<AUtilityShovelActor>(Context.CarryComponent->GetHeldObject())
 		: nullptr;
 	if (!IsValid(Shovel))
 	{
 		return FPlayerInteractionResult::Failed(
-			LOCTEXT("InsertNeedsShovel", "삽을 들고 있어야 합니다."));
+			LOCTEXT("InsertNeedsShovel", "삽을 들고 있어야 합니다."),
+			Intent);
 	}
 
 	const FUtilityFuelResult Result = FUtilityFuelTransaction::Insert(*Shovel, *this, Context);
 	return Result.bSucceeded
-		? FPlayerInteractionResult::Succeeded()
-		: FPlayerInteractionResult::Failed(Result.FailureReason);
+		? FPlayerInteractionResult::Succeeded(Intent)
+		: FPlayerInteractionResult::Failed(Result.FailureReason, Intent);
 }
 
 void UUtilityFuelIntakeVolumeComponent::NotifyInteractionFocusChanged(
@@ -61,7 +81,9 @@ void UUtilityFuelIntakeVolumeComponent::NotifyInteractionFocusChanged(
 {
 	if (IsValid(FuelDoorPresentation))
 	{
-		FuelDoorPresentation->SetSourceInsertable(&Source, Query.bVisible && Query.bCanInteract);
+		FuelDoorPresentation->SetSourceInsertable(
+			&Source,
+			Query.bHeldApplyVisible && Query.bCanHeldApply);
 	}
 }
 

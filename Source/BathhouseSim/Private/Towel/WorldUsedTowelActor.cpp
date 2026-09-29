@@ -6,6 +6,7 @@
 #include "Towel/TowelCirculationSubsystem.h"
 #include "Towel/TowelInventoryComponent.h"
 #include "Towel/TowelTransferSubsystem.h"
+#include "Towel/TowelHeldTransferRules.h"
 
 #define LOCTEXT_NAMESPACE "WorldUsedTowelActor"
 
@@ -56,15 +57,19 @@ FPlayerInteractionQuery AWorldUsedTowelActor::QueryInteraction(const FPlayerInte
 	}
 	Query.bVisible = true;
 	Query.TargetName = LOCTEXT("UsedTowel", "사용한 수건");
-	Query.ActionName = LOCTEXT("CollectUsedTowel", "수건 줍기");
 	const ATowelBasketActor* Basket = Context.CarryComponent
 		? Cast<ATowelBasketActor>(Context.CarryComponent->GetHeldObject())
 		: nullptr;
-	Query.bCanInteract = Basket && Basket->GetInventory()->CanAccept(ETowelState::Used);
-	if (!Query.bCanInteract)
-	{
-		Query.FailureReason = LOCTEXT("UsedBasketRequired", "비어 있거나 사용한 수건용 바구니가 필요합니다.");
-	}
+	const FTowelInventorySnapshot BasketSnapshot = Basket && Basket->GetInventory()
+		? Basket->GetInventory()->GetSnapshot()
+		: FTowelInventorySnapshot();
+	const FTowelHeldTransferQuery HeldUseQuery = FTowelHeldTransferRules::Build(
+		ETowelHeldTransferTargetKind::WorldUsedTowel,
+		Query.TargetName,
+		Inventory ? Inventory->GetSnapshot() : FTowelInventorySnapshot(),
+		Basket && Basket->GetInventory(),
+		BasketSnapshot);
+	FTowelHeldTransferRules::ApplyToQuery(Query, HeldUseQuery);
 	return Query;
 }
 
@@ -81,14 +86,39 @@ void AWorldUsedTowelActor::CommitStagedToken()
 
 FPlayerInteractionResult AWorldUsedTowelActor::ExecuteInteraction(const FPlayerInteractionContext& Context)
 {
+	return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::Primary);
+}
+
+FPlayerInteractionResult AWorldUsedTowelActor::ExecuteHeldTargetUse(
+	const FPlayerInteractionContext& Context,
+	const EPlayerHeldTargetUseDirection Direction)
+{
+	const EPlayerInteractionIntent Intent = Direction == EPlayerHeldTargetUseDirection::Apply
+		? EPlayerInteractionIntent::HeldApply
+		: EPlayerInteractionIntent::HeldTake;
+	const FPlayerInteractionQuery Query = QueryInteraction(Context);
+	if (Direction != EPlayerHeldTargetUseDirection::Take || !Query.bCanHeldTake)
+	{
+		const FText& FailureReason = Direction == EPlayerHeldTargetUseDirection::Apply
+			? Query.HeldApplyFailureReason
+			: Query.HeldTakeFailureReason;
+		return FPlayerInteractionResult::Failed(FailureReason, Intent);
+	}
+
 	ATowelBasketActor* Basket = Context.CarryComponent
 		? Cast<ATowelBasketActor>(Context.CarryComponent->GetHeldObject())
 		: nullptr;
-	UTowelTransferSubsystem* Transfer = GetWorld()->GetSubsystem<UTowelTransferSubsystem>();
-	if (!Basket || !Transfer || !bTokenCommitted || bConsumed)
+	UTowelTransferSubsystem* Transfer = GetWorld()
+		? GetWorld()->GetSubsystem<UTowelTransferSubsystem>()
+		: nullptr;
+	if (!Basket || !Transfer || !bTokenCommitted || bConsumed
+		|| !Inventory || !Basket->GetInventory())
 	{
-		return FPlayerInteractionResult::Failed(LOCTEXT("CollectFailed", "수건을 주울 수 없습니다."));
+		return FPlayerInteractionResult::Failed(
+			LOCTEXT("CollectFailed", "수건을 주울 수 없습니다."),
+			Intent);
 	}
+
 	FTowelTransferRequest Request;
 	Request.Source = Inventory;
 	Request.Destination = Basket->GetInventory();
@@ -98,12 +128,14 @@ FPlayerInteractionResult AWorldUsedTowelActor::ExecuteInteraction(const FPlayerI
 	const FTowelTransferResult Result = Transfer->TryTransfer(Request);
 	if (!Result.bSucceeded)
 	{
-		return FPlayerInteractionResult::Failed(LOCTEXT("CollectFailed", "수건을 주울 수 없습니다."));
+		return FPlayerInteractionResult::Failed(
+			LOCTEXT("CollectFailed", "수건을 주울 수 없습니다."),
+			Intent);
 	}
 	bConsumed = true;
 	WorldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SetLifeSpan(0.05f);
-	return FPlayerInteractionResult::Succeeded();
+	return FPlayerInteractionResult::Succeeded(Intent);
 }
 
 #undef LOCTEXT_NAMESPACE

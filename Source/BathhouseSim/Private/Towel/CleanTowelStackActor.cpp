@@ -6,6 +6,7 @@
 #include "Towel/TowelInventoryComponent.h"
 #include "Towel/Presentation/TowelStackVisualComponent.h"
 #include "Towel/TowelTransferSubsystem.h"
+#include "Towel/TowelHeldTransferRules.h"
 
 #define LOCTEXT_NAMESPACE "CleanTowelStackActor"
 
@@ -37,33 +38,23 @@ FPlayerInteractionQuery ACleanTowelStackActor::QueryInteraction(const FPlayerInt
 	{
 		return ABathhouseFacilityActor::QueryInteraction(Context);
 	}
+
 	FPlayerInteractionQuery Query;
 	Query.bVisible = true;
 	Query.TargetName = LOCTEXT("CleanStack", "깨끗한 수건 선반");
-	Query.ActionName = LOCTEXT("DepositOne", "수건 한 장 놓기");
-	Query.bSecondaryVisible = true;
-	Query.SecondaryActionName = LOCTEXT("DepositMax", "가능한 만큼 놓기");
 	const ATowelBasketActor* Basket = Context.CarryComponent
 		? Cast<ATowelBasketActor>(Context.CarryComponent->GetHeldObject())
 		: nullptr;
-	if (!Basket)
-	{
-		Query.FailureReason = LOCTEXT("CleanBasketRequired", "깨끗한 수건 바구니가 필요합니다.");
-		Query.SecondaryFailureReason = Query.FailureReason;
-		return Query;
-	}
-	const FTowelInventorySnapshot BasketSnapshot = Basket->GetInventory()->GetSnapshot();
-	const FTowelInventorySnapshot StackSnapshot = Inventory->GetSnapshot();
-	Query.bCanInteract = BasketSnapshot.State == ETowelState::Clean && BasketSnapshot.Count > 0
-		&& StackSnapshot.Count < StackSnapshot.Capacity;
-	Query.bCanSecondaryInteract = Query.bCanInteract;
-	if (!Query.bCanInteract)
-	{
-		Query.FailureReason = BasketSnapshot.Count <= 0
-			? LOCTEXT("BasketEmpty", "바구니가 비어 있습니다.")
-			: LOCTEXT("CleanStateOrCapacity", "깨끗한 수건만 놓을 수 있거나 선반이 가득 찼습니다.");
-		Query.SecondaryFailureReason = Query.FailureReason;
-	}
+	const FTowelInventorySnapshot BasketSnapshot = Basket && Basket->GetInventory()
+		? Basket->GetInventory()->GetSnapshot()
+		: FTowelInventorySnapshot();
+	const FTowelHeldTransferQuery HeldUseQuery = FTowelHeldTransferRules::Build(
+		ETowelHeldTransferTargetKind::CleanShelf,
+		Query.TargetName,
+		Inventory ? Inventory->GetSnapshot() : FTowelInventorySnapshot(),
+		Basket && Basket->GetInventory(),
+		BasketSnapshot);
+	FTowelHeldTransferRules::ApplyToQuery(Query, HeldUseQuery);
 	return Query;
 }
 
@@ -74,44 +65,66 @@ FPlayerInteractionResult ACleanTowelStackActor::ExecuteInteraction(const FPlayer
 	{
 		return ABathhouseFacilityActor::ExecuteInteraction(Context);
 	}
-	return TransferFromHeldBasket(Context, 1, EPlayerInteractionIntent::Primary);
+	return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::Primary);
 }
 
-FPlayerInteractionResult ACleanTowelStackActor::ExecuteSecondaryInteraction(const FPlayerInteractionContext& Context)
+FPlayerInteractionResult ACleanTowelStackActor::ExecuteHeldTargetUse(
+	const FPlayerInteractionContext& Context,
+	const EPlayerHeldTargetUseDirection Direction)
 {
-	return TransferFromHeldBasket(Context, MAX_int32, EPlayerInteractionIntent::Secondary);
+	return TransferFromHeldBasket(Context, Direction);
 }
 
 FPlayerInteractionResult ACleanTowelStackActor::TransferFromHeldBasket(
 	const FPlayerInteractionContext& Context,
-	const int32 RequestedCount,
-	const EPlayerInteractionIntent Intent)
+	const EPlayerHeldTargetUseDirection Direction)
 {
+	const EPlayerInteractionIntent Intent = Direction == EPlayerHeldTargetUseDirection::Apply
+		? EPlayerInteractionIntent::HeldApply
+		: EPlayerInteractionIntent::HeldTake;
 	if (GetFacilityPlacementComponent()
 		&& !GetFacilityPlacementComponent()->IsPlacedDomainActive())
 	{
-		return FPlayerInteractionResult::Failed(
-			LOCTEXT("CleanStackInactive", "설치가 완료된 수건 선반만 사용할 수 있습니다."),
-			Intent);
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), Intent);
 	}
+
+	const FPlayerInteractionQuery Query = QueryInteraction(Context);
+	const bool bCanTransfer = Direction == EPlayerHeldTargetUseDirection::Apply
+		? Query.bCanHeldApply
+		: Query.bCanHeldTake;
+	const FText& FailureReason = Direction == EPlayerHeldTargetUseDirection::Apply
+		? Query.HeldApplyFailureReason
+		: Query.HeldTakeFailureReason;
+	if (!bCanTransfer)
+	{
+		return FPlayerInteractionResult::Failed(FailureReason, Intent);
+	}
+
 	ATowelBasketActor* Basket = Context.CarryComponent
 		? Cast<ATowelBasketActor>(Context.CarryComponent->GetHeldObject())
 		: nullptr;
 	UTowelTransferSubsystem* Transfer = GetWorld()->GetSubsystem<UTowelTransferSubsystem>();
-	if (!Basket || !Transfer)
+	if (!Basket || !Transfer || !Basket->GetInventory() || !Inventory)
 	{
-		return FPlayerInteractionResult::Failed(LOCTEXT("CleanBasketRequired", "깨끗한 수건 바구니가 필요합니다."), Intent);
+		return FPlayerInteractionResult::Failed(
+			LOCTEXT("DepositFailed", "수건을 선반으로 옮길 수 없습니다."),
+			Intent);
 	}
+
 	FTowelTransferRequest Request;
-	Request.Source = Basket->GetInventory();
-	Request.Destination = Inventory;
-	Request.RequestedCount = RequestedCount;
+	Request.Source = Direction == EPlayerHeldTargetUseDirection::Apply
+		? Basket->GetInventory() : Inventory.Get();
+	Request.Destination = Direction == EPlayerHeldTargetUseDirection::Apply
+		? Inventory.Get() : Basket->GetInventory();
+	Request.RequestedCount = 1;
 	Request.ExpectedSourceRevision = Request.Source->GetSnapshot().Revision;
 	Request.ExpectedDestinationRevision = Request.Destination->GetSnapshot().Revision;
 	const FTowelTransferResult Result = Transfer->TryTransfer(Request);
 	return Result.bSucceeded
 		? FPlayerInteractionResult::Succeeded(Intent)
-		: FPlayerInteractionResult::Failed(LOCTEXT("DepositFailed", "수건을 선반으로 옮길 수 없습니다."), Intent);
+		: FPlayerInteractionResult::Failed(
+			LOCTEXT("DepositFailed", "수건을 선반으로 옮길 수 없습니다."),
+			Intent);
 }
 
 #undef LOCTEXT_NAMESPACE

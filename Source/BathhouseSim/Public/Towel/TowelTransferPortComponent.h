@@ -14,11 +14,12 @@ public:
 	UTowelTransferPortComponent();
 	virtual FPlayerInteractionQuery QueryInteraction(const FPlayerInteractionContext& Context) const override;
 	virtual FPlayerInteractionResult ExecuteInteraction(const FPlayerInteractionContext& Context) override;
-	virtual FPlayerInteractionResult ExecuteSecondaryInteraction(const FPlayerInteractionContext& Context) override;
+	virtual FPlayerInteractionResult ExecuteHeldTargetUse(
+		const FPlayerInteractionContext& Context,
+		EPlayerHeldTargetUseDirection Direction) override;
 
 private:
 	FPlayerInteractionResult Transfer(
 		const FPlayerInteractionContext& Context,
-		int32 RequestedCount,
-		EPlayerInteractionIntent Intent);
+		EPlayerHeldTargetUseDirection Direction);
 };

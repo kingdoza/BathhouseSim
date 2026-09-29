@@ -2,6 +2,7 @@
 #include "Tests/UtilityLaborAutomationTestSupport.h"
 #include "Utility/UtilityGaugeComponent.h"
 #include "Utility/UtilityOperationComponent.h"
+#include "Utility/UtilityPivotRotation.h"
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FUtilityLaborOperationAndCapacityTest,
 	"BathhouseSim.Utility.Labor.OperationAndCapacitySplit",
@@ -225,5 +226,167 @@ bool FUtilityLaborOperationAndCapacityTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUtilityPivotRotationRotatedParentLocationTest,
+	"BathhouseSim.Utility.Labor.PivotRotationKeepsExactLocationUnderRotatedParent",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUtilityPivotRotationRotatedParentLocationTest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	FScopedUtilityLaborWorld Scope(TEXT("UtilityPivotRotatedParentWorld"));
+	UWorld* World = Scope.Get();
+	if (!TestNotNull(TEXT("Automation world exists"), World))
+	{
+		return false;
+	}
+	AActor* Owner = World->SpawnActorDeferred<AActor>(
+		AActor::StaticClass(), FTransform::Identity, nullptr, nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!TestNotNull(TEXT("Rotated-parent pivot owner exists"), Owner))
+	{
+		return false;
+	}
+
+	// Mirrors a utility facility authored with a scaled physical root and a rotated SceneRoot.
+	USceneComponent* PhysicalRoot = NewObject<USceneComponent>(Owner, TEXT("PivotDriftPhysicalRoot"));
+	PhysicalRoot->SetRelativeScale3D(FVector(0.5));
+	Owner->SetRootComponent(PhysicalRoot);
+	Owner->AddInstanceComponent(PhysicalRoot);
+	PhysicalRoot->RegisterComponent();
+	USceneComponent* SceneRoot = NewObject<USceneComponent>(Owner, TEXT("PivotDriftSceneRoot"));
+	SceneRoot->SetupAttachment(PhysicalRoot);
+	SceneRoot->SetRelativeRotation(FRotator(0.0, -90.0, 0.0));
+	Owner->AddInstanceComponent(SceneRoot);
+	SceneRoot->RegisterComponent();
+
+	auto CreatePivot = [&](const TCHAR* Name)
+	{
+		USceneComponent* Pivot = NewObject<USceneComponent>(Owner, Name);
+		Pivot->SetupAttachment(SceneRoot);
+		Pivot->SetRelativeLocation_Direct(FVector(500.0, 23.12633895875516, 192.53095578010425));
+		Owner->AddInstanceComponent(Pivot);
+		Pivot->RegisterComponent();
+		return Pivot;
+	};
+	auto DescribeLocation = [](const FVector& Location)
+	{
+		return FString::Printf(TEXT("(%.17g, %.17g, %.17g)"), Location.X, Location.Y, Location.Z);
+	};
+
+	// Control: the raw engine call is the drift source this regression test guards against.
+	USceneComponent* ControlPivot = CreatePivot(TEXT("PivotDriftControlPivot"));
+	const FVector ControlAuthoredLocation = ControlPivot->GetRelativeLocation();
+	ControlPivot->SetRelativeRotation(FQuat(FVector::RightVector, FMath::DegreesToRadians(-30.0)));
+	AddInfo(FString::Printf(TEXT("Raw SetRelativeRotation under rotated parent: authored=%s after=%s drifted=%s"),
+		*DescribeLocation(ControlAuthoredLocation), *DescribeLocation(ControlPivot->GetRelativeLocation()),
+		ControlPivot->GetRelativeLocation() != ControlAuthoredLocation ? TEXT("true") : TEXT("false")));
+
+	USceneComponent* Pivot = CreatePivot(TEXT("PivotDriftPivot"));
+	const FVector AuthoredLocation = Pivot->GetRelativeLocation();
+	auto TestExactLocation = [&](const TCHAR* Step)
+	{
+		TestTrue(FString::Printf(TEXT("%s keeps the authored pivot location bit-exact (authored=%s, actual=%s)"),
+			Step, *DescribeLocation(AuthoredLocation), *DescribeLocation(Pivot->GetRelativeLocation())),
+			Pivot->GetRelativeLocation() == AuthoredLocation);
+	};
+
+	FUtilityPivotRotation PivotRotation;
+	PivotRotation.CaptureBaseline(Pivot);
+	PivotRotation.Apply(Pivot, FVector::RightVector, -30.0f);
+	TestExactLocation(TEXT("Apply"));
+	PivotRotation.Apply(Pivot, FVector::RightVector, -150.0f);
+	TestExactLocation(TEXT("Repeated Apply"));
+	PivotRotation.Reset(Pivot);
+	TestExactLocation(TEXT("Reset"));
+	TestTrue(TEXT("Reset still restores the authored baseline rotation"),
+		Pivot->GetRelativeRotation().Quaternion().Equals(FQuat::Identity, 1.0e-4f));
+	PivotRotation.Apply(Pivot, FVector::RightVector, -90.0f);
+	TestTrue(TEXT("Apply still produces the requested local-axis rotation"),
+		Pivot->GetRelativeRotation().Quaternion().Equals(
+			FQuat(FVector::RightVector, FMath::DegreesToRadians(-90.0f)), 1.0e-4f));
+	TestTrue(TEXT("Pivot world transform matches its preserved relative transform"),
+		Pivot->GetComponentTransform().Equals(
+			Pivot->GetRelativeTransform() * SceneRoot->GetComponentTransform(), 1.0e-6f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUtilityGaugePreviewBaselineFromTemplateTest,
+	"BathhouseSim.Utility.Labor.GaugePreviewBaselineUsesComponentTemplate",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUtilityGaugePreviewBaselineFromTemplateTest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	FScopedUtilityLaborWorld Scope(TEXT("UtilityGaugeTemplateBaselineWorld"));
+	UWorld* World = Scope.Get();
+	UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (!TestNotNull(TEXT("Automation world exists"), World)
+		|| !TestNotNull(TEXT("Engine cube mesh exists"), CubeMesh))
+	{
+		return false;
+	}
+	ABathWaterBoilerFacilityActor* Boiler = World->SpawnActorDeferred<ABathWaterBoilerFacilityActor>(
+		ABathWaterBoilerFacilityActor::StaticClass(), FTransform::Identity, nullptr, nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!TestNotNull(TEXT("Deferred boiler exists"), Boiler))
+	{
+		return false;
+	}
+	TestTrue(TEXT("Boiler fixture assigns door and gauge meshes"), SetBoilerTestMeshes(Boiler, CubeMesh));
+	Boiler->FinishSpawning(FTransform::Identity);
+	BeginActorPlayIfNeeded(Boiler);
+
+	UUtilityGaugeComponent* Gauge = Boiler->GetGaugePresentation();
+	USceneComponent* NeedlePivot = Boiler->GetGaugeNeedlePivot();
+	UUtilityOperationComponent* Operation = Boiler->GetOperation();
+	const USceneComponent* NeedlePivotTemplate = NeedlePivot ? Cast<USceneComponent>(NeedlePivot->GetArchetype()) : nullptr;
+	if (!TestNotNull(TEXT("Gauge presentation exists"), Gauge)
+		|| !TestNotNull(TEXT("Gauge needle pivot exists"), NeedlePivot)
+		|| !TestNotNull(TEXT("Gauge operation exists"), Operation)
+		|| !TestNotNull(TEXT("Gauge needle pivot has a component template"), NeedlePivotTemplate))
+	{
+		return false;
+	}
+	// Native defaults: LocalRotationAxis = Forward, ZeroAngleDegrees = -90.
+	const FQuat ExpectedZeroPose = NeedlePivotTemplate->GetRelativeRotation().Quaternion()
+		* FQuat(FVector::ForwardVector, FMath::DegreesToRadians(-90.0f));
+	auto DescribePose = [NeedlePivot]()
+	{
+		return NeedlePivot->GetRelativeRotation().ToString();
+	};
+
+	Gauge->ApplyConstructionPreview();
+	TestTrue(FString::Printf(TEXT("Construction preview shows the template zero pose (actual=%s)"), *DescribePose()),
+		NeedlePivot->GetRelativeRotation().Quaternion().Equals(ExpectedZeroPose, 1.0e-4f));
+
+	// Blueprint compile reinstancing keeps the displayed pivot pose but loses the gauge's baseline state.
+	// Re-pointing the gauge at another pivot and back forgets the baseline the same way.
+	USceneComponent* ScratchPivot = NewObject<USceneComponent>(Boiler, TEXT("GaugeTemplateBaselineScratchPivot"));
+	auto ForgetBaseline = [&]()
+	{
+		Gauge->Configure(Operation, ScratchPivot);
+		Gauge->Configure(Operation, NeedlePivot);
+	};
+	for (int32 Cycle = 1; Cycle <= 3; ++Cycle)
+	{
+		ForgetBaseline();
+		Gauge->ApplyConstructionPreview();
+		TestTrue(FString::Printf(TEXT("Reinstancing cycle %d does not accumulate the zero angle (actual=%s)"),
+			Cycle, *DescribePose()),
+			NeedlePivot->GetRelativeRotation().Quaternion().Equals(ExpectedZeroPose, 1.0e-4f));
+	}
+
+	// A level instance saved with a displayed pose (e.g. Pitch 30) must not treat it as authored on reload.
+	NeedlePivot->SetRelativeRotation(FRotator(30.0f, 0.0f, 0.0f));
+	ForgetBaseline();
+	Gauge->ApplyConstructionPreview();
+	TestTrue(FString::Printf(TEXT("A stale saved instance pose is ignored in favor of the template (actual=%s)"),
+		*DescribePose()),
+		NeedlePivot->GetRelativeRotation().Quaternion().Equals(ExpectedZeroPose, 1.0e-4f));
+	return true;
+}
 
 #endif // WITH_DEV_AUTOMATION_TESTS

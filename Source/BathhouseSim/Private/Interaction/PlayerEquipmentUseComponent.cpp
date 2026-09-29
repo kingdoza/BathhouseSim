@@ -46,6 +46,17 @@ FPlayerInteractionQuery UPlayerEquipmentUseComponent::MergeEquipmentQuery(
 		return Result;
 	}
 
+	Result.bHeldApplyVisible = false;
+	Result.bCanHeldApply = false;
+	Result.HeldApplyActionName = FText::GetEmpty();
+	Result.HeldApplyFailureReason = FText::GetEmpty();
+	Result.HeldApplyActivationMode = EPlayerInteractionActivationMode::Instant;
+	Result.bHeldTakeVisible = false;
+	Result.bCanHeldTake = false;
+	Result.HeldTakeActionName = FText::GetEmpty();
+	Result.HeldTakeFailureReason = FText::GetEmpty();
+	Result.HeldTakeActivationMode = EPlayerInteractionActivationMode::Instant;
+
 	FHeldEquipmentUseContext Context;
 	if (!BuildContext(Equipment, Context))
 	{
@@ -247,6 +258,12 @@ bool UPlayerEquipmentUseComponent::BuildContext(
 		InteractionComponent->GetCurrentFocusHit(OutContext.FocusHit);
 	}
 	return !OutContext.CameraDirection.IsNearlyZero();
+}
+
+bool UPlayerEquipmentUseComponent::HasUsableHeldEquipment() const
+{
+	AActor* Equipment = nullptr;
+	return GetHeldUsable(Equipment) != nullptr;
 }
 
 IHeldEquipmentUsable* UPlayerEquipmentUseComponent::GetHeldUsable(AActor*& OutEquipment) const

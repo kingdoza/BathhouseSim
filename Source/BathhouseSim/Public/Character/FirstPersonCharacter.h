@@ -15,6 +15,7 @@ class UFirstPersonMovementComponent;
 class UInputAction;
 class UPlayerCarryComponent;
 class UPlayerInteractionComponent;
+class UPlayerHeldTargetUseComponent;
 class UPlayerFacilityPlacementComponent;
 class USceneComponent;
 class UWidgetInteractionComponent;
@@ -52,6 +53,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	UPlayerEquipmentUseComponent* GetPlayerEquipmentUse() const { return PlayerEquipmentUse; }
 
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	UPlayerHeldTargetUseComponent* GetPlayerHeldTargetUse() const { return PlayerHeldTargetUse; }
+
 	UFUNCTION(BlueprintPure, Category = "Facility Placement")
 	UPlayerFacilityPlacementComponent* GetPlayerFacilityPlacement() const { return PlayerFacilityPlacement; }
 
@@ -68,6 +72,8 @@ protected:
 	void PrimaryUseStartInput();
 	void PrimaryUseTriggeredInput();
 	void PrimaryUseEndInput();
+	void SecondaryUseStartInput();
+	void SecondaryUseEndInput();
 	void ComputerClickStartInput();
 	void ComputerClickEndInput();
 	void RecoverFacilityStartInput();
@@ -120,6 +126,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPlayerEquipmentUseComponent> PlayerEquipmentUse;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPlayerHeldTargetUseComponent> PlayerHeldTargetUse;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Facility Placement", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPlayerFacilityPlacementComponent> PlayerFacilityPlacement;
 
@@ -151,6 +160,9 @@ protected:
 	TObjectPtr<UInputAction> PrimaryUseAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> SecondaryUseAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> RecoverFacilityAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
@@ -174,6 +186,7 @@ protected:
 private:
 	friend class FBathhouseComputerSessionTest;
 	friend class FBathhouseEquipmentUseRoutingTest;
+	friend class FBathhouseHeldTargetUseOwnerRoutingTest;
 	friend class FBathhousePhysicalCarryFallRecoveryTest;
 
 	enum class EPrimaryUsePressOwner : uint8
@@ -181,10 +194,20 @@ private:
 		None,
 		Computer,
 		Placement,
-		Equipment
+		Equipment,
+		HeldTargetUse,
+		Ignored
+	};
+
+	enum class ESecondaryUsePressOwner : uint8
+	{
+		None,
+		HeldTargetUse,
+		Ignored
 	};
 
 	bool bComputerOwnsInteractPress = false;
 	bool bComputerOwnsPointerPress = false;
 	EPrimaryUsePressOwner PrimaryUsePressOwner = EPrimaryUsePressOwner::None;
+	ESecondaryUsePressOwner SecondaryUsePressOwner = ESecondaryUsePressOwner::None;
 };

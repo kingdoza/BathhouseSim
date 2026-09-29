@@ -17,14 +17,24 @@ enum class EPlayerInteractionIntent : uint8
 	DropCarry,
 	EquipmentUse,
 	PlacementConfirm,
-	FacilityRecovery
+	FacilityRecovery,
+	HeldApply,
+	HeldTake
+};
+
+UENUM(BlueprintType)
+enum class EPlayerHeldTargetUseDirection : uint8
+{
+	Apply,
+	Take
 };
 
 UENUM(BlueprintType)
 enum class EPlayerInteractionActivationMode : uint8
 {
 	Instant,
-	Hold
+	Hold,
+	Repeat
 };
 
 UENUM()
@@ -155,6 +165,36 @@ struct BATHHOUSESIM_API FPlayerInteractionQuery
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float RecoveryProgress = 0.0f;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	bool bHeldApplyVisible = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	bool bCanHeldApply = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	FText HeldApplyActionName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	FText HeldApplyFailureReason;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	EPlayerInteractionActivationMode HeldApplyActivationMode = EPlayerInteractionActivationMode::Instant;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	bool bHeldTakeVisible = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	bool bCanHeldTake = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	FText HeldTakeActionName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	FText HeldTakeFailureReason;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	EPlayerInteractionActivationMode HeldTakeActivationMode = EPlayerInteractionActivationMode::Instant;
+
 	bool Equals(const FPlayerInteractionQuery& Other) const
 	{
 		return bVisible == Other.bVisible
@@ -183,7 +223,17 @@ struct BATHHOUSESIM_API FPlayerInteractionQuery
 			&& bCanRecover == Other.bCanRecover
 			&& RecoveryActionName.EqualTo(Other.RecoveryActionName)
 			&& RecoveryFailureReason.EqualTo(Other.RecoveryFailureReason)
-			&& FMath::IsNearlyEqual(RecoveryProgress, Other.RecoveryProgress);
+			&& FMath::IsNearlyEqual(RecoveryProgress, Other.RecoveryProgress)
+			&& bHeldApplyVisible == Other.bHeldApplyVisible
+			&& bCanHeldApply == Other.bCanHeldApply
+			&& HeldApplyActionName.EqualTo(Other.HeldApplyActionName)
+			&& HeldApplyFailureReason.EqualTo(Other.HeldApplyFailureReason)
+			&& HeldApplyActivationMode == Other.HeldApplyActivationMode
+			&& bHeldTakeVisible == Other.bHeldTakeVisible
+			&& bCanHeldTake == Other.bCanHeldTake
+			&& HeldTakeActionName.EqualTo(Other.HeldTakeActionName)
+			&& HeldTakeFailureReason.EqualTo(Other.HeldTakeFailureReason)
+			&& HeldTakeActivationMode == Other.HeldTakeActivationMode;
 	}
 };
 
