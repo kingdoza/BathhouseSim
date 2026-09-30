@@ -10,8 +10,10 @@
 #include "Placement/FacilityPlacementCollisionUtils.h"
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/PlaceableFacilityItemActor.h"
+#include "Service/ItemBoxActor.h"
 #include "Shop/ShopDeliveryBoxActor.h"
 #include "Shop/ShopUnboxingCluster.h"
+#include "Shop/ShopUnboxItemShape.h"
 
 #define LOCTEXT_NAMESPACE "ShopUnboxingPlacement"
 
@@ -34,30 +36,30 @@ struct FUnboxCandidate
 };
 
 bool BuildCandidateAtShapeCenter(
-	const UFacilityPlacementDefinition& Definition,
+	const FShopUnboxItemShape& Item,
 	const FVector& ShapeCenter,
 	const float Yaw,
 	FUnboxCandidate& OutCandidate,
 	FText& OutFailureReason)
 {
 	const FRotator CandidateRotation(0.0f, Yaw, 0.0f);
-	FVector ItemScale = FVector::OneVector;
-	if (!APlaceableFacilityItemActor::GetDefinitionItemScale(Definition, ItemScale, OutFailureReason))
-	{
-		return false;
-	}
+	const FVector ItemScale = Item.ItemScale;
 	const FTransform ProbeTransform(CandidateRotation, FVector::ZeroVector, ItemScale);
 	FVector RelativeShapeCenter = FVector::ZeroVector;
 	FQuat ProbeRotation = FQuat::Identity;
-	if (!APlaceableFacilityItemActor::BuildDefinitionCollisionQuery(
-		Definition,
-		ProbeTransform,
-		RelativeShapeCenter,
-		ProbeRotation,
-		OutCandidate.Shape,
-		OutCandidate.CollisionTemplate,
-		OutFailureReason))
+	if (!Item.BuildCollisionQuery
+		|| !Item.BuildCollisionQuery(
+			ProbeTransform,
+			RelativeShapeCenter,
+			ProbeRotation,
+			OutCandidate.Shape,
+			OutCandidate.CollisionTemplate,
+			OutFailureReason))
 	{
+		if (OutFailureReason.IsEmpty())
+		{
+			OutFailureReason = LOCTEXT("MissingShapeQuery", "개봉 물품의 충돌 형태를 확인할 수 없습니다.");
+		}
 		return false;
 	}
 
@@ -172,7 +174,7 @@ bool TryMakeLayout(
 	UWorld& World,
 	AActor& Player,
 	AShopDeliveryBoxActor& Box,
-	const TArray<UFacilityPlacementDefinition*>& Definitions,
+	const TArray<FShopUnboxItemShape>& Items,
 	const TArray<FVector>& HalfExtents,
 	const FVector& TargetXYCenter,
 	const float TargetLowestZ,
@@ -195,16 +197,16 @@ bool TryMakeLayout(
 		TargetXYCenter,
 		TargetLowestZ);
 	TArray<FTransform> CandidateTransforms;
-	CandidateTransforms.Reserve(Definitions.Num());
+	CandidateTransforms.Reserve(Items.Num());
 	const float EnvironmentClearanceCm = bUseEnvironmentClearance
 		? FMath::Clamp(OverlapDepthCm, 0.0f, 50.0f)
 		: 0.0f;
 
-	for (int32 Index = 0; Index < Definitions.Num(); ++Index)
+	for (int32 Index = 0; Index < Items.Num(); ++Index)
 	{
 		FUnboxCandidate Candidate;
 		if (!BuildCandidateAtShapeCenter(
-			*Definitions[Index],
+			Items[Index],
 			Layout[Index].Center + Translation,
 			Layout[Index].YawDegrees,
 			Candidate,
@@ -238,7 +240,7 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 	AShopDeliveryBoxActor& Box,
 	const FVector& FootLocation,
 	const float ViewYaw,
-	const TArray<UFacilityPlacementDefinition*>& Definitions,
+	const TArray<FShopUnboxItemShape>& Items,
 	const float ForwardDistanceCm,
 	FRandomStream& RandomStream,
 	const float OverlapDepthCm,
@@ -247,7 +249,7 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 {
 	OutTransforms.Reset();
 	OutFailureReason = FText::GetEmpty();
-	if (Definitions.IsEmpty() || FootLocation.ContainsNaN() || !FMath::IsFinite(ViewYaw)
+	if (Items.IsEmpty() || FootLocation.ContainsNaN() || !FMath::IsFinite(ViewYaw)
 		|| !FMath::IsFinite(ForwardDistanceCm) || ForwardDistanceCm < 0.0f
 		|| !FMath::IsFinite(OverlapDepthCm) || OverlapDepthCm < 0.0f)
 	{
@@ -267,17 +269,12 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 	const FVector CapsuleTop(PlayerCenter.X, PlayerCenter.Y, PlayerCenter.Z + CapsuleHalfHeight);
 
 	TArray<FVector> HalfExtents;
-	HalfExtents.Reserve(Definitions.Num());
-	for (const UFacilityPlacementDefinition* Definition : Definitions)
+	HalfExtents.Reserve(Items.Num());
+	for (const FShopUnboxItemShape& Item : Items)
 	{
-		if (!IsValid(Definition))
-		{
-			OutFailureReason = LOCTEXT("MissingPlacementDefinition", "주문 상품 배치 정의를 찾을 수 없습니다.");
-			return false;
-		}
 		FUnboxCandidate Probe;
 		if (!BuildCandidateAtShapeCenter(
-			*Definition,
+			Item,
 			FVector::ZeroVector,
 			ViewYaw,
 			Probe,
@@ -297,7 +294,7 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 				World,
 				Player,
 				Box,
-				Definitions,
+				Items,
 				HalfExtents,
 				TargetXYCenter,
 				FootLocation.Z + FloorClearanceCm,
@@ -331,7 +328,7 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 				World,
 				Player,
 				Box,
-				Definitions,
+				Items,
 				HalfExtents,
 				TargetXYCenter,
 				LowestZ,
@@ -353,13 +350,13 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 
 	OutTransforms.Reset();
 	float BaseZ = FootLocation.Z;
-	for (int32 Index = 0; Index < Definitions.Num(); ++Index)
+	for (int32 Index = 0; Index < Items.Num(); ++Index)
 	{
 		const FVector& Extent = HalfExtents[Index];
 		const FVector ShapeCenter(PlayerCenter.X, PlayerCenter.Y, BaseZ + Extent.Z);
 		FUnboxCandidate Candidate;
 		if (!BuildCandidateAtShapeCenter(
-			*Definitions[Index],
+			Items[Index],
 			ShapeCenter,
 			ViewYaw,
 			Candidate,
@@ -383,7 +380,7 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 				LogTemp,
 				Warning,
 				TEXT("Shop unboxing final fallback overlaps a world blocker for %s; continuing because all safe candidates were blocked."),
-				*Definitions[Index]->GetPathName());
+				*Items[Index].DebugName);
 		}
 		OutTransforms.Add(Candidate.Transform);
 		BaseZ = ShapeCenter.Z + Extent.Z;

@@ -18,6 +18,7 @@ class UPlayerCarryComponent;
 class UPrimitiveComponent;
 class USceneComponent;
 class APlaceableFacilityItemActor;
+class UBathhouseFacilityPlacementInstanceData;
 struct FFacilityPlacementPayload;
 struct FFacilityPlacementPublication;
 
@@ -54,6 +55,7 @@ public:
 	virtual void CancelFacilityRecoveryHold() override {}
 	virtual bool ExportPlacementPayload(APlaceableFacilityItemActor& Item, FFacilityPlacementPayload& OutPayload, FText& OutFailureReason) const override;
 	virtual bool ImportPlacementPayload(const APlaceableFacilityItemActor& Item, const FFacilityPlacementPayload& Payload, FText& OutFailureReason) override;
+	virtual bool FinalizePlacementPayloadAfterConstruction(FText& OutFailureReason) override;
 	virtual bool StagePlacedDomainRegistration(FText& OutFailureReason) override;
 	virtual void RollbackPlacedDomainRegistration() override;
 	virtual bool StagePlacedDomainUnregistration(FFacilityPlacementPublication& OutPublication, FText& OutFailureReason) override;
@@ -110,6 +112,12 @@ public:
 	void OnSlotUseEnded(UBathhouseFacilitySlotComponent* Slot, AActor* User);
 
 protected:
+	/** Extension hooks for derived facilities that carry state through recovery payloads. Defaults are a no-op. */
+	virtual UBathhouseFacilityPlacementInstanceData* CreateFacilityPlacementInstanceData(UObject* Outer) const;
+	virtual bool ExportFacilityExtension(UBathhouseFacilityPlacementInstanceData& Data, FText& OutFailureReason) const;
+	/** Data is null for a fresh install. Must validate everything before applying anything. */
+	virtual bool ImportFacilityExtension(const UBathhouseFacilityPlacementInstanceData* Data, FText& OutFailureReason);
+
 	friend class FBathhouseKeyTopologyInitializationTest;
 	friend class FBathhouseFacilityPlacementRuntimeTest;
 
@@ -156,6 +164,11 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UBathhouseFacilitySlotComponent>> FacilitySlots;
+
+	/** Extension data captured by ImportPlacementPayload and applied after construction. Null means fresh install. */
+	UPROPERTY(Transient)
+	TObjectPtr<UBathhouseFacilityPlacementInstanceData> PendingFacilityExtension;
+	bool bPendingFacilityExtension = false;
 	bool bPlacedDomainRegistered = false;
 	bool bEndingPlay = false;
 };

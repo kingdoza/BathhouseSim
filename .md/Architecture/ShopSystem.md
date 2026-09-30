@@ -44,6 +44,8 @@ UI native class는 `Public/UI`, `Private/UI`에 둔다([UISystem.md](UISystem.md
 
 ## Catalog And Settings
 
+2026-09-30 서비스 1단위: 상품은 설비(`PlacementDefinition`) 또는 품목 박스(`ItemBoxDefinition`) 중 정확히 하나를 가진다. 박스 상품, `ItemBoxClass` 설정, 개봉 시 박스 생성과 항목별 shape 무리 배치는 [ServiceSystem.md](ServiceSystem.md) Shop Integration이 정본이다. 아래 설비 규칙(`Facility.Discardable` 등)은 설비 상품에만 적용한다.
+
 `UShopCatalog : UPrimaryDataAsset`의 `Products : TArray<FShopProductEntry>`가 상품 정의의 유일 정본이다. 배열 순서가 화면 카드 순서다.
 
 | 필드 | 규칙 |

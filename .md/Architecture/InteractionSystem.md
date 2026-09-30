@@ -195,6 +195,7 @@ Blueprint 조회·표현 API:
 - exact fixed-slot take/store와 actual-held-pose free-drop result
 - combined equipment-use query/result의 optional LMB action/failure/mode/progress
 - held-use Apply·Take의 visible/can/action/failure/mode 필드와 `HeldApply`·`HeldTake` result intent
+- `HeldObjectSummary`: 들고 있는 carryable의 `GetHeldSummaryText()`. `UPlayerEquipmentUseComponent::MergeEquipmentQuery`가 채운다(2026-09-30, [ServiceSystem.md](ServiceSystem.md) HUD)
 - combined placement LMB action/failure와 recovery Q action/failure/hold progress
 - `ABathhouseKeyActor::OnKeyStateChanged`
 - `ABathhouseKeyActor::OnHeldPresentationChanged`

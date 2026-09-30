@@ -195,6 +195,9 @@ struct BATHHOUSESIM_API FPlayerInteractionQuery
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	EPlayerInteractionActivationMode HeldTakeActivationMode = EPlayerInteractionActivationMode::Instant;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	FText HeldObjectSummary;
+
 	bool Equals(const FPlayerInteractionQuery& Other) const
 	{
 		return bVisible == Other.bVisible
@@ -233,7 +236,8 @@ struct BATHHOUSESIM_API FPlayerInteractionQuery
 			&& bCanHeldTake == Other.bCanHeldTake
 			&& HeldTakeActionName.EqualTo(Other.HeldTakeActionName)
 			&& HeldTakeFailureReason.EqualTo(Other.HeldTakeFailureReason)
-			&& HeldTakeActivationMode == Other.HeldTakeActivationMode;
+			&& HeldTakeActivationMode == Other.HeldTakeActivationMode
+			&& HeldObjectSummary.EqualTo(Other.HeldObjectSummary);
 	}
 };
 

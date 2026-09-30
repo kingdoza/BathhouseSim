@@ -23,6 +23,7 @@
 #include "Shop/ShopSettings.h"
 #include "Shop/ShopUnboxingCluster.h"
 #include "Shop/ShopUnboxingPlacement.h"
+#include "Tests/ShopUnboxShapeTestSupport.h"
 #include "Tests/ShopAutomationTestProbe.h"
 
 namespace
@@ -339,7 +340,7 @@ bool FShopUnboxingPawnAvoidanceAutomationTest::RunTest(const FString& Parameters
 	FText FailureReason;
 	TestTrue(TEXT("Clear front area generates a baseline candidate"), FShopUnboxingPlacement::FindSpawnTransforms(
 		World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-		Definitions, 500.0f, BaselineStream, 8.0f, BaselineTransforms, FailureReason));
+		ShopUnboxTest::MakeShapes(Definitions), 500.0f, BaselineStream, 8.0f, BaselineTransforms, FailureReason));
 	if (BaselineTransforms.Num() != 1)
 	{
 		return false;
@@ -364,7 +365,7 @@ bool FShopUnboxingPawnAvoidanceAutomationTest::RunTest(const FString& Parameters
 	FRandomStream SafeStream(31415);
 	TestTrue(TEXT("Placement retries around a guest Pawn"), FShopUnboxingPlacement::FindSpawnTransforms(
 		World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-		Definitions, 500.0f, SafeStream, 8.0f, SafeTransforms, FailureReason));
+		ShopUnboxTest::MakeShapes(Definitions), 500.0f, SafeStream, 8.0f, SafeTransforms, FailureReason));
 	if (SafeTransforms.Num() == 1)
 	{
 		FVector CandidateCenter = FVector::ZeroVector;
@@ -411,7 +412,7 @@ bool FShopUnboxingPawnAvoidanceAutomationTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("Placement retries around a guest only inside horizontal Dc clearance"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-			Definitions, 500.0f, EdgeSafeStream, 8.0f, EdgeSafeTransforms, FailureReason));
+			ShopUnboxTest::MakeShapes(Definitions), 500.0f, EdgeSafeStream, 8.0f, EdgeSafeTransforms, FailureReason));
 	if (EdgeSafeTransforms.Num() == 1)
 	{
 		FVector CandidateCenter = FVector::ZeroVector;
@@ -968,7 +969,7 @@ bool FShopUnboxingEnvironmentClearanceAutomationTest::RunTest(const FString& Par
 		TestTrue(TEXT("Clear environment accepts the baseline front candidate"),
 			FShopUnboxingPlacement::FindSpawnTransforms(
 				World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-				Definitions, ForwardDistanceCm, Stream, ClearanceCm, Result, FailureReason));
+				ShopUnboxTest::MakeShapes(Definitions), ForwardDistanceCm, Stream, ClearanceCm, Result, FailureReason));
 		if (Result.Num() != 1 && !FailureReason.IsEmpty())
 		{
 			AddError(FailureReason.ToString());
@@ -1028,7 +1029,7 @@ bool FShopUnboxingEnvironmentClearanceAutomationTest::RunTest(const FString& Par
 	TestTrue(TEXT("Placement rejects or relocates a layout near a side wall"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-			Definitions, ForwardDistanceCm, SideSafeStream, ClearanceCm, SideSafeTransforms, FailureReason));
+			ShopUnboxTest::MakeShapes(Definitions), ForwardDistanceCm, SideSafeStream, ClearanceCm, SideSafeTransforms, FailureReason));
 	if (SideSafeTransforms.Num() != 1)
 	{
 		AddError(FailureReason.ToString());
@@ -1092,7 +1093,7 @@ bool FShopUnboxingEnvironmentClearanceAutomationTest::RunTest(const FString& Par
 	TestTrue(TEXT("Placement rejects or relocates a layout below the ceiling"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-			Definitions, ForwardDistanceCm, CeilingSafeStream, ClearanceCm, CeilingSafeTransforms, FailureReason));
+			ShopUnboxTest::MakeShapes(Definitions), ForwardDistanceCm, CeilingSafeStream, ClearanceCm, CeilingSafeTransforms, FailureReason));
 	if (CeilingSafeTransforms.Num() != 1)
 	{
 		AddError(FailureReason.ToString());
@@ -1161,7 +1162,7 @@ bool FShopUnboxingDepthPlacementObservationTest::RunTest(const FString& Paramete
 			FText FailureReason;
 			const bool bFound = FShopUnboxingPlacement::FindSpawnTransforms(
 				World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-				Definitions, ForwardDistanceCm, Stream, DepthCm, SpawnTransforms, FailureReason);
+				ShopUnboxTest::MakeShapes(Definitions), ForwardDistanceCm, Stream, DepthCm, SpawnTransforms, FailureReason);
 			TestTrue(FString::Printf(TEXT("Open-floor placement succeeds at D=%.0f cm and forward distance %.0f cm"),
 				DepthCm, ForwardDistanceCm), bFound);
 			if (!bFound || SpawnTransforms.Num() != 1)
@@ -1293,7 +1294,7 @@ bool FShopUnboxingPhysicsAutomationTest::RunTest(const FString& Parameters)
 	FText FailureReason;
 	TestTrue(TEXT("Ten mixed items find a safe opening inside the closed room"), FShopUnboxingPlacement::FindSpawnTransforms(
 		RoomWorld, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-		Definitions, 100.0f, RoomStream, 8.0f, SpawnTransforms, FailureReason));
+		ShopUnboxTest::MakeShapes(Definitions), 100.0f, RoomStream, 8.0f, SpawnTransforms, FailureReason));
 	TestEqual(TEXT("Closed-room unboxing returns ten transforms"), SpawnTransforms.Num(), 10);
 	TArray<APlaceableFacilityItemActor*> SpawnedItems;
 	for (int32 Index = 0; Index < FMath::Min(Definitions.Num(), SpawnTransforms.Num()); ++Index)

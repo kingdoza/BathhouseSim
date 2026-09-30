@@ -88,6 +88,9 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> RmbKeyText = nullptr;
 
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> HeldSummaryText = nullptr;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction Prompt")
 	FText PrimaryKeyLabel = NSLOCTEXT("InteractionPromptWidget", "PrimaryKeyLabel", "E");
 

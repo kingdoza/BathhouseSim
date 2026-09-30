@@ -236,6 +236,7 @@ fixed-slot placement는 cleaning, combat 또는 towel transaction이 아니다. 
 - 상자 개봉과 쓰레기통이 이 경로를 쓴다. Actor 제거는 호출자가 commit 뒤에 한다. carry 상태에 제거 예정 Actor를 남기지 않는다.
 - `IPhysicalCarryDiscardable`(Interaction, C++ 전용, 선택): `CanDiscardCarriedObject(OutFailure)`, `HandleDiscardCommitted()`. 설비 아이템과 배송 상자만 구현한다. 열쇠와 exact 거치대 도구는 구현하지 않아 버릴 수 없다.
 - 배송 상자는 `EPhysicalCarryKind::DeliveryBox`(enum 끝 append), capability `FreeDrop`만 쓴다. 다른 held 물품처럼 class 소유 `HeldTransform`의 location/rotation만 적용하고 CDO root scale을 모든 전이에서 보존한다. 상세는 [ShopSystem.md](ShopSystem.md)에 있다.
+- 품목 박스는 `EPhysicalCarryKind::ItemBox`(enum 끝 append), `FreeDrop`만, 배송 상자와 같은 held·scale·복구 규칙이다. `IPhysicalCarryable::GetHeldSummaryText()`(기본 빈 값)는 들고 있는 물건의 HUD 요약이다([ServiceSystem.md](ServiceSystem.md)).
 
 ## Recovery And EndPlay
 

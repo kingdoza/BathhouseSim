@@ -4,6 +4,7 @@
 #include "ShopTypes.generated.h"
 
 class UFacilityPlacementDefinition;
+class UServiceItemDefinition;
 class UTexture2D;
 
 UENUM(BlueprintType)
@@ -44,6 +45,10 @@ struct BATHHOUSESIM_API FShopProductEntry
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop")
 	TObjectPtr<UFacilityPlacementDefinition> PlacementDefinition = nullptr;
+
+	/** Exactly one of PlacementDefinition and ItemBoxDefinition is set. A box product delivers one full item box per unit. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop")
+	TObjectPtr<UServiceItemDefinition> ItemBoxDefinition = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -68,6 +73,9 @@ struct BATHHOUSESIM_API FShopOrderLine
 
 	UPROPERTY(BlueprintReadOnly, Category = "Shop")
 	TObjectPtr<UFacilityPlacementDefinition> PlacementDefinition = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Shop")
+	TObjectPtr<UServiceItemDefinition> ItemBoxDefinition = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Shop")
 	FText DisplayName;

@@ -46,6 +46,7 @@
 #include "Shop/ShopOrderSubsystem.h"
 #include "Shop/ShopSettings.h"
 #include "Shop/ShopUnboxingPlacement.h"
+#include "Tests/ShopUnboxShapeTestSupport.h"
 #include "Tests/FacilityPlacementAutomationTestProbe.h"
 #include "Tests/ShopAutomationTestProbe.h"
 #include "Towel/TowelBasketActor.h"
@@ -692,7 +693,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	TestTrue(TEXT("Open floor chooses the configured forward row"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			Definitions, 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
+			ShopUnboxTest::MakeShapes(Definitions), 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
 	TestEqual(TEXT("Open floor returns one spawn transform"), SpawnTransforms.Num(), 1);
 	if (SpawnTransforms.Num() == 1)
 	{
@@ -781,7 +782,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	TestTrue(TEXT("A wall in front keeps the item on the near side"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			Definitions, 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
+			ShopUnboxTest::MakeShapes(Definitions), 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
 	if (SpawnTransforms.Num() == 1 && Wall)
 	{
 		TestTrue(TEXT("Wall candidate uses the definition collision query"),
@@ -821,7 +822,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	TestTrue(TEXT("Blocked forward row safely stacks above the capsule"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			Definitions, 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
+			ShopUnboxTest::MakeShapes(Definitions), 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
 	if (SpawnTransforms.Num() == 1)
 	{
 		const float CapsuleTopZ = PlayerCenter.Z + Capsule->GetScaledCapsuleHalfHeight();
@@ -855,7 +856,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	TestTrue(TEXT("A four-sided blocked corner stacks items above the capsule safely"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
 			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			Definitions, 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
+			ShopUnboxTest::MakeShapes(Definitions), 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
 	if (SpawnTransforms.Num() == 1)
 	{
 		const float CapsuleTopZ = PlayerCenter.Z + CageHalfHeight;

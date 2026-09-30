@@ -84,6 +84,8 @@ Cash mesh, material과 제시 표현은 Blueprint 책임이지만 이번 단계�
 
 ## Dependencies
 
+- 음료 판매 적립금과 공용 수거함 수금은 Service가 소유하고 wallet `TryAddMoney`만 호출한다([ServiceSystem.md](ServiceSystem.md) Drink Sales And Collection, 2026-09-30).
+
 - Economy -> Interaction interface
 - Economy -> Engine PlayerState/ActorComponent
 - Customer -> Economy cash actor

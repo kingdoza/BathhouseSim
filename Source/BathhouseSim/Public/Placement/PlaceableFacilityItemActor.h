@@ -34,6 +34,7 @@ public:
 	virtual FPlayerInteractionResult ExecuteInteraction(const FPlayerInteractionContext& Context) override;
 	virtual EPhysicalCarryKind GetPhysicalCarryKind() const override { return EPhysicalCarryKind::Facility; }
 	virtual FText GetPhysicalCarryDisplayName() const override;
+	virtual FText GetHeldSummaryText() const override;
 	virtual EPhysicalCarryCapability GetPhysicalCarryCapabilities() const override
 	{
 		return EPhysicalCarryCapability::FreeDrop;

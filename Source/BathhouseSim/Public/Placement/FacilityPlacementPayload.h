@@ -10,6 +10,10 @@ UCLASS(Abstract, Transient, NotBlueprintable)
 class BATHHOUSESIM_API UFacilityPlacementInstanceData : public UObject
 {
 	GENERATED_BODY()
+
+public:
+	/** Short player-facing description of what the recovered facility still carries. Empty when it carries nothing. */
+	virtual FText GetPlacementContentsSummary() const { return FText::GetEmpty(); }
 };
 
 USTRUCT()

@@ -25,10 +25,11 @@
 | `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Circulator` | `BP_Circulator` | 0 | placement 활성 |
 | `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler` | `BP_Boiler` | 0 | placement 활성 |
 | `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Cooler` | `BP_Cooler` | 0 | placement 활성 |
+| `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_DrinkFridge` | `BP_DrinkFridge` | 0 | placement 활성 |
 | `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_CleanTowelStack` | `None` | 0 | placement opt-out |
 | `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_UsedTowelBin` | `None` | 0 | placement opt-out |
 
-활성 10개 Definition의 `RecoveryItemClass`는 공통 `/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem.BP_PlaceableFacilityItem_C`, `RecoveryItemMesh`는 `None`이며 native Cube fallback을 사용한다. Stack과 Bin은 `PlacedFacilityClass`, `RecoveryItemClass`, `RecoveryItemMesh`가 모두 `None`인 opt-out 상태다.
+활성 11개 Definition의 `RecoveryItemClass`는 공통 `/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem.BP_PlaceableFacilityItem_C`, `RecoveryItemMesh`는 `None`이며 native Cube fallback을 사용한다. Stack과 Bin은 `PlacedFacilityClass`, `RecoveryItemClass`, `RecoveryItemMesh`가 모두 `None`인 opt-out 상태다.
 
 `BP_Boiler`의 inherited `FacilityPlacement.Definition`은 `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler`로 저장됐다. `DefaultMap`의 기존 보일러 인스턴스는 별도 override 없이 재시작 후 같은 Definition을 상속한다. 다른 utility Blueprint의 Definition 연결 여부는 이 변경으로 보장하지 않는다.
 

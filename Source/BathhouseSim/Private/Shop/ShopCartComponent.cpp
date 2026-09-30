@@ -3,6 +3,7 @@
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/FacilityPlacementTypes.h"
 #include "Shop/ShopCatalog.h"
+#include "Shop/ShopProductRules.h"
 #include "Shop/ShopSettings.h"
 
 UShopCartComponent::UShopCartComponent()
@@ -32,10 +33,7 @@ EShopFailureCode UShopCartComponent::EvaluateAdd(const FName ProductId) const
 		return EShopFailureCode::NotForSale;
 	}
 	FText DefinitionFailure;
-	if (Product->ProductId.IsNone() || Product->DisplayName.IsEmpty() || Product->Price <= 0
-		|| !Product->PlacementDefinition || Product->PlacementDefinition->LockerSlotCount != 0
-		|| !Product->PlacementDefinition->FacilityTags.HasTag(TAG_Facility_Discardable)
-		|| !Product->PlacementDefinition->ValidateRuntime(DefinitionFailure))
+	if (!FShopProductRules::ValidateProduct(*Product, DefinitionFailure))
 	{
 		return EShopFailureCode::InvalidProduct;
 	}
@@ -150,7 +148,7 @@ bool UShopCartComponent::CalculateTotalPrice(
 	{
 		const FShopProductEntry* Product = Catalog.FindProduct(Line.ProductId);
 		if (!Product || Product->ProductId.IsNone() || Product->Price <= 0 || Line.Quantity <= 0
-			|| !Product->PlacementDefinition)
+			|| (Product->PlacementDefinition == nullptr) == (Product->ItemBoxDefinition == nullptr))
 		{
 			OutFailure = EShopFailureCode::InvalidProduct;
 			return false;

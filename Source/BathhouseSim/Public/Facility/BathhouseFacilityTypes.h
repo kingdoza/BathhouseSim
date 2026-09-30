@@ -13,7 +13,8 @@ enum class EBathhouseFacilityType : uint8
 	DryingSpot,
 	TowelBasket,
 	Exit,
-	TowelShelf
+	TowelShelf,
+	DrinkFridge
 };
 
 UENUM(BlueprintType)

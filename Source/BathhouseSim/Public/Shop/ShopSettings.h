@@ -4,6 +4,7 @@
 #include "Engine/DeveloperSettings.h"
 #include "ShopSettings.generated.h"
 
+class AItemBoxActor;
 class AShopDeliveryBoxActor;
 class UShopCatalog;
 
@@ -15,6 +16,7 @@ class BATHHOUSESIM_API UShopSettings : public UDeveloperSettings
 public:
 	UShopCatalog* LoadCatalog() const;
 	TSubclassOf<AShopDeliveryBoxActor> LoadDeliveryBoxClass() const;
+	TSubclassOf<AItemBoxActor> LoadItemBoxClass() const;
 	int32 GetCartTotalQuantityLimit() const { return FMath::Max(1, CartTotalQuantityLimit); }
 	int32 GetPerProductQuantityLimit() const { return FMath::Max(1, PerProductQuantityLimit); }
 	float GetDeliveryDelaySeconds() const;
@@ -27,6 +29,9 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Shop")
 	TSoftClassPtr<AShopDeliveryBoxActor> DeliveryBoxClass;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Shop")
+	TSoftClassPtr<AItemBoxActor> ItemBoxClass;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Shop", meta = (ClampMin = "1"))
 	int32 CartTotalQuantityLimit = 10;

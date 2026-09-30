@@ -19,7 +19,8 @@ enum class EPhysicalCarryKind : uint8
 	MonkeyWrench,
 	Facility,
 	Shovel,
-	DeliveryBox
+	DeliveryBox,
+	ItemBox
 };
 
 UENUM(BlueprintType, meta = (Bitflags))
@@ -58,6 +59,7 @@ public:
 		return EPhysicalCarryCapability::FreeDrop | EPhysicalCarryCapability::FixedSlot;
 	}
 	virtual FTransform GetHeldTransform() const { return FTransform::Identity; }
+	virtual FText GetHeldSummaryText() const { return FText::GetEmpty(); }
 	virtual bool CanBeTakenBy(const UPlayerCarryComponent& Carry, FText& OutFailureReason) const = 0;
 	virtual bool HandleTakenBy(UPlayerCarryComponent& Carry, USceneComponent* HeldAnchor) = 0;
 	virtual bool CanFreeDrop(FText& OutFailureReason) const

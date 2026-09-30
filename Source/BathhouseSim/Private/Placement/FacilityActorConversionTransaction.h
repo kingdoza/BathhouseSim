@@ -26,7 +26,8 @@ public:
 		PlacementCollisionSnapshotMissing,
 		PlacementImport,
 		PlacementDomainRegistration,
-		PlacementCarryCommit
+		PlacementCarryCommit,
+		PlacementFinalizePayload
 	};
 
 	static void SetTestFault(ETestFault Fault);

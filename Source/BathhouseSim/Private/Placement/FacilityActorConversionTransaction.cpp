@@ -380,6 +380,23 @@ AActor* FFacilityActorConversionTransaction::PlaceItemAsFacility(
 		false,
 		nullptr,
 		ESpawnActorScaleMethod::OverrideRootScale);
+	if (!IsValid(NewFacilityActor))
+	{
+		return nullptr;
+	}
+	if (
+#if WITH_DEV_AUTOMATION_TESTS
+		ConsumeTestFault(ETestFault::PlacementFinalizePayload) ||
+#endif
+		!NewFacility->FinalizePlacementPayloadAfterConstruction(OutFailureReason))
+	{
+		if (OutFailureReason.IsEmpty())
+		{
+			OutFailureReason = LOCTEXT("PlacementFinalizePayloadFailed", "설비 회수 데이터를 적용할 수 없습니다.");
+		}
+		DestroyStaged();
+		return nullptr;
+	}
 	if (!IsValid(NewFacilityActor)
 		|| !NewPlacement->FinalizeStagedPlacementCollisionSnapshot(OutFailureReason))
 	{

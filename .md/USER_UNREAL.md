@@ -1,5 +1,18 @@
 # 사용자 Unreal 후속 작업
 
+## 서비스 1단위 수직 (품목 박스·진열·음료 냉장고·수거함) — MCP 불가 항목
+
+MCP로 신규 asset 7개와 `DA_ShopCatalog`, `BP_FirstPersonCharacter` 카메라 blendable은 저장·재로드했다(`.md/Unreal/ServiceSystem.md`). Config(`ItemBoxClass`, `InsertPreviewMaterial`, `r.CustomDepth=3`)는 사용자 승인으로 직접 반영했고 새 Editor에서 값을 확인했다. 아래는 남은 항목이다. 완료 확인 전에는 통합 리뷰를 승인하지 않는다.
+
+1. **DefaultMap에 `BP_DrinkCollectionBox` 배치·저장 (사용자 직접).** `SceneTools.save_actor`가 external actor 경로 오류(`Asset does not exist: /Game/__ExternalActors__/Maps/DefaultMap/1/P1/UWXIDD9LM1ZURKQSERVEKZ`)로 실패해 MCP로는 저장할 수 없다.
+   - 배치할 액터: `/Game/Bathhouse/Blueprints/Service/BP_DrinkCollectionBox`(1개, 레벨 액터 이름 `DrinkCollectionBox`). 카운터(`BP_BathhouseCounter`, 원점) 상판 위 world `(-50,-20,90)`에 두면 된다(카운터 bounds x∈[-80,80], y∈[-50,50], 상판 z=75; 손님 서비스 지점 x=220 반대편, `ReturnedKeyDropPoint (20,20,90)`과 겹치지 않음). 회전·scale 기본값.
+   - 저장 후 `git status`에서 `DefaultMap.umap`이 아닌 `__ExternalActors__` package만 변경됐는지 확인한다. `Save All`은 사용하지 않는다.
+2. **직접 화면·입력 검증** (`.md/PROMPT_UNREAL.md`의 PIE 절차 1~9와 DISP 표). 특히 `M_PP_TakeHighlightOutline`이 실제로 마지막 자리 외곽선을 그리는지(셰이더 컴파일 오류는 로그에 없으나 화면은 미확인), 화면 네 테두리에 선이 없는지, `BP_ItemBox` Blueprint 뷰포트 미리보기(`EditorPreviewCount` 7)에서 병 7개가 트레이 위에 보이는지, 병(Cylinder)·트레이(Cube)·냉장고 모양이 임시 mesh로 충분한지 확인한다. 보이지 않으면 stencil 판독 채널(`.r`)과 `DepthBias`를 먼저 의심한다.
+3. **`WBP_InteractionPrompt` 보완 (선택, 이번 승인 범위 밖).** `HeldSummaryText`는 Python API로 추가·저장했다(`PromptRoot` Overlay 자식, 위쪽 여백 600). 다만 저장된 트리에는 held-use 단계 항목인 `HeldTakeActionNameText`, `HeldTakeFailureReasonText`, `PrimaryKeyText`, `LmbKeyText`, `RmbKeyText`(모두 `BindWidgetOptional`)가 아직 없다. RMB 행·키 라벨을 화면에 쓰려면 별도 승인으로 추가한다. 위치(위쪽 여백 600)는 화면에서 보고 조정한다.
+4. 임시 art 교체(선택): 위가 열린 박스 mesh, 바나나우유 mesh, 냉장고 mesh. 교체하면 `BoxSlotTransforms`와 `DisplayOffset`을 다시 맞춘다.
+
+---
+
 ## FuelIntake migration — 직접 Editor 검증 대기
 
 ### 현재 상태

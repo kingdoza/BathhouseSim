@@ -55,6 +55,16 @@ public:
 		const APlaceableFacilityItemActor& PayloadOwner,
 		const FFacilityPlacementPayload& Payload,
 		FText& OutFailureReason) = 0;
+	/**
+	 * Called by the placement transaction right after FinishSpawning (Blueprint components exist) and before the
+	 * collision snapshot is finalized. Payload state that depends on Blueprint components is applied here.
+	 * Returning false fails the placement like an import failure.
+	 */
+	virtual bool FinalizePlacementPayloadAfterConstruction(FText& OutFailureReason)
+	{
+		OutFailureReason = FText::GetEmpty();
+		return true;
+	}
 	virtual bool StagePlacedDomainRegistration(FText& OutFailureReason) = 0;
 	virtual void RollbackPlacedDomainRegistration() = 0;
 	virtual bool StagePlacedDomainUnregistration(

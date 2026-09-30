@@ -2,10 +2,11 @@
 
 #include "CoreMinimal.h"
 
+#include "Shop/ShopUnboxItemShape.h"
+
 class AActor;
 class AShopDeliveryBoxActor;
 class UCapsuleComponent;
-class UFacilityPlacementDefinition;
 class UWorld;
 
 class FShopUnboxingPlacement
@@ -18,10 +19,11 @@ public:
 		AShopDeliveryBoxActor& Box,
 		const FVector& FootLocation,
 		float ViewYaw,
-		const TArray<UFacilityPlacementDefinition*>& Definitions,
+		const TArray<FShopUnboxItemShape>& Items,
 		float ForwardDistanceCm,
 		FRandomStream& RandomStream,
 		float OverlapDepthCm,
 		TArray<FTransform>& OutTransforms,
 		FText& OutFailureReason);
+
 };

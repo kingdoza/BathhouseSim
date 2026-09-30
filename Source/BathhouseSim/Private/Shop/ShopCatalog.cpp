@@ -1,8 +1,7 @@
 #include "Shop/ShopCatalog.h"
 
-#include "Placement/FacilityPlacementDefinition.h"
-#include "Placement/FacilityPlacementTypes.h"
 #include "Misc/DataValidation.h"
+#include "Shop/ShopProductRules.h"
 
 const FShopProductEntry* UShopCatalog::FindProduct(const FName ProductId) const
 {
@@ -36,17 +35,13 @@ EDataValidationResult UShopCatalog::IsDataValid(FDataValidationContext& Context)
 		{
 			Invalidate(NSLOCTEXT("ShopCatalog", "InvalidProductDisplayOrPrice", "Shop products require a display name and a positive price."));
 		}
-		const UFacilityPlacementDefinition* Definition = Product.PlacementDefinition;
 		FText DefinitionFailure;
-		if (!Definition || !Definition->ValidateRuntime(DefinitionFailure))
+		if (!FShopProductRules::ValidateDefinitions(Product.PlacementDefinition, Product.ItemBoxDefinition, DefinitionFailure))
 		{
-			Invalidate(NSLOCTEXT("ShopCatalog", "MissingPlacementDefinition", "Every shop product requires a valid placement definition."));
-			continue;
-		}
-		if (Definition->LockerSlotCount != 0
-			|| !Definition->FacilityTags.HasTag(TAG_Facility_Discardable))
-		{
-			Invalidate(NSLOCTEXT("ShopCatalog", "InvalidDiscardableDefinition", "Shop products must be non-locker facilities marked Facility.Discardable."));
+			Invalidate(FText::Format(
+				NSLOCTEXT("ShopCatalog", "InvalidProductDefinition", "Shop product '{0}': {1}"),
+				FText::FromName(Product.ProductId),
+				DefinitionFailure));
 		}
 	}
 	return Result == EDataValidationResult::NotValidated ? EDataValidationResult::Valid : Result;

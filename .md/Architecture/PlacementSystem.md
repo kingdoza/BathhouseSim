@@ -131,6 +131,8 @@ footprint authoring 계약:
 
 Recovery item collision과 설치 footprint는 서로 대체하지 않는다. `RecoveryItemMesh`는 기존 동일 규격 직육면체/simple-box/physics 계약을 유지한다.
 
+`UFacilityPlacementInstanceData::GetPlacementContentsSummary()`(2026-09-30, 기본 빈 값)는 회수 아이템의 내용 요약이다. `APlaceableFacilityItemActor`는 요약이 있으면 표시 이름 뒤에 붙이고 `GetHeldSummaryText()`로 반환한다. 사용처는 음료 냉장고다([ServiceSystem.md](ServiceSystem.md) Placement Payload Extension).
+
 활성 Definition은 하나의 공통 Blueprint 파생 클래스를 `RecoveryItemClass`로 공유할 수 있다. runtime/Data Validation은 `APlaceableFacilityItemActor` 자체 또는 그 자식 클래스만 허용한다. 선택된 class CDO의 `ItemRoot` relative scale(`APlaceableFacilityItemActor::GetDefinitionItemScale`, 유한한 양수)이 설비 회수 아이템의 공통 물리·표현 scale 정본이며, 회수 collision query와 실제 spawn이 같은 값을 사용한다. Blueprint CDO는 component-to-world를 갱신하지 않으므로 CDO `GetActorScale3D()`로 읽지 않는다. 이 scale을 담은 transform으로 spawn할 때는 `SpawnActorDeferred`와 `FinishSpawning` 모두 `ESpawnActorScaleMethod::OverrideRootScale`을 써 root scale이 두 번 곱해지지 않게 한다. `FacilityItemHeldTransform` scale은 계속 무시하고 위치·회전만 적용한다.
 
 ## Placement Zone And Candidate Transform
@@ -218,6 +220,8 @@ recovery hold 시작은 side-effect-free query 성공 뒤 `TryBeginFacilityRecov
 실제 recovery transaction은 staged item 준비와 collision 확인 후 원본 Actor collision/domain을 silent 비활성화한다. Bath의 domain-unregistration override는 control 닫힘을 commit-pending으로 적용하되 hold snapshot은 유지한다. item physics 활성화와 원본 파괴가 성공하면 EndPlay에서 snapshot을 폐기하고 publication한다. 파괴 전 실패는 원본 domain/collision 뒤 hold snapshot까지 복원하고 item을 제거한다. Player의 후속 cancel과 target EndPlay는 idempotent하다.
 
 Actor collision restore는 실패 가능한 domain rollback 뒤에 수행한다. callback 재진입과 Actor 파괴 보상, held identity/Root scale/payload와 기존 회수 조건은 현재 transaction 계약을 유지한다.
+
+placement staged 순서(2026-09-30 확정): `SpawnActorDeferred` → `PrepareForStagedPlacement` → `ImportPlacementPayload`(construction 전, native subobject만 존재) → `FinishSpawning`(Blueprint SCS component 생성) → `IPlaceableFacility::FinalizePlacementPayloadAfterConstruction(OutFailure)` → collision snapshot 확정·검증 → `QueryFacilityPlacement` → `BeginTransition` → domain 등록 → item 소비 → publication. 새 단계는 default `true`이며 기존 설비의 순서·결과를 바꾸지 않는다. 실패하면 기존 import 실패와 같이 staged Actor를 제거하고 item 소비·publication 없이 실패를 반환한다. Blueprint component에 의존하는 payload 적용은 이 단계에서만 한다([ServiceSystem.md](ServiceSystem.md) Placement Payload Extension).
 
 ## Fresh Install Payload And Discard Tag
 

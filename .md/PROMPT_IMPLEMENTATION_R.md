@@ -1,119 +1,146 @@
-# 구현 재작업 프롬프트 — 상점 확장: 물리 측정 harness 수정과 재측정
+# 재작업 프롬프트 — 서비스 1단위 수직: 냉장고 payload import 시점과 Editor 인계 보완
 
 ## 재검토 결론
 
-- 2026-09-28 두 번째 코드 리뷰 결론: **구현 재검토**. 입력은 `.md/PROMPT_REVIEW.md`(19:00 UTC)와 현재 작업 트리다.
-- 완료 확인:
-  - 백업(`20260928_shop_ext`, SHA 기록).
-  - Editor 빌드.
-  - copy-first load gate 1~4.
-  - P2 `WITH_EDITOR` guard.
-  - P3 관찰표(D별 단계, 7종 회전 성분 없음).
-- 중단 조건이 발동했다고 보고된 `UnboxingPhysics`의 측정은 **물리가 실제로 진행된 결과로 볼 수 없다.** 기능 명세로 복귀하기 전에 측정 harness부터 바로잡는다. 이번 판단의 근거는 아래와 같다.
+- 2026-09-30 코드 리뷰 결론: **아키텍처 재검토**(F1) 후 **구현 재검토**(F1 반영, F2~F5).
+- 입력은 `.md/PROMPT_REVIEW.md`, `.md/PROMPT_UNREAL.md`와 현재 작업 트리다. 기능 계약은 `.md/PROMPT_ARCHITECTURE.md`(DISP-001~022, FRDG-001~015, SHOP-S01·S02), 단계는 **수직 구현**이다.
+- 확인된 사항:
+  - 작업명·시나리오 ID·단계가 네 입력에서 일치한다.
+  - 리뷰 시점에 UE 5.8 `Build.bat`를 다시 실행했고 결과는 "Target is up to date"다. 빌드 로그 이후 변경된 Source는 없다.
+  - `git status -- Content Config`에 변경이 없다.
+  - 전체 회귀 리포트는 성공 75, 경고 포함 성공 11, 실패 0으로 보고와 일치한다.
+- Editor 단계로 넘기지 않는다. 아래 F1 때문에 대표 시나리오의 "냉장고 배치"가 실제 `BP_DrinkFridge`에서 성립하지 않는다.
 
-## 근거 — 테스트 world에서 물리가 진행되지 않았다
+## F1 — 치명: 배치 import가 Blueprint 진열 공간 생성 전에 실행된다 (아키텍처 결정 필요)
 
-1. **자유낙하 속도가 맞지 않는다.**
-   - 두 물품을 Z=5000cm 허공에 만들고 1/60초 × 30 step을 진행했다.
-   - 정상 물리라면 자유낙하 속도가 약 490cm/s(980 × 0.5)까지 올라야 한다.
-   - 보고된 최고 선속도는 세 D 모두 16.331cm/s다. 중력 한 step(980/60)과 같다. 첫 step 이후 적분이 멈춘 것으로 보인다.
-2. **물품이 떠 있다.**
-   - 닫힌 방의 바닥 윗면은 Z=0(`ShopRoomFloor` 중심 −50, half 50)이다.
-   - 3초 tick 뒤 10개 물품의 Z는 981~1337cm였다. 중력이 작동했다면 모두 바닥 근처에 있어야 한다.
-   - 현재 단언("방 안·바닥 위")은 떠 있는 상태도 통과시킨다.
-3. **world 생성에 물리 시작 단계가 없다.** `FShopScatterAutomationWorld::Initialize`는 `CreateWorld(Game)`, `InitializeActorsForPlay`만 호출한다. 물리 시뮬레이션 활성화와 `BeginPlay`가 없다.
+### 근거
 
-따라서 "분리 방향 상대속도 0"과 D별 비교는 기능 전제(Q29 B)의 판정 근거가 아니다. depenetration 설정과 unboxing 로직은 계속 바꾸지 않는다.
+- `FFacilityActorConversionTransaction`(`Private/Placement/FacilityActorConversionTransaction.cpp:323-382`)의 순서는 다음과 같다.
+  1. `SpawnActorDeferred`
+  2. `PrepareForStagedPlacement`
+  3. `ImportPlacementPayload`
+  4. `FinishSpawning`
+- Blueprint SCS 컴포넌트는 `FinishSpawning`의 construction에서 생성된다.
+- `ADrinkFridgeActor::ImportFacilityExtension`(`Private/Service/DrinkFridgeActor.cpp:247`)은 신규 설치(`Data == nullptr`)와 재설치 모두에서 `CollectSpaces`를 먼저 호출한다. `CollectSpaces`는 `GetComponents<UDisplaySpaceComponent>`와 slot 수 1개를 요구한다.
+- `PROMPT_UNREAL.md`와 `ServiceSystem.md`는 진열 공간 4개와 손님 slot을 `BP_DrinkFridge`에 추가하는 구조로 정했다.
+- 따라서 import 시점에는 공간 0개, slot 0개다. `"냉장고에는 진열 공간이 1개 이상 필요합니다."`로 실패하고 staged Actor가 파괴된다.
+- 결과적으로 신규 설치(FRDG-012, 대표 시나리오)와 재설치 복원(FRDG-009)이 모두 실패한다.
+- 자동화가 이를 잡지 못한 이유:
+  - fixture `AServiceAutomationFridge`는 공간과 slot을 생성자의 `CreateDefaultSubobject`로 만든다.
+  - `SpawnInstalledFridge`도 `FinishSpawning` 전에 import한다.
+  - 즉 native subobject라서 통과한 것이며, 실제 BP authoring 구조를 재현하지 않는다.
 
-## 진행 상태 (2026-09-28, 리뷰 에이전트 직접 수정)
+### 아키텍처 단계가 정할 것
 
-사용자 지시로 리뷰 에이전트가 P1을 직접 수정했다. **구현 단계는 P1 코드를 다시 작성하지 말고, 빌드·실행·보고만 한다.** R1(`.md/PROMPT_IMPLEMENTATION.md`) 작업과 같은 차례에 함께 진행한다.
+리뷰는 구조를 고르지 않는다. 다음 불변식을 모두 지키는 import 시점과 경로를 `ServiceSystem.md` Placement Payload Extension과 `PlacementSystem.md` transaction 순서에 확정한다.
 
-- 수정 파일: `Source/BathhouseSim/Private/Tests/ShopUnboxingScatterAutomationTests.cpp`만. 제품 코드·Content·Config는 무변경.
-- 확인된 원인: 물리 테스트가 `World.Tick`만 반복하고 `GFrameCounter`를 올리지 않았다. tick 관리자는 같은 frame 번호에서 tick 함수를 한 번만 실행하므로 물리가 첫 step만 적분했다(최고 속도 16.331cm/s = 980/60). Utility 테스트 helper는 이미 `++GFrameCounter`를 한다.
-- 변경 내용:
-  1. `FShopScatterAutomationWorld::Initialize(..., bool bSimulatePhysics = false)`. true면 `bShouldSimulatePhysics = true`와 `World->BeginPlay()`를 실행한다. 기본값 false라 다른 Shop 테스트의 동작은 그대로다.
-  2. `TickShopPhysicsStep`: `++GFrameCounter` 후 `World.Tick`. 물리 테스트의 모든 tick이 이 helper를 쓴다.
-  3. `RunShopFreeFallSanityGate`: 샤워기 한 개를 0.5초 자유낙하시킨다. 속도는 |g|·t ±20%, 낙하 거리는 ½|g|t² ±25%여야 한다. 실패하면 `UnboxingPhysics`가 이후 판정 없이 실패한다.
-  4. 튐 측정: 첫 3 step의 분리 방향 최고 상대속도를 따로 기록한다. "nonzero velocity" 단언을 전체 선속도(자유낙하에서는 중력 때문에 항상 참)에서 분리 방향 상대속도로 바꿨다.
-  5. 닫힌 방: 각 물품이 생성 바닥면보다 200cm 이상 낙하했는지, 가장 낮은 바닥면이 방 바닥 ±5cm에 정착했는지 단언한다.
-- 1차 실행 결과(사용자 실행, 2026-09-28 02:27): sanity 통과(하강 속도 488.736/490, 낙하 126.359/122.5cm). 방 물품 10개가 바닥에 정착했다(lowestBottom −0.03cm). 그러나 D=2/8/20 모두 분리 속도 0.000이고 최종 penetration −44.319/−32.000/−26.319로, 처음부터 겹치지 않았다.
-- 2차 수정(테스트 코드만):
-  6. 원인: `RunShopOverlapPhysicsCase`가 layout의 **collision shape 중심**을 actor 위치로 그대로 썼다. 메시 bounds origin이 yaw마다 다르게 어긋나 두 물품이 벌어진 채 생성됐다. 근거: 같은 seed에서 D=2와 D=20의 차이가 정확히 18cm이다. 이제 제품(`BuildCandidateAtShapeCenter`)과 같은 변환 `actor = shapeCenter − R·(scale·boundsOrigin)`을 쓰고, CDO scale을 transform에 넣는다.
-  7. 초기 겹침 sanity: 생성 직후, tick 전에 실제 두 collision box의 SAT penetration이 D±0.5cm인지 단언하고 `initialPenetration`을 로그에 남긴다.
-  8. scale 계약: 겹침 테스트와 닫힌 방 테스트 모두 생성된 actor scale이 CDO(template) scale과 같은지 단언하고 `actorScale/templateScale`을 로그에 남긴다. 제품 경로(`FindSpawnTransforms`가 준 transform에 scale 포함 → `SpawnFreshItem`의 `SpawnActorDeferred`는 `ScaleMethod`를 지정하지 않음)에서 root scale이 두 번 곱해지는지 확인하려는 것이다. **이 단언이 실패하면 테스트를 고치지 말고 그대로 보고한다**(제품 결함 후보).
-- 2차 실행 결과(사용자 실행, 2026-09-28 11:38 KST): 빌드 성공. 생성된 물품 actor scale은 겹침·방 테스트 모두 `(0.6,0.6,0.6)`, CDO `GetActorScale3D()`는 `(1,1,1)`. 초기 penetration은 D=8 −32.000, D=2 −44.319, D=20 −26.319cm로 **최종값과 같다**(두 물품이 한 번도 닿지 않음). 분리 속도 0.
-- 원인 확정 — **제품 결함**(아래 P3): Blueprint CDO는 component-to-world를 계산하지 않으므로 `ItemCDO->GetActorScale3D()`는 Blueprint가 `ItemRoot`에 넣은 scale과 무관하게 1.0이다. 상점 배치는 이 1.0으로 모든 collision shape를 계산하고, 실제 물품은 root 기본 scale 0.6으로 생성된다. 수치 검산: 실제 penetration = D − (1 − 0.6)·(두 물품의 분리축 반경 합). D=8 → 8 − 0.4·100 = −32. 같은 seed의 D=2·D=20은 반경 합 115.8로 −44.319·−26.319가 둘 다 맞는다.
-- 3차 수정(테스트 코드만): 테스트도 같은 방식(`CDO->GetActorScale3D()`)으로 template scale을 읽고 있었다. `GetShopItemTemplateScale()`(CDO root의 `GetRelativeScale3D()`, `FacilityPlacementGeometry`와 같은 규칙)로 바꾸고 `GetDefinitionHalfExtent`, 겹침 테스트, 방 테스트의 기준값에 적용했다. scale 단언은 유지한다. P3 전에는 겹침 테스트 scale 단언이 계속 실패하는 것이 정상이다(0.6 transform × root 0.6 = 0.36 예상).
-- 리뷰 에이전트는 Windows UE 빌드를 실행할 수 없어 compile은 미확인이다. 구현 단계가 아래 순서로 실행해 결과를 `.md/PROMPT_REVIEW.md`에 적는다.
-  1. `Build.bat BathhouseSimEditor Win64 Development`. compile 오류가 이 파일에서 나면 최소 수정하고 무엇을 고쳤는지 보고한다.
-  2. `Automation RunTests BathhouseSim.Shop.UnboxingPhysics`(Headless Policy). 로그의 `UnboxingPhysics sanity`, D=2/8/20 줄(`initialPenetration` 포함), `actorScale` 줄, room 줄을 그대로 옮긴다.
-  3. 아래 P2 판정 분기에 따른다. 성립하면 집중 `BathhouseSim.Shop`과 전체 회귀를 R1 결과와 함께 보고한다.
+- 공간 수, 공간 정원, 자리 위치는 Editor(BP)에서 조정한다. 기능 계약 "공간 수와 공간당 정원은 Editor에서 조정한다"를 유지한다.
+- 잘못된 payload는 전부 거부하고 아무 공간도 바꾸지 않는다. 실패는 staged placement rollback(item 미소모, publication 없음)으로 전파한다.
+- 기존 설비(`BP_Shower` 등)의 hook 기본 동작, placement 순서와 결과는 바뀌지 않는다.
+- 고려할 후보(선택은 아키텍처 단계):
+  - transaction이 `FinishSpawning` 뒤, 배치 검증 전에 확장 import 단계를 호출한다.
+  - import 시점에는 payload만 보관하고, construction 뒤 검증·적용 실패를 기존 실패 경로로 전파한다.
+  - 그 밖의 방식.
+- 구현 단계는 확정된 설계로 `PROMPT_IMPLEMENTATION.md`를 받은 뒤 수정한다.
 
-## P1 — 물리 harness 수정(테스트 코드만)
+### 재검증 조건
 
-대상: `Source/BathhouseSim/Private/Tests/ShopUnboxingScatterAutomationTests.cpp`의 `FShopScatterAutomationWorld`와 physics 테스트.
+- 공간과 slot이 **생성자 subobject가 아닌** fixture로 테스트한다. 예: `FinishSpawning` 중 construction에서 생성되는 component, 또는 SCS를 가진 테스트용 Blueprint 대체 경로.
+- 이 fixture로 실제 `FFacilityActorConversionTransaction` 경로를 통과시켜 다음을 확인한다.
+  - 신규 설치가 빈 공간으로 성공한다.
+  - 회수 → 재설치가 공간별 종류·수량을 복원한다.
+  - 잘못된 payload는 거부되고 item과 공간이 모두 변하지 않는다.
+- 기존 Placement·Shop·Facility 회귀가 유지된다.
 
-1. **물리 시뮬레이션이 실제로 진행되는 world를 만든다.**
-   - `UWorld::bShouldSimulatePhysics`를 켠다.
-   - 필요한 play 초기화(`BeginPlay` 등)를 수행한다.
-   - 프로젝트의 다른 물리 테스트(낙하·래그돌·carry release)에서 physics가 실제로 진행되는 기존 fixture가 있으면 그 방식을 재사용한다. 무엇을 기준으로 삼았는지 보고한다.
-2. **sanity gate를 먼저 둔다.** 튐 측정 전에 같은 world에서 샤워기 한 개를 바닥 없는 공중에 두고 0.5초 진행한다.
-   - 하강 속도가 980 × t의 ±20% 안이어야 한다.
-   - 실패하면 이후 측정을 하지 않고 실패로 보고한다.
-3. **닫힌 방 단언을 강화한다.** 3초 뒤 모든 물품이 방 안에 있고, 가장 낮은 collision 바닥면이 방 바닥 윗면 + 5cm 이내(정착)여야 한다.
-4. **튐 측정:**
-   - 기존 D=2, 8, 20 비교를 유지한다.
-   - 매 step(1/60초)마다 분리 방향 상대속도와 전체 선속도의 최대값을 기록한다.
-   - 첫 3 step의 값도 따로 적는다(초기 depenetration은 첫 step들에서 일어난다).
-   - sanity gate를 통과한 world에서만 결과를 판정한다.
+## F2 — 중요: `PROMPT_UNREAL.md`가 Editor 계약을 정확히 인계하지 않는다
 
-## P2 — 재측정 뒤 판정
+`AGENT_IMPLEMENTATION.md`의 `PROMPT_UNREAL.md` 항목과 `AGENT_REVIEW.md` 기능 계약 검토 기준에 미달한다. F1 반영 후 다시 작성한다.
 
-- sanity gate 통과 + D가 클수록 분리 속도가 커지면: 기능 전제가 성립한다. 집중 `BathhouseSim.Shop`과 전체 `Automation RunTests BathhouseSim`을 실행하고 보고한다.
-- sanity gate 통과 + 분리 속도가 여전히 거의 0: 이것이 진짜 중단 조건이다. 설정을 바꾸지 말고 수치와 함께 멈춰 보고한다(기능 명세 복귀).
-- sanity gate 자체가 통과하지 않으면: 물리 fixture 문제로 멈추고 시도한 방법과 로그를 보고한다.
+1. **exact asset path가 없다.** 문서 전체에 `/Game/` 경로가 0개다.
+   - 대상: 신규 asset 전부(`DA_ServiceItem_BananaMilk`, `BP_ItemBox`, `BP_DrinkFridge`, `BP_DrinkCollectionBox`, `DA_FacilityPlacement_DrinkFridge`, `M_PP_TakeHighlightOutline`)와 이름이 없는 "프리뷰 반투명 머티리얼".
+   - 기존 규약을 따른다: `/Game/Bathhouse/Data/...`, `/Game/Bathhouse/Blueprints/...`, `/Game/Bathhouse/Materials/...`.
+   - `RecoveryItemClass`도 정확한 경로로 적는다(`/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem`).
+2. **저장 allowlist가 이름만 적혀 있다.**
+   - `BP_FirstPersonCharacter`, `WBP_InteractionPrompt`는 full path로 적는다.
+   - `DefaultMap`은 World Partition이다(`.md/Unreal/InteractionUISystem.md` 30~31행 참조). 수거함 배치가 저장될 external actor package 경로 규칙과, `DefaultMap.umap` 자체는 저장하지 않는지를 명시한다.
+3. **갱신할 `.md/Unreal/*System.md`가 없다.**
+   - 신규 `.md/Unreal/ServiceSystem.md`와 `0_UNREAL.md` 지도 항목을 추가 대상으로 적는다.
+   - `ShopSystem.md`(catalog 상품 2개), `PlacementSystem.md`(Definition 표), `InteractionUISystem.md`(WBP `HeldSummaryText`, 카메라 blendable)의 갱신 범위도 적는다.
+4. **검증 방법이 성립하지 않는 항목이 있다.**
+   - `ADrinkFridgeActor::IsDataValid`는 `IsTemplate()`에서 검사를 건너뛴다. BP CDO에는 SCS component도 없다. 그래서 `BP_DrinkFridge` Data Validation은 항상 통과한다.
+   - 공간 index·자리·분류·slot 수는 다른 방법으로 확인하도록 명시한다. 예: MCP로 SCS template 값 readback, PIE 배치 성공과 HUD `빈 공간 0/6` ×4.
+5. **PIE 절차에 대표 시나리오 전체가 없다.**
+   - 기능 계약 "단계 판단"의 대표 시나리오를 순서대로 1회 수행하는 절차를 넣는다.
+   - DISP-003~011·020·022의 관찰 방법도 적는다: 키, 조준 대상, 기대 HUD 문구, 병 위치.
+6. **품목 박스 Editor 미리보기 방법이 없다.**
+   - `AItemBoxActor::OnConstruction`과 `RefreshEditorPreview`는 `EWorldType::Editor`에서만 동작한다. Blueprint 에디터 뷰포트(`EditorPreview`)와 class defaults 버튼에서는 보이지 않는다.
+   - 레벨에 둔 미리보기 인스턴스는 게임에서 초기화되지 않은 박스로 남는다. 들 수 없고 조준 표시도 없다.
+   - 미리보기 방법(레벨 인스턴스, 저장 금지)을 명시한다.
+   - BP 뷰포트 미리보기가 기능 계약상 필요한지는 아키텍처 단계가 판단한다(F3).
 
-## P3 — 제품 결함: 상점 물품 scale 이중 기준 (구현 재검토)
+## F3 — 보통: 설계 정본과 구현의 불일치 (아키텍처 단계 정리)
 
-현상: `FShopUnboxingPlacement`가 계산한 collision shape와 실제로 생성된 물품의 크기가 다르다. shape는 scale 1.0 기준이고 실제 물품은 0.6이다. 결과적으로 다음 계약이 게임에서 성립하지 않는다.
+구현 프롬프트는 Architecture 수정을 금지했고, 구현 단계는 차이를 보고만 했다. F1 설계와 함께 `ServiceSystem.md`를 현재 상태로 맞춘다.
 
-- 무리 겹침 D: 실제로는 겹치지 않고 약 40cm 벌어진다. 튐 연출이 발생하지 않는다.
-- 바닥 +20cm: 실제 물품 바닥은 shape 바닥보다 (1−0.6)·Ez만큼 더 높다.
-- 환경·Pawn 여유: 실제보다 1/0.6배 큰 상자로 검사한다. 안전 쪽이지만 배치 실패가 과다하다.
-- 기존 `ShopAutomationTests`의 "+20cm" 검사는 반환 transform(scale 1)으로만 계산하므로 이 결함을 잡지 못했다.
+- Status가 "Source 미반영"으로 남아 있다.
+- `DisplayOffset` 합성
+  - 정본: `SlotTransforms[i] * Kind->DisplayOffset`
+  - 구현: `DisplayOffset * SlotTransforms[i]`(자리 로컬, `DisplaySpaceComponent.cpp:253`)
+  - `PROMPT_UNREAL.md`는 구현 쪽 해석을 따른다. MCP 단계가 두 문서에서 서로 다른 기준을 받지 않도록 하나로 정한다.
+- 정본에 없는 공개 API와 이름 차이
+  - 이름 차이: 정본 `TryMoveOne` / 구현 `TryApplyOne`·`TryTakeOne`
+  - 추가 API: `AItemBoxActor::SpawnFilledBox`, `GetMutableContents`/`NotifyContentsChanged`, `UDisplaySpaceComponent::ImportStock`/`RemoveOneForCustomer`/`PublishStockChanged`/`IsOperational`
+  - 추가 동작: placeable이 아닌 owner는 게이트하지 않는 규칙
+  - 추가 helper: `FShopProductRules`, `FShopUnboxItemShape`
+- 품목 박스 Editor 미리보기 world 범위(F2-6).
 
-수정:
+## F4 — 낮음: 자동화 누락
 
-1. **scale 원천을 하나로 둔다.** `APlaceableFacilityItemActor`에 static helper(예: `GetDefinitionItemScale(const UFacilityPlacementDefinition&, FVector&, FText&)`)를 추가한다. CDO `GetRootComponent()->GetRelativeScale3D()`를 반환하고, NaN이나 0 이하 성분은 실패로 처리한다(`FacilityPlacementComponent::BuildPlacedActorTransform`과 같은 규칙). `ShopUnboxingPlacement.cpp`의 `ItemCDO->GetActorScale3D()`를 이 helper로 바꾼다.
-2. **생성 transform을 최종 world transform으로 만든다.** `SpawnFreshItem`의 `SpawnActorDeferred`와 `FinishSpawning` 모두 `ESpawnActorScaleMethod::OverrideRootScale`을 쓴다(설비 생성 `FacilityActorConversionTransaction.cpp` 313·372행과 같은 방식). 그러지 않으면 transform의 0.6과 root의 0.6이 곱해진다. `SpawnFreshItem` 호출처는 `ShopUnboxingTransaction`과 테스트뿐이다.
-3. **생성된 actor로 검증한다.** R1의 `UnboxingDepthPlacementObservation` 단언 전환에서 "바닥 +20±0.5"는 반환 transform이 아니라 `SpawnFreshItem` + `ActivateFreeWorld`로 생성한 actor의 transform으로 계산한 collision 바닥면으로 판정한다. `ShopAutomationTests`의 open-floor "+20cm" 검사에도 생성 actor 기준 검사를 하나 추가한다.
-4. 테스트의 `GetShopItemTemplateScale()`은 새 helper를 호출하도록 바꿔도 된다(기준 동일).
+- DISP-021 냉장고 아이템 버리기가 없다. 정본 Verification 표에 있는 항목이다.
+  - 진열이 든 냉장고 아이템(payload 보유)을 쓰레기통 경로로 버린다.
+  - item과 payload 소멸, 지갑·수거함 금액 불변을 확인한다.
+- 박스 버리기 테스트에 돈 불변 검증을 추가한다.
 
-완료 기준 — `BathhouseSim.Shop.UnboxingPhysics`:
+## F5 — 낮음: 클래스 성장·정리
 
-- actorScale = templateScale = 0.6(현재 Blueprint 값).
-- initialPenetration = D ± 0.5.
-- 그다음 P2 판정 분기를 적용한다.
+- `ShopUnboxingPlacement.cpp`가 399줄에서 499줄로 늘어 400줄 경고선을 넘었다.
+- 설비 전용 `FindSpawnTransforms(Definitions)` overload는 이제 production 호출처가 없고 테스트 12곳만 쓴다.
+  - 구현 프롬프트는 "입력을 shape 목록으로 바꾼다"였다.
+  - 선택지: 테스트를 shape 경로로 옮기고 overload를 제거한다. 또는 유지 근거와 제거 조건을 정본에 남긴다.
+  - `FShopUnboxItemShape` factory 두 개를 별도 private 파일로 옮기는 것은 선택 사항이다.
+- `UServiceDisplaySettings::LoadInsertPreviewMaterial`이 `ServiceItemDefinition.cpp`에 정의돼 있다. `ServiceDisplaySettings.cpp`로 옮긴다.
 
-R1과 같은 파일(`ShopUnboxingPlacement.cpp`)이므로 R1과 한 차례에 처리한다. 순서: P3 1·2 → R1 → P3 3.
+## 유지할 것 (리뷰에서 문제없음)
 
-범위 밖 관찰(수정하지 않고 보고만):
+- `FServiceItemTransfer`
+  - 이유 우선순위와 문구가 정본·기능 계약 표와 일치한다.
+  - 실패 시 두 stack·Revision이 불변이다.
+  - 빈 박스는 Take 정원으로 공간 종류의 정원을 쓴다.
+- held-use 경로
+  - `BeginUse`와 `TickRepeat`이 매번 재평가한 뒤 1개만 이동한다.
+  - 공간 전환, 박스 내려놓기, suppression에서 멈춘다.
+  - 가득 참 이유가 1회 보고된다.
+- 프리뷰·강조
+  - observer는 표현만 바꾼다.
+  - proxy는 main/depth pass 제외, custom depth와 stencil 설정값을 쓴다.
+  - 설정값을 매 알림마다 읽는다.
+  - transient component는 NoCollision·Navigation off라 `ValidateNavigationContract`와 충돌하지 않는다.
+- 냉장고 손님 계약
+  - 가져가기와 적립이 같은 단계이고 방송은 commit 뒤다.
+  - 회수 보류 중 예약을 거부한다. 취소하면 해제된다.
+  - 사용자 EndPlay에서 `ForceRelease`한다.
+- 수거함
+  - query를 다시 검증한다.
+  - `CanAddMoney`를 먼저 확인하고, 성공할 때만 0으로 만든다.
+  - 재진입 guard가 있다.
+  - wallet 해석 경로가 기존 cash 액터와 같다.
+- 상점: 정확히 하나의 정의만 허용하고, 박스 12/12 개봉, rollback이 기존과 같다.
+- HUD: `HeldObjectSummary`를 `Equals`에 포함하고, `UPlayerInteractionComponent`는 무변경이다.
+- 추가만 한 reflected 변경: enum append, struct field, 비 final. Core Redirect가 필요 없다.
 
-- `FacilityActorConversionTransaction.cpp` 75행(설비 회수)도 `ItemCDO->GetActorScale3D()` + 기본 scale method로 같은 패턴이다. 회수 공간 검사가 실제보다 큰 상자로 이뤄진다. 기존 회수 테스트는 constructor에서 scale을 정하는 native fixture를 써서 드러나지 않는다. 별도 과제로 아키텍처에 넘긴다.
-- `.md/Unreal/PlacementSystem.md`와 `.md/USER_UNREAL.md`는 `BP_PlaceableFacilityItem.ItemRoot` scale을 `(0.3,0.3,0.3)`으로 기록하고 있다. 실측은 0.6이다. 사용자가 조정한 값이면 Unreal 문서 갱신 대상이다.
+## 재작업 후 리뷰 입력
 
-## 유지
-
-- P3 관찰 결과(D ≥ 20에서 정면 대신 위 단계 채택)는 **아키텍처 판단 대상**이다. 코드를 바꾸지 않는다.
-- 제품 코드 수정은 P3 범위(scale helper, `SpawnFreshItem` scale method, 호출처 교체)와 R1에 한정한다. Content·Config·Level, depenetration 설정, 개봉 속도·impulse는 수정하지 않는다.
-
-## 결과물
-
-- `.md/PROMPT_REVIEW.md` 갱신:
-  - harness 수정 방식과 기준 fixture.
-  - sanity gate 수치.
-  - 튐 측정표(첫 3 step 포함).
-  - 닫힌 방 정착 결과.
-  - 판정 분기, 자동화 수치.
-- `.md/PROMPT_UNREAL.md`는 판정이 성립할 때만 갱신한다.
+- 갱신된 `ServiceSystem.md`(F1·F3)와 `PROMPT_IMPLEMENTATION.md`
+- 재작성된 `PROMPT_REVIEW.md`: F1~F5 대응, 새 fixture 방식, 전체 회귀 수치
+- 재작성된 `PROMPT_UNREAL.md`(F2)
+- Content·Config 무변경을 유지한다. 기존 copy-first load gate는 hook 시점이 바뀌면 `BP_Shower`만 다시 실행한다.

@@ -89,7 +89,16 @@ FPlayerInteractionResult APlaceableFacilityItemActor::ExecuteInteraction(
 
 FText APlaceableFacilityItemActor::GetPhysicalCarryDisplayName() const
 {
-	return LOCTEXT("FacilityItemName", "설비 회수 아이템");
+	const FText BaseName = LOCTEXT("FacilityItemName", "설비 회수 아이템");
+	const FText Summary = GetHeldSummaryText();
+	return Summary.IsEmpty()
+		? BaseName
+		: FText::Format(LOCTEXT("FacilityItemNameWithContents", "{0} — {1}"), BaseName, Summary);
+}
+
+FText APlaceableFacilityItemActor::GetHeldSummaryText() const
+{
+	return Payload.InstanceData ? Payload.InstanceData->GetPlacementContentsSummary() : FText::GetEmpty();
 }
 
 FTransform APlaceableFacilityItemActor::GetHeldTransform() const

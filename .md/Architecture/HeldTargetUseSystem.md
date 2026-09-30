@@ -4,7 +4,7 @@
 
 - 2026-09-28 설계, Source 미반영. 입력은 `.md/PROMPT_ARCHITECTURE.md`(들고 있는 물건 조작 LMB 통일, CTRL-001~029)와 `.md/QNA_FEATURE_SPEC.md` Q1~Q7이다.
 - 들고 있는 물건으로 조준 대상에 하는 일을 LMB(물건 → 대상)와 RMB(대상 → 물건)로 옮기는 Interaction 하위 계약이다. 입력 소유, 연속 실행, HUD 표시 데이터를 정한다.
-- 첫 사용처는 삽(공급함·투입구)과 수건바구니(선반·사용 수건통·세탁기/건조기 port·바닥 수건)다. 앞으로 "박스 → 진열대" 같은 작업이 같은 계약을 쓴다.
+- 첫 사용처는 삽(공급함·투입구)과 수건바구니(선반·사용 수건통·세탁기/건조기 port·바닥 수건)다. 2026-09-30부터 품목 박스 → 진열 공간이 같은 계약을 쓴다([ServiceSystem.md](ServiceSystem.md) Display Space).
 - 이동 방향·조건·transaction은 각 domain 정본([TowelSystem.md](TowelSystem.md), [UtilityFuelSystem.md](UtilityFuelSystem.md))을 그대로 따른다. 키와 실행 경로만 바뀐다.
 - 비대상: F의 새 용도, 장비(`IHeldEquipmentUsable`)의 RMB, 키 재설정 UI.
 

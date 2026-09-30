@@ -219,8 +219,9 @@ void UInteractionPromptWidget::ApplyCurrentPresentation()
 	const bool bHasTransientFailure = bHasPrimaryTransientFailure || bHasSecondaryTransientFailure
 		|| bHasHeldApplyTransientFailure || bHasHeldTakeTransientFailure
 		|| bHasEquipmentTransientFailure || bHasPlacementTransientFailure || bHasRecoveryTransientFailure;
+	const bool bHasHeldSummary = !CachedQuery.HeldObjectSummary.IsEmpty();
 	const bool bShowPrompt = bHasPersistentTarget || CachedQuery.bPlacementVisible
-		|| CachedQuery.bRecoveryVisible || bHasTransientFailure;
+		|| CachedQuery.bRecoveryVisible || bHasTransientFailure || bHasHeldSummary;
 	const bool bSecondaryVisible = bHasVisibleQuery && CachedQuery.bSecondaryVisible;
 	const bool bPromptEnabled = IsPromptRootEnabled(CachedQuery);
 	const bool bPrimaryEnabled = IsLegacyPrimaryEnabled(CachedQuery);
@@ -350,6 +351,12 @@ void UInteractionPromptWidget::ApplyCurrentPresentation()
 	{
 		RmbKeyText->SetText(RmbKeyLabel);
 		RmbKeyText->SetVisibility(bHeldTakeRowVisible
+			? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	if (HeldSummaryText)
+	{
+		HeldSummaryText->SetText(CachedQuery.HeldObjectSummary);
+		HeldSummaryText->SetVisibility(bHasHeldSummary
 			? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	}
 

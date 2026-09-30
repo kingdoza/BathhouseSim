@@ -39,6 +39,14 @@ FPlayerInteractionQuery UPlayerEquipmentUseComponent::MergeEquipmentQuery(
 	const FPlayerInteractionQuery& BaseQuery) const
 {
 	FPlayerInteractionQuery Result = BaseQuery;
+	if (CarryComponent)
+	{
+		const IPhysicalCarryable* HeldCarryable = Cast<IPhysicalCarryable>(CarryComponent->GetHeldObject());
+		if (HeldCarryable)
+		{
+			Result.HeldObjectSummary = HeldCarryable->GetHeldSummaryText();
+		}
+	}
 	AActor* Equipment = nullptr;
 	const IHeldEquipmentUsable* Usable = GetHeldUsable(Equipment);
 	if (!Usable)

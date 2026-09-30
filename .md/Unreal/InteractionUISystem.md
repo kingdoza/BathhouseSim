@@ -31,3 +31,8 @@ Summary의 접두사별 이름은 표기된 접두사에 `CapacityText`, `Capaci
 - Level reference는 World Partition external actor `/Game/__ExternalActors__/Maps/DefaultMap/7/EH/E4FLO971KSWUJ40H7W7PHK`에 저장됐다. `DefaultMap.umap` 자체는 이 연결 때문에 변경하지 않았다.
 
 UE 5.8 DLL 빌드 후 새 Editor에서 다섯 WBP와 컴퓨터 BP의 Data Validation 6/6 `VALID`를 확인했다. PIE의 1024×576 RenderTarget에는 Zone 격자·경계, Bath 타일 2개, utility summary와 detail이 표시됐다. 타일 Button의 `OnClicked` 이벤트를 호출하면 선택·detail·slider 활성화가 갱신된다. 실제 플레이어 LMB 조준/클릭과 물 제어·회수 전체 시나리오는 아직 직접 플레이 검증이 필요하며 [USER_UNREAL.md](../USER_UNREAL.md)에 남겼다. 이번 FocusExitPoint/취소 입력 변경은 fresh-process reload와 PIE 시작·종료까지만 확인했고, Data Validation과 E/ESC/마우스 입력 수용은 미완료다.
+
+
+## 서비스 단계 연결
+
+`BP_FirstPersonCharacter.FirstPersonCamera`의 PostProcessSettings `WeightedBlendables`에 `/Game/Bathhouse/Materials/Service/M_PP_TakeHighlightOutline`(weight 1)이 저장돼 있다(레벨 PostProcessVolume 아님). `/Game/Bathhouse/UI/WBP_InteractionPrompt`에는 `HeldSummaryText`(TextBlock, `BindWidgetOptional`)가 `PromptRoot`(Overlay) 자식으로 저장돼 있다. Overlay slot padding top 600·Left/Top 정렬, 폰트·색·그림자는 `ActionNameText`와 동일(Roboto Bold 24), 기본 Visibility Collapsed(C++가 표시 제어). 기존 필수 BindWidget 15개는 모두 유지된다. 이 WBP에는 `HeldTake*`, `PrimaryKeyText`, `LmbKeyText`, `RmbKeyText`가 아직 없다([USER_UNREAL.md](../USER_UNREAL.md)).

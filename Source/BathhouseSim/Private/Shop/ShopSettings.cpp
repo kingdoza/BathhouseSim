@@ -1,5 +1,6 @@
 #include "Shop/ShopSettings.h"
 
+#include "Service/ItemBoxActor.h"
 #include "Shop/ShopCatalog.h"
 #include "Shop/ShopDeliveryBoxActor.h"
 
@@ -11,6 +12,11 @@ UShopCatalog* UShopSettings::LoadCatalog() const
 TSubclassOf<AShopDeliveryBoxActor> UShopSettings::LoadDeliveryBoxClass() const
 {
 	return DeliveryBoxClass.LoadSynchronous();
+}
+
+TSubclassOf<AItemBoxActor> UShopSettings::LoadItemBoxClass() const
+{
+	return ItemBoxClass.LoadSynchronous();
 }
 
 float UShopSettings::GetDeliveryDelaySeconds() const

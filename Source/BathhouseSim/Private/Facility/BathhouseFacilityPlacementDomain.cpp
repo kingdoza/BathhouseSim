@@ -21,8 +21,7 @@ bool ABathhouseFacilityActor::ExportPlacementPayload(
 		OutFailureReason = LOCTEXT("MissingExportDefinition", "설비 변환 정의를 찾을 수 없습니다.");
 		return false;
 	}
-	UBathhouseFacilityPlacementInstanceData* Data =
-		NewObject<UBathhouseFacilityPlacementInstanceData>(&Item);
+	UBathhouseFacilityPlacementInstanceData* Data = CreateFacilityPlacementInstanceData(&Item);
 	if (!Data)
 	{
 		OutFailureReason = LOCTEXT("FacilityPayloadAllocationFailed", "설비 변환 데이터를 생성할 수 없습니다.");
@@ -32,6 +31,10 @@ bool ABathhouseFacilityActor::ExportPlacementPayload(
 	Data->FacilityNumber = FacilityNumber;
 	Data->SelectionWeight = SelectionWeight;
 	Data->bEnabled = bEnabled;
+	if (!ExportFacilityExtension(*Data, OutFailureReason))
+	{
+		return false;
+	}
 	OutPayload.Definition = FacilityPlacement->GetDefinition();
 	OutPayload.InstanceData = Data;
 	return OutPayload.Validate(Item, OutFailureReason);
@@ -55,6 +58,8 @@ bool ABathhouseFacilityActor::ImportPlacementPayload(
 			}
 			return false;
 		}
+		PendingFacilityExtension = nullptr;
+		bPendingFacilityExtension = true;
 		return true;
 	}
 	const UBathhouseFacilityPlacementInstanceData* Data =
@@ -81,6 +86,44 @@ bool ABathhouseFacilityActor::ImportPlacementPayload(
 	{
 		BathWaterState->ResetEmptyForPlacement();
 	}
+	// Extension state may depend on Blueprint components, so it is applied after construction.
+	PendingFacilityExtension = const_cast<UBathhouseFacilityPlacementInstanceData*>(Data);
+	bPendingFacilityExtension = true;
+	return true;
+}
+
+bool ABathhouseFacilityActor::FinalizePlacementPayloadAfterConstruction(FText& OutFailureReason)
+{
+	if (!bPendingFacilityExtension)
+	{
+		return true;
+	}
+	const UBathhouseFacilityPlacementInstanceData* Pending = PendingFacilityExtension;
+	PendingFacilityExtension = nullptr;
+	bPendingFacilityExtension = false;
+	return ImportFacilityExtension(Pending, OutFailureReason);
+}
+
+UBathhouseFacilityPlacementInstanceData* ABathhouseFacilityActor::CreateFacilityPlacementInstanceData(UObject* Outer) const
+{
+	return NewObject<UBathhouseFacilityPlacementInstanceData>(Outer);
+}
+
+bool ABathhouseFacilityActor::ExportFacilityExtension(
+	UBathhouseFacilityPlacementInstanceData& Data,
+	FText& OutFailureReason) const
+{
+	(void)Data;
+	(void)OutFailureReason;
+	return true;
+}
+
+bool ABathhouseFacilityActor::ImportFacilityExtension(
+	const UBathhouseFacilityPlacementInstanceData* Data,
+	FText& OutFailureReason)
+{
+	(void)Data;
+	(void)OutFailureReason;
 	return true;
 }
 

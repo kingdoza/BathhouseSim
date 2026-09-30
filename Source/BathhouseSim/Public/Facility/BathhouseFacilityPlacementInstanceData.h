@@ -6,7 +6,7 @@
 #include "BathhouseFacilityPlacementInstanceData.generated.h"
 
 UCLASS(Transient, NotBlueprintable)
-class BATHHOUSESIM_API UBathhouseFacilityPlacementInstanceData final
+class BATHHOUSESIM_API UBathhouseFacilityPlacementInstanceData
 	: public UFacilityPlacementInstanceData
 {
 	GENERATED_BODY()

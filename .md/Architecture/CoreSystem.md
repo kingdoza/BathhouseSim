@@ -97,6 +97,7 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 - `UtilityFuelSystem.md`: Utility 하위 재료·공급함·삽·연료 설비·투입 Volume·문 경계.
 - `UtilityLeverSystem.md`: Utility 하위 순환기 조작부·레버 왕복 경계.
 - `ShopSystem.md`: `Public/Shop`, `Private/Shop`의 상품 목록·장바구니·주문·배송·상자·개봉·쓰레기통 경계.
+- `ServiceSystem.md`: `Public/Service`, `Private/Service`의 품목 정의·품목 박스·진열 공간·음료 냉장고·판매 적립·수거함과 꺼내기 외곽선 경계. 프로젝트 렌더 설정 Custom Depth-Stencil Pass(Enabled with Stencil)의 사용처다.
 - `PlacementSystem.md`: 설비 mode/preview/placement/recovery, 확장 단계와 락커 capacity lease 경계
 - `EconomySystem.md`: wallet과 cash claim 경계
 - `CustomerSystem.md`: StateTree routine과 customer session 경계

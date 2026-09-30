@@ -7,6 +7,7 @@
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/FacilityPlacementTypes.h"
 #include "Misc/DataValidation.h"
+#include "Shop/ShopProductRules.h"
 #include "Shop/ShopSettings.h"
 #include "Shop/ShopUnboxingTransaction.h"
 #include "UObject/ConstructorHelpers.h"
@@ -67,11 +68,7 @@ bool AShopDeliveryBoxActor::InitializeContents(
 	for (const FShopOrderLine& Line : InContents)
 	{
 		FText DefinitionFailure;
-		if (Line.ProductId.IsNone() || !IsValid(Line.PlacementDefinition.Get())
-			|| Line.Quantity <= 0 || Line.DisplayName.IsEmpty()
-			|| Line.PlacementDefinition->LockerSlotCount != 0
-			|| !Line.PlacementDefinition->FacilityTags.HasTag(TAG_Facility_Discardable)
-			|| !Line.PlacementDefinition->ValidateRuntime(DefinitionFailure))
+		if (!FShopProductRules::ValidateOrderLine(Line, DefinitionFailure))
 		{
 			return false;
 		}

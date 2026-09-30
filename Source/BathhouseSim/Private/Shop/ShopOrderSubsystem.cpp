@@ -11,6 +11,7 @@
 #include "Shop/ShopCartComponent.h"
 #include "Shop/ShopDeliveryBoxActor.h"
 #include "Shop/ShopDeliveryPointActor.h"
+#include "Shop/ShopProductRules.h"
 #include "Shop/ShopSettings.h"
 
 void UShopOrderSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -83,12 +84,8 @@ FShopPlaceOrderEvaluation UShopOrderSubsystem::EvaluatePlaceOrder(
 	{
 		const FShopProductEntry* Product = Catalog->FindProduct(CartLine.ProductId);
 		FText DefinitionFailure;
-		if (!Product || !Product->bForSale || Product->ProductId.IsNone()
-			|| Product->DisplayName.IsEmpty() || !Product->PlacementDefinition
-			|| Product->PlacementDefinition->LockerSlotCount != 0
-			|| !Product->PlacementDefinition->FacilityTags.HasTag(TAG_Facility_Discardable)
-			|| !Product->PlacementDefinition->ValidateRuntime(DefinitionFailure)
-			|| Product->Price <= 0 || CartLine.Quantity <= 0)
+		if (!Product || !Product->bForSale || CartLine.Quantity <= 0
+			|| !FShopProductRules::ValidateProduct(*Product, DefinitionFailure))
 		{
 			Evaluation.Failure = EShopFailureCode::InvalidProduct;
 			return Evaluation;
@@ -147,7 +144,7 @@ bool UShopOrderSubsystem::TryPlaceOrder(
 	for (const FShopCartLine& CartLine : Cart->GetLines())
 	{
 		const FShopProductEntry* Product = Catalog->FindProduct(CartLine.ProductId);
-		if (!Product || !Product->PlacementDefinition)
+		if (!Product || (Product->PlacementDefinition == nullptr) == (Product->ItemBoxDefinition == nullptr))
 		{
 			OutFailure = EShopFailureCode::InvalidProduct;
 			return false;
@@ -155,6 +152,7 @@ bool UShopOrderSubsystem::TryPlaceOrder(
 		FShopOrderLine& OrderLine = NewOrder.Lines.AddDefaulted_GetRef();
 		OrderLine.ProductId = Product->ProductId;
 		OrderLine.PlacementDefinition = Product->PlacementDefinition;
+		OrderLine.ItemBoxDefinition = Product->ItemBoxDefinition;
 		OrderLine.DisplayName = Product->DisplayName;
 		OrderLine.Quantity = CartLine.Quantity;
 	}

@@ -19,6 +19,7 @@
 | Customer AI | [CustomerSystem.md](CustomerSystem.md) | Customer routine Data Asset, Character/AIController Blueprint, StateTree schema/state/task/binding |
 | Interaction/UI | [InteractionUISystem.md](InteractionUISystem.md) | Input Mapping, Widget hierarchy, BindWidget와 표시 asset |
 | Shop | [ShopSystem.md](ShopSystem.md) | Catalog, 상품 Definition tag와 Shop Editor authoring state |
+| Service | [ServiceSystem.md](ServiceSystem.md) | 품목 정의, 품목 박스·음료 냉장고·수거함 Blueprint, 외곽선·프리뷰 Material |
 | Towel | `TowelSystem.md` | 수건 설비·표현 Blueprint, mesh/material과 presentation 설정 |
 | World | [WorldSystem.md](WorldSystem.md) | map actor, World Settings, RecastNavMesh와 유일 Authority |
 

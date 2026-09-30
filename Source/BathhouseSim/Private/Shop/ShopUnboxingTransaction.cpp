@@ -11,7 +11,10 @@
 #include "Placement/FacilityPlacementTypes.h"
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/PlaceableFacilityItemActor.h"
+#include "Service/ItemBoxActor.h"
+#include "Service/ServiceItemDefinition.h"
 #include "Shop/ShopDeliveryBoxActor.h"
+#include "Shop/ShopProductRules.h"
 #include "Shop/ShopSettings.h"
 #include "Shop/ShopUnboxingPlacement.h"
 
@@ -49,16 +52,20 @@ bool FShopUnboxingTransaction::Open(
 		OutFailureReason = LOCTEXT("MissingUnboxSettings", "상점 설정을 확인할 수 없습니다.");
 		return false;
 	}
-	TArray<UFacilityPlacementDefinition*> Definitions;
+	// Every unboxed unit is either a facility item or one full item box.
+	struct FUnboxUnit
+	{
+		UFacilityPlacementDefinition* Facility = nullptr;
+		UServiceItemDefinition* BoxKind = nullptr;
+	};
+	TArray<FUnboxUnit> Units;
+	TArray<FShopUnboxItemShape> Shapes;
+	TSubclassOf<AItemBoxActor> ItemBoxClass;
 	int64 TotalQuantity = 0;
 	for (const FShopOrderLine& Line : Box.Contents)
 	{
 		FText DefinitionFailure;
-		if (Line.ProductId.IsNone() || !IsValid(Line.PlacementDefinition.Get())
-			|| Line.DisplayName.IsEmpty() || Line.Quantity <= 0
-			|| Line.PlacementDefinition->LockerSlotCount != 0
-			|| !Line.PlacementDefinition->FacilityTags.HasTag(TAG_Facility_Discardable)
-			|| !Line.PlacementDefinition->ValidateRuntime(DefinitionFailure))
+		if (!FShopProductRules::ValidateOrderLine(Line, DefinitionFailure))
 		{
 			OutFailureReason = LOCTEXT("InvalidBoxContents", "배송 상자의 주문 내용이 올바르지 않습니다.");
 			return false;
@@ -69,9 +76,33 @@ bool FShopUnboxingTransaction::Open(
 			OutFailureReason = LOCTEXT("ExcessiveBoxContents", "배송 상자 상품 수량이 허용 한도를 초과했습니다.");
 			return false;
 		}
+		FShopUnboxItemShape LineShape;
+		if (Line.ItemBoxDefinition)
+		{
+			if (!ItemBoxClass)
+			{
+				ItemBoxClass = Settings->LoadItemBoxClass();
+			}
+			if (!ItemBoxClass)
+			{
+				OutFailureReason = LOCTEXT("MissingItemBoxClass", "품목 박스 클래스가 설정되지 않았습니다.");
+				return false;
+			}
+			if (!FShopUnboxItemShape::FromItemBoxClass(ItemBoxClass, LineShape, OutFailureReason))
+			{
+				return false;
+			}
+		}
+		else if (!FShopUnboxItemShape::FromFacilityDefinition(*Line.PlacementDefinition, LineShape, OutFailureReason))
+		{
+			return false;
+		}
 		for (int32 Index = 0; Index < Line.Quantity; ++Index)
 		{
-			Definitions.Add(Line.PlacementDefinition);
+			FUnboxUnit& Unit = Units.AddDefaulted_GetRef();
+			Unit.Facility = Line.PlacementDefinition;
+			Unit.BoxKind = Line.ItemBoxDefinition;
+			Shapes.Add(LineShape);
 		}
 	}
 	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
@@ -86,7 +117,7 @@ bool FShopUnboxingTransaction::Open(
 		Box,
 		FootLocation,
 		ViewYaw,
-		Definitions,
+		Shapes,
 		Settings->GetUnboxForwardDistanceCm(),
 		RandomStream,
 		Settings->GetUnboxOverlapDepthCm(),
@@ -96,38 +127,60 @@ bool FShopUnboxingTransaction::Open(
 		return false;
 	}
 
-	TArray<APlaceableFacilityItemActor*> SpawnedItems;
-	SpawnedItems.Reserve(Definitions.Num());
-	for (int32 Index = 0; Index < Definitions.Num(); ++Index)
+	TArray<AActor*> SpawnedItems;
+	SpawnedItems.Reserve(Units.Num());
+	auto DestroySpawned = [&SpawnedItems]()
 	{
+		for (AActor* Spawned : SpawnedItems)
+		{
+			if (IsValid(Spawned))
+			{
+				Spawned->Destroy();
+			}
+		}
+	};
+	for (int32 Index = 0; Index < Units.Num(); ++Index)
+	{
+		FText ActivationFailure;
+		if (Units[Index].BoxKind)
+		{
+			AItemBoxActor* ItemBox = AItemBoxActor::SpawnFilledBox(
+				*World,
+				ItemBoxClass,
+				Units[Index].BoxKind,
+				Units[Index].BoxKind->BoxCapacity,
+				SpawnTransforms[Index],
+				OutFailureReason);
+			if (!ItemBox)
+			{
+				DestroySpawned();
+				return false;
+			}
+			if (!ItemBox->ActivateFreeWorld(SpawnTransforms[Index], ActivationFailure))
+			{
+				OutFailureReason = ActivationFailure;
+				ItemBox->Destroy();
+				DestroySpawned();
+				return false;
+			}
+			SpawnedItems.Add(ItemBox);
+			continue;
+		}
 		APlaceableFacilityItemActor* Item = APlaceableFacilityItemActor::SpawnFreshItem(
 			*World,
-			*Definitions[Index],
+			*Units[Index].Facility,
 			SpawnTransforms[Index],
 			OutFailureReason);
 		if (!Item)
 		{
-			for (APlaceableFacilityItemActor* Spawned : SpawnedItems)
-			{
-				if (IsValid(Spawned))
-				{
-					Spawned->Destroy();
-				}
-			}
+			DestroySpawned();
 			return false;
 		}
-		FText ActivationFailure;
 		if (!Item->ActivateFreeWorld(SpawnTransforms[Index], ActivationFailure))
 		{
 			OutFailureReason = ActivationFailure;
 			Item->Destroy();
-			for (APlaceableFacilityItemActor* Spawned : SpawnedItems)
-			{
-				if (IsValid(Spawned))
-				{
-					Spawned->Destroy();
-				}
-			}
+			DestroySpawned();
 			return false;
 		}
 		SpawnedItems.Add(Item);
@@ -142,13 +195,7 @@ bool FShopUnboxingTransaction::Open(
 	});
 	if (!bConsumed)
 	{
-		for (APlaceableFacilityItemActor* Spawned : SpawnedItems)
-		{
-			if (IsValid(Spawned))
-			{
-				Spawned->Destroy();
-			}
-		}
+		DestroySpawned();
 		OutFailureReason = LOCTEXT("BoxConsumeFailed", "상자 소지 상태가 변경되어 개봉을 취소했습니다.");
 		return false;
 	}

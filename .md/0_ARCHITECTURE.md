@@ -2,8 +2,8 @@
 
 ## 문서 기준
 
-- 기준일: 2026-09-28(KST), 들고 있는 물건 조작 LMB·RMB 통일(held-use) 설계 반영
-- 상태: 보일러 노동 수직은 완료·승인됐다. 쿨러·순환기 확장은 Source 구현 뒤 통합 승인 전이다. 컴퓨터 포커스 수정은 구현됐다. 상점 주문·배송 상자·쓰레기통 수직(샤워기)은 2026-09-28 구현됐다(`94f0f11`). 같은 날 상점 확장(7종 판매·개봉 물품 흩어짐·배송 상자 scale 정책)이 구현되고 사용자가 통합 승인했다. 설비 회수 아이템 scale 읽기 수정(Placement)은 구현됐다. 들고 있는 물건 조작 LMB·RMB 통일은 설계만 확정됐다.
+- 기준일: 2026-09-30(KST), 서비스 1단위(품목 박스·진열·음료 냉장고·공용 수거함) 완료 반영
+- 상태: 보일러 노동 수직은 완료·승인됐다. 쿨러·순환기 확장은 Source 구현 뒤 통합 승인 전이다. 컴퓨터 포커스 수정은 구현됐다. 상점 주문·배송 상자·쓰레기통 수직(샤워기)은 2026-09-28 구현됐다(`94f0f11`). 같은 날 상점 확장(7종 판매·개봉 물품 흩어짐·배송 상자 scale 정책)이 구현되고 사용자가 통합 승인했다. 설비 회수 아이템 scale 읽기 수정(Placement)은 구현됐다. 들고 있는 물건 조작 LMB·RMB 통일은 구현됐다(`3934d09`). 2026-09-30 서비스 1단위 수직(음료 냉장고)은 아키텍처 재검토(construction 뒤 payload 적용) 재작업을 거쳐 완료됐다(사용자 확인).
 - 정본 문서: `.md/0_ARCHITECTURE.md`와 `.md/Architecture/*.md`
 
 ## 분석 범위
@@ -25,6 +25,7 @@
   - Customer Recovery
   - Utility Labor
   - Shop
+  - Service
 - `Content`는 Blueprint 참조 검증 범위로만 다룬다. C++ 시스템 책임의 정본은 Source 하위 문서에 둔다.
 - `Config/DefaultEngine.ini`는 GameMode/Pawn/Controller 연결 또는 Core Redirect가 필요한 rename 호환 경로로만 문서화한다.
 
@@ -33,6 +34,7 @@
 - [UtilityLaborSystem.md](Architecture/UtilityLaborSystem.md): 설비 노동 hub — class 계층, Operation·시간, 설치/가동 용량, 바늘 계기, 회수 payload
 - [UtilityFuelSystem.md](Architecture/UtilityFuelSystem.md): 석탄·드라이아이스, 공급함, 삽, 보일러·쿨러 투입 Volume·자동 열림 문
 - [UtilityLeverSystem.md](Architecture/UtilityLeverSystem.md): 순환기 조작부, 레버 왕복·취소·복귀와 E 진행 표시
+- [ServiceSystem.md](Architecture/ServiceSystem.md): 품목 정의·품목 박스, 진열 공간 넣기·빼기·프리뷰·외곽선 강조, 음료 냉장고, 판매 적립과 공용 수거함
 - [ShopSystem.md](Architecture/ShopSystem.md): 상품 목록, 장바구니, 주문·배송 FIFO, 배송 지점·상자, LMB 개봉 무리 배치, 쓰레기통
 - [CharacterSystem.md](Architecture/CharacterSystem.md): 1인칭 입력, 컨트롤러 입력 매핑, 이동, 점프, sprint, 캐릭터 조립
 - [CameraSystem.md](Architecture/CameraSystem.md): 이동/착지 기반 카메라 셰이크, camera manager 기반 pitch limit
@@ -108,6 +110,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
   - Combat: 몽키스패너, camera-based melee attack과 공용 health 책임
   - Customer Recovery: Customer Source 내 knockdown, soft interruption과 restartable Task 책임
   - Shop: cart, 주문·배송, 배송 상자·개봉과 쓰레기통 책임
+  - Service: 품목 박스·진열 공간·음료 냉장고·판매 적립·수거함 책임
   - Core: 모듈/redirect/문서 경계 책임
 
 ## 시스템 간 책임 흐름
@@ -163,7 +166,8 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - UI -> Interaction
 - Computer/UI -> Interaction과 Bath Water Operations snapshot/request API
 - Utility -> Interaction/Placement 계약, Facility utility base. Facility Capacity는 주입된 Operation 가동 query만 사용하며 전역 합계는 Operations에 둔다.
-- Shop -> Economy/Placement/Interaction 계약, DeveloperSettings
+- Shop -> Economy/Placement/Interaction 계약, DeveloperSettings, Service 품목 정의·박스 class
+- Service -> Interaction/Facility/Placement/Economy 계약, GameplayTags, DeveloperSettings
 - UI -> Shop, Computer screen context interface
 - Computer -> UMG/Engine Camera/PlayerController
 - Cleaning -> Interaction
@@ -215,4 +219,5 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 보일러 노동 수직(Operation, 삽·석탄 공급함, 투입 Volume·문, 계기, 설치/가동 용량, 회수 잔량 보존)은 구현·승인됐다. 2026-09-26 설계로 labor·fuel intermediate class, 쿨러·드라이아이스, 순환기 레버, native `GaugeFace` 삭제와 legacy 항상 공급 제거가 추가되며 `.md/PROMPT_IMPLEMENTATION.md`가 다음 Source 입력이다.
 - 상점(ShopSystem): 수직(`94f0f11`)과 확장 모두 구현·통합 승인(2026-09-28).
 - 설비 회수 아이템 scale 읽기 수정(PlacementSystem): 2026-09-28 구현(`72f85ec`).
-- 들고 있는 물건 조작 LMB·RMB 통일(HeldTargetUseSystem): 2026-09-28 설계 확정, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
+- 들고 있는 물건 조작 LMB·RMB 통일(HeldTargetUseSystem): 구현(`3934d09`).
+- 서비스 1단위(ServiceSystem): 2026-09-30 완료(사용자 확인). 2단위(진열 확장)는 기능 계약 작성 대기이며, 박스 품목 공통 transform(`BoxItemOffset`)은 2단위 설계에 포함하기로 확정했다.

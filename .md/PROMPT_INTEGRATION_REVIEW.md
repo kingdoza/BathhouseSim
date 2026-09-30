@@ -1,32 +1,49 @@
-# Unreal MCP 단계 보고 — held target use (2026-09-28)
+# Unreal MCP 단계 보고 — 서비스 1단위 수직 (2026-09-30)
 
 ## 판정
 
-**부분 authoring 완료; 통합 완료 판정 보류.** MCP로 `IA_SecondaryUse`를 생성·저장하고 `BP_FirstPersonCharacter.SecondaryUseAction`을 연결·저장했다. `IMC_FirstPerson`의 RMB binding과 `WBP_InteractionPrompt` hierarchy는 미완료다. 사용자가 PIE와 검증을 제외했으므로 Compile, Data Validation, reload, PIE 결과는 없다.
+**부분 완료; 통합 승인 보류.** asset 생성·설정·저장·새 프로세스 재로드, Config 반영, `HeldSummaryText`(Python API), Data Validation 10/10 VALID까지 끝났다. DefaultMap 수거함 배치·저장(사용자 직접)과 화면·입력 검증이 `USER_UNREAL.md`에 남아 있다.
 
-## 연결과 세션 종료
+## 연결과 세션
 
-- 제한 실행의 첫 시도는 Turnkey 단계에서 실패·정지했고 MCP 요청까지 도달하지 못했다. 종료한 뒤 저장소의 MCP 연결 절차에 맞춘 elevated Editor 실행으로 재시도했다. Turnkey 오류의 근본 원인은 확정하지 않았다.
-- UE 5.8.3 작업 Editor PID 24128이 `127.0.0.1:8000` listener를 소유한 것을 확인했다. MCP `initialize`와 protocol `2025-11-25` 협상, `tools/list`, `list_toolsets`, read-only asset query가 성공했고 19개 toolset을 확인했다.
-- 작업 후 정상 창 종료 요청은 실패했다. 작업 소유 PID 24128만 종료했고, 종료 후 UnrealEditor 프로세스와 8000 listener가 없음을 확인했다.
-- Computer Use, 화면 캡처, Python reflection, asset binary 편집, Compile, Data Validation, 새 프로세스 reload와 PIE는 수행하지 않았다.
+- Editor가 없어 작업용 백그라운드 UE 5.8 Editor(PID 10552)를 실행해 `127.0.0.1:8000`에 MCP `initialize`(protocol 2025-06-18) → `tools/list`(메타 도구 3개) → `list_toolsets` → 읽기 조회로 연결했다. 현재 대화에 Unreal 도구가 노출되지 않아 문서 3절대로 직접 MCP 호출을 썼다.
+- 저장 후 PID 10552를 정상 창 종료(성공)하고 새 Editor(PID 24820)로 재로드 검증했다. 새 Editor는 검증 후 정리한다.
+- Config 세 항목(ItemBoxClass, InsertPreviewMaterial, r.CustomDepth=3)은 사용자 승인 후 ini에 직접 추가했다. Computer Use, Python reflection, binary 편집은 쓰지 않았다.
 
-## Authoring 결과
+## 변경 asset (모두 개별 Save, 재로드 값 일치, dirty=false)
 
-| Asset | 결과 |
-|---|---|
-| `/Game/Input/Actions/IA_SecondaryUse` | 생성 후 `ValueType=Boolean`으로 설정했다. 불필요한 trigger/modifier는 추가하지 않았다. 개별 Save 성공. |
-| `/Game/FirstPersonCharacter/BP_FirstPersonCharacter` | `SecondaryUseAction`에 위 InputAction을 지정하고 개별 Save 성공. `PrimaryUseAction`, `InteractAction`, `SecondaryInteractAction` 참조는 보존했다. |
-| `/Game/Input/IMC_FirstPerson` | 변경·저장하지 않았다. 유효 `Mappings` 8개는 IA_Interact/E, IA_SecondaryInteract/F, IA_DropCarry/G, IA_PrimaryUse/LeftMouseButton, IA_RecoverFacility/Q, IA_PlacementSnap/LeftControl, IA_PlacementRotate/MouseWheelAxis, IA_Cancel/Escape였다. `defaultKeyMappings`는 유효 15개와 끝의 빈 None/None row를 반환했다. |
-| `/Game/Bathhouse/UI/WBP_InteractionPrompt` | 변경·저장하지 않았다. 현 19개 toolset에 WidgetTree/hierarchy authoring tool이 없어 요구된 다섯 TextBlock을 추가할 수 없었다. |
+신규: `DA_ServiceItem_BananaMilk`, `BP_ItemBox`, `BP_DrinkFridge`, `BP_DrinkCollectionBox`, `DA_FacilityPlacement_DrinkFridge`, `M_PP_TakeHighlightOutline`, `MI_DisplayInsertPreview`.
+수정: `DA_ShopCatalog`(상품 2개 추가), `BP_FirstPersonCharacter`(`FirstPersonCamera` weighted blendable 1개만 추가; 다른 후처리 필드 diff 없음). 경로와 값은 `.md/Unreal/ServiceSystem.md`.
 
-- `IMC_FirstPerson`의 배열 변경 두 호출은 각각 `ArrayRemove: elements changed alongside the size change; removed elements are ambiguous` 및 `ArrayAdd: elements changed alongside the size change; insertion points are ambiguous`로 실패했다. 실패 뒤 package는 dirty=false였다. 따라서 이번 MCP 작업에서 해당 에셋의 부분 변경이나 저장은 없었다. 이 결과는 현재 ObjectTools 배열 경로의 제한이며 모든 MCP 버전의 보편적 불가를 뜻하지 않는다.
-- `IMC_FirstPerson.uasset`은 이 작업의 MCP 편집 전부터 Git 변경 상태였다. 이번 작업은 해당 에셋을 저장하지 않았다. 앞선 별도 Editor 로그에는 빈 Input Action mapping 저장 시 `A mapping cannot have an empty input action!` 오류가 기록되어 있어, 이 빈 row를 수동 정리 인계에 포함했다. 그 별도 변경의 작성 주체는 확인하지 않았다.
-- Save 후 MCP dirty-state 조회에서 IA, BP, IMC, WBP 모두 dirty=false였다. 이는 현재 Editor 내 dirty 상태만 확인하며 새 프로세스 reload나 디스크 재로드 검증은 아니다.
+## 검증
 
-## 미완료 및 후속 조건
+- Compile: 세 BP `warnings_as_errors` 성공(저장 전, 재로드 후 각각). 저장 시 AssetCheck는 모든 저장 asset에서 오류 0, 경고는 Definition의 RecoveryItemMesh 미설정 하나.
+- `BP_DrinkFridge` SCS readback: 공간 4개 `SpaceIndex` 0~3, `AcceptedCategory=Display.Fridge`, 공간별 `SlotTransforms` 6, slot 1.
+- PIE(기본 5초)를 한 번 시작·종료했다. 그 시간 동안 관련 Error/Warning 로그는 없었다. 입력 시나리오는 실행하지 않았다.
+- Data Validation(`EditorValidatorSubsystem`, 새 프로세스): DA·BP 3·Definition·Material 2·카탈로그·캐릭터 BP·WBP 10개 전부 VALID. 오류 0, 경고는 Definition의 RecoveryItemMesh 미설정 하나.
+- 미검증: 외곽선·프리뷰 화면, 박스 뷰포트 미리보기, PIE 절차 1~9, 자동화 재실행(`Automation RunTests BathhouseSim`).
 
-- `IMC_FirstPerson`: 기존 8개 binding을 보존하고 RightMouseButton → IA_SecondaryUse를 추가한다. `defaultKeyMappings`의 기존 유효 15개를 보존하면서 끝의 빈 row를 제거하고 개별 Save한다.
-- `WBP_InteractionPrompt`: 프롬프트에 지정된 다섯 TextBlock과 키 행 계층을 authoring한다. 기존 native parent 및 필수 BindWidget 이름·타입을 보존한다.
-- 위 MCP 미지원 authoring은 `.md/USER_UNREAL.md`에 정확한 수동 단계로 인계했다. 새 저장 상태가 reload로 확인되기 전에는 `.md/Unreal/InteractionUISystem.md`를 갱신하지 않는다.
-- Compile·Data Validation·reload·PIE는 사용자가 이번 요청에서 제외했다. 실행하거나 통과했다고 기록하지 않았다. 남은 authoring을 포함해 이번 통합 단계는 완료로 판정하지 않는다.
+## 실패·차단
+
+- `SceneTools.save_actor`(수거함 external actor): `Asset does not exist: /Game/__ExternalActors__/Maps/DefaultMap/1/P1/UWXIDD9LM1ZURKQSERVEKZ`. 과거 기록과 동일해 재시도하지 않았다. 임시 actor는 제거했고 DefaultMap은 clean이다.
+- `ShopSettings`/`ServiceDisplaySettings` CDO는 메모리에서만 바뀌고 ini에 쓰이지 않았다. Config 변경 0.
+- `BL_BeforeTonemapping`은 엔진이 `BL_SceneColorAfterDOF`(에디터 표기 Before Tonemapping)로 되돌린다.
+
+## dirty·미완료
+
+- 종료 전 dirty package 없음. 예상 밖 변경 없음(`git status`의 Content 변경은 위 asset뿐, Config·umap 변경 없음).
+- `USER_UNREAL.md` 상단 "서비스 1단위 수직" 6개 항목.
+
+## Python API 작업 — `WBP_InteractionPrompt.HeldSummaryText`
+
+- 사용자 승인: 이 작업에 한해 `AGENT_UNREAL_PYTHON.md` 절차 사용을 승인받았다(대화에서 "위젯작업 진행해").
+- 백업: `Saved/MigrationBackup/20260930_held_summary_text/`(SHA-256 `41827D52…F337`, 수정 전 디스크 해시와 일치 확인 후 진행). 스크립트: `Saved/Claude/HeldSummary/held_01~06_*.py`(01·02 조회, 03 저작, 04 GUID 재저장, 05 검증, 06 Data Validation).
+- 결과: `PromptRoot` Overlay에 TextBlock `HeldSummaryText` 추가 → Compile `BS_UP_TO_DATE` → 개별 Save. 첫 프로세스의 GUID ensure는 문서대로 새 프로세스에서 재Compile·강제 저장해 해소, `Success - 0 error(s)`. 재로드 검증 `VERIFY_RESULT PASS 0`(기존 필수 BindWidget 15개 전부 도달·타입 일치, 신규 위젯 parent=PromptRoot).
+- 저장한 package는 `WBP_InteractionPrompt` 하나. 종료 시 dirty package 없음.
+- 발견: 저장된 트리에는 `HeldTake*`, `PrimaryKeyText`, `LmbKeyText`, `RmbKeyText`가 없다(범위 밖, `USER_UNREAL.md` 3번). 표시 위치(위쪽 여백 600)와 실제 화면은 미검증.
+
+## 외곽선 머티리얼 수정 (Python API)
+
+- 증상: 사용자 PIE에서 화면 전체가 노랗게 덮임(`OutlineColor`가 전 화면에 적용). 원인 추정: 후처리 Translucent + Opacity 구조에서 Opacity가 반영되지 않음. 재현은 하지 못했다(사용자 Editor가 열려 있어 MCP 접속 불가, 헤드리스는 렌더링 불가). 스텐실 읽기(`.r`)는 엔진 셰이더 소스(`MaterialTemplate.ush`/`SceneTexturesCommon.ush`)로 확인해 문제가 아님.
+- 조치: 사용자 승인("원인수정까지 진행해")과 Editor 종료 후 `M_PP_TakeHighlightOutline`을 Opaque + `Lerp(SceneColor, OutlineColor, Mask)`로 재구성해 개별 Save. 백업 `Saved/MigrationBackup/20260930_outline_fix/`(SHA-256 `1BFA3CCD…6226`), 스크립트 `Saved/Claude/Outline/outline_01_rebuild.py`·`outline_02_verify.py`.
+- 검증: 새 프로세스에서 domain/blend/location, Emissive=Lerp, Opacity 미연결, 파라미터 4개, Data Validation VALID, 셰이더 오류 로그 없음. **화면 결과는 미확인** — 사용자 PIE 필요. 여전히 전체가 덮이면 마스크가 1로 나오는 것이므로 Custom 노드 출력을 디버그 색으로 내보내 원인을 좁힌다.
