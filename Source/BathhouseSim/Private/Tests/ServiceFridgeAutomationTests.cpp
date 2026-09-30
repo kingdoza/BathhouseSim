@@ -131,8 +131,8 @@ bool FBathhouseServiceFridgePayloadTest::RunTest(const FString& Parameters)
 		AddError(Failure.ToString());
 		return false;
 	}
-	const UDrinkFridgePlacementInstanceData* Data =
-		Cast<UDrinkFridgePlacementInstanceData>(Item->GetPlacementPayload().InstanceData);
+	const UServiceDisplayPlacementData* Data =
+		GetDisplayData(Item->GetPlacementPayload());
 	if (!TestNotNull(TEXT("Payload carries fridge data"), Data))
 	{
 		return false;
@@ -141,7 +141,7 @@ bool FBathhouseServiceFridgePayloadTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Snapshot A keeps milk 3"), Data->Spaces[0].Kind == Milk && Data->Spaces[0].Count == 3 && Data->Spaces[0].SpaceIndex == 0);
 	TestTrue(TEXT("Snapshot B keeps juice 2"), Data->Spaces[1].Kind == Juice && Data->Spaces[1].Count == 2 && Data->Spaces[1].SpaceIndex == 1);
 	TestEqual(TEXT("Payload summary lists kinds and totals"),
-		Data->GetPlacementContentsSummary().ToString(), FString(TEXT("바나나우유 3병, 주스 2병")));
+		Data->GetContentsSummary().ToString(), FString(TEXT("바나나우유 3병, 주스 2병")));
 	TestEqual(TEXT("Held summary matches the payload"), Item->GetHeldSummaryText().ToString(),
 		FString(TEXT("바나나우유 3병, 주스 2병")));
 	TestTrue(TEXT("The item name carries the summary"),
@@ -160,7 +160,7 @@ bool FBathhouseServiceFridgePayloadTest::RunTest(const FString& Parameters)
 		Reinstalled->GetSpaceB()->GetStock().Kind == Juice && Reinstalled->GetSpaceB()->GetStock().Count == 2);
 
 	// Invalid payloads are rejected all-or-nothing on a staged fridge.
-	auto TryBadPayload = [&](const TFunction<void(UDrinkFridgePlacementInstanceData&)>& Configure, const TCHAR* Label)
+	auto TryBadPayload = [&](const TFunction<void(UServiceDisplayPlacementData&)>& Configure, const TCHAR* Label)
 	{
 		AServiceAutomationFridge* Staged = World->SpawnActorDeferred<AServiceAutomationFridge>(
 			AServiceAutomationFridge::StaticClass(),
@@ -169,12 +169,15 @@ bool FBathhouseServiceFridgePayloadTest::RunTest(const FString& Parameters)
 		FText StagedFailure;
 		const bool bPrepared = Staged
 			&& Staged->GetPlacementForTest()->PrepareForStagedPlacement(*Definition, StagedFailure);
-		UDrinkFridgePlacementInstanceData* Bad = NewObject<UDrinkFridgePlacementInstanceData>(Item);
-		Bad->FacilityType = EBathhouseFacilityType::DrinkFridge;
+		auto* Base=NewObject<UBathhouseFacilityPlacementInstanceData>(Item);
+		Base->FacilityType=EBathhouseFacilityType::DrinkFridge;
+		UServiceDisplayPlacementData* Bad = NewObject<UServiceDisplayPlacementData>(Base);
+		Bad->Key=TEXT("ServiceDisplay");
+		Base->Extensions.Add(Bad);
 		Configure(*Bad);
 		FFacilityPlacementPayload BadPayload;
 		BadPayload.Definition = Definition;
-		BadPayload.InstanceData = Bad;
+		BadPayload.InstanceData = Base;
 		TestTrue(FString::Printf(TEXT("%s: staged fixture prepares"), Label), bPrepared);
 		if (bPrepared)
 		{
@@ -191,23 +194,23 @@ bool FBathhouseServiceFridgePayloadTest::RunTest(const FString& Parameters)
 			Staged->Destroy();
 		}
 	};
-	TryBadPayload([&](UDrinkFridgePlacementInstanceData& Data)
+	TryBadPayload([&](UServiceDisplayPlacementData& Data)
 	{
 		Data.Spaces = { MakeSnapshot(0, Milk, 2) };
 	}, TEXT("Wrong space count"));
-	TryBadPayload([&](UDrinkFridgePlacementInstanceData& Data)
+	TryBadPayload([&](UServiceDisplayPlacementData& Data)
 	{
 		Data.Spaces = { MakeSnapshot(0, Milk, 2), MakeSnapshot(5, Juice, 1) };
 	}, TEXT("Wrong space index"));
-	TryBadPayload([&](UDrinkFridgePlacementInstanceData& Data)
+	TryBadPayload([&](UServiceDisplayPlacementData& Data)
 	{
 		Data.Spaces = { MakeSnapshot(0, Milk, 2), MakeSnapshot(1, Juice, 4) };
 	}, TEXT("Over capacity in the second space"));
-	TryBadPayload([&](UDrinkFridgePlacementInstanceData& Data)
+	TryBadPayload([&](UServiceDisplayPlacementData& Data)
 	{
 		Data.Spaces = { MakeSnapshot(0, Milk, 2), MakeSnapshot(1, Snack, 1) };
 	}, TEXT("Category refused in the second space"));
-	TryBadPayload([&](UDrinkFridgePlacementInstanceData& Data)
+	TryBadPayload([&](UServiceDisplayPlacementData& Data)
 	{
 		Data.Spaces = { MakeSnapshot(0, nullptr, 2), MakeSnapshot(1, Juice, 1) };
 	}, TEXT("Count without a kind"));

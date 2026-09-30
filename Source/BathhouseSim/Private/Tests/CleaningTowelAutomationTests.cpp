@@ -265,12 +265,20 @@ bool FBathhouseTowelTransferTest::RunTest(const FString& Parameters)
 	Request.ExpectedSourceRevision = Request.Source->GetSnapshot().Revision;
 	Request.ExpectedDestinationRevision = Request.Destination->GetSnapshot().Revision;
 	const FTowelInventorySnapshot WaitingMachineBefore = Request.Source->GetSnapshot();
-	TestEqual(TEXT("A Waiting machine cannot be drained directly"),
-		Transfer->TryTransfer(Request).Failure, ETowelTransferFailure::EndpointBlocked);
-	TestEqual(TEXT("Rejected Waiting drain preserves the machine"),
-		Request.Source->GetSnapshot().Count, WaitingMachineBefore.Count);
-	TestEqual(TEXT("Rejected Waiting drain preserves the output basket"),
-		Request.Destination->GetSnapshot().Count, 0);
+	// Service unit 2 / CTRL-016: Waiting output is now legal, and draining preserves Waiting.
+	TestTrue(TEXT("A Waiting machine can be drained into an empty basket"),
+		Transfer->TryTransfer(Request).bSucceeded);
+	TestEqual(TEXT("Waiting drain empties the machine"), Request.Source->GetSnapshot().Count, 0);
+	TestEqual(TEXT("Waiting drain preserves input towel state"),
+		Request.Destination->GetSnapshot().State, ETowelState::Used);
+	TestEqual(TEXT("Draining leaves the machine Waiting"), Machine->GetMachineState(), ETowelMachineState::Waiting);
+	// Restore through the real transfer so the unchanged Processing/Complete regression continues.
+	Swap(Request.Source, Request.Destination);
+	Request.ExpectedSourceRevision = Request.Source->GetSnapshot().Revision;
+	Request.ExpectedDestinationRevision = Request.Destination->GetSnapshot().Revision;
+	TestTrue(TEXT("Waiting towels can be inserted back"), Transfer->TryTransfer(Request).bSucceeded);
+	TestEqual(TEXT("Restored input count"), Machine->GetInventory()->GetSnapshot().Count, WaitingMachineBefore.Count);
+	Swap(Request.Source, Request.Destination);
 
 	FText FailureReason;
 	TestTrue(TEXT("A washer starts only with Used towels"), Machine->StartProcessing(FailureReason));

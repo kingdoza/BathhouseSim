@@ -7,6 +7,10 @@
 #include "Towel/TowelProcessingMachineActor.h"
 #include "Towel/TowelTransferSubsystem.h"
 #include "Towel/TowelHeldTransferRules.h"
+#include "Towel/TowelDisplayCueUtils.h"
+#include "Towel/Presentation/TowelPileVisualComponent.h"
+#include "Service/DisplayCueComponent.h"
+#include "Interaction/Presentation/OpeningPresentationComponent.h"
 
 #define LOCTEXT_NAMESPACE "TowelTransferPortComponent"
 
@@ -21,6 +25,8 @@ FPlayerInteractionQuery UTowelTransferPortComponent::QueryInteraction(const FPla
 {
 	FPlayerInteractionQuery Query;
 	const ATowelProcessingMachineActor* Machine = Cast<ATowelProcessingMachineActor>(GetOwner());
+	Query.PresentationRevision = TowelDisplayCueUtils::GetPresentationRevision(
+		Context, Machine ? Machine->GetInventory() : nullptr);
 	if (!Machine || (Machine->GetFacilityPlacementComponent()
 		&& !Machine->GetFacilityPlacementComponent()->IsPlacedDomainActive()))
 	{
@@ -112,3 +118,36 @@ FPlayerInteractionResult UTowelTransferPortComponent::Transfer(
 }
 
 #undef LOCTEXT_NAMESPACE
+
+void UTowelTransferPortComponent::NotifyInteractionFocusChanged(const UPlayerInteractionComponent& Source,
+																const FPlayerInteractionQuery& Query)
+{
+	if (auto* Machine = Cast<ATowelProcessingMachineActor>(GetOwner()))
+	{
+		TowelDisplayCueUtils::Update(Source, Query, Machine->GetInventory(), Machine->GetTowelVisual(),
+									 Machine->GetDisplayCue());
+		const bool bCanOpen =
+			Machine->GetMachineState() != ETowelMachineState::Processing &&
+			((Query.bHeldApplyVisible && Query.bCanHeldApply) || (Query.bHeldTakeVisible && Query.bCanHeldTake));
+		Machine->GetLidPresentation()->SetSourceInsertable(this, bCanOpen);
+	}
+}
+
+void UTowelTransferPortComponent::NotifyInteractionFocusEnded(const UPlayerInteractionComponent& Source)
+{
+	if (auto* Machine = Cast<ATowelProcessingMachineActor>(GetOwner()))
+	{
+		Machine->GetDisplayCue()->HideAll();
+		Machine->GetLidPresentation()->RemoveSource(this);
+	}
+}
+
+void UTowelTransferPortComponent::EndPlay(const EEndPlayReason::Type Reason)
+{
+	if (auto* Machine = Cast<ATowelProcessingMachineActor>(GetOwner()))
+	{
+		Machine->GetDisplayCue()->HideAll();
+		Machine->GetLidPresentation()->RemoveSource(this);
+	}
+	Super::EndPlay(Reason);
+}

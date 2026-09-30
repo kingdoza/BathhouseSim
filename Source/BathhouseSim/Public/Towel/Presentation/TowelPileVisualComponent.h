@@ -17,6 +17,11 @@ public:
 	void ClearPreview();
 
 protected:
+
+	virtual bool UsesDeterministicIndexLayout() const override
+	{
+		return true;
+	}
 	virtual FTransform BuildLocalTransform(int32 VisualIndex) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Towel|Presentation|Pile", meta = (ClampMin = "0.0"))

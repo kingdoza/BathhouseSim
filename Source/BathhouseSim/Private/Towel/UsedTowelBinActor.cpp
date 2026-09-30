@@ -8,6 +8,8 @@
 #include "Towel/TowelCirculationSubsystem.h"
 #include "Towel/TowelInventoryComponent.h"
 #include "Towel/Presentation/TowelStackVisualComponent.h"
+#include "Towel/TowelDisplayCueUtils.h"
+#include "Service/DisplayCueComponent.h"
 #include "Towel/TowelTransferSubsystem.h"
 #include "Towel/WorldUsedTowelActor.h"
 #include "Towel/TowelHeldTransferRules.h"
@@ -21,6 +23,8 @@ AUsedTowelBinActor::AUsedTowelBinActor()
 	Inventory->ConfigureDefaults(ETowelState::None, 0, 20);
 	TowelPresentationVisual = CreateDefaultSubobject<UTowelStackVisualComponent>(TEXT("TowelPresentationVisual"));
 	TowelPresentationVisual->SetupAttachment(GetRootComponent());
+	DisplayCue = CreateDefaultSubobject<UDisplayCueComponent>(TEXT("DisplayCue"));
+	DisplayCue->SetupAttachment(TowelPresentationVisual);
 }
 
 void AUsedTowelBinActor::BeginPlay()
@@ -37,13 +41,17 @@ void AUsedTowelBinActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 FPlayerInteractionQuery AUsedTowelBinActor::QueryInteraction(const FPlayerInteractionContext& Context) const
 {
+	const int64 PresentationRevision = TowelDisplayCueUtils::GetPresentationRevision(Context, Inventory);
 	if (GetFacilityPlacementComponent()
 		&& !GetFacilityPlacementComponent()->IsPlacedDomainActive())
 	{
-		return ABathhouseFacilityActor::QueryInteraction(Context);
+		FPlayerInteractionQuery Query = ABathhouseFacilityActor::QueryInteraction(Context);
+		Query.PresentationRevision = PresentationRevision;
+		return Query;
 	}
 
 	FPlayerInteractionQuery Query;
+	Query.PresentationRevision = PresentationRevision;
 	Query.bVisible = true;
 	Query.TargetName = LOCTEXT("UsedBin", "사용 수건통");
 	const ATowelBasketActor* Basket = Context.CarryComponent
@@ -203,3 +211,14 @@ FPlayerInteractionResult AUsedTowelBinActor::TransferToHeldBasket(
 }
 
 #undef LOCTEXT_NAMESPACE
+
+void AUsedTowelBinActor::NotifyInteractionFocusChanged(const UPlayerInteractionComponent& Source,
+													   const FPlayerInteractionQuery& Query)
+{
+	TowelDisplayCueUtils::Update(Source, Query, Inventory, TowelPresentationVisual, DisplayCue);
+}
+
+void AUsedTowelBinActor::NotifyInteractionFocusEnded(const UPlayerInteractionComponent& Source)
+{
+	DisplayCue->HideAll();
+}

@@ -4,6 +4,7 @@
 #include "Components/SceneComponent.h"
 #include "Facility/BathWaterStateComponent.h"
 #include "Facility/BathhouseFacilitySlotComponent.h"
+#include "Facility/FacilityPlacementExtensionUtils.h"
 #include "Facility/BathhouseFacilitySubsystem.h"
 #include "Facility/LockerCapacitySubsystem.h"
 #include "Interaction/PhysicalCarryFixedSlot.h"
@@ -136,6 +137,12 @@ void ABathhouseFacilityActor::PostEditImport()
 EDataValidationResult ABathhouseFacilityActor::IsDataValid(FDataValidationContext& Context) const
 {
 	EDataValidationResult Result = Super::IsDataValid(Context);
+	FText ExtensionFailure;
+	if (!FacilityPlacementExtensionUtils::ValidateAuthoring(*this, ExtensionFailure))
+	{
+		Context.AddError(ExtensionFailure);
+		Result = EDataValidationResult::Invalid;
+	}
 	if (!IsTemplate() && FacilityType == EBathhouseFacilityType::ClothesLocker)
 	{
 		if (!RegistrationId.IsValid())
@@ -180,10 +187,9 @@ FPlayerInteractionResult ABathhouseFacilityActor::ExecuteInteraction(const FPlay
 
 bool ABathhouseFacilityActor::IsAvailableForReservation() const
 {
-	return bEnabled && FacilityPlacement
-		&& FacilityPlacement->GetMode() == EPlaceableFacilityMode::Placed
-		&& !FacilityPlacement->IsStagedPlacement()
-		&& FacilityPlacement->IsPlacedDomainActive();
+	return bEnabled && !bRecoveryHoldActive && FacilityPlacement &&
+		   FacilityPlacement->GetMode() == EPlaceableFacilityMode::Placed && !FacilityPlacement->IsStagedPlacement() &&
+		   FacilityPlacement->IsPlacedDomainActive();
 }
 
 FPlayerInteractionQuery ABathhouseFacilityActor::MergeSupplementalInteractionQuery(
@@ -358,6 +364,41 @@ void ABathhouseFacilityActor::HandleSlotStateChanged(
 	if (UBathhouseFacilitySubsystem* Subsystem = GetWorld()->GetSubsystem<UBathhouseFacilitySubsystem>())
 	{
 		Subsystem->NotifyFacilityAvailabilityChanged(FacilityType);
+	}
+}
+
+bool ABathhouseFacilityActor::TryBeginFacilityRecoveryHold(FText& OutFailureReason)
+{
+	if (bRecoveryHoldActive)
+	{
+		OutFailureReason = LOCTEXT("AlreadyHeld", "설비 회수가 이미 진행 중입니다.");
+		return false;
+	}
+	const FFacilityPlacementTransactionResult Query = QueryFacilityRecovery();
+	if (!Query.bSucceeded)
+	{
+		OutFailureReason = Query.FailureReason;
+		return false;
+	}
+	bRecoveryHoldActive = true;
+	OutFailureReason = FText::GetEmpty();
+	return true;
+}
+
+void ABathhouseFacilityActor::CancelFacilityRecoveryHold()
+{
+	if (!bRecoveryHoldActive)
+	{
+		return;
+	}
+	bRecoveryHoldActive = false;
+	if (!bEndingPlay && bPlacedDomainRegistered && FacilityPlacement && FacilityPlacement->IsPlacedDomainActive())
+	{
+		if (UBathhouseFacilitySubsystem* Subsystem =
+				GetWorld() ? GetWorld()->GetSubsystem<UBathhouseFacilitySubsystem>() : nullptr)
+		{
+			Subsystem->NotifyFacilityAvailabilityChanged(FacilityType);
+		}
 	}
 }
 

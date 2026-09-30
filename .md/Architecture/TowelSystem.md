@@ -204,6 +204,8 @@ machine Actor는 canonical target에서 `IPlaceableFacility`만 구현하고 `IP
 
 ## Transfer Direction
 
+2026-09-30 서비스 2단위: `Clean stack`은 held basket ← stack(RMB, 빈·Clean 바구니)도 허용하고, `Waiting washer/dryer`는 machine → held basket(RMB, 빈 바구니 또는 기계 안과 같은 상태)도 허용한다. 아래 Service Unit 2 Display Changes 절.
+
 | Target | Direction |
 |---|---|
 | Used bin | bin Used -> held basket |
@@ -254,12 +256,45 @@ Towel actor 표현 event:
 
 ## Dependencies
 
+- Towel → Service `UDisplayCueComponent`·`UServiceDisplaySettings`(표시만), Interaction `UOpeningPresentationComponent`(2026-09-30).
+
 - Towel -> Interaction/Physical Carry의 intent/carry/fixed-slot public 계약
 - Towel -> Facility의 generic actor/slot registration
 - Towel -> Placement의 placeable facility interface
 - Customer -> Towel transaction/token API
 - UI -> Interaction prompt data
 - Towel은 Customer concrete StateTree와 UI concrete class에 의존하지 않는다.
+
+## Service Unit 2 Display Changes
+
+2026-09-30 설계, Source 반영. 입력: `.md/PROMPT_ARCHITECTURE.md` 서비스 2단위 TOWL-001~018. 상태 전환·작동·정원·손님 사용·바구니 규칙은 바꾸지 않는다.
+
+- 이동 조건:
+  - `FTowelHeldTransferRules`: 선반 Take와 Waiting 기계 Take를 허용한다(빈 바구니 또는 같은 상태). 다른 상태면 `다른 상태의 수건`, 비었으면 `꺼낼 수건 없음`(TOWL-012, 014, 015). 누르고 있으면 기존 Repeat로 바구니가 차거나 선반이 빌 때까지 옮긴다(TOWL-013).
+  - `ATowelProcessingMachineActor::AllowsInventoryTransfer`: Waiting 상태의 machine → basket 이동을 허용한다. 모두 빼도 Waiting을 유지한다(TOWL-011). Complete·Processing 규칙은 그대로다.
+  - 선반 빼기와 손님 가져가기는 기존 `UTowelTransferSubsystem` 원자 이동이라 섞이지 않는다(TOWL-018).
+- 넣기 프리뷰·꺼내기 강조:
+  - 선반·사용 수건통·transfer port(기계)는 `IPlayerInteractionFocusObserver`를 구현한다.
+  - 각 owner에 `UDisplayCueComponent` native default subobject를 하나 추가하고, 수건 visual component에 붙인다.
+  - 알림 query가 Apply 가능이면 visual의 `GetIndexPresentation(Count, 바구니 상태)`에 프리뷰를 둔다.
+  - Take 가능이면 `GetIndexPresentation(Count−1, 대상 상태)`에 강조를 둔다(설정 옵션).
+  - Count는 inventory authoritative 값이다. 표시 animation의 displayed count가 아니다.
+  - cue 재계산 경로(2026-09-30 재작업): cue는 focus 알림에서만 계산하고, 수량 변화는 query 변화로 알림을 다시 받는다.
+    - 선반·사용 수건통·transfer port의 `QueryInteraction`이 `FPlayerInteractionQuery::PresentationRevision` = 대상 inventory `Revision` + 든 바구니 inventory `Revision`(바구니가 아니면 0)을 채운다. 두 값은 commit마다 1씩 오르므로 어느 쪽이 바뀌어도 합이 바뀐다. TargetName·행동명·가능 여부·이유는 바꾸지 않는다(HUD 문구 불변).
+    - `Equals`가 이 필드를 비교하므로 수량이 바뀐 다음 query commit에서 `SyncFocusObservers`가 같은 대상에 알림을 다시 보내고, owner는 새 Count로 `TowelDisplayCueUtils::Update`를 다시 실행한다.
+    - 플레이어 넣기·빼기와 연속 반복: `UPlayerHeldTargetUseComponent`가 매 실행 직후 `RefreshInteractionQuery`를 호출하므로 같은 프레임에 따라간다.
+    - 손님 가져가기·기계 상태 전환 등 외부 변화: 조준 중 매 tick의 `RefreshInteractionQuery`에서 반영된다(늦어도 다음 tick). 별도 inventory 구독·마지막 query 보관은 두지 않는다.
+    - 숨김·닫힘(focus 종료, suppression, 작동 시작)과 뚜껑 규칙은 그대로다. revision 변화만으로는 뚜껑 열림 요청이 바뀌지 않는다(같은 가능 방향이면 같은 요청).
+    - 진열 공간·router·냉장고는 필드를 채우지 않는다(0). 이들은 TargetName 수량으로 이미 따라간다([ServiceSystem.md](ServiceSystem.md)).
+    - 결정 근거: 리뷰 선택지 C. A(owner별 inventory 구독)는 알림 시점의 query 가능 여부가 이전 값이라 잠깐 틀린 cue를 낼 수 있고 owner 세 곳에 수명 관리가 필요하다. B(TargetName 수량)는 HUD 문구 변경이라 기능 계약 밖이다.
+  - 사용 수건통은 Apply가 없어 프리뷰가 없다. 바닥 수건은 대상이 아니다(TOWL-001, 004, 005, 016).
+- 기계 안 자리: Pile의 index 자리를 결정적으로 바꾼다([TowelPresentationSystem.md](TowelPresentationSystem.md) Deterministic Index Layout). 프리뷰 자리 = 넣었을 때 놓이는 자리다. 빼고 다시 넣으면 같은 자리다. 기계가 비면 배치를 새로 정한다(TOWL-006~008, 010).
+- 뚜껑·문:
+  - `ATowelProcessingMachineActor`에 native default subobject `LidPivot`(USceneComponent), `LidMesh`(UStaticMeshComponent, NoCollision, Navigation off, pivot 자식), `LidPresentation`(`UOpeningPresentationComponent`, pivot 주입)을 추가한다. 이름·위치·열림 값은 `BP_Washer`·`BP_Dryer`가 authoring한다.
+  - transfer port의 focus 알림에서 Apply 또는 Take가 가능하면 열림을 요청하고, 아니면 해제한다. focus 종료·suppression에서도 해제한다.
+  - 작동 시작은 query 변화로 닫히며, 작동 중에는 가능 방향이 없어 열리지 않는다(TOWL-002, 003, 009, 건조기 TOWL-017).
+  - 표현 전용이며 이동 조건·작동 조작에 영향이 없다.
+- 기존 E/F·held-use 규칙, CTRL-017·018·021~024 결과는 유지한다.
 
 ## Manual Review Points
 

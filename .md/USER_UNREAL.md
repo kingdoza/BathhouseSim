@@ -1,5 +1,16 @@
 # 사용자 Unreal 후속 작업
 
+## 서비스 2단위 (화장대·비품 여섯 종) — PIE 수용 대기
+
+MCP로 authoring·Compile·개별 Save·재로드 대조는 끝났다(`.md/Unreal/ServiceSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). MCP는 입력·console 명령을 실행할 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 통합 리뷰를 승인하지 않는다.
+
+1. **PIE 대표 시나리오와 표 전체** (`.md/PROMPT_UNREAL.md`의 "검증 순서와 대표 PIE" 이하): SHWR→TOWL, DISP-015~017·023·024, VANI-001~017, SHWR-001~011, TOWL-001~018, SHOP-S03·S04, F1(knockdown 재개 후 소모 불변), F2(보류 취소 뒤 대기 손님 자동 재시도, 실제 StateTree 전이). 실패하면 조준 위치와 Output Log를 남긴다. 콘솔: `bathhouse.Debug.Facility.BeginUse` / `.EndUse`.
+2. **임시 도형 화면 확인**: 박스 안 품목 배치(각 품목 정원 개수)와 트레이 안 수용, 화장대 네 그룹 자리·조준 범위(몸체 앞면 조준이 router보다 먼저 막히는지), 샤워기 샴푸/바디워시 자리, Washer/Dryer 뚜껑 열림 축·끼임과 pile 가시성(pile 범위는 컴포넌트 scale을 고려해 월드 약 ±10cm로 환산해 두었다). 어긋나면 값을 알려 주면 재작업한다.
+3. **Data Validation 명시 실행 (선택)**: 이번 작업엔 MCP tool이 없고 Python API는 승인되지 않았다. 저장 시 AssetCheck는 오류 0이었다. 원하면 Python API 사용을 승인해 6개 DA·`BP_Vanity`·`DA_FacilityPlacement_Vanity`·`BP_Shower`·`BP_Washer`·`BP_Dryer`·`DA_ShopCatalog`를 일괄 검증할 수 있다.
+4. **연결 절차 갱신 (문서)**: MCP 서버는 `-ModelContextProtocolStartServer` 인자(또는 설정 `bAutoStartServer`)가 있어야 포트가 열린다. `.md/UNREAL_MCP_CONNECTION.md`에 반영할지 결정한다.
+
+---
+
 ## 서비스 1단위 수직 (품목 박스·진열·음료 냉장고·수거함) — MCP 불가 항목
 
 MCP로 신규 asset 7개와 `DA_ShopCatalog`, `BP_FirstPersonCharacter` 카메라 blendable은 저장·재로드했다(`.md/Unreal/ServiceSystem.md`). Config(`ItemBoxClass`, `InsertPreviewMaterial`, `r.CustomDepth=3`)는 사용자 승인으로 직접 반영했고 새 Editor에서 값을 확인했다. 아래는 남은 항목이다. 완료 확인 전에는 통합 리뷰를 승인하지 않는다.

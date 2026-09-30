@@ -326,6 +326,8 @@ Check-in 외 gameplay timeout은 두지 않는다.
 
 ## Dependencies
 
+- 샤워 비품 소모(2026-09-30 서비스 2단위)는 설비 쪽이 facility slot의 Occupied 전이를 받아 처리한다. Customer 코드와 StateTree는 바꾸지 않는다([ServiceFacilityDisplaySystem.md](ServiceFacilityDisplaySystem.md)).
+
 - Customer -> Facility
 - Customer -> Bath Water public query/usability delegate
 - Customer -> Bath Water Operations actual-bather identity registration API

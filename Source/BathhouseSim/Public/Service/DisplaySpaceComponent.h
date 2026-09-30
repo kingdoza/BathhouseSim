@@ -10,6 +10,7 @@
 
 class UInstancedStaticMeshComponent;
 class UStaticMeshComponent;
+class UDisplayCueComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDisplaySpaceStockChanged, const FDisplaySpaceSnapshot&, Snapshot);
 
@@ -42,7 +43,27 @@ public:
 		const FPlayerInteractionQuery& Query) override;
 	virtual void NotifyInteractionFocusEnded(const UPlayerInteractionComponent& Source) override;
 
-	int32 GetSpaceIndex() const { return SpaceIndex; }
+	int32 GetSpaceIndex() const
+	{
+		return SpaceIndex;
+	}
+
+	EDisplaySpaceTargetMode GetTargetMode() const
+	{
+		return TargetMode;
+	}
+
+	UServiceItemDefinition* GetFixedKind() const
+	{
+		return FixedKind;
+	}
+
+	FVector GetSlotsWorldCenter() const;
+	FPlayerInteractionQuery BuildHeldUseQuery(const FPlayerInteractionContext& Context) const;
+	FPlayerInteractionResult ExecuteRoutedHeldTargetUse(const FPlayerInteractionContext& Context,
+														EPlayerHeldTargetUseDirection Direction);
+	bool ConsumeOneUse(bool& OutDepleted);
+	FText GetStockSummary() const;
 	FGameplayTag GetAcceptedCategory() const { return AcceptedCategory; }
 	int32 GetCapacity() const { return SlotTransforms.Num(); }
 	const FServiceItemStack& GetStock() const { return Stock; }
@@ -53,9 +74,10 @@ public:
 	bool IsOperational() const;
 	bool CanAcceptKind(const UServiceItemDefinition* Kind) const;
 	/** All-or-nothing check for payload import. Does not mutate. */
-	bool ValidateStockImport(const UServiceItemDefinition* Kind, int32 Count, FText& OutFailureReason) const;
+	bool ValidateStockImport(const UServiceItemDefinition* Kind, int32 Count, FText& OutFailureReason,
+							 int32 InUseRemaining = 0) const;
 	/** Applies a validated import and refreshes presentation. Broadcasts only when the stock actually changed. */
-	bool ImportStock(UServiceItemDefinition* Kind, int32 Count, FText& OutFailureReason);
+	bool ImportStock(UServiceItemDefinition* Kind, int32 Count, FText& OutFailureReason, int32 InUseRemaining = 0);
 	/** Customer removal (LIFO). Does not broadcast; the caller publishes after its own commit. */
 	bool RemoveOneForCustomer(UServiceItemDefinition*& OutKind, FText& OutFailureReason);
 	void PublishStockChanged();
@@ -69,6 +91,13 @@ public:
 	FOnDisplaySpaceStockChanged OnStockChanged;
 
 protected:
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Display Space")
+	EDisplaySpaceTargetMode TargetMode = EDisplaySpaceTargetMode::SelfAim;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Display Space")
+	TObjectPtr<UServiceItemDefinition> FixedKind;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Display Space", meta = (ClampMin = "0"))
 	int32 SpaceIndex = 0;
 
@@ -99,5 +128,6 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> TakeHighlightProxy;
 
-	bool bWarnedMissingPreviewMaterial = false;
+	UPROPERTY(Transient)
+	TObjectPtr<UDisplayCueComponent> DisplayCue;
 };

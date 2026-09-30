@@ -56,6 +56,7 @@ Facility는 towel 수량/overflow/machine, customer phase, key actor state·물�
 - `Exit`
 - `TowelShelf`  # 기존 ordinal 보존을 위해 enum 끝에 추가
 - `DrinkFridge`  # 2026-09-30 enum 끝에 추가, [ServiceSystem.md](ServiceSystem.md)
+- `Vanity`  # 2026-09-30 서비스 2단위 enum 끝에 추가, [ServiceFacilityDisplaySystem.md](ServiceFacilityDisplaySystem.md)
 
 `ShoeLocker`는 reflected ordinal 보존용 deprecated 값이며 신규 runtime에서 사용하지 않는다. `ClothesLocker`는 번호 없는 locker bank/action-slot 분류로 사용하고 `FacilityNumber`는 `INDEX_NONE`이다.
 
@@ -87,7 +88,12 @@ Facility는 Montage, AnimNotify, Motion Warping과 prop socket 계약을 소유�
 - pre-placed locker instance는 cooked build에도 저장되는 자동 생성 `RegistrationId`를 가진다. UE Editor-only Actor GUID를 runtime 순서에 사용하지 않는다.
 - pre-placed locker는 개별 Authority 변경 delegate로 재시도하지 않고 subsystem reconciliation에 제출한다.
 - actor destruction 시 모든 reservation을 해제하고 subsystem에서 등록 해제한다.
-- 파생 설비의 추가 회수 payload를 위해 protected virtual `CreateFacilityPlacementInstanceData`, `ExportFacilityExtension`, `ImportFacilityExtension`을 제공한다. `ImportFacilityExtension`은 construction 전 `ImportPlacementPayload`가 아니라 `FinalizePlacementPayloadAfterConstruction`에서 호출한다(base import는 확장 data를 Transient pending으로 보관만 한다). `UBathhouseFacilityPlacementInstanceData`는 `final`이 아니다(2026-09-30, [ServiceSystem.md](ServiceSystem.md) Placement Payload Extension).
+- 파생 설비의 추가 회수 payload를 위해 protected virtual `CreateFacilityPlacementInstanceData`, `ExportFacilityExtension`, `ImportFacilityExtension`을 제공한다. `ImportFacilityExtension`은 construction 전 `ImportPlacementPayload`가 아니라 `FinalizePlacementPayloadAfterConstruction`에서 호출한다(base import는 확장 data를 Transient pending으로 보관만 한다).
+- 2026-09-30 서비스 2단위: 기본 hook이 `IFacilityPlacementExtension` component를 일반 처리한다(export 수집, finalize에서 전부 검증 후 전부 적용, CDO는 SCS 템플릿 검증). `ABathhouseFacilityActor`가 회수 보류 `bRecoveryHoldActive`를 관리하고 기본 `IsAvailableForReservation()`이 보류 중 false다. 모든 설비에 적용되는 규칙이다. 상세는 [ServiceFacilityDisplaySystem.md](ServiceFacilityDisplaySystem.md) Facility Extension Contract. `UBathhouseFacilityPlacementInstanceData`는 `final`이 아니다(2026-09-30, [ServiceSystem.md](ServiceSystem.md) Placement Payload Extension).
+- 회수 보류 알림(2026-09-30 서비스 2단위 리뷰 F2): base `CancelFacilityRecoveryHold()`는 `bRecoveryHoldActive`가 실제로 true → false가 됐고, `bEndingPlay`가 아니며, placed domain이 등록·활성(`bPlacedDomainRegistered`, `FacilityPlacement->IsPlacedDomainActive()`)일 때만 `UBathhouseFacilitySubsystem::NotifyFacilityAvailabilityChanged(FacilityType)`를 한 번 호출한다. 보류 중 예약에 실패해 `WaitForFacility`로 들어간 손님이 이 알림으로 재시도한다.
+  - base `TryBeginFacilityRecoveryHold()`는 알리지 않는다. 가용성이 줄어드는 변화라 깨울 대기자가 없고, 회수 성공 경로의 알림을 domain publication 한 번으로 유지한다(Placement 회귀 `Recovery publishes one facility event`).
+  - 회수 성공: `StagePlacedDomainUnregistration`이 domain을 비활성으로 만든 뒤 파괴되므로, 이후 `HandleRecoveryTargetDestroyed` → cancel은 조용하다. 파괴 전 실패의 rollback은 domain을 복원한 뒤 cancel하므로 알린다.
+  - 욕탕 override(`RefreshReservationAvailability`, 시작·취소 모두 알림, commit-pending 억제)는 기존대로 유지한다.
 
 Blueprint event:
 

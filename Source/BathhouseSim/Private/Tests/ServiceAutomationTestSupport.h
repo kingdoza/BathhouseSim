@@ -12,7 +12,8 @@
 #include "Placement/FacilityPlacementSettings.h"
 #include "Placement/FacilityPlacementTypes.h"
 #include "Service/DisplaySpaceComponent.h"
-#include "Service/DrinkFridgePlacementInstanceData.h"
+#include "Service/ServiceDisplayPlacementData.h"
+#include "Facility/BathhouseFacilityPlacementInstanceData.h"
 #include "Service/ItemBoxActor.h"
 #include "Service/ServiceDisplaySettings.h"
 #include "Service/ServiceItemDefinition.h"
@@ -22,6 +23,14 @@
 
 namespace ServiceTest
 {
+inline UServiceDisplayPlacementData* GetDisplayData(const FFacilityPlacementPayload& Payload)
+{
+	const auto* Base=Cast<UBathhouseFacilityPlacementInstanceData>(Payload.InstanceData);
+	if (!Base) return nullptr;
+	for (UFacilityPlacementExtensionData* Extension : Base->Extensions)
+		if (auto* Display=Cast<UServiceDisplayPlacementData>(Extension)) return Display;
+	return nullptr;
+}
 struct FPlayer
 {
 	APawn* Pawn = nullptr;

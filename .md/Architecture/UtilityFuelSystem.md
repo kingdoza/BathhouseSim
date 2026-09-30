@@ -64,6 +64,8 @@
 
 ## Fuel Door Presentation
 
+2026-09-30: 같은 알고리즘의 범용 `UOpeningPresentationComponent`(Interaction/Presentation)가 세탁기·건조기 뚜껑용으로 추가된다. 이 class의 부모와 reflected layout은 바꾸지 않는다(BP_Boiler 호환).
+
 `UUtilityFuelDoorComponent`는 보일러·쿨러 공통이며 문 자세만 표현한다. domain 상태, 투입 판단과 collision을 소유하지 않는다.
 
 - `FuelIntakeVolume`이 `IPlayerInteractionFocusObserver`로 받은 알림을 자기 설비의 문에 전달한다. 다른 설비 문에는 전달하지 않는다.

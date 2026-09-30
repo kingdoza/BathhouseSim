@@ -51,7 +51,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Towel|Presentation")
 	UTowelInventoryComponent* GetBoundInventorySource() const { return BoundInventory.Get(); }
 
+	bool GetIndexPresentation(int32 Index, ETowelState State, UStaticMesh*& OutMesh,
+							  FTransform& OutRelativeTransform) const;
+
+	int32 GetLayoutSeed() const
+	{
+		return LayoutSeed;
+	}
+
 protected:
+
+	virtual bool UsesDeterministicIndexLayout() const
+	{
+		return false;
+	}
+
+	uint32 GetIndexSeed(int32 Index) const
+	{
+		return HashCombine(GetTypeHash(LayoutSeed), GetTypeHash(Index));
+	}
 	virtual void OnRegister() override;
 	virtual void OnUnregister() override;
 	virtual FTransform BuildLocalTransform(int32 VisualIndex);
@@ -83,6 +101,7 @@ protected:
 
 private:
 	friend class FBathhouseTowelPresentationTest;
+	friend class FBathhouseTowelDisplayCueTest;
 
 	UFUNCTION()
 	void HandleInventoryChanged(
@@ -122,6 +141,7 @@ private:
 	int32 DisplayedCount = 0;
 	int64 AppliedRevision = -1;
 	FRandomStream RandomStream;
+	int32 LayoutSeed = 1337;
 	FTimerHandle StepTimerHandle;
 	bool bCleaningUp = false;
 	bool bEditorPreviewActive = false;

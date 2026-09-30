@@ -3,15 +3,10 @@
 #define LOCTEXT_NAMESPACE "TowelHeldTransferRules"
 
 FTowelHeldTransferDirection FTowelHeldTransferRules::EvaluateDirection(
-	const bool bApply,
-	const FText& ActionName,
-	const FText& TargetName,
-	const FTowelInventorySnapshot& TargetSnapshot,
-	const bool bHasBasket,
-	const FTowelInventorySnapshot& BasketSnapshot,
-	const ETowelState RequiredState,
-	const bool bMachineProcessing,
-	const EPlayerInteractionActivationMode ActivationMode)
+	const bool bApply, const FText& ActionName, const FText& TargetName, const FTowelInventorySnapshot& TargetSnapshot,
+	const bool bHasBasket, const FTowelInventorySnapshot& BasketSnapshot, const ETowelState RequiredState,
+	const bool bMachineProcessing, const EPlayerInteractionActivationMode ActivationMode,
+	const bool bDisplayEmptyReason)
 {
 	FTowelHeldTransferDirection Result;
 	Result.bVisible = true;
@@ -52,9 +47,9 @@ FTowelHeldTransferDirection FTowelHeldTransferRules::EvaluateDirection(
 	{
 		if (TargetSnapshot.Count <= 0)
 		{
-			Result.FailureReason = FText::Format(
-				LOCTEXT("TargetEmpty", "{0} 비어 있음"),
-				TargetName);
+			Result.FailureReason = bDisplayEmptyReason
+									   ? LOCTEXT("DisplayEmpty", "꺼낼 수건 없음")
+									   : FText::Format(LOCTEXT("TargetEmpty", "{0} 비어 있음"), TargetName);
 			return Result;
 		}
 		if (BasketSnapshot.Count >= BasketSnapshot.Capacity)
@@ -90,8 +85,8 @@ FTowelHeldTransferQuery FTowelHeldTransferRules::Build(
 		Result.Apply = EvaluateDirection(
 			true, ApplyName, TargetName, TargetSnapshot, bHasBasket, BasketSnapshot,
 			ETowelState::Clean, false, RepeatMode);
-		Result.Take.FailureReason = LOCTEXT("ShelfTakeUnavailable", "여기서는 꺼낼 수 없음");
-		Result.Take.ActivationMode = RepeatMode;
+		Result.Take = EvaluateDirection(false, TakeName, TargetName, TargetSnapshot, bHasBasket, BasketSnapshot,
+										ETowelState::Clean, false, RepeatMode, true);
 		break;
 
 	case ETowelHeldTransferTargetKind::UsedBin:
@@ -108,10 +103,8 @@ FTowelHeldTransferQuery FTowelHeldTransferRules::Build(
 			Result.Apply = EvaluateDirection(
 				true, ApplyName, TargetName, TargetSnapshot, bHasBasket, BasketSnapshot,
 				MachineInputState, false, RepeatMode);
-			Result.Take.bVisible = true;
-			Result.Take.ActionName = TakeName;
-			Result.Take.FailureReason = LOCTEXT("WaitingTakeUnavailable", "완료 후 뺄 수 있음");
-			Result.Take.ActivationMode = RepeatMode;
+			Result.Take = EvaluateDirection(false, TakeName, TargetName, TargetSnapshot, bHasBasket, BasketSnapshot,
+											MachineInputState, false, RepeatMode, true);
 		}
 		else if (MachineState == ETowelMachineState::Complete)
 		{

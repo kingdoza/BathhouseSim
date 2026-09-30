@@ -14,7 +14,21 @@ class UServiceAutomationDisplaySpace final : public UDisplaySpaceComponent
 	GENERATED_BODY()
 
 public:
+
 	void ConfigureForTest(int32 InSpaceIndex, const FGameplayTag& InCategory, int32 SlotCount);
+
+	void ConfigureRoutedForTest(int32 Index, UServiceItemDefinition* Kind, int32 Capacity)
+	{
+		SpaceIndex = Index;
+		TargetMode = EDisplaySpaceTargetMode::FacilityRouted;
+		FixedKind = Kind;
+		SlotTransforms.Reset();
+		for (int32 Slot = 0; Slot < Capacity; ++Slot)
+		{
+			SlotTransforms.Add(FTransform(FVector(0, Slot * 5, 0)));
+		}
+		SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 };
 
 /**

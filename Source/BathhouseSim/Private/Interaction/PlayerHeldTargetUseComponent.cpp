@@ -140,6 +140,7 @@ void UPlayerHeldTargetUseComponent::BeginUse(const EPlayerHeldTargetUseDirection
 		return;
 	}
 	RepeatTarget = TargetObject;
+	RepeatTargetKey = Query.HeldUseTargetKey;
 	RepeatHeldObject = HeldObject;
 	RepeatElapsedSeconds = 0.0f;
 	bRepeatActive = true;
@@ -195,6 +196,11 @@ void UPlayerHeldTargetUseComponent::TickRepeat(const float DeltaTime)
 
 	const FPlayerInteractionQuery Query = Interactable->QueryInteraction(Context);
 	const FHeldTargetUseAvailability Availability = GetAvailability(Query, ActiveDirection);
+	if (Query.HeldUseTargetKey != RepeatTargetKey)
+	{
+		StopRepeating();
+		return;
+	}
 	if (!Availability.bVisible && (!Availability.FailureReason || Availability.FailureReason->IsEmpty()))
 	{
 		StopRepeating();
@@ -237,6 +243,7 @@ void UPlayerHeldTargetUseComponent::StopRepeating()
 {
 	bRepeatActive = false;
 	RepeatTarget.Reset();
+	RepeatTargetKey = INDEX_NONE;
 	RepeatHeldObject.Reset();
 	RepeatElapsedSeconds = 0.0f;
 	SetComponentTickEnabled(false);

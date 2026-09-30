@@ -37,6 +37,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Service Item|Box", meta = (ClampMin = "1"))
 	int32 BoxCapacity = 1;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Service Item|Consumption", meta = (ClampMin = "0"))
+	int32 ConsumableUses = 0;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Service Item|Box")
+	FTransform BoxItemOffset = FTransform::Identity;
+
 	/** Box-root-relative cm transforms. Count must equal BoxCapacity; array order is the fill order. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Service Item|Box")
 	TArray<FTransform> BoxSlotTransforms;

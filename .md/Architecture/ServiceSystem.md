@@ -3,7 +3,11 @@
 ## Status And Scope
 
 - 2026-09-30 설계. 입력은 `.md/PROMPT_ARCHITECTURE.md`(서비스 1단위: 진열 기반, 음료 냉장고)와 `.md/NextWork/QNA_FEATURE_SPEC.md`의 해당 Q다. 사용자 결정: 꺼내기 강조는 Custom Depth Stencil + 후처리 외곽선(2026-09-30).
-- 구현 상태: 1단위 완료(2026-09-30 사용자 확인). Source 구현, 코드 리뷰의 아키텍처 재검토(F1~F5) 재작업, Editor authoring까지 끝났다.
+- 구현 상태: 1단위 완료(2026-09-30 사용자 확인, 커밋 `5b42a47`). Source 구현, 코드 리뷰의 아키텍처 재검토(F1~F5) 재작업, Editor authoring까지 끝났다.
+- 2단위(진열 확장) 설계: 2026-09-30, [ServiceFacilityDisplaySystem.md](ServiceFacilityDisplaySystem.md)가 정본이다. 이 문서의 1단위 구조 중 다음을 일반화한다.
+  - 냉장고 payload → 공용 `UServiceDisplayManagerComponent`와 설비 extension
+  - 공간 proxy → `UDisplayCueComponent`
+  - 냉장고 회수 보류·사용자 정리 → 설비 base·manager
 - 재작업 이력(1단위):
   - F1: 냉장고 payload 적용을 construction 뒤 단계로 옮겼다(Placement Payload Extension).
   - F2: Editor 정확한 경로, Data Validation의 SCS 검사, 박스 미리보기 world 범위를 정했다.
@@ -57,7 +61,7 @@ Source/BathhouseSim/Private/Service/
 | `ItemMesh` (UStaticMesh) | 필수. 박스·진열 외형 |
 | `BoxCapacity` (int32) | ≥ 1. 바나나우유 12 |
 | `BoxSlotTransforms` (TArray<FTransform>) | 박스 root 기준 cm. 개수 = `BoxCapacity`. 배열 순서가 채우는 순서 |
-| `BoxItemOffset` (FTransform, 기본 Identity) | 2단위 추가(설계 확정, Source 미반영). 박스 안 모든 자리에 공통으로 적용하는 품목 보정. 자리 i의 최종값은 `BoxItemOffset * BoxSlotTransforms[i]`(품목 자기 기준 공통 회전·스케일·피벗 보정 → 자리 transform). 회전은 합성, 스케일은 곱. 공통 스케일은 균일값 권장(비균일 + 자리 회전은 찌그러짐). Validation은 finite·스케일 양수. 진열 쪽 `DisplayOffset`과 별개 |
+| `BoxItemOffset` (FTransform, 기본 Identity) | 2단위 추가([ServiceFacilityDisplaySystem.md](ServiceFacilityDisplaySystem.md) Item Definition Additions, `ConsumableUses`와 함께). 박스 안 모든 자리에 공통으로 적용하는 품목 보정. 자리 i의 최종값은 `BoxItemOffset * BoxSlotTransforms[i]`(품목 자기 기준 공통 회전·스케일·피벗 보정 → 자리 transform). 회전은 합성, 스케일은 곱. 공통 스케일은 균일값 권장(비균일 + 자리 회전은 찌그러짐). Validation은 finite·스케일 양수. 진열 쪽 `DisplayOffset`과 별개 |
 | `DisplayMesh` (선택) / `DisplayOffset` (FTransform) | 진열 공간 자리 위 외형. 없으면 `ItemMesh` |
 | `DisplayCategories` (FGameplayTagContainer) | 넣을 수 있는 진열 분류. 음료는 `Display.Fridge` |
 | `SaleValue` (int32) | ≥ 0. 손님이 가져갈 때 적립. 바나나우유 2000 |

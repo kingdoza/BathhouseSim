@@ -58,6 +58,7 @@ private:
 	TWeakObjectPtr<AActor> RepeatHeldObject;
 	EPlayerHeldTargetUseDirection ActiveDirection = EPlayerHeldTargetUseDirection::Apply;
 	float RepeatElapsedSeconds = 0.0f;
+	int32 RepeatTargetKey = INDEX_NONE;
 	bool bUseActive = false;
 	bool bRepeatActive = false;
 };

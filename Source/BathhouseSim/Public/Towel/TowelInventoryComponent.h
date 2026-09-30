@@ -48,6 +48,7 @@ private:
 	friend class FBathhouseTowelTransferTest;
 	friend class FBathhouseCustomerTowelTest;
 	friend class FBathhouseTowelPresentationTest;
+	friend class FBathhouseTowelDisplayCueTest;
 	friend class FBathhousePhysicalCarryFixedSlotTest;
 	friend class FBathhouseHeldTargetUseRepeatTest;
 	friend class FBathhouseFacilityPlacementRuntimeTest;

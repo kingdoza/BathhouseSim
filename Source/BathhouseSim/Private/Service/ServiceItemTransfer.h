@@ -24,27 +24,31 @@ public:
 		const FServiceItemStack& Box,
 		const FServiceItemStack& Space,
 		const FGameplayTag& SpaceCategory,
-		int32 SpaceCapacity);
+		int32 SpaceCapacity,
+		const UServiceItemDefinition* FixedKind = nullptr);
 
 	static FServiceTransferEvaluation EvaluateTake(
 		const FServiceItemStack& Box,
 		const FServiceItemStack& Space,
 		const FGameplayTag& SpaceCategory,
-		int32 SpaceCapacity);
+		int32 SpaceCapacity,
+		const UServiceItemDefinition* FixedKind = nullptr);
 
 	static bool TryApplyOne(
 		FServiceItemStack& Box,
 		FServiceItemStack& Space,
 		const FGameplayTag& SpaceCategory,
 		int32 SpaceCapacity,
-		FText& OutFailureReason);
+		FText& OutFailureReason,
+		const UServiceItemDefinition* FixedKind = nullptr);
 
 	static bool TryTakeOne(
 		FServiceItemStack& Box,
 		FServiceItemStack& Space,
 		const FGameplayTag& SpaceCategory,
 		int32 SpaceCapacity,
-		FText& OutFailureReason);
+		FText& OutFailureReason,
+		const UServiceItemDefinition* FixedKind = nullptr);
 
 	/** Customer removal from a display space. Bumps the revision and unlocks the kind at zero. */
 	static bool TryRemoveOne(FServiceItemStack& Space, UServiceItemDefinition*& OutKind, FText& OutFailureReason);

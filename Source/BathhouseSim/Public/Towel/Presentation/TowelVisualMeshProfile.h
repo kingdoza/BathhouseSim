@@ -30,6 +30,7 @@ protected:
 
 private:
 	friend class FBathhouseTowelPresentationTest;
+	friend class FBathhouseTowelDisplayCueTest;
 
 	void InvalidateCache();
 	void RebuildCache(TArray<FText>* OutErrors = nullptr, TArray<FText>* OutWarnings = nullptr) const;

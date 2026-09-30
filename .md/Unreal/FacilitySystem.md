@@ -5,12 +5,13 @@
 | Asset | Parent Class | 역할 |
 |---|---|---|
 | `/Game/Bathhouse/Blueprints/Facility/BP_Bath` | `/Script/BathhouseSim.BathhouseBathFacilityActor` | Bath 시설, 3개 Facility Slot과 물 표현 composition root |
-| `/Game/Bathhouse/Blueprints/Facility/BP_Shower` | `/Script/BathhouseSim.BathhouseFacilityActor` | Shower 시설과 2개 Facility Slot |
+| `/Game/Bathhouse/Blueprints/Facility/BP_Shower` | `/Script/BathhouseSim.BathhouseFacilityActor` | Shower 시설과 2개 Facility Slot, 비품 manager·router·공간 2개([ServiceSystem.md](ServiceSystem.md)) |
+| `/Game/Bathhouse/Blueprints/Service/BP_Vanity` | `/Script/BathhouseSim.BathhouseFacilityActor` | 화장대(비품 진열 4그룹, Facility Slot 1개, [ServiceSystem.md](ServiceSystem.md)) |
 | `/Game/Bathhouse/Blueprints/Facility/BP_ClothesLocker` | `/Script/BathhouseSim.BathhouseFacilityActor` | 1칸 Clothes Locker |
 | `/Game/Bathhouse/Blueprints/Facility/BP_ClothesLocker_4` | `/Script/BathhouseSim.BathhouseFacilityActor` | 4칸 Clothes Locker |
 | `/Game/Bathhouse/Blueprints/Facility/BP_ClothesLocker_8` | `/Script/BathhouseSim.BathhouseFacilityActor` | 8칸 Clothes Locker |
-| `/Game/Bathhouse/Blueprints/Towel/BP_Washer` | `/Script/BathhouseSim.TowelProcessingMachineActor` | Washer |
-| `/Game/Bathhouse/Blueprints/Towel/BP_Dryer` | `/Script/BathhouseSim.TowelProcessingMachineActor` | Dryer |
+| `/Game/Bathhouse/Blueprints/Towel/BP_Washer` | `/Script/BathhouseSim.TowelProcessingMachineActor` | Washer, native 뚜껑(`LidPivot`/`LidMesh`/`LidPresentation`)·`DisplayCue`, 값은 ServiceSystem.md |
+| `/Game/Bathhouse/Blueprints/Towel/BP_Dryer` | `/Script/BathhouseSim.TowelProcessingMachineActor` | Dryer, 뚜껑·`DisplayCue` 동일 |
 | `/Game/Bathhouse/Blueprints/Towel/BP_CleanTowelStack` | `/Script/BathhouseSim.CleanTowelStackActor` | placement opt-out 수건 공급대 |
 | `/Game/Bathhouse/Blueprints/Towel/BP_UsedTowelBin` | `/Script/BathhouseSim.UsedTowelBinActor` | placement opt-out 사용 수건함 |
 

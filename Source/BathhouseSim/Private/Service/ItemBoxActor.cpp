@@ -405,7 +405,7 @@ void AItemBoxActor::RebuildContentsVisual(const UServiceItemDefinition* Kind, co
 	const int32 Visible = FMath::Min(Count, Kind->BoxSlotTransforms.Num());
 	for (int32 Index = 0; Index < Visible; ++Index)
 	{
-		ContentsVisual->AddInstance(Kind->BoxSlotTransforms[Index], false);
+		ContentsVisual->AddInstance(Kind->BoxItemOffset * Kind->BoxSlotTransforms[Index], false);
 	}
 }
 

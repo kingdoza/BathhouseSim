@@ -215,7 +215,7 @@ preview Actor와 생성 component는 collision/overlap/physics/Tick과 Navigatio
 
 placement는 후보를 같은 frame에 재검증하고 새 placed Actor를 collision/domain 비활성 staged 상태로 만든다. payload import와 silent facility/locker 등록 후 held item을 소비하며, 그 뒤 Actor collision을 복원하고 held/facility/capacity event를 한 번 publish한다. `StagePlacedDomainRegistration()`은 collision을 복원하거나 staged flag를 commit하지 않는다. 최종 commit API만 이를 수행한다.
 
-recovery hold 시작은 side-effect-free query 성공 뒤 `TryBeginFacilityRecoveryHold()`을 정확히 한 번 호출한다. 일반 설비의 default hook은 no-op이고 Bath는 0% 수위·control motion·Niagara를 snapshot한 뒤 동결한다. Q release, gaze/target 변경, suppression과 조건 변경은 `CancelFacilityRecoveryHold()`로 복원한다.
+recovery hold 시작은 side-effect-free query 성공 뒤 `TryBeginFacilityRecoveryHold()`을 정확히 한 번 호출한다. 일반 설비의 default hook은 base `bRecoveryHoldActive`만 관리해 보류 중 예약을 막고 취소 때 가용성을 알린다([FacilitySystem.md](FacilitySystem.md) 회수 보류 알림). Bath는 0% 수위·control motion·Niagara를 snapshot한 뒤 동결한다. Q release, gaze/target 변경, suppression과 조건 변경은 `CancelFacilityRecoveryHold()`로 복원한다.
 
 실제 recovery transaction은 staged item 준비와 collision 확인 후 원본 Actor collision/domain을 silent 비활성화한다. Bath의 domain-unregistration override는 control 닫힘을 commit-pending으로 적용하되 hold snapshot은 유지한다. item physics 활성화와 원본 파괴가 성공하면 EndPlay에서 snapshot을 폐기하고 publication한다. 파괴 전 실패는 원본 domain/collision 뒤 hold snapshot까지 복원하고 item을 제거한다. Player의 후속 cancel과 target EndPlay는 idempotent하다.
 

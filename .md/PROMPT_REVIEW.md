@@ -1,66 +1,86 @@
-# 코드 리뷰 입력 — 서비스 1단위 수직 재작업(F1~F5)
+# 코드 리뷰 프롬프트 — 수건 cue 갱신 재작업
 
-## 단계와 범위
+## 현재 단계와 입력
 
-- 기능 계약 `.md/PROMPT_ARCHITECTURE.md`(DISP-001~022, FRDG-001~015, SHOP-S01·S02), 단계는 **수직 구현**. 입력은 `.md/PROMPT_IMPLEMENTATION.md` 맨 앞 "R. 아키텍처 재검토 반영 재작업"과 `.md/PROMPT_IMPLEMENTATION_R.md`(F1~F5)다.
-- 이전 Service 구현(미커밋)을 그대로 두고 그 위에서 수정했다. `Content/`, `Config/`, `.md/Architecture/*`, `.md/Unreal/*`는 수정·저장하지 않았다(`git status -- Content Config` 무변경).
-- 구현 QNA 미해결 없음. 설계와 달라서 멈춘 항목 없음.
+서비스 2단위 완료 뒤 보고된 수건 cue 갱신 결함의 C++ 재작업이다. AGENT_WORKFLOW.md → AGENT_REVIEW.md 순서로 코드 리뷰한다. 현재 보고는 코드 리뷰 승인이나 PIE 통합 승인 자체가 아니다.
+입력: [재작업 findings](PROMPT_IMPLEMENTATION_R.md), [구현 프롬프트 맨 앞 재작업 절](PROMPT_IMPLEMENTATION.md), [기능 계약](PROMPT_ARCHITECTURE.md), [수건 cue 재계산 정본](Architecture/TowelSystem.md), [Interaction PresentationRevision 정본](Architecture/InteractionSystem.md), [결정적 자리 표현](Architecture/TowelPresentationSystem.md).
+기존 2단위 Source·F1~F4 결과·Editor 작업물을 유지했다. 최초 구현/F1~F4를 다시 수행하지 않았다. 이번 변경은 아래 8개 Source 파일과 PROMPT_REVIEW.md·PROMPT_UNREAL.md뿐이다. 기존 인계 문서는 Saved/ImplementationUnit2/CueRefresh/Before/.md/에 보관했다.
 
-## F1~F5 대응
+## 선택된 경로와 구현
 
-| 항목 | 구현 | 검증 |
+- 정본의 C안: `FPlayerInteractionQuery` 끝에 `UPROPERTY() int64 PresentationRevision = 0`을 추가하고 Equals에 포함했다. Blueprint 비노출이며 HUD 이름·행동명·이유·가능 여부·mode는 그대로다.
+- `TowelDisplayCueUtils::GetPresentationRevision` 한 곳에서 대상 inventory Revision + 든 ATowelBasketActor inventory Revision을 계산한다. 없는 inventory·바구니가 아닌 물건은 해당 항 0이다.
+- 선반·사용 수건통·기계 transfer port query의 정상·불가·inactive fallback·ownerless 빈 반환에 같은 규칙을 채운다. 이동 조건·정원·기계 상태를 바꾸지 않는다.
+- 매 transfer 뒤 기존 HeldUse의 RefreshInteractionQuery → CommitQuery → SyncFocusObservers가 revision 차이를 감지해 기존 owner focus 알림을 보낸다. cue는 기존 Update에서 authoritative Count/Count−1로 다시 계산된다. 플레이어 연속 입력은 같은 프레임, 손님/기계 등 외부 변화는 늦어도 다음 query tick에 반영된다.
+- PlayerInteractionComponent·PlayerHeldTargetUseComponent는 수정하지 않았다. 반복 guard는 기존 target/key 조건이며 revision이 바뀌어도 반복을 중단하지 않는다. owner inventory 구독·query 캐시·새 lifecycle을 추가하지 않았다.
+- NotifyInteractionFocusChanged·TowelDisplayCueUtils::Update·뚜껑 요청은 변경하지 않았다. 기존 SetSourceInsertable은 같은 source key에 bool을 덮어쓰므로 같은 열림 방향의 요청 반복은 중복 source를 만들지 않는다. 기존 결정적 Pile·뚜껑 자동화도 유지했다.
+- 진열 공간·설비 router·냉장고 runtime query와 HUD는 변경하지 않았다. 새 필드의 기본값 0을 유지한다.
+
+## 변경 파일과 클래스 성장
+
+Source/BathhouseSim 기준 줄 수다. 이번 시작 상태와 비교한다.
+
+| 파일 | 변경 전 → 후 |
+|---|---|
+| `Private/Tests/ServiceBlueprintLoadAutomationTests.cpp` | 227 → 227 |
+| `Private/Tests/TowelDisplayCueAutomationTests.cpp` | 236 → 539 |
+| `Private/Towel/CleanTowelStackActor.cpp` | 145 → 149 |
+| `Private/Towel/TowelDisplayCueUtils.cpp` | 45 → 55 |
+| `Private/Towel/TowelDisplayCueUtils.h` | 14 → 16 |
+| `Private/Towel/TowelTransferPortComponent.cpp` | 151 → 153 |
+| `Private/Towel/UsedTowelBinActor.cpp` | 220 → 224 |
+| `Public/Interaction/InteractionTypes.h` | 279 → 283 |
+
+production은 query 값 1개와 stateless helper 1개 추가뿐이다. 새 UFUNCTION·delegate·Tick·bind/unbind·default subobject·독립 상태 책임은 없다. 큰 Interaction 클래스의 구현 성장 없이 승인된 query 계약을 따랐다. 테스트 파일 증가는 네 대상 실제 입력 경로의 fixture·회귀 검증이다.
+`ServiceBlueprintLoadAutomationTests.cpp`는 기존 DA_ShopCatalog 상품 수 기대값 한 줄만 9→16으로 맞췄다. [현재 Shop Editor 정본](Unreal/ShopSystem.md)에 기존 9 + 2단위 7 = 16이 저장·재로드된 상태다. 실제 Content를 바꾸거나 기존 상품 보존 검사를 제거하지 않았다.
+
+## 새 실제 경로 자동화
+
+`BathhouseSim.Towel.Display.RefreshFollowsTransfersAndRepeats`를 기존 TowelDisplayCueAutomationTests.cpp에 추가했다. 새 테스트는 NotifyInteractionFocusChanged를 직접 호출하지 않는다. 실제 locally controlled player·camera trace·held basket·Interaction Refresh·HeldUse BeginUse/TickComponent를 사용한다.
+
+| 대상/시나리오 | 경로와 기대값 |
+|---|---|
+| 선반 TOWL-001·004·005·013·016 | 조준 고정 → LMB 즉시 1장 + Tick 반복 2장 → RMB 즉시 1장 + Tick 반복 2장. 매 장 exactly 1 transfer, preview=GetIndexPresentation(Count), highlight=GetIndexPresentation(Count−1) |
+| 사용 수건통 TOWL-004·005·016 | Apply·프리뷰 없음. RMB 즉시+반복 총 3장마다 강조가 새 맨 위로 이동 |
+| Waiting 세탁기 TOWL-006·010·013 | Used 바구니로 LMB/RMB 각각 3장, 결정적 Pile의 새 index transform과 cue 일치 |
+| Waiting 건조기 TOWL-006·017 | Wet 바구니로 같은 LMB/RMB 3장 검증 |
+| 외부 선반 변화 TOWL-018 | 실제 UTowelTransferSubsystem으로 선반→손님 inventory 1장 이동 → RefreshInteractionQuery 1회로 새 자리 반영 |
+| 바구니만 변경 | 네 대상에서 basket→외부 inventory 1장 이동, 대상 revision 불변인데 query 합은 변경되고 cue를 다시 계산 |
+| query/HUD | 매 count-only 이동에서 Equals false. revision만 맞추면 Equals true이므로 모든 기존 HUD/가능 여부 필드는 동일 |
+| fallback/default | inactive 대상·ownerless port·null inventory/바구니 없음의 합, BlueprintVisible flag 없음, 진열 공간·router·냉장고 revision 0 |
+| 숨김 | 실제 suppression과 focus exit에서 양 cue 숨김, suppression 해제 후 실제 조준·표현 복구 |
+
+모든 cue 검사에서 실제 target focus도 확인한다. 사용 수건통의 Apply 예외를 제외하면 각 장 이동 직후 보이는 cue의 relative transform을 검사하며 수량 경계에 의한 우연한 query 변화에 기대지 않는다.
+기존 `BathhouseSim.Towel.Display.CuesDeterministicPileAndLid` 본문은 수정하지 않았다. 기존 Towel·Service·Interaction held-use·Utility 자동화를 제외하지 않고 전체 실행했다.
+
+## 빌드·로드·회귀 결과
+
+모든 headless는 AGENT_WORKFLOW 형식과 -DDC-ForceMemoryCache를 사용했다. 빌드는 UE 5.8 Build.bat / BathhouseSimEditor Win64 Development / -WaitMutex -NoHotReloadFromIDE다.
+
+| 검증 | 실제 결과 | 로그 / report (Saved 기준) |
 |---|---|---|
-| F1 construction 뒤 payload 적용 | `IPlaceableFacility::FinalizePlacementPayloadAfterConstruction`(기본 true). `FFacilityActorConversionTransaction`이 `FinishSpawning` 직후·`IsValid` 확인 뒤·collision snapshot 확정 앞에서 호출, 실패하면 `DestroyStaged` 후 `nullptr`(item 미소모, publication 없음). `ETestFault::PlacementFinalizePayload` 추가. `ABathhouseFacilityActor::ImportPlacementPayload`는 base 필드만 처리하고 확장 data를 `PendingFacilityExtension`/`bPendingFacilityExtension`으로 보관(신규 설치는 null), finalize override가 `ImportFacilityExtension(Pending)` 호출 후 결과와 무관하게 pending 비움 | 새 fixture `AServiceAutomationConstructedFridge`(공간 4개·slot 1개를 `OnConstruction`의 NewObject+`RegisterComponent`로 생성) + 실제 transaction: 신규 설치 4공간 빔, 회수→재설치 복원(공간 0 우유 3, 공간 2 주스 2), 잘못된 payload 4종(index 불일치·정원 초과·분류 불허·공간 누락)·finalize fault → 배치 실패, 원래 item·payload·held 유지, 새 Actor 없음, 이후 정상 payload 재설치 성공. 기존 native subobject fixture 테스트는 `FinishSpawning`→finalize까지 호출하도록 수정 |
-| F2 Editor 인계·미리보기 | `AItemBoxActor` 미리보기 world를 `Editor`+`EditorPreview`로 확대. `ADrinkFridgeActor::ValidateSpaceLayout`(공유 규칙)과 CDO 경로 `IsDataValid`(native subobject + Blueprint 상속 사슬 SCS `ComponentTemplate` 수집, WITH_EDITOR) | `Fridge.LayoutRuleAndDiscard`: 정상·slot 0·slot 2·공간 없음·index 중복·index gap·분류 태그 없음·자리 0. 테스트용 `UBlueprint`는 만들지 않았다: SCS 노드 수집 자체(BP CDO 경로)는 자동화 미검증이고 Editor 단계(Data Validation + SCS readback)로 넘겼다. `PROMPT_UNREAL.md` 전면 재작성 |
-| F3 정본 정렬 | 코드 변경 없음. `DisplayOffset * SlotTransforms[i]` 유지(정본과 일치) | — |
-| F4 자동화 | DISP-021: 진열이 든 냉장고 아이템(payload 보유)을 쓰레기통으로 버림 → item 소멸, 지갑·수거함 금액 불변. 박스 버리기도 쓰레기통 경로로 바꾸고 지갑·수거함 불변 단언 추가 | `Fridge.LayoutRuleAndDiscard`, `ItemBox.LifecycleAndContents` |
-| F5 정리 | `FShopUnboxItemShape`와 factory 두 개를 `Private/Shop/ShopUnboxItemShape.h/.cpp`로 이동. 설비 전용 `FindSpawnTransforms(Definitions)` overload 삭제, 테스트 12곳은 테스트 helper `ShopUnboxTest::MakeShapes`(Private/Tests/ShopUnboxShapeTestSupport.h)로 shape 경로 사용. `LoadInsertPreviewMaterial`을 `Private/Service/ServiceDisplaySettings.cpp`로 이동 | `ShopUnboxingPlacement.cpp` 391줄(<400). Shop 개봉 무리 테스트 전부 통과 |
+| Build 01~04 | 4회 Succeeded, 최종 9.56초. 최종 빌드 뒤 Source 수정 없음 | ImplementationUnit2/CueRefresh/build_01.txt ~ build_04.txt |
+| DefaultMap 로드 + Towel.Display 최종 | 2/2 성공, test warning/error 0, exit 0 | ImplementationUnit2/CueRefresh/defaultmap_03.log; Automation/Reports/20260930/unit2_cue_defaultmap_03/index.json |
+| Template 전체 BathhouseSim | **100/100 성공**, 실패 0, 미실행 0, test warnings 22, errors 0, exit 0 | ImplementationUnit2/CueRefresh/all.log; Automation/Reports/20260930/unit2_cue_all/index.json |
+| 정적 검사 | git --no-optional-locks diff --check 통과, 새 테스트 direct Notify 호출 없음 | ImplementationUnit2/CueRefresh/static_checks.txt |
 
-## 변경 파일 (이번 재작업분)
+전체 100개 중 warning 없는 성공은 90개, warning을 동반한 성공은 10개다. warning 22개는 기존 invalid-authoring fixture·판매 pool/수거함·preview material 미지정·수건 slot/payload 거부와 Template의 Boiler/Cooler/Circulator instance 없음(CDO 호환성 확인), 이동 불가 static mesh 등을 보고했다. 새 cue 테스트는 warning/error 0이다.
+전체에 Towel 4개, Service 22개, Interaction 16개(held-use 포함), Utility 10개가 포함된다. 이전 F1~F4의 99개에 이번 새 테스트 1개가 추가됐다. 이전 빌드/회귀 상세는 Saved/ImplementationUnit2/Rework/ 및 CueRefresh/Before/.md/PROMPT_REVIEW.md에 유지돼 있다.
+초기 DefaultMap 테스트 01·02는 새 테스트 1개가 실패했다(각 error 2): RefreshFollowsTransfersAndRepeats의 Shelf/UsedBin query revision 14/7 기대값에 0이 반환됐다. 비활성 query fixture가 PackagePhysicalRoot trace 충돌을 끈 뒤 복구하지 않아 suppression 해제에서 조준을 잃은 것이었다. 충돌 복구와 매 cue 검사 실제 focus 확인을 추가한 뒤 03에서 전부 통과했다. 냉장고 default query probe도 조준선 밖에 둔다. 실패 로그를 삭제하거나 테스트를 제외하지 않았다.
+startup의 optional profiling DLL·Zen/DDC·Rider/EOS 환경 메시지는 전체 로그에 남겼다. DDC는 명시한 memory fallback으로 초기화돼 테스트까지 실행됐으며 fatal 없이 정상 종료했다. Automation test event와 startup 메시지를 구별한다.
 
-- Placement: `PlaceableFacility.h`(virtual 추가), `FacilityActorConversionTransaction.h/.cpp`(fault enum·호출).
-- Facility: `BathhouseFacilityActor.h`(pending 필드·override 선언), `BathhouseFacilityPlacementDomain.cpp`(import 분리·finalize 구현).
-- Service: `DrinkFridgeActor.h/.cpp`(`ValidateSpaceLayout`, CDO 검사), `ItemBoxActor.cpp`(미리보기 world), `ServiceItemDefinition.cpp`, 신규 `ServiceDisplaySettings.cpp`.
-- Shop: `ShopUnboxingPlacement.h/.cpp`(shape 이동·overload 삭제), 신규 `ShopUnboxItemShape.h/.cpp`.
-- 테스트: `ServiceAutomationTestProbe.h/.cpp`(constructed fixture), `ServiceAutomationTestSupport.h`, `ServiceFridgeAutomationTests.cpp`, `ServiceDisplayAutomationTests.cpp`, `ShopAutomationTests.cpp`·`ShopUnboxingScatterAutomationTests.cpp`(shape 경로), 신규 `ServiceFridgePlacementAutomationTests.cpp`, `ShopUnboxShapeTestSupport.h`.
+## 보존 확인과 API/Editor 영향
 
-## 클래스 크기·책임 변화
+- 시작 전 UnrealEditor 종료를 확인했고 검증 종료 뒤 headless process도 종료됐다.
+- Content/Config status 전체 문자열과 변경 13개 uasset SHA256이 시작/종료에 동일하다. Content가 clean이었다는 뜻이 아니다. 기존 Shower·Washer·Dryer·상품·DefaultMap external actor 및 신규 Vanity/DA 작업물을 그대로 유지했다. Config 변경 없음.
+- 시작 snapshot: Saved/ImplementationUnit2/CueRefresh/content_before.json·files_before.json. 종료 확인: verification_final.json. 기존 Source 중 위 8개 외 파일은 SHA256 동일하며 신규 Source 파일도 없다.
+- 6개 production 변경에서 지정 revision 추가 부분만 제거하면 시작 SHA256과 일치한다(production_delta_verified.json). 따라서 cue Update·owner observer·뚜껑/HUD/transfer 조건의 기존 구현은 보존했다.
+- 종료 검사 중 FEEDBACK_BACKLOG.md의 별도 변경을 감지했다. 구현 단계는 이 파일을 수정하지 않았고 현재 내용을 보존했다. 이 별도 변경은 verification_final.json에서 구현 변경과 구분한다.
+- Architecture·Unreal 정본·구현/재작업 입력·QNA는 수정하지 않았다. 정본은 이미 선택된 경로를 확정한 입력이므로 이번 결과를 중복 기록하지 않는다.
+- additive query UPROPERTY뿐이며 reflected rename/삭제·parent/subobject 변경·Core Redirect·BP migration이 없다. 구현 프롬프트가 정한 DefaultMap 단일 로드 gate를 최종 실행으로 통과했다. asset Save·commit·push는 수행하지 않았다.
 
-- `ShopUnboxingPlacement.cpp` 499 → 391줄. shape 표현은 별도 파일이 소유하고 무리 계산·월드 검사 규칙은 불변.
-- `ABathhouseFacilityActor`: virtual override 1개와 pending 필드 2개만 추가. 냉장고 로직은 계속 `ADrinkFridgeActor`에 있다. 기존 설비 클래스(Bath·Utility·Towel machine)는 finalize 기본값(true)이거나 base의 pending 없는 경로라 동작 불변.
-- `UPlayerInteractionComponent`, `UPlayerCarryComponent` 무변경.
+## 리뷰 중점과 남은 PIE
 
-## 설계와 문서 차이 보고
-
-- R절과 `PROMPT_IMPLEMENTATION_R.md`는 F1 방향이 같아 충돌 없음. R절 F2가 요구한 "테스트용 `UBlueprint`로 SCS 검사"는 불가하다고 판단해 판정 함수를 component 목록으로 검사하는 대안을 썼다(R절이 허용한 경로).
-- 로드 게이트: `BathhouseSim.Service.BlueprintLoad`는 인자 없이 실행하면 세 원본(`DA_ShopCatalog`, `WBP_InteractionPrompt`, `BP_Shower`)을 모두 로드한다. R절은 `BP_Shower`만 요구했지만 원본·DefaultMap 단계는 세 asset 전체가 통과했다. 복사본 단계는 `BP_Shower`만 실행했다.
-- 이전 리뷰에서 있던 `PROMPT_REVIEW.md`의 "DisplayOffset 슬롯 로컬 해석" 편차는 정본이 같은 해석으로 정리돼 해소됐다.
-
-## Blueprint·API·Core Redirect 영향
-
-- 추가만 했다: `IPlaceableFacility` virtual 1개, `ETestFault` 값(테스트 전용), `ABathhouseFacilityActor` Transient 필드. rename·삭제·class 변경 없음, Core Redirect 없음.
-- `DA_ShopCatalog`, `WBP_InteractionPrompt`, `BP_Shower` 로드 통과(아래).
-
-## 검증 결과
-
-- **빌드**: UE 5.8 `Build.bat BathhouseSimEditor Win64 Development` 성공. 로그 `Saved/Logs/build_r1.log`, `build_r2.log`.
-- **정적**: `git diff --check -- Source` 공백 오류 없음(LF/CRLF 안내 경고만). `git status -- Content Config` 무변경. 신규 Source 미커밋 그대로.
-- **copy-first load gate**(로그 `Saved/Logs/r_load_*.log`):
-  1. `BP_Shower` 복사본을 `Content/Developers/MigrationCheck/`에 두고 Template 맵 로드: 성공, `Serial size mismatch`·Fatal 없음.
-  2. 복사본과 빈 폴더 삭제 후 Content 무변경 확인.
-  3. 원본 Template 맵 로드: 성공. 4. `/Game/Maps/DefaultMap` 로드: 성공. 5. 무변경 재확인.
-- **집중**: `BathhouseSim.Service` 11개 전부 성공 — 기존 9개 + 신규 `Fridge.ConstructedPlacementTransaction`, `Fridge.LayoutRuleAndDiscard`. 로그 `Saved/Logs/auto_r.log`. Shop·Placement·BathWater·Utility 회수 테스트는 전체 회귀에 포함되어 통과.
-- **전체 회귀** `Automation RunTests BathhouseSim`(headless, Template 맵): 88개 중 성공 76, 경고 포함 성공 12, 실패 0, 미실행 0(이전 86 → 88, 신규 2개). 경고는 기대된 `LogTemp` 경고와 기존 테스트 경고다. 리포트 `Saved/Automation/Reports/20260930/r_full`, 로그 `Saved/Logs/auto_r_full.log`.
-
-## 리뷰 중점
-
-- finalize가 `FinishSpawning` 뒤·snapshot 확정 앞에서만 불리고 실패 시 기존 import 실패와 같은 정리(item 미소모·publication 없음)를 타는지.
-- base import 성공 후 finalize 실패 시 남는 부수효과(`BathWaterState->ResetEmptyForPlacement`, FacilityType 등)가 staged Actor 파괴로 함께 사라지는지.
-- `PendingFacilityExtension`이 성공·실패 모두에서 비워지는지, 다른 설비 Actor(BathWaterUtility·Towel machine의 자체 Export/Import)가 이 경로를 타지 않는지.
-- CDO `IsDataValid`의 SCS 수집이 부모 Blueprint의 template까지 포함하고 중복 카운트하지 않는지.
-
-## 미검증
-
-- **PIE 전용**: 외곽선 모양·화면 테두리, 프리뷰 반투명, 박스 안 물품 실제 모습, 0.15초 감각, 콘솔 명령 실제 동작, HUD 요약 표시. Content가 아직 없다.
-- **Editor 전용**: 실제 `BP_DrinkFridge`(SCS) 배치, BP CDO `IsDataValid`의 SCS 수집 결과, `BP_ItemBox` 뷰포트 미리보기. `PROMPT_UNREAL.md`의 검증 방법으로 확인한다.
-- 손님 루틴이 없어 냉장고 손님 계약은 시설 쪽 API를 테스트 사용자 Actor로만 검증했다.
+revision 합이 모든 반환 경로에 채워지는지, Equals 외 실행/반복 조건을 바꾸지 않는지, 바구니만 변하는 경우도 갱신되는지, 새 자동화가 observer 생략을 우회하지 않는지를 리뷰한다.
+[PROMPT_UNREAL.md](PROMPT_UNREAL.md) 맨 앞에 네 수건 대상 연속 LMB/RMB 매 장 cue 이동과 조준 중 실제 손님 획득을 추가했다. 이번 새 authoring·저장 대상은 없다.
+headless transform 검증은 실제 화면 반투명/외곽선·lid animation·authored mesh bounds·실제 손님 이동 PIE 확인을 대체하지 않는다. 이 시각/통합 확인은 다음 단계에 남긴다.

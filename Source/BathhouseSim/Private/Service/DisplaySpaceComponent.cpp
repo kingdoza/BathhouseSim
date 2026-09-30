@@ -11,6 +11,8 @@
 #include "Placement/FacilityPlacementComponent.h"
 #include "Placement/PlaceableFacility.h"
 #include "Service/ItemBoxActor.h"
+#include "Service/DisplayCueComponent.h"
+#include "Service/DisplayStockRules.h"
 #include "Service/ServiceDisplaySettings.h"
 #include "Service/ServiceItemDefinition.h"
 #include "Service/ServiceItemTransfer.h"
@@ -49,6 +51,10 @@ UDisplaySpaceComponent::UDisplaySpaceComponent()
 void UDisplaySpaceComponent::OnRegister()
 {
 	Super::OnRegister();
+	if (TargetMode == EDisplaySpaceTargetMode::FacilityRouted)
+	{
+		SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 	EnsurePresentationComponents();
 }
 
@@ -86,38 +92,29 @@ void UDisplaySpaceComponent::EnsurePresentationComponents()
 		StockVisual->CastShadow = true;
 		Finish(StockVisual);
 	}
-	if (!InsertPreview)
+	if (!DisplayCue)
 	{
-		InsertPreview = NewObject<UStaticMeshComponent>(Owner, NAME_None, RF_Transient);
-		InsertPreview->CastShadow = false;
-		Finish(InsertPreview);
+		DisplayCue = NewObject<UDisplayCueComponent>(Owner, NAME_None, RF_Transient);
+		DisplayCue->SetupAttachment(this);
+		DisplayCue->RegisterComponent();
 	}
-	if (!TakeHighlightProxy)
-	{
-		TakeHighlightProxy = NewObject<UStaticMeshComponent>(Owner, NAME_None, RF_Transient);
-		TakeHighlightProxy->CastShadow = false;
-		Finish(TakeHighlightProxy);
-		TakeHighlightProxy->SetRenderInMainPass(false);
-		TakeHighlightProxy->SetRenderInDepthPass(false);
-		TakeHighlightProxy->SetRenderCustomDepth(true);
-		TakeHighlightProxy->SetCustomDepthStencilValue(
-			GetDefault<UServiceDisplaySettings>()->GetTakeHighlightStencilValue());
-	}
+	InsertPreview = DisplayCue->GetInsertPreview();
+	TakeHighlightProxy = DisplayCue->GetTakeHighlightProxy();
 	RefreshStockVisual();
 }
 
 void UDisplaySpaceComponent::DestroyPresentationComponents()
 {
-	for (UPrimitiveComponent* Comp : { static_cast<UPrimitiveComponent*>(StockVisual.Get()),
-		static_cast<UPrimitiveComponent*>(InsertPreview.Get()),
-		static_cast<UPrimitiveComponent*>(TakeHighlightProxy.Get()) })
+	if (IsValid(StockVisual))
 	{
-		if (IsValid(Comp))
-		{
-			Comp->DestroyComponent();
-		}
+		StockVisual->DestroyComponent();
+	}
+	if (IsValid(DisplayCue))
+	{
+		DisplayCue->DestroyComponent();
 	}
 	StockVisual = nullptr;
+	DisplayCue = nullptr;
 	InsertPreview = nullptr;
 	TakeHighlightProxy = nullptr;
 }
@@ -128,13 +125,15 @@ FDisplaySpaceSnapshot UDisplaySpaceComponent::BuildSnapshot() const
 	Snapshot.SpaceIndex = SpaceIndex;
 	Snapshot.Kind = Stock.Kind;
 	Snapshot.Count = Stock.Count;
+	Snapshot.InUseRemaining = Stock.InUseRemaining;
 	return Snapshot;
 }
 
 bool UDisplaySpaceComponent::ValidateAuthoring(FText& OutFailureReason) const
 {
 	OutFailureReason = FText::GetEmpty();
-	if (SpaceIndex < 0 || !AcceptedCategory.IsValid() || SlotTransforms.IsEmpty())
+	if (SpaceIndex < 0 || (TargetMode == EDisplaySpaceTargetMode::SelfAim ? !AcceptedCategory.IsValid() : !FixedKind) ||
+		SlotTransforms.IsEmpty())
 	{
 		OutFailureReason = LOCTEXT("InvalidSpaceAuthoring", "진열 공간에는 0 이상의 SpaceIndex, 분류 태그와 자리 1개 이상이 필요합니다.");
 		return false;
@@ -150,8 +149,13 @@ bool UDisplaySpaceComponent::ValidateAuthoring(FText& OutFailureReason) const
 	const FVector Extent = GetUnscaledBoxExtent();
 	// Ignore the owner's enable-collision flag: staged placement disables it while authoring is still valid.
 	const FBodyInstance* Body = GetBodyInstance();
-	if (Extent.GetMin() <= 0.0f || !Body || Body->GetCollisionEnabled(false) != ECollisionEnabled::QueryOnly
-		|| GetCollisionResponseToChannel(ECC_Visibility) != ECR_Block || CanEverAffectNavigation())
+	if (Extent.GetMin() <= 0.0f || !Body ||
+		Body->GetCollisionEnabled(false) != (TargetMode == EDisplaySpaceTargetMode::SelfAim
+												 ? ECollisionEnabled::QueryOnly
+												 : ECollisionEnabled::NoCollision) ||
+		(TargetMode == EDisplaySpaceTargetMode::SelfAim &&
+		 GetCollisionResponseToChannel(ECC_Visibility) != ECR_Block) ||
+		CanEverAffectNavigation())
 	{
 		OutFailureReason = LOCTEXT("InvalidSpaceCollision", "진열 공간 Box는 양수 extent, QueryOnly, Visibility Block, Navigation off여야 합니다.");
 		return false;
@@ -178,17 +182,17 @@ bool UDisplaySpaceComponent::IsOperational() const
 
 bool UDisplaySpaceComponent::CanAcceptKind(const UServiceItemDefinition* Kind) const
 {
-	return Kind && AcceptedCategory.IsValid() && Kind->DisplayCategories.HasTag(AcceptedCategory);
+	return TargetMode == EDisplaySpaceTargetMode::FacilityRouted
+			   ? Kind && Kind == FixedKind
+			   : Kind && AcceptedCategory.IsValid() && Kind->DisplayCategories.HasTag(AcceptedCategory);
 }
 
-bool UDisplaySpaceComponent::ValidateStockImport(
-	const UServiceItemDefinition* Kind,
-	const int32 Count,
-	FText& OutFailureReason) const
+bool UDisplaySpaceComponent::ValidateStockImport(const UServiceItemDefinition* Kind, const int32 Count,
+												 FText& OutFailureReason, const int32 InUseRemaining) const
 {
 	OutFailureReason = FText::GetEmpty();
-	if (Count < 0 || Count > GetCapacity() || (Count == 0) != (Kind == nullptr)
-		|| (Kind && !CanAcceptKind(Kind)))
+	if (!FDisplayStockRules::ValidateImport(Kind, Count, InUseRemaining, GetCapacity()) ||
+		(Kind && !CanAcceptKind(Kind)))
 	{
 		OutFailureReason = LOCTEXT("InvalidStockImport", "진열 공간에 적용할 수 없는 물건 데이터입니다.");
 		return false;
@@ -196,18 +200,17 @@ bool UDisplaySpaceComponent::ValidateStockImport(
 	return true;
 }
 
-bool UDisplaySpaceComponent::ImportStock(
-	UServiceItemDefinition* Kind,
-	const int32 Count,
-	FText& OutFailureReason)
+bool UDisplaySpaceComponent::ImportStock(UServiceItemDefinition* Kind, const int32 Count, FText& OutFailureReason,
+										 const int32 InUseRemaining)
 {
-	if (!ValidateStockImport(Kind, Count, OutFailureReason))
+	if (!ValidateStockImport(Kind, Count, OutFailureReason, InUseRemaining))
 	{
 		return false;
 	}
-	const bool bChanged = Stock.Kind != Kind || Stock.Count != Count;
+	const bool bChanged = Stock.Kind != Kind || Stock.Count != Count || Stock.InUseRemaining != InUseRemaining;
 	Stock.Kind = Count > 0 ? Kind : nullptr;
 	Stock.Count = Count;
+	Stock.InUseRemaining = InUseRemaining;
 	if (bChanged)
 	{
 		++Stock.Revision;
@@ -277,60 +280,67 @@ void UDisplaySpaceComponent::RefreshStockVisual()
 
 void UDisplaySpaceComponent::HidePresentation()
 {
-	if (InsertPreview)
+	if (DisplayCue)
 	{
-		InsertPreview->SetVisibility(false);
-	}
-	if (TakeHighlightProxy)
-	{
-		TakeHighlightProxy->SetVisibility(false);
+		DisplayCue->HideAll();
 	}
 }
 
-void UDisplaySpaceComponent::ShowInsertPreview(const UServiceItemDefinition& BoxKind)
+void UDisplaySpaceComponent::ShowInsertPreview(const UServiceItemDefinition& Kind)
 {
-	UMaterialInterface* Material = GetDefault<UServiceDisplaySettings>()->LoadInsertPreviewMaterial();
-	UStaticMesh* Mesh = BoxKind.ResolveDisplayMesh();
-	if (!InsertPreview || !Mesh || Stock.Count >= SlotTransforms.Num())
+	if (DisplayCue && Stock.Count < SlotTransforms.Num())
 	{
-		return;
+		DisplayCue->ShowInsertPreview(Kind.ResolveDisplayMesh(), GetSlotWorldRelativeTransform(Stock.Count, Kind));
 	}
-	if (!Material)
-	{
-		if (!bWarnedMissingPreviewMaterial)
-		{
-			bWarnedMissingPreviewMaterial = true;
-			UE_LOG(LogTemp, Warning, TEXT("ServiceDisplaySettings.InsertPreviewMaterial is not set; display insert preview is omitted."));
-		}
-		return;
-	}
-	InsertPreview->SetStaticMesh(Mesh);
-	for (int32 MaterialIndex = 0; MaterialIndex < InsertPreview->GetNumMaterials(); ++MaterialIndex)
-	{
-		InsertPreview->SetMaterial(MaterialIndex, Material);
-	}
-	InsertPreview->SetRelativeTransform(GetSlotWorldRelativeTransform(Stock.Count, BoxKind));
-	InsertPreview->SetVisibility(true);
 }
 
 void UDisplaySpaceComponent::ShowTakeHighlight()
 {
-	const UServiceDisplaySettings* Settings = GetDefault<UServiceDisplaySettings>();
-	UStaticMesh* Mesh = Stock.Kind ? Stock.Kind->ResolveDisplayMesh() : nullptr;
-	if (!TakeHighlightProxy || !Settings->ShouldShowTakeHighlight() || !Mesh || Stock.Count <= 0)
+	if (DisplayCue && Stock.Kind && FDisplayStockRules::GetTakeableCount(Stock) > 0)
 	{
-		return;
+		DisplayCue->ShowTakeHighlight(Stock.Kind->ResolveDisplayMesh(),
+									  GetSlotWorldRelativeTransform(Stock.Count - 1, *Stock.Kind));
 	}
-	TakeHighlightProxy->SetStaticMesh(Mesh);
-	TakeHighlightProxy->SetRenderInMainPass(false);
-	TakeHighlightProxy->SetRenderInDepthPass(false);
-	TakeHighlightProxy->SetRenderCustomDepth(true);
-	TakeHighlightProxy->SetCustomDepthStencilValue(Settings->GetTakeHighlightStencilValue());
-	TakeHighlightProxy->SetRelativeTransform(GetSlotWorldRelativeTransform(Stock.Count - 1, *Stock.Kind));
-	TakeHighlightProxy->SetVisibility(true);
 }
 
+FVector UDisplaySpaceComponent::GetSlotsWorldCenter() const
+{
+	FVector Center = FVector::ZeroVector;
+	for (const FTransform& Slot : SlotTransforms)
+	{
+		Center += GetComponentTransform().TransformPosition(Slot.GetLocation());
+	}
+	return SlotTransforms.IsEmpty() ? GetComponentLocation() : Center / SlotTransforms.Num();
+}
+
+bool UDisplaySpaceComponent::ConsumeOneUse(bool& OutDepleted)
+{
+	if (!FDisplayStockRules::ConsumeOneUse(Stock, FixedKind, OutDepleted))
+	{
+		return false;
+	}
+	RefreshStockVisual();
+	PublishStockChanged();
+	return true;
+}
+
+FText UDisplaySpaceComponent::GetStockSummary() const
+{
+	const UServiceItemDefinition* Kind = Stock.Kind ? Stock.Kind.Get() : FixedKind.Get();
+	if (Kind && Stock.InUseRemaining > 0)
+	{
+		return FText::Format(LOCTEXT("InUseSummary", "{0} 새것 {1} + 사용 중 {2}/{3}회"), Kind->DisplayName,
+							 Stock.Count - 1, Stock.InUseRemaining, Kind->ConsumableUses);
+	}
+	return Kind ? FText::Format(LOCTEXT("StockSummary", "{0} {1}/{2}"), Kind->DisplayName, Stock.Count, GetCapacity())
+				: FText::Format(LOCTEXT("EmptySummary", "빈 공간 0/{0}"), GetCapacity());
+}
 FPlayerInteractionQuery UDisplaySpaceComponent::QueryInteraction(const FPlayerInteractionContext& Context) const
+{
+	return TargetMode == EDisplaySpaceTargetMode::SelfAim ? BuildHeldUseQuery(Context) : FPlayerInteractionQuery();
+}
+
+FPlayerInteractionQuery UDisplaySpaceComponent::BuildHeldUseQuery(const FPlayerInteractionContext& Context) const
 {
 	FPlayerInteractionQuery Query;
 	if (!IsOperational())
@@ -339,13 +349,7 @@ FPlayerInteractionQuery UDisplaySpaceComponent::QueryInteraction(const FPlayerIn
 	}
 	Query.bVisible = true;
 	const int32 Capacity = GetCapacity();
-	Query.TargetName = Stock.Count > 0 && Stock.Kind
-		? FText::Format(
-			LOCTEXT("StockedName", "{0} {1}/{2}"),
-			Stock.Kind->DisplayName,
-			FText::AsNumber(Stock.Count),
-			FText::AsNumber(Capacity))
-		: FText::Format(LOCTEXT("EmptyName", "빈 공간 0/{0}"), FText::AsNumber(Capacity));
+	Query.TargetName = GetStockSummary();
 
 	const AItemBoxActor* Box = Context.CarryComponent
 		? Cast<AItemBoxActor>(Context.CarryComponent->GetHeldObject())
@@ -354,15 +358,17 @@ FPlayerInteractionQuery UDisplaySpaceComponent::QueryInteraction(const FPlayerIn
 	{
 		return Query;
 	}
-	const FServiceTransferEvaluation Apply =
-		FServiceItemTransfer::EvaluateApply(Box->GetContents(), Stock, AcceptedCategory, Capacity);
+	const FServiceTransferEvaluation Apply = FServiceItemTransfer::EvaluateApply(
+		Box->GetContents(), Stock, AcceptedCategory, Capacity,
+		TargetMode == EDisplaySpaceTargetMode::FacilityRouted ? FixedKind.Get() : nullptr);
 	Query.bHeldApplyVisible = true;
 	Query.bCanHeldApply = Apply.bCan;
 	Query.HeldApplyActionName = LOCTEXT("ApplyAction", "넣기");
 	Query.HeldApplyFailureReason = Apply.Reason;
 	Query.HeldApplyActivationMode = EPlayerInteractionActivationMode::Repeat;
-	const FServiceTransferEvaluation Take =
-		FServiceItemTransfer::EvaluateTake(Box->GetContents(), Stock, AcceptedCategory, Capacity);
+	const FServiceTransferEvaluation Take = FServiceItemTransfer::EvaluateTake(
+		Box->GetContents(), Stock, AcceptedCategory, Capacity,
+		TargetMode == EDisplaySpaceTargetMode::FacilityRouted ? FixedKind.Get() : nullptr);
 	Query.bHeldTakeVisible = true;
 	Query.bCanHeldTake = Take.bCan;
 	Query.HeldTakeActionName = LOCTEXT("TakeAction", "빼기");
@@ -377,9 +383,15 @@ FPlayerInteractionResult UDisplaySpaceComponent::ExecuteInteraction(const FPlaye
 	return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::Primary);
 }
 
-FPlayerInteractionResult UDisplaySpaceComponent::ExecuteHeldTargetUse(
-	const FPlayerInteractionContext& Context,
-	const EPlayerHeldTargetUseDirection Direction)
+FPlayerInteractionResult UDisplaySpaceComponent::ExecuteHeldTargetUse(const FPlayerInteractionContext& Context,
+																	  const EPlayerHeldTargetUseDirection Direction)
+{
+	return TargetMode == EDisplaySpaceTargetMode::SelfAim ? ExecuteRoutedHeldTargetUse(Context, Direction)
+														  : FPlayerInteractionResult::Failed(FText::GetEmpty());
+}
+
+FPlayerInteractionResult UDisplaySpaceComponent::ExecuteRoutedHeldTargetUse(
+	const FPlayerInteractionContext& Context, const EPlayerHeldTargetUseDirection Direction)
 {
 	const bool bApply = Direction == EPlayerHeldTargetUseDirection::Apply;
 	const EPlayerInteractionIntent Intent = bApply
@@ -395,9 +407,12 @@ FPlayerInteractionResult UDisplaySpaceComponent::ExecuteHeldTargetUse(
 			Intent);
 	}
 	FText Failure;
-	const bool bMoved = bApply
-		? FServiceItemTransfer::TryApplyOne(Box->GetMutableContents(), Stock, AcceptedCategory, GetCapacity(), Failure)
-		: FServiceItemTransfer::TryTakeOne(Box->GetMutableContents(), Stock, AcceptedCategory, GetCapacity(), Failure);
+	const bool bMoved = bApply ? FServiceItemTransfer::TryApplyOne(
+									 Box->GetMutableContents(), Stock, AcceptedCategory, GetCapacity(), Failure,
+									 TargetMode == EDisplaySpaceTargetMode::FacilityRouted ? FixedKind.Get() : nullptr)
+							   : FServiceItemTransfer::TryTakeOne(
+									 Box->GetMutableContents(), Stock, AcceptedCategory, GetCapacity(), Failure,
+									 TargetMode == EDisplaySpaceTargetMode::FacilityRouted ? FixedKind.Get() : nullptr);
 	if (!bMoved)
 	{
 		return FPlayerInteractionResult::Failed(Failure, Intent);

@@ -115,7 +115,7 @@ bool FBathhouseServiceFridgeConstructedPlacementTest::RunTest(const FString& Par
 		AddError(Failure.ToString());
 		return false;
 	}
-	UDrinkFridgePlacementInstanceData* Data = Cast<UDrinkFridgePlacementInstanceData>(Recovered->GetPlacementPayload().InstanceData);
+	UServiceDisplayPlacementData* Data = GetDisplayData(Recovered->GetPlacementPayload());
 	if (!TestNotNull(TEXT("Recovered payload has fridge data"), Data) || !TestEqual(TEXT("Payload has four snapshots"), Data->Spaces.Num(), 4))
 	{
 		return false;
@@ -131,7 +131,7 @@ bool FBathhouseServiceFridgeConstructedPlacementTest::RunTest(const FString& Par
 			*Recovered, PlacementTransform, *Zone, *Player.Carry, Failure);
 		TestNull(FString::Printf(TEXT("%s: placement fails"), Label), Result);
 		TestTrue(FString::Printf(TEXT("%s: the original item survives"), Label), IsValid(Recovered));
-		TestTrue(FString::Printf(TEXT("%s: the payload is unchanged"), Label), Recovered->GetPlacementPayload().InstanceData == Data);
+		TestTrue(FString::Printf(TEXT("%s: the payload is unchanged"), Label), GetDisplayData(Recovered->GetPlacementPayload()) == Data);
 		TestEqual(FString::Printf(TEXT("%s: no new Actor remains"), Label), CountConstructedFridges(World), FridgesBeforeBad);
 		TestTrue(FString::Printf(TEXT("%s: the item is still held"), Label), Player.Carry->GetHeldObject() == Recovered);
 		Data->Spaces = GoodSpaces;
@@ -149,7 +149,7 @@ bool FBathhouseServiceFridgeConstructedPlacementTest::RunTest(const FString& Par
 	FFacilityActorConversionTransaction::ClearTestFault();
 	TestNull(TEXT("Finalize fault: placement fails"), FaultResult);
 	TestTrue(TEXT("Finalize fault: item and payload survive"),
-		IsValid(Recovered) && Recovered->GetPlacementPayload().InstanceData == Data && Player.Carry->GetHeldObject() == Recovered);
+		IsValid(Recovered) && GetDisplayData(Recovered->GetPlacementPayload()) == Data && Player.Carry->GetHeldObject() == Recovered);
 	TestEqual(TEXT("Finalize fault: no new Actor remains"), CountConstructedFridges(World), FridgesBeforeBad);
 
 	// The good payload still installs and restores every space.
@@ -222,7 +222,7 @@ bool FBathhouseServiceFridgeLayoutRuleTest::RunTest(const FString& Parameters)
 		AddError(Failure.ToString());
 		return false;
 	}
-	TestTrue(TEXT("The item carries fridge data"), Cast<UDrinkFridgePlacementInstanceData>(Item->GetPlacementPayload().InstanceData) != nullptr);
+	TestTrue(TEXT("The item carries fridge data"), GetDisplayData(Item->GetPlacementPayload()) != nullptr);
 	TestTrue(TEXT("Player takes the item"), Player.Carry->TryTakePhysicalObject(Item, Failure));
 	UDrinkSalesSubsystem* Sales = World->GetSubsystem<UDrinkSalesSubsystem>();
 	Sales->AddSale(1000);

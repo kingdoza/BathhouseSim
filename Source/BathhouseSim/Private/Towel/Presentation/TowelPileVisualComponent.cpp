@@ -20,7 +20,7 @@ void UTowelPileVisualComponent::ClearPreview()
 
 FTransform UTowelPileVisualComponent::BuildLocalTransform(const int32 VisualIndex)
 {
-	FRandomStream& Random = GetVisualRandomStream();
+	FRandomStream Random(GetIndexSeed(VisualIndex));
 	const FVector SafeExtent(
 		FMath::Max(0.0f, PileHalfExtent.X),
 		FMath::Max(0.0f, PileHalfExtent.Y),

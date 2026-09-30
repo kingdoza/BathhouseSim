@@ -198,9 +198,16 @@ struct BATHHOUSESIM_API FPlayerInteractionQuery
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	FText HeldObjectSummary;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	int32 HeldUseTargetKey = INDEX_NONE;
+
+	UPROPERTY()
+	int64 PresentationRevision = 0;
+
 	bool Equals(const FPlayerInteractionQuery& Other) const
 	{
-		return bVisible == Other.bVisible
+		return PresentationRevision == Other.PresentationRevision
+			&& HeldUseTargetKey == Other.HeldUseTargetKey && bVisible == Other.bVisible
 			&& bCanInteract == Other.bCanInteract
 			&& TargetName.EqualTo(Other.TargetName)
 			&& ActionName.EqualTo(Other.ActionName)

@@ -3,13 +3,16 @@
 #include "CoreMinimal.h"
 #include "Facility/BathhouseFacilityActor.h"
 #include "Interaction/PlayerInteractable.h"
+#include "Interaction/PlayerInteractionFocusObserver.h"
 #include "CleanTowelStackActor.generated.h"
 
 class UTowelInventoryComponent;
 class UTowelStackVisualComponent;
+class UDisplayCueComponent;
 
 UCLASS(Blueprintable)
-class BATHHOUSESIM_API ACleanTowelStackActor : public ABathhouseFacilityActor
+
+class BATHHOUSESIM_API ACleanTowelStackActor : public ABathhouseFacilityActor, public IPlayerInteractionFocusObserver
 {
 	GENERATED_BODY()
 
@@ -24,10 +27,22 @@ public:
 		const FPlayerInteractionContext& Context,
 		EPlayerHeldTargetUseDirection Direction) override;
 
+	virtual void NotifyInteractionFocusChanged(const UPlayerInteractionComponent& Source,
+											   const FPlayerInteractionQuery& Query) override;
+	virtual void NotifyInteractionFocusEnded(const UPlayerInteractionComponent& Source) override;
+
+	UDisplayCueComponent* GetDisplayCue() const
+	{
+		return DisplayCue;
+	}
+
 	UFUNCTION(BlueprintPure, Category = "Towel")
 	UTowelInventoryComponent* GetInventory() const { return Inventory; }
 
 protected:
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Towel|Presentation")
+	TObjectPtr<UDisplayCueComponent> DisplayCue;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Towel")
 	TObjectPtr<UTowelInventoryComponent> Inventory;
 

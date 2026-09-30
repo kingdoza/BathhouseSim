@@ -43,14 +43,11 @@ public:
 	static void ApplyToQuery(FPlayerInteractionQuery& InteractionQuery, const FTowelHeldTransferQuery& TransferQuery);
 
 private:
-	static FTowelHeldTransferDirection EvaluateDirection(
-		bool bApply,
-		const FText& ActionName,
-		const FText& TargetName,
-		const FTowelInventorySnapshot& TargetSnapshot,
-		bool bHasBasket,
-		const FTowelInventorySnapshot& BasketSnapshot,
-		ETowelState RequiredState,
-		bool bMachineProcessing,
-		EPlayerInteractionActivationMode ActivationMode);
+
+	static FTowelHeldTransferDirection EvaluateDirection(bool bApply, const FText& ActionName, const FText& TargetName,
+														 const FTowelInventorySnapshot& TargetSnapshot, bool bHasBasket,
+														 const FTowelInventorySnapshot& BasketSnapshot,
+														 ETowelState RequiredState, bool bMachineProcessing,
+														 EPlayerInteractionActivationMode ActivationMode,
+														 bool bDisplayEmptyReason = false);
 };

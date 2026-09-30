@@ -105,14 +105,16 @@ Character default subobject `PlayerHeldTargetUse`. `Configure(Interaction, Carry
 
 ## Towel Targets
 
+2026-09-30 서비스 2단위: 선반·대기 기계 빼기 허용과 넣기 프리뷰·꺼내기 강조·뚜껑 열림은 [TowelSystem.md](TowelSystem.md) Service Unit 2 Display Changes가 정본이다. `HeldUseTargetKey`(설비 전체 조준의 묶음 key) 확장은 [ServiceFacilityDisplaySystem.md](ServiceFacilityDisplaySystem.md) Held-Use Extension이다.
+
 - 대상: `ACleanTowelStackActor`, `AUsedTowelBinActor`, `UTowelTransferPortComponent`(세탁기·건조기), `AWorldUsedTowelActor`.
 - `FTowelHeldTransferRules`(Private/Towel, 순수 helper): 대상 종류, 대상 snapshot·machine state, held basket snapshot(없으면 없음)을 받아 두 방향의 {Visible, bCan, ActionName, FailureReason}를 만든다. 대상은 query와 execute 재검증에서 같은 helper를 쓴다.
 
 | 대상 | Apply(LMB) | Take(RMB) | mode |
 |---|---|---|---|
-| 선반 | 표시 `넣기` | 숨김, 이유 `여기서는 꺼낼 수 없음` | Repeat |
+| 선반 | 표시 `넣기` | 표시 `빼기`(2026-09-30 서비스 2단위, CTRL-015 결과 변경). 빔이면 `꺼낼 수건 없음` | Repeat |
 | 사용 수건통 | 숨김, 이유 `여기에는 넣을 수 없음` | 표시 `빼기` | Repeat |
-| 기계 Waiting | 표시 `넣기` | 표시·불가 `완료 후 뺄 수 있음` | Repeat |
+| 기계 Waiting | 표시 `넣기` | 표시 `빼기`(2026-09-30 서비스 2단위, CTRL-016 결과 변경). 빔이면 `꺼낼 수건 없음` | Repeat |
 | 기계 Complete | 표시·불가 `비운 뒤 넣을 수 있음` | 표시 `빼기` | Repeat |
 | 기계 Processing | 표시·불가 `작동 중` | 표시·불가 `작동 중` | Repeat |
 | 바닥 사용한 수건 | 숨김, 이유 `여기에는 넣을 수 없음` | 표시 `줍기` | Instant |

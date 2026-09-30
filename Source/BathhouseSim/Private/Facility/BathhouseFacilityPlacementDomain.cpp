@@ -1,4 +1,5 @@
 #include "Facility/BathhouseFacilityActor.h"
+#include "Facility/FacilityPlacementExtensionUtils.h"
 
 #include "Facility/BathWaterStateComponent.h"
 #include "Facility/BathhouseFacilitySubsystem.h"
@@ -113,18 +114,14 @@ bool ABathhouseFacilityActor::ExportFacilityExtension(
 	UBathhouseFacilityPlacementInstanceData& Data,
 	FText& OutFailureReason) const
 {
-	(void)Data;
-	(void)OutFailureReason;
-	return true;
+	return FacilityPlacementExtensionUtils::Export(*this, Data, OutFailureReason);
 }
 
 bool ABathhouseFacilityActor::ImportFacilityExtension(
 	const UBathhouseFacilityPlacementInstanceData* Data,
 	FText& OutFailureReason)
 {
-	(void)Data;
-	(void)OutFailureReason;
-	return true;
+	return FacilityPlacementExtensionUtils::Import(*this, Data, OutFailureReason);
 }
 
 bool ABathhouseFacilityActor::StagePlacedDomainRegistration(FText& OutFailureReason)

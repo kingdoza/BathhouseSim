@@ -229,7 +229,11 @@ bool FBathhouseHeldTargetUseTowelRuleMatrixTest::RunTest(const FString& Paramete
 				ExpectedApply = EvaluateExpectedHeldDirection(
 					true, TEXT("넣기"), TargetName, Target.TargetCount, Target.TargetCapacity,
 					Basket, false, ETowelState::Clean, true);
-				ExpectedTake.Failure = TEXT("여기서는 꺼낼 수 없음");
+				ExpectedTake = EvaluateExpectedHeldDirection(
+					false, TEXT("빼기"), TargetName, Target.TargetCount, Target.TargetCapacity,
+					Basket, false, ETowelState::Clean, true);
+				if (Target.TargetCount==0 && ExpectedTake.Failure==FString::Printf(TEXT("%s 비어 있음"),*TargetName))
+					ExpectedTake.Failure=TEXT("꺼낼 수건 없음");
 				break;
 			case ETowelHeldTransferTargetKind::UsedBin:
 				ExpectedApply.Failure = TEXT("여기에는 넣을 수 없음");
@@ -243,7 +247,11 @@ bool FBathhouseHeldTargetUseTowelRuleMatrixTest::RunTest(const FString& Paramete
 					ExpectedApply = EvaluateExpectedHeldDirection(
 						true, TEXT("넣기"), TargetName, Target.TargetCount, Target.TargetCapacity,
 						Basket, false, Target.InputState, true);
-					ExpectedTake = { true, false, TEXT("빼기"), TEXT("완료 후 뺄 수 있음"), EPlayerInteractionActivationMode::Repeat };
+					ExpectedTake = EvaluateExpectedHeldDirection(
+						false,TEXT("빼기"),TargetName,Target.TargetCount,Target.TargetCapacity,
+						Basket,false,Target.InputState,true);
+					if (Target.TargetCount==0 && ExpectedTake.Failure==FString::Printf(TEXT("%s 비어 있음"),*TargetName))
+						ExpectedTake.Failure=TEXT("꺼낼 수건 없음");
 				}
 				else if (Target.MachineState == ETowelMachineState::Complete)
 				{

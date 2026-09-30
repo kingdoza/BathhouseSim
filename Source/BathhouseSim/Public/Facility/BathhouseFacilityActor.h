@@ -51,8 +51,9 @@ public:
 	virtual UFacilityPlacementComponent* GetFacilityPlacementComponent() const override { return FacilityPlacement; }
 	virtual FFacilityPlacementTransactionResult QueryFacilityPlacement(const FTransform& CandidateTransform, const class AFacilityPlacementZoneActor& Zone) const override;
 	virtual FFacilityPlacementTransactionResult QueryFacilityRecovery() const override;
-	virtual bool TryBeginFacilityRecoveryHold(FText& OutFailureReason) override { OutFailureReason = FText::GetEmpty(); return true; }
-	virtual void CancelFacilityRecoveryHold() override {}
+	virtual bool TryBeginFacilityRecoveryHold(FText& OutFailureReason) override;
+	virtual void CancelFacilityRecoveryHold() override;
+	bool IsRecoveryHoldActive() const { return bRecoveryHoldActive; }
 	virtual bool ExportPlacementPayload(APlaceableFacilityItemActor& Item, FFacilityPlacementPayload& OutPayload, FText& OutFailureReason) const override;
 	virtual bool ImportPlacementPayload(const APlaceableFacilityItemActor& Item, const FFacilityPlacementPayload& Payload, FText& OutFailureReason) override;
 	virtual bool FinalizePlacementPayloadAfterConstruction(FText& OutFailureReason) override;
@@ -112,7 +113,7 @@ public:
 	void OnSlotUseEnded(UBathhouseFacilitySlotComponent* Slot, AActor* User);
 
 protected:
-	/** Extension hooks for derived facilities that carry state through recovery payloads. Defaults are a no-op. */
+	/** Extension hooks for derived facilities that carry state through recovery payloads. Defaults collect generic placement extensions. */
 	virtual UBathhouseFacilityPlacementInstanceData* CreateFacilityPlacementInstanceData(UObject* Outer) const;
 	virtual bool ExportFacilityExtension(UBathhouseFacilityPlacementInstanceData& Data, FText& OutFailureReason) const;
 	/** Data is null for a fresh install. Must validate everything before applying anything. */
@@ -171,4 +172,5 @@ private:
 	bool bPendingFacilityExtension = false;
 	bool bPlacedDomainRegistered = false;
 	bool bEndingPlay = false;
+	bool bRecoveryHoldActive = false;
 };

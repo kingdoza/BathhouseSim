@@ -10,6 +10,9 @@
 #include "TowelProcessingMachineActor.generated.h"
 
 class USceneComponent;
+class UStaticMeshComponent;
+class UDisplayCueComponent;
+class UOpeningPresentationComponent;
 class UBoxComponent;
 class UFacilityPlacementComponent;
 class UPlayerCarryComponent;
@@ -99,6 +102,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Towel Machine")
 	UTowelInventoryComponent* GetInventory() const { return Inventory; }
 
+	UTowelPileVisualComponent* GetTowelVisual() const
+	{
+		return TowelPresentationVisual;
+	}
+
+	UDisplayCueComponent* GetDisplayCue() const
+	{
+		return DisplayCue;
+	}
+
+	UOpeningPresentationComponent* GetLidPresentation() const
+	{
+		return LidPresentation;
+	}
 	ETowelState GetInputState() const;
 	ETowelState GetOutputState() const;
 	bool CanStartProcessing(FText& OutFailureReason) const;
@@ -114,6 +131,15 @@ public:
 	FOnTowelMachineContentsChanged OnMachineContentsChanged;
 
 protected:
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Towel Machine|Presentation")
+	TObjectPtr<UDisplayCueComponent> DisplayCue;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Towel Machine|Presentation")
+	TObjectPtr<USceneComponent> LidPivot;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Towel Machine|Presentation")
+	TObjectPtr<UStaticMeshComponent> LidMesh;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Towel Machine|Presentation")
+	TObjectPtr<UOpeningPresentationComponent> LidPresentation;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Towel Machine")
 	TObjectPtr<USceneComponent> SceneRoot;
 

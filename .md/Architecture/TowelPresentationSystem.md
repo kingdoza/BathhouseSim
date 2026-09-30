@@ -168,6 +168,17 @@ index는 `LayerIndex = Index / ItemsPerLayer`를 사용한다. X/Y는 authored e
 
 Pile component는 Stack과 같은 preview API를 제공하여 washer/dryer Blueprint에서 Used/Wet/Clean profile, bounds, layer와 seed 배치를 PIE 없이 확인한다.
 
+## Deterministic Index Layout
+
+2026-09-30 서비스 2단위([TowelSystem.md](TowelSystem.md) Service Unit 2 Display Changes).
+
+- 모든 quantity visual에 `GetIndexPresentation(Index, State, OutMesh, OutRelativeTransform) const`를 추가한다. 이 값은 실제 index visual과 같은 값이다.
+- Stack: 기존 식 그대로다(결정적).
+- Pile: index 자리와 mesh variant를 `FRandomStream(HashCombine(LayoutSeed, Index))`로 계산한다. 공유 stream 순차 소비를 대체한다. 같은 seed와 index면 언제나 같은 transform과 variant다.
+  - `LayoutSeed`는 bound inventory의 target count가 0이 되는 snapshot을 적용할 때 새로 뽑는다(`FMath::Rand`). 비지 않은 동안에는 유지한다.
+  - 기존 규칙 "제거 후 같은 index 재생성 시 새로 추첨"은 이 규칙으로 대체한다.
+- Editor preview seed(authoring 값)는 preview에서만 쓴다. runtime 첫 seed도 bind 시점 count가 0이면 새로 뽑고, 0이 아니면 authoring seed를 쓴다.
+
 ## Slot Layout Target
 
 `UTowelSlotVisualComponent`는 ordered `TArray<FComponentReference> SlotReferences`를 가진다.

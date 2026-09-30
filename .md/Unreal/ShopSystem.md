@@ -16,7 +16,7 @@
 
 ## 서비스 상품
 
-`DA_ShopCatalog`에는 기존 7종 뒤에 `DrinkFridge`(30,000, `DA_FacilityPlacement_DrinkFridge`)와 `BananaMilkBox`(12,000, `DA_ServiceItem_BananaMilk`를 `ItemBoxDefinition`으로 지정)가 있다. 저장·재로드 확인됨. `ShopSettings.ItemBoxClass`(`BP_ItemBox`)는 Config에 아직 저장되지 않았다([USER_UNREAL.md](../USER_UNREAL.md)). 상세는 [ServiceSystem.md](ServiceSystem.md).
+`DA_ShopCatalog`에는 기존 7종 뒤에 `DrinkFridge`(30,000, `DA_FacilityPlacement_DrinkFridge`)와 `BananaMilkBox`(12,000, `DA_ServiceItem_BananaMilk`를 `ItemBoxDefinition`으로 지정)가 있다. 저장·재로드 확인됨. `ItemBoxClass`는 이제 Config에 저장돼 있다. 서비스 2단위로 상품 7개가 추가돼 총 16개다: `Vanity`(20,000, `DA_FacilityPlacement_Vanity`), `HairDryerBox` 10,000, `SkinLotionBox` 6,000, `CottonSwabBox` 3,000, `CombBox` 3,000, `ShampooBox` 6,000, `BodyWashBox` 6,000(각각 `DA_ServiceItem_*`를 `ItemBoxDefinition`으로 지정, 상품마다 정의 하나). 상세는 [ServiceSystem.md](ServiceSystem.md).
 
 ## 아직 authoring 정본에 기록되지 않은 범위
 

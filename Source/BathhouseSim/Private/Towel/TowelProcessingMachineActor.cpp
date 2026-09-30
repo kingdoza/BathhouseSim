@@ -2,6 +2,9 @@
 
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Service/DisplayCueComponent.h"
+#include "Interaction/Presentation/OpeningPresentationComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "Interaction/PhysicalCarryFixedSlot.h"
@@ -48,6 +51,16 @@ ATowelProcessingMachineActor::ATowelProcessingMachineActor()
 	MachineControl->SetupAttachment(SceneRoot);
 	TowelPresentationVisual = CreateDefaultSubobject<UTowelPileVisualComponent>(TEXT("TowelPresentationVisual"));
 	TowelPresentationVisual->SetupAttachment(SceneRoot);
+	DisplayCue = CreateDefaultSubobject<UDisplayCueComponent>(TEXT("DisplayCue"));
+	DisplayCue->SetupAttachment(TowelPresentationVisual);
+	LidPivot = CreateDefaultSubobject<USceneComponent>(TEXT("LidPivot"));
+	LidPivot->SetupAttachment(SceneRoot);
+	LidMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LidMesh"));
+	LidMesh->SetupAttachment(LidPivot);
+	LidMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	LidMesh->SetCanEverAffectNavigation(false);
+	LidPresentation = CreateDefaultSubobject<UOpeningPresentationComponent>(TEXT("LidPresentation"));
+	LidPresentation->Configure(LidPivot);
 }
 
 void ATowelProcessingMachineActor::FellOutOfWorld(const UDamageType& DamageType)
@@ -251,6 +264,8 @@ bool ATowelProcessingMachineActor::StartProcessing(FText& OutFailureReason)
 	}
 	Inventory->SetExternalMutationBlocked(true);
 	ProcessingEndTime = GetWorld()->GetTimeSeconds() + FMath::Max(0.1f, ProcessingDurationSeconds);
+	LidPresentation->ApplyClosedImmediately();
+	DisplayCue->HideAll();
 	CommitMachineState(ETowelMachineState::Processing);
 	SetActorTickEnabled(true);
 	GetWorldTimerManager().SetTimer(
@@ -295,9 +310,9 @@ bool ATowelProcessingMachineActor::AllowsInventoryTransfer(
 			&& (DestinationSnapshot.Count == 0 || DestinationSnapshot.State == GetInputState());
 	}
 
-	return MachineState == ETowelMachineState::Complete
-		&& SourceSnapshot.State == GetOutputState()
-		&& (DestinationSnapshot.Count == 0 || DestinationSnapshot.State == GetOutputState());
+	const ETowelState State = MachineState == ETowelMachineState::Waiting ? GetInputState() : GetOutputState();
+	return (MachineState == ETowelMachineState::Waiting || MachineState == ETowelMachineState::Complete) &&
+		   SourceSnapshot.State == State && (DestinationSnapshot.Count == 0 || DestinationSnapshot.State == State);
 }
 
 void ATowelProcessingMachineActor::HandleCommittedInventoryTransfer(

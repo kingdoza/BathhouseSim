@@ -18,6 +18,7 @@ void UTowelQuantityVisualComponent::OnRegister()
 {
 	Super::OnRegister();
 	RandomStream.Initialize(RandomSeed);
+	LayoutSeed = RandomSeed;
 	PrepareLayout();
 	if (UTowelInventoryComponent* InventorySource = PendingReregisterInventory.Get())
 	{
@@ -166,6 +167,21 @@ void UTowelQuantityVisualComponent::SetTargetPresentation(
 		return;
 	}
 
+	// Start a new batch only after an authoritative empty snapshot. Stale visible layers
+	// from its count animation cannot become the next batch's insert positions.
+	if (SafeCount > 0 && TargetCount == 0 && !LayerRecords.IsEmpty())
+	{
+		ClearPresentation();
+	}
+	if (SafeCount == 0 && BoundInventory.IsValid() && (TargetCount > 0 || AppliedRevision < 0))
+	{
+		int32 NewSeed = FMath::Rand();
+		while (NewSeed == LayoutSeed)
+		{
+			NewSeed = FMath::Rand();
+		}
+		LayoutSeed = NewSeed;
+	}
 	AppliedRevision = Revision;
 	TargetState = State;
 	TargetCount = SafeCount;
@@ -278,7 +294,10 @@ void UTowelQuantityVisualComponent::RebuildVisibleMeshesPreservingTransforms()
 	{
 		FTowelVisualLayerRecord& Record = LayerRecords.AddDefaulted_GetRef();
 		Record.LocalTransform = Transform;
-		Record.Mesh = MeshProfile ? MeshProfile->SelectMesh(DisplayedState, RandomStream) : nullptr;
+		FRandomStream IndexRandom(GetIndexSeed(DisplayedCount));
+		Record.Mesh = MeshProfile ? MeshProfile->SelectMesh(DisplayedState,
+															UsesDeterministicIndexLayout() ? IndexRandom : RandomStream)
+								  : nullptr;
 		if (Record.Mesh)
 		{
 			Record.Bucket = FindOrCreateBucket(Record.Mesh);
@@ -317,6 +336,7 @@ void UTowelQuantityVisualComponent::ResetForNewSource()
 {
 	ClearPresentation();
 	RandomStream.Initialize(RandomSeed);
+	LayoutSeed = RandomSeed;
 	TargetState = ETowelState::None;
 	DisplayedState = ETowelState::None;
 	TargetCount = 0;
@@ -400,8 +420,13 @@ void UTowelQuantityVisualComponent::AddVisualLayer()
 {
 	const int32 VisualIndex = DisplayedCount;
 	FTowelVisualLayerRecord& Record = LayerRecords.AddDefaulted_GetRef();
-	Record.LocalTransform = BuildLocalTransform(VisualIndex);
-	Record.Mesh = MeshProfile ? MeshProfile->SelectMesh(TargetState, RandomStream) : nullptr;
+	UStaticMesh* Mesh = nullptr;
+	GetIndexPresentation(VisualIndex, TargetState, Mesh, Record.LocalTransform);
+	Record.Mesh = Mesh;
+	if (!UsesDeterministicIndexLayout() && MeshProfile)
+	{
+		MeshProfile->SelectMesh(TargetState, RandomStream);
+	}
 	if (Record.Mesh)
 	{
 		Record.Bucket = FindOrCreateBucket(Record.Mesh);
@@ -518,4 +543,37 @@ bool UTowelQuantityVisualComponent::IsEditorPreviewWorld() const
 {
 	const UWorld* World = GetWorld();
 	return World && (World->WorldType == EWorldType::Editor || World->WorldType == EWorldType::EditorPreview);
+}
+
+bool UTowelQuantityVisualComponent::GetIndexPresentation(int32 Index, ETowelState State, UStaticMesh*& Mesh,
+														 FTransform& Transform) const
+{
+	Mesh = nullptr;
+	Transform = FTransform::Identity;
+	if (Index < 0 || Index >= GetVisualCapacity() || State == ETowelState::None)
+	{
+		return false;
+	}
+	if (TargetCount > 0 && LayerRecords.IsValidIndex(Index) && State == DisplayedState)
+	{
+		const auto& Record = LayerRecords[Index];
+		// The record being appended is still uninitialized when AddVisualLayer calls here.
+		if (Record.Mesh)
+		{
+			Mesh = Record.Mesh;
+			Transform = Record.LocalTransform;
+			return true;
+		}
+	}
+	Transform = const_cast<UTowelQuantityVisualComponent*>(this)->BuildLocalTransform(Index);
+	FRandomStream Random = UsesDeterministicIndexLayout() ? FRandomStream(GetIndexSeed(Index)) : RandomStream;
+	if (!UsesDeterministicIndexLayout() && MeshProfile)
+	{
+		for (int32 Pending = DisplayedCount; Pending < Index; ++Pending)
+		{
+			MeshProfile->SelectMesh(State, Random);
+		}
+	}
+	Mesh = MeshProfile ? MeshProfile->SelectMesh(State, Random) : nullptr;
+	return Mesh != nullptr;
 }

@@ -8,6 +8,13 @@ class UServiceItemDefinition;
 
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Display_Fridge);
 
+UENUM(BlueprintType)
+enum class EDisplaySpaceTargetMode : uint8
+{
+	SelfAim,
+	FacilityRouted
+};
+
 /** Homogeneous item stack shared by item boxes and display spaces. Count 0 always means Kind is null. */
 USTRUCT()
 struct BATHHOUSESIM_API FServiceItemStack
@@ -22,6 +29,9 @@ struct BATHHOUSESIM_API FServiceItemStack
 
 	UPROPERTY(Transient)
 	int32 Revision = 0;
+
+	UPROPERTY(Transient)
+	int32 InUseRemaining = 0;
 
 	bool IsEmpty() const { return Count <= 0; }
 };
@@ -39,4 +49,7 @@ struct BATHHOUSESIM_API FDisplaySpaceSnapshot
 
 	UPROPERTY(BlueprintReadOnly, Category = "Service")
 	int32 Count = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Service")
+	int32 InUseRemaining = 0;
 };

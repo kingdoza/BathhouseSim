@@ -1,6 +1,7 @@
 #include "Service/ServiceItemTransfer.h"
 
 #include "Service/ServiceItemDefinition.h"
+#include "Service/DisplayStockRules.h"
 
 #define LOCTEXT_NAMESPACE "ServiceItemTransfer"
 
@@ -13,15 +14,15 @@ FServiceTransferEvaluation Deny(const FText& Reason)
 	return Result;
 }
 
-bool AcceptsKind(const UServiceItemDefinition* Kind, const FGameplayTag& Category)
+bool AcceptsKind(const UServiceItemDefinition* Kind, const FGameplayTag& Category, const UServiceItemDefinition* FixedKind)
 {
-	return Kind && Category.IsValid() && Kind->DisplayCategories.HasTag(Category);
+	return FixedKind ? Kind == FixedKind : Kind && Category.IsValid() && Kind->DisplayCategories.HasTag(Category);
 }
 }
 
 bool FServiceItemTransfer::IsConsistent(const FServiceItemStack& Stack)
 {
-	return Stack.Count >= 0 && (Stack.Count == 0) == (Stack.Kind == nullptr);
+	return FDisplayStockRules::IsConsistent(Stack);
 }
 
 int32 FServiceItemTransfer::GetBoxCapacity(const FServiceItemStack& Box, const FServiceItemStack& Space)
@@ -37,13 +38,14 @@ FServiceTransferEvaluation FServiceItemTransfer::EvaluateApply(
 	const FServiceItemStack& Box,
 	const FServiceItemStack& Space,
 	const FGameplayTag& SpaceCategory,
-	const int32 SpaceCapacity)
+	const int32 SpaceCapacity,
+	const UServiceItemDefinition* FixedKind)
 {
 	if (!IsConsistent(Box) || !IsConsistent(Space))
 	{
 		return Deny(LOCTEXT("InconsistentStack", "물건 상태를 확인할 수 없음"));
 	}
-	if (Box.Kind && !AcceptsKind(Box.Kind, SpaceCategory))
+	if (Box.Kind && !AcceptsKind(Box.Kind, SpaceCategory, FixedKind))
 	{
 		return Deny(LOCTEXT("CategoryRejected", "여기에 넣을 수 없는 물건"));
 	}
@@ -68,14 +70,15 @@ FServiceTransferEvaluation FServiceItemTransfer::EvaluateTake(
 	const FServiceItemStack& Box,
 	const FServiceItemStack& Space,
 	const FGameplayTag& SpaceCategory,
-	const int32 SpaceCapacity)
+	const int32 SpaceCapacity,
+	const UServiceItemDefinition* FixedKind)
 {
 	(void)SpaceCapacity;
 	if (!IsConsistent(Box) || !IsConsistent(Space))
 	{
 		return Deny(LOCTEXT("InconsistentStack", "물건 상태를 확인할 수 없음"));
 	}
-	if (Box.Kind && !AcceptsKind(Box.Kind, SpaceCategory))
+	if (Box.Kind && !AcceptsKind(Box.Kind, SpaceCategory, FixedKind))
 	{
 		return Deny(LOCTEXT("CategoryRejected", "여기에 넣을 수 없는 물건"));
 	}
@@ -86,6 +89,10 @@ FServiceTransferEvaluation FServiceItemTransfer::EvaluateTake(
 	if (Space.Count <= 0)
 	{
 		return Deny(LOCTEXT("SpaceEmpty", "꺼낼 물건 없음"));
+	}
+	if (FDisplayStockRules::GetTakeableCount(Space) == 0)
+	{
+		return Deny(LOCTEXT("InUseOnly", "사용 중인 것은 꺼낼 수 없음"));
 	}
 	if (Box.Count >= GetBoxCapacity(Box, Space))
 	{
@@ -101,9 +108,10 @@ bool FServiceItemTransfer::TryApplyOne(
 	FServiceItemStack& Space,
 	const FGameplayTag& SpaceCategory,
 	const int32 SpaceCapacity,
-	FText& OutFailureReason)
+	FText& OutFailureReason,
+	const UServiceItemDefinition* FixedKind)
 {
-	const FServiceTransferEvaluation Evaluation = EvaluateApply(Box, Space, SpaceCategory, SpaceCapacity);
+	const FServiceTransferEvaluation Evaluation = EvaluateApply(Box, Space, SpaceCategory, SpaceCapacity, FixedKind);
 	if (!Evaluation.bCan)
 	{
 		OutFailureReason = Evaluation.Reason;
@@ -128,9 +136,10 @@ bool FServiceItemTransfer::TryTakeOne(
 	FServiceItemStack& Space,
 	const FGameplayTag& SpaceCategory,
 	const int32 SpaceCapacity,
-	FText& OutFailureReason)
+	FText& OutFailureReason,
+	const UServiceItemDefinition* FixedKind)
 {
-	const FServiceTransferEvaluation Evaluation = EvaluateTake(Box, Space, SpaceCategory, SpaceCapacity);
+	const FServiceTransferEvaluation Evaluation = EvaluateTake(Box, Space, SpaceCategory, SpaceCapacity, FixedKind);
 	if (!Evaluation.bCan)
 	{
 		OutFailureReason = Evaluation.Reason;

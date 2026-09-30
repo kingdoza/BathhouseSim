@@ -10,6 +10,17 @@
 #include "Engine/SimpleConstructionScript.h"
 #include "Facility/BathhouseFacilityActor.h"
 #include "Facility/BathhouseFacilitySlotComponent.h"
+#include "Facility/FacilityPlacementExtensionUtils.h"
+#include "Service/DisplaySpaceComponent.h"
+#include "Service/DrinkFridgeActor.h"
+#include "Service/ItemBoxActor.h"
+#include "Service/ServiceItemDefinition.h"
+#include "Service/ServiceDisplayManagerComponent.h"
+#include "Towel/TowelProcessingMachineActor.h"
+#include "Towel/TowelInventoryComponent.h"
+#include "Towel/Presentation/TowelPileVisualComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Interaction/Presentation/OpeningPresentationComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/PackageName.h"
 #include "Misc/Parse.h"
@@ -28,6 +39,10 @@ struct FServiceLoadSpec
 };
 
 const FServiceLoadSpec ServiceLoadSpecs[] = {
+	{TEXT("BP_DrinkFridge"),TEXT("/Game/Bathhouse/Blueprints/Service/BP_DrinkFridge"),TEXT("/Game/Developers/MigrationCheck/BP_DrinkFridge")},
+	{TEXT("BP_Washer"),TEXT("/Game/Bathhouse/Blueprints/Towel/BP_Washer"),TEXT("/Game/Developers/MigrationCheck/BP_Washer")},
+	{TEXT("BP_Dryer"),TEXT("/Game/Bathhouse/Blueprints/Towel/BP_Dryer"),TEXT("/Game/Developers/MigrationCheck/BP_Dryer")},
+	{TEXT("BP_ItemBox"),TEXT("/Game/Bathhouse/Blueprints/Service/BP_ItemBox"),TEXT("/Game/Developers/MigrationCheck/BP_ItemBox")},
 	{
 		TEXT("DA_ShopCatalog"),
 		TEXT("/Game/Bathhouse/Data/Shop/DA_ShopCatalog"),
@@ -126,14 +141,12 @@ bool FBathhouseServiceBlueprintLoadTest::RunTest(const FString& Parameters)
 			{
 				return false;
 			}
-			TestEqual(TEXT("Catalog keeps its existing product count"), Catalog->Products.Num(), 7);
+			TestEqual(TEXT("Catalog includes the authored unit-two products"), Catalog->Products.Num(), 16);
 			for (const FShopProductEntry& Product : Catalog->Products)
 			{
 				TestFalse(FString::Printf(TEXT("%s keeps a product id"), *Product.ProductId.ToString()), Product.ProductId.IsNone());
-				TestTrue(FString::Printf(TEXT("%s keeps its facility definition"), *Product.ProductId.ToString()),
-					IsValid(Product.PlacementDefinition));
-				TestTrue(FString::Printf(TEXT("%s has no item box definition yet"), *Product.ProductId.ToString()),
-					Product.ItemBoxDefinition == nullptr);
+				TestTrue(FString::Printf(TEXT("%s keeps exactly one definition"), *Product.ProductId.ToString()),
+					IsValid(Product.PlacementDefinition) != IsValid(Product.ItemBoxDefinition));
 				TestTrue(FString::Printf(TEXT("%s keeps a positive price"), *Product.ProductId.ToString()), Product.Price > 0);
 			}
 			continue;
@@ -163,31 +176,49 @@ bool FBathhouseServiceBlueprintLoadTest::RunTest(const FString& Parameters)
 		}
 		else
 		{
-			TestTrue(TEXT("BP_Shower keeps a facility native parent"),
-				Blueprint->GeneratedClass->IsChildOf(ABathhouseFacilityActor::StaticClass()));
-			const ABathhouseFacilityActor* CDO = Cast<ABathhouseFacilityActor>(Blueprint->GeneratedClass->GetDefaultObject());
-			TestNotNull(TEXT("BP_Shower CDO loads"), CDO);
-			TestEqual(TEXT("BP_Shower keeps its Shower facility type"),
-				CDO ? CDO->GetFacilityType() : EBathhouseFacilityType::Bath, EBathhouseFacilityType::Shower);
-			bool bHasSlot = CDO && CDO->FindComponentByClass<UBathhouseFacilitySlotComponent>() != nullptr;
-			for (const UClass* Class = Blueprint->GeneratedClass; Class && !bHasSlot; Class = Class->GetSuperClass())
+			const FName Name(Spec->Name);
+			const bool bMachine=Name==TEXT("BP_Washer") || Name==TEXT("BP_Dryer");
+			UClass* Expected=Name==TEXT("BP_ItemBox") ? AItemBoxActor::StaticClass()
+				: bMachine ? ATowelProcessingMachineActor::StaticClass()
+				: Name==TEXT("BP_DrinkFridge") ? ADrinkFridgeActor::StaticClass() : ABathhouseFacilityActor::StaticClass();
+			TestTrue(TEXT("Blueprint keeps its native parent"),Blueprint->GeneratedClass->GetSuperClass()==Expected);
+			AActor* CDO=Cast<AActor>(Blueprint->GeneratedClass->GetDefaultObject());
+			if (!TestNotNull(TEXT("Blueprint CDO loads"),CDO)) return false;
+			TArray<UActorComponent*> Components;
+			FacilityPlacementExtensionUtils::CollectAuthoringComponents(*CDO,Components);
+			auto CountType=[&](UClass* Type)
 			{
-				const UBlueprintGeneratedClass* GeneratedClass = Cast<UBlueprintGeneratedClass>(Class);
-				if (!GeneratedClass || !GeneratedClass->SimpleConstructionScript)
+				int32 Count=0;
+				for (auto* Component : Components) if (Component && Component->IsA(Type)) ++Count;
+				return Count;
+			};
+			if (bMachine)
+			{
+				TestEqual(TEXT("Existing machine inventory retained"),CountType(UTowelInventoryComponent::StaticClass()),1);
+				TestEqual(TEXT("Existing machine visual retained"),CountType(UTowelPileVisualComponent::StaticClass()),1);
+				TestNotNull(TEXT("New LidPivot native subobject"),CDO->GetDefaultSubobjectByName(TEXT("LidPivot")));
+				TestNotNull(TEXT("New LidMesh native subobject"),CDO->GetDefaultSubobjectByName(TEXT("LidMesh")));
+				TestNotNull(TEXT("New LidPresentation native subobject"),CDO->GetDefaultSubobjectByName(TEXT("LidPresentation")));
+			}
+			else if (Name==TEXT("BP_ItemBox"))
+			{
+				TestNotNull(TEXT("Existing BoxMesh native subobject retained"),CDO->GetDefaultSubobjectByName(TEXT("BoxMesh")));
+				TestEqual(TEXT("Existing ContentsVisual retained"),CountType(UInstancedStaticMeshComponent::StaticClass()),1);
+			}
+			else
+			{
+				const auto* Facility=Cast<ABathhouseFacilityActor>(CDO);
+				const bool bFridge=Name==TEXT("BP_DrinkFridge");
+				TestEqual(TEXT("Existing facility type retained"),Facility->GetFacilityType(),
+					bFridge ? EBathhouseFacilityType::DrinkFridge : EBathhouseFacilityType::Shower);
+				TestEqual(TEXT("Existing customer slots retained"),CountType(UBathhouseFacilitySlotComponent::StaticClass()),bFridge ? 1 : 2);
+				if (bFridge)
 				{
-					continue;
-				}
-				for (const USCS_Node* Node : GeneratedClass->SimpleConstructionScript->GetAllNodes())
-				{
-					if (Node && Node->ComponentClass
-						&& Node->ComponentClass->IsChildOf(UBathhouseFacilitySlotComponent::StaticClass()))
-					{
-						bHasSlot = true;
-						break;
-					}
+					TestEqual(TEXT("New native display manager"),CountType(UServiceDisplayManagerComponent::StaticClass()),1);
+					TestEqual(TEXT("Four existing SCS display spaces retained"),CountType(UDisplaySpaceComponent::StaticClass()),4);
 				}
 			}
-			TestTrue(TEXT("BP_Shower keeps its facility slot"), bHasSlot);
+			TestFalse(TEXT("Load gate does not dirty package"),Package->IsDirty());
 		}
 	}
 	return true;

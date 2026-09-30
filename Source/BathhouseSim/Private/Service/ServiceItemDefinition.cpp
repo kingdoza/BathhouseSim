@@ -24,6 +24,7 @@ UStaticMesh* UServiceItemDefinition::ResolveDisplayMesh() const
 bool UServiceItemDefinition::ValidateRuntime(FText& OutFailureReason) const
 {
 	if (ItemId.IsNone() || DisplayName.IsEmpty() || !ItemMesh || BoxCapacity < 1 || SaleValue < 0
+		|| ConsumableUses < 0 || !IsValidTransform(BoxItemOffset)
 		|| BoxSlotTransforms.Num() != BoxCapacity || !IsValidTransform(DisplayOffset))
 	{
 		OutFailureReason = NSLOCTEXT("ServiceItemDefinition", "InvalidDefinition", "품목 정의가 올바르지 않습니다.");
