@@ -62,10 +62,12 @@ LMB Started(`PrimaryUseAction`), 위에서부터 처음 맞는 owner 하나:
 5. 손에 장비 아닌 물건이 있음, 또는 focus query의 Apply 방향에 행이나 이유가 있음 → HeldTargetUse(Apply)
 6. 그 밖(빈손이고 Apply 정보 없음) → Equipment 기존 fallback. 예: 빈손으로 물 얼룩을 조준하면 "물걸레가 필요합니다"
 
-RMB Started(`SecondaryUseAction`, 신규):
+RMB Started(`SecondaryUseAction`, 신규. 2026-10-01 서비스 3단위에서 장비 보조 사용 추가, [CleaningLitterSystem.md](CleaningLitterSystem.md) Input Routing):
 
-1. Computer capture, Placement active, held-use 진행 중, 장비를 듦 → 무시(press만 소비)
-2. 그 밖 → HeldTargetUse(Take)
+1. Computer capture, Placement active, held-use 진행 중, LMB 장비 입력 진행 중 → 무시(press만 소비)
+2. 장비를 들었고 `IHeldEquipmentSecondaryUsable` 구현 → `UPlayerEquipmentUseComponent::ExecuteSecondaryEquipmentUse`(press당 한 번, 조준 무관). 첫 사용처는 집게 `봉투 묶기`
+3. 장비를 들었고 보조 사용 없음 → 무시
+4. 그 밖 → HeldTargetUse(Take)
 
 - Completed/Canceled는 시작 owner에만 전달한다. press 도중 owner를 바꾸지 않는다.
 - E/F/G/Q 입력 경로는 바꾸지 않는다. 삽·수건 이동이 E/F에서 사라지는 것은 대상 query·execute 변경으로 처리한다.
@@ -137,7 +139,7 @@ Character default subobject `PlayerHeldTargetUse`. `Configure(Interaction, Carry
 [UISystem.md](UISystem.md) Interaction Prompt의 추가 규칙:
 
 - LMB 행: `bEquipmentUseVisible`이면 equipment 필드, 아니면 held Apply 필드를 쓴다. 두 source를 두 행으로 동시에 표시하지 않는다.
-- RMB 행: held Take 필드를 쓴다. 새 `BindWidgetOptional` `HeldTakeActionNameText`, `HeldTakeFailureReasonText`(UTextBlock)다.
+- RMB 행: held Take 필드를 쓴다. 새 `BindWidgetOptional` `HeldTakeActionNameText`, `HeldTakeFailureReasonText`(UTextBlock)다. 장비 보조 사용이 있으면 `MergeEquipmentQuery`가 이 필드를 그 query로 채우고, 실행 결과도 intent `HeldTake`로 보고한다(`HeldTake` = RMB 행 결과).
 - 키 라벨: `BindWidgetOptional` `PrimaryKeyText`, `LmbKeyText`, `RmbKeyText`(UTextBlock)와 EditDefaultsOnly 표시값 `PrimaryKeyLabel`(E), `LmbKeyLabel`(LMB), `RmbKeyLabel`(RMB). native가 해당 행과 같이 보이기·접기를 적용한다.
 - E 행은 `ActionName`이 비면 키·행동·이유를 모두 접는다.
 - F 행은 기존대로 `bSecondaryVisible`을 따른다. 이번 대상에서는 모두 false다(CTRL-025).

@@ -94,7 +94,7 @@ Data Validation이 위 규칙과 transform finite·scale 양수를 검사한다.
 - 외형: `ContentsVisual` instance는 `Kind->BoxSlotTransforms[0..Count-1]`에 `ItemMesh`로 둔다. Contents 변경 시 다시 만든다(DISP-004, 018).
 - E query: 빈손이면 `들기`. TargetName은 요약이다: `바나나우유 7/12` 또는 `빈 박스`(DISP-002, 014). 다른 물건을 들었으면 불가 이유.
 - `GetHeldSummaryText()`(아래 HUD)도 같은 요약을 반환한다.
-- 버리기: 항상 가능. 내용도 함께 사라지고 환불 없음(DISP-021).
+- 버리기: 항상 가능. 내용도 함께 사라지고 환불 없음(DISP-021). 3단위부터 수거 구역의 world 버리기도 구현한다([CleaningLitterSystem.md](CleaningLitterSystem.md)).
 - 수건 대상 규칙은 품목 박스를 수건바구니로 보지 않으므로 수건을 옮기지 않는다. 진열 공간은 품목 박스만 받는다(DISP-022).
 - Editor 미리보기(기능 계약: PIE 없이 종류·개수를 골라 박스 안 모습 확인):
   - WITH_EDITORONLY_DATA `EditorPreviewKind`, `EditorPreviewCount`(EditAnywhere)를 둔다.

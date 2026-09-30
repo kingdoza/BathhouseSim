@@ -20,3 +20,5 @@
 - 삭제된 `PlacementNavModifier`는 조사한 Bath 2개, Clothes Locker 2개, Washer 1개, Dryer 1개 external actor instance에 존재하지 않는다.
 
 현재 MCP의 World Partition actor 저장 경로가 external actor package를 저장하지 못하므로, Recast를 `Dynamic`으로 바꾸는 작업은 [USER_UNREAL.md](../USER_UNREAL.md)에 남아 있다.
+
+쓰레기·청소용 DefaultMap instance(쓰레기 구역·집게·거치대·수거 구역, stain zone/director 재저장)와 바닥(world Z=0) 조사 결과는 [CleaningSystem.md](CleaningSystem.md)에 있다.

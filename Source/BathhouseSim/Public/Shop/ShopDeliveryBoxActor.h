@@ -57,6 +57,8 @@ public:
 	virtual void RecoverPhysicalCarryable(UPlayerCarryComponent* PreviousCarry) override;
 	virtual bool CanDiscardCarriedObject(FText& OutFailureReason) const override;
 	virtual void HandleDiscardCommitted() override;
+	virtual bool CanDiscardFromWorld(FText& OutFailureReason) const override;
+	virtual void HandleDiscardFromWorldCommitted() override;
 
 	virtual FHeldEquipmentUseQuery QueryEquipmentUse(const FHeldEquipmentUseContext& Context) const override;
 	virtual FHeldEquipmentUseResult BeginEquipmentUse(const FHeldEquipmentUseContext& Context) override;
@@ -82,6 +84,8 @@ protected:
 	float UpwardThrowImpulseStrength = 15.0f;
 
 private:
+
+	bool CanDiscardKind() const;
 	friend class FShopUnboxingTransaction;
 
 	enum class ELifecycle : uint8

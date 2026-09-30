@@ -20,6 +20,7 @@
 | Interaction/UI | [InteractionUISystem.md](InteractionUISystem.md) | Input Mapping, Widget hierarchy, BindWidget와 표시 asset |
 | Shop | [ShopSystem.md](ShopSystem.md) | Catalog, 상품 Definition tag와 Shop Editor authoring state |
 | Service | [ServiceSystem.md](ServiceSystem.md) | 품목 정의, 품목 박스·음료 냉장고·수거함 Blueprint, 외곽선·프리뷰 Material |
+| Cleaning | [CleaningSystem.md](CleaningSystem.md) | 쓰레기·집게·봉투·수거 구역, 청소 director·물 얼룩·구역 Blueprint와 DefaultMap instance |
 | Towel | `TowelSystem.md` | 수건 설비·표현 Blueprint, mesh/material과 presentation 설정 |
 | World | [WorldSystem.md](WorldSystem.md) | map actor, World Settings, RecastNavMesh와 유일 Authority |
 

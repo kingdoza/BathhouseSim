@@ -6,6 +6,8 @@
 
 class AStainSpawnZoneActor;
 class AWaterStainActor;
+class ALitterActor;
+class ALitterSpawnZoneActor;
 
 UCLASS(Blueprintable)
 class BATHHOUSESIM_API ACleaningDirectorActor : public AActor
@@ -17,8 +19,27 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+#if WITH_DEV_AUTOMATION_TESTS
+	void AdvanceSpawnScheduleForTesting(float DeltaSeconds, const TArray<FVector>& CustomerLocations);
+	void SetSpawnRandomSeedForTesting(int32 Seed);
+#endif
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "0.1"))
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "0.05"))
+	float SpawnUpdateIntervalSeconds = 0.25f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "1.0"))
+	float LitterMeanIntervalPerCustomerSeconds = 120.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "1"))
+	int32 MaxActiveLitter = 20;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning Spawn")
+	TSubclassOf<ALitterActor> LitterClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "0.0"))
+	float DefaultLitterSpacing = 40.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "0.1"))
+	float SpawnClearanceHeightCm = 30.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cleaning Spawn",
+			  meta = (ClampMin = "0.1", ToolTip = "Mean interval per customer (seconds)."))
 	float SpawnIntervalSeconds = 15.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "1"))
@@ -33,16 +54,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "0.0"))
 	float DefaultStainSpacing = 100.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "0.0"))
-	float DefaultPawnClearance = 80.0f;
-
 private:
+
 	friend class FBathhouseCleaningInteractionTest;
 
-	void TrySpawnStain();
-	AStainSpawnZoneActor* SelectZone(
-		const TArray<AStainSpawnZoneActor*>& Zones,
-		FRandomStream& RandomStream) const;
-
+	void UpdateSpawnSchedule();
+	void AdvanceSpawnSchedule(float DeltaSeconds, const TArray<FVector>& CustomerLocations);
+	void TrySpawnStain(AStainSpawnZoneActor& Zone);
+	void TrySpawnLitter(ALitterSpawnZoneActor& Zone);
+	TMap<TWeakObjectPtr<AStainSpawnZoneActor>, float> StainClocks;
+	TMap<TWeakObjectPtr<ALitterSpawnZoneActor>, float> LitterClocks;
+	FRandomStream SpawnRandom;
 	FTimerHandle SpawnTimerHandle;
 };

@@ -3,7 +3,7 @@
 ## Status And Scope
 
 - [ServiceSystem.md](ServiceSystem.md)의 하위 문서다. 서비스 2단위(진열 확장)의 설비 전체 조준 진열, 소모품, 공용 화장대, 샤워 비품, 진열 payload 일반화, 공용 표시 도구를 소유한다.
-- 2026-09-30 설계. Source 반영 완료, 코드 리뷰 재작업(F1~F4, 2026-09-30) 반영 대기. 입력은 `.md/PROMPT_ARCHITECTURE.md`(서비스 2단위, DISP-015~017·023·024, VANI-001~017, SHWR-001~011, TOWL-001~018, SHOP-S03·S04)이고 사용자가 설계를 승인했다.
+- 2026-09-30 설계. 구현 완료(커밋 `c9a1150`, 코드 리뷰 재작업 F1~F4와 수건 cue 재작업 포함). 입력은 `.md/PROMPT_ARCHITECTURE.md`(서비스 2단위, DISP-015~017·023·024, VANI-001~017, SHWR-001~011, TOWL-001~018, SHOP-S03·S04)이고 사용자가 설계를 승인했다.
 - 수건 쪽 변경(규칙·표현·뚜껑)은 [TowelSystem.md](TowelSystem.md), [TowelPresentationSystem.md](TowelPresentationSystem.md)의 2단위 절이 정본이다. 이 문서는 수건이 쓰는 공용 표시 도구만 정한다.
 - 1단위 구조(품목 정의·품목 박스·진열 공간·냉장고·외곽선)는 유지하며, 아래에서 일반화하는 부분만 바뀐다.
 

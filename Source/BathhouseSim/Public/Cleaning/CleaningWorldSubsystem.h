@@ -6,6 +6,9 @@
 
 class AStainSpawnZoneActor;
 class AWaterStainActor;
+class ALitterActor;
+class ALitterSpawnZoneActor;
+struct FFacilityPlacedEvent;
 
 UCLASS()
 class BATHHOUSESIM_API UCleaningWorldSubsystem : public UWorldSubsystem
@@ -13,6 +16,17 @@ class BATHHOUSESIM_API UCleaningWorldSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
+
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+	void RegisterLitterZone(ALitterSpawnZoneActor* Zone);
+	void UnregisterLitterZone(ALitterSpawnZoneActor* Zone);
+	void RegisterLitter(ALitterActor* Litter);
+	void UnregisterLitter(ALitterActor* Litter);
+	TArray<ALitterSpawnZoneActor*> GetActiveLitterZones();
+	int32 GetActiveLitterCount();
+	int32 GetActiveLitterCountForZone(const ALitterSpawnZoneActor* Zone);
+	bool IsLitterLocationClear(const FVector& Location, float MinimumSpacing);
 	void RegisterZone(AStainSpawnZoneActor* Zone);
 	void UnregisterZone(AStainSpawnZoneActor* Zone);
 	void RegisterStain(AWaterStainActor* Stain);
@@ -25,6 +39,10 @@ public:
 
 private:
 	void Compact();
+	void HandleFacilityPlaced(const FFacilityPlacedEvent& Event);
+	FDelegateHandle PlacementHandle;
+	TArray<TWeakObjectPtr<ALitterSpawnZoneActor>> LitterZones;
+	TArray<TWeakObjectPtr<ALitterActor>> LitterActors;
 
 	TArray<TWeakObjectPtr<AStainSpawnZoneActor>> Zones;
 	TArray<TWeakObjectPtr<AWaterStainActor>> Stains;

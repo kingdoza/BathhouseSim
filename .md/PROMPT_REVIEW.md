@@ -1,86 +1,103 @@
-# 코드 리뷰 프롬프트 — 수건 cue 갱신 재작업
+# 코드 리뷰 프롬프트 — 서비스 3단위: 생성 자리 clearance 재작업
 
-## 현재 단계와 입력
+## 단계와 입력
 
-서비스 2단위 완료 뒤 보고된 수건 cue 갱신 결함의 C++ 재작업이다. AGENT_WORKFLOW.md → AGENT_REVIEW.md 순서로 코드 리뷰한다. 현재 보고는 코드 리뷰 승인이나 PIE 통합 승인 자체가 아니다.
-입력: [재작업 findings](PROMPT_IMPLEMENTATION_R.md), [구현 프롬프트 맨 앞 재작업 절](PROMPT_IMPLEMENTATION.md), [기능 계약](PROMPT_ARCHITECTURE.md), [수건 cue 재계산 정본](Architecture/TowelSystem.md), [Interaction PresentationRevision 정본](Architecture/InteractionSystem.md), [결정적 자리 표현](Architecture/TowelPresentationSystem.md).
-기존 2단위 Source·F1~F4 결과·Editor 작업물을 유지했다. 최초 구현/F1~F4를 다시 수행하지 않았다. 이번 변경은 아래 8개 Source 파일과 PROMPT_REVIEW.md·PROMPT_UNREAL.md뿐이다. 기존 인계 문서는 Saved/ImplementationUnit2/CueRefresh/Before/.md/에 보관했다.
+- **수직 구현(단위 확장), C++ 재작업 완료, pre-Editor 재리뷰 요청**. 현재 작업은 `.md/PROMPT_IMPLEMENTATION.md` 맨 위 2026-10-01 재작업 절과 `.md/PROMPT_IMPLEMENTATION_R.md` F1~F3다.
+- `.md/AGENT_WORKFLOW.md` → `.md/AGENT_REVIEW.md`를 읽는다. 기능 계약은 `.md/PROMPT_ARCHITECTURE.md` TRSH-001~005·018·019·029·030과 대표 시나리오다. 사용자 결정은 `.md/QNA_FEATURE_SPEC.md` 2026-10-01 정정이다.
+- 설계 정본: `.md/Architecture/CleaningLitterSystem.md` **Floor Rule**. 이 절과 구현 프롬프트가 일치함을 확인했다. 관련 CleaningSystem·CoreSystem 및 `.md/0_ARCHITECTURE.md`를 참조한다.
+- 기존 미커밋 3단위 Source를 유지했다. 완료된 본 구현 절을 다시 수행하지 않았다. 기존 서비스 1/2단위와 사용자 소유 문서 변경도 보존했다.
+- 구현 단계는 Source와 두 인계 문서만 변경했다. Architecture·Unreal 정본·입력 프롬프트·QNA·Config는 수정하지 않았다. commit/push 없음.
 
-## 선택된 경로와 구현
+## 선택된 판정 기준과 변경
 
-- 정본의 C안: `FPlayerInteractionQuery` 끝에 `UPROPERTY() int64 PresentationRevision = 0`을 추가하고 Equals에 포함했다. Blueprint 비노출이며 HUD 이름·행동명·이유·가능 여부·mode는 그대로다.
-- `TowelDisplayCueUtils::GetPresentationRevision` 한 곳에서 대상 inventory Revision + 든 ATowelBasketActor inventory Revision을 계산한다. 없는 inventory·바구니가 아닌 물건은 해당 항 0이다.
-- 선반·사용 수건통·기계 transfer port query의 정상·불가·inactive fallback·ownerless 빈 반환에 같은 규칙을 채운다. 이동 조건·정원·기계 상태를 바꾸지 않는다.
-- 매 transfer 뒤 기존 HeldUse의 RefreshInteractionQuery → CommitQuery → SyncFocusObservers가 revision 차이를 감지해 기존 owner focus 알림을 보낸다. cue는 기존 Update에서 authoritative Count/Count−1로 다시 계산된다. 플레이어 연속 입력은 같은 프레임, 손님/기계 등 외부 변화는 늦어도 다음 query tick에 반영된다.
-- PlayerInteractionComponent·PlayerHeldTargetUseComponent는 수정하지 않았다. 반복 guard는 기존 target/key 조건이며 revision이 바뀌어도 반복을 중단하지 않는다. owner inventory 구독·query 캐시·새 lifecycle을 추가하지 않았다.
-- NotifyInteractionFocusChanged·TowelDisplayCueUtils::Update·뚜껑 요청은 변경하지 않았다. 기존 SetSourceInsertable은 같은 source key에 bool을 덮어쓰므로 같은 열림 방향의 요청 반복은 중복 source를 만들지 않는다. 기존 결정적 Pile·뚜껑 자동화도 유지했다.
-- 진열 공간·설비 router·냉장고 runtime query와 HUD는 변경하지 않았다. 새 필드의 기본값 0을 유지한다.
+- F1: `FCleaningFloorSpawnQuery::Find` clearance를 `OverlapMultiByChannel(ECC_PhysicsBody)`로 바꿨다. query response는 모두 Ignore에서 WorldStatic·WorldDynamic·PhysicsBody만 Block이다.
+- `bBlockingHit && IsValid(GetComponent())`인 결과만 막힘으로 센다. QueryOnly 여부·object type만으로 막지 않는다. 축 정렬 box의 반폭 R, hit 위 1cm부터 ClearanceHeight까지의 범위는 유지했다.
+- F2: trace가 맞힌 **component**를 `AddIgnoredComponent`로 제외한다. Actor 전체를 제외하지 않으며 다른 mesh의 턱·벽은 계속 막는다.
+- 제외 전 바닥 guard: floor height ±tolerance, 시설/휴대물 interface 기각에 object type `WorldStatic`·Mobility `Static`을 추가했다. 낮은 수건·movable 판의 윗면을 바닥으로 인정하지 않는다.
+- trace의 물 얼룩·쓰레기 통과와 overlap의 두 종류 Actor 무시는 유지했다. 바닥 tag·XY·경사·같은 종류 간격 검사도 유지했다.
+- TRSH-029: Pawn clearance sphere·private settings 값·zone→director 인자를 제거했다. clearance 결과에서 APawn 소유 component를 무시하므로 서 있는 capsule과 넘어진 손님 PhysicsBody가 생성을 막지 않는다.
+- TRSH-030: 벽은 충돌 응답을 그대로 따라 막는다. 종류별 반경 R 안 후보를 기각하고 R 밖은 허용한다.
+- F3: 집게 `TakeTongs`·`TongsNotHeldForDrop`, 봉투 `InvalidBagActivation`·`BagPhysicsFailed`·`BagNotDiscardable`·`InvalidBagAuthoring`로 LOCTEXT 키만 바꿨다. 문구와 동작은 유지했다.
+- 발생 clock·손님 수 수집·RMB routing·HUD 합성·집게/봉투 lifecycle·버리기·수거·배치 이벤트와 Placement collision helper는 재작업 시작 Source와 동일하다. 집게/봉투는 키 치환 및 공백을 정규화해 비교했다.
+- 설비/휴대물/Customer collision profile, 모듈 의존성과 범용 helper API는 바꾸지 않았다. 테스트 fixture만 profile과 Mobility를 설정한다.
 
-## 변경 파일과 클래스 성장
+## Blueprint/API와 미검증
 
-Source/BathhouseSim 기준 줄 수다. 이번 시작 상태와 비교한다.
+- 승인된 reflected 삭제는 정확히 3개다: director `DefaultPawnClearance`, stain zone `PawnClearanceOverride`, litter zone `PawnClearanceOverride`.
+- 다른 reflected 추가/삭제·기존 class/component 이름·native parent·enum 순서·Serialize·Core Redirect 변경은 없다. native `FindSpawnTransform`의 Pawn 인자는 제거했다.
+- reflection 자동화에서 세 property 부재를 확인했다. 기존 `SpawnIntervalSeconds` 값과 zone bounds·tag·trace·최대 값은 보존한다.
+- Blueprint Compile/Save·DefaultMap authoring·PIE는 이번 단계에서 실행하지 않았다. 삭제 property의 기존 BP/레벨 resave와 바닥 WorldStatic/Static 확인은 `.md/PROMPT_UNREAL.md`로 인계했다.
 
-| 파일 | 변경 전 → 후 |
-|---|---|
-| `Private/Tests/ServiceBlueprintLoadAutomationTests.cpp` | 227 → 227 |
-| `Private/Tests/TowelDisplayCueAutomationTests.cpp` | 236 → 539 |
-| `Private/Towel/CleanTowelStackActor.cpp` | 145 → 149 |
-| `Private/Towel/TowelDisplayCueUtils.cpp` | 45 → 55 |
-| `Private/Towel/TowelDisplayCueUtils.h` | 14 → 16 |
-| `Private/Towel/TowelTransferPortComponent.cpp` | 151 → 153 |
-| `Private/Towel/UsedTowelBinActor.cpp` | 220 → 224 |
-| `Public/Interaction/InteractionTypes.h` | 279 → 283 |
+## 시나리오와 fixture 추적
 
-production은 query 값 1개와 stateless helper 1개 추가뿐이다. 새 UFUNCTION·delegate·Tick·bind/unbind·default subobject·독립 상태 책임은 없다. 큰 Interaction 클래스의 구현 성장 없이 승인된 query 계약을 따랐다. 테스트 파일 증가는 네 대상 실제 입력 경로의 fixture·회귀 검증이다.
-`ServiceBlueprintLoadAutomationTests.cpp`는 기존 DA_ShopCatalog 상품 수 기대값 한 줄만 9→16으로 맞췄다. [현재 Shop Editor 정본](Unreal/ShopSystem.md)에 기존 9 + 2단위 7 = 16이 저장·재로드된 상태다. 실제 Content를 바꾸거나 기존 상품 보존 검사를 제거하지 않았다.
+신규 4개는 `Private/Tests/CleaningSpawnClearanceAutomationTests.cpp`에 둔다. 모두 실제 stain/litter zone `FindSpawnTransform` 경로를 사용한다.
 
-## 새 실제 경로 자동화
-
-`BathhouseSim.Towel.Display.RefreshFollowsTransfersAndRepeats`를 기존 TowelDisplayCueAutomationTests.cpp에 추가했다. 새 테스트는 NotifyInteractionFocusChanged를 직접 호출하지 않는다. 실제 locally controlled player·camera trace·held basket·Interaction Refresh·HeldUse BeginUse/TickComponent를 사용한다.
-
-| 대상/시나리오 | 경로와 기대값 |
-|---|---|
-| 선반 TOWL-001·004·005·013·016 | 조준 고정 → LMB 즉시 1장 + Tick 반복 2장 → RMB 즉시 1장 + Tick 반복 2장. 매 장 exactly 1 transfer, preview=GetIndexPresentation(Count), highlight=GetIndexPresentation(Count−1) |
-| 사용 수건통 TOWL-004·005·016 | Apply·프리뷰 없음. RMB 즉시+반복 총 3장마다 강조가 새 맨 위로 이동 |
-| Waiting 세탁기 TOWL-006·010·013 | Used 바구니로 LMB/RMB 각각 3장, 결정적 Pile의 새 index transform과 cue 일치 |
-| Waiting 건조기 TOWL-006·017 | Wet 바구니로 같은 LMB/RMB 3장 검증 |
-| 외부 선반 변화 TOWL-018 | 실제 UTowelTransferSubsystem으로 선반→손님 inventory 1장 이동 → RefreshInteractionQuery 1회로 새 자리 반영 |
-| 바구니만 변경 | 네 대상에서 basket→외부 inventory 1장 이동, 대상 revision 불변인데 query 합은 변경되고 cue를 다시 계산 |
-| query/HUD | 매 count-only 이동에서 Equals false. revision만 맞추면 Equals true이므로 모든 기존 HUD/가능 여부 필드는 동일 |
-| fallback/default | inactive 대상·ownerless port·null inventory/바구니 없음의 합, BlueprintVisible flag 없음, 진열 공간·router·냉장고 revision 0 |
-| 숨김 | 실제 suppression과 focus exit에서 양 cue 숨김, suppression 해제 후 실제 조준·표현 복구 |
-
-모든 cue 검사에서 실제 target focus도 확인한다. 사용 수건통의 Apply 예외를 제외하면 각 장 이동 직후 보이는 cue의 relative transform을 검사하며 수량 경계에 의한 우연한 query 변화에 기대지 않는다.
-기존 `BathhouseSim.Towel.Display.CuesDeterministicPileAndLid` 본문은 수정하지 않았다. 기존 Towel·Service·Interaction held-use·Utility 자동화를 제외하지 않고 전체 실행했다.
-
-## 빌드·로드·회귀 결과
-
-모든 headless는 AGENT_WORKFLOW 형식과 -DDC-ForceMemoryCache를 사용했다. 빌드는 UE 5.8 Build.bat / BathhouseSimEditor Win64 Development / -WaitMutex -NoHotReloadFromIDE다.
-
-| 검증 | 실제 결과 | 로그 / report (Saved 기준) |
+| 시나리오 / 리뷰 | 자동화 | 검증 |
 |---|---|---|
-| Build 01~04 | 4회 Succeeded, 최종 9.56초. 최종 빌드 뒤 Source 수정 없음 | ImplementationUnit2/CueRefresh/build_01.txt ~ build_04.txt |
-| DefaultMap 로드 + Towel.Display 최종 | 2/2 성공, test warning/error 0, exit 0 | ImplementationUnit2/CueRefresh/defaultmap_03.log; Automation/Reports/20260930/unit2_cue_defaultmap_03/index.json |
-| Template 전체 BathhouseSim | **100/100 성공**, 실패 0, 미실행 0, test warnings 22, errors 0, exit 0 | ImplementationUnit2/CueRefresh/all.log; Automation/Reports/20260930/unit2_cue_all/index.json |
-| 정적 검사 | git --no-optional-locks diff --check 통과, 새 테스트 direct Notify 호출 없음 | ImplementationUnit2/CueRefresh/static_checks.txt |
+| F1, TRSH-001/018/019, 대표 생성 | `Cleaning.Clearance.RegionsAndDirector` | 실제 PlacementZone 위치 `(600,-100,0)`·extent `(1400,900,10)` 안의 겹친 두 spawn zone; Visibility-only 공간과 nonblocking overlap 허용; 실제 director AdvanceSpawnScheduleForTesting으로 두 종류 Actor 생성 |
+| F2, TRSH-004 | `Cleaning.Clearance.SlopeAndStep` | 20° static mesh 바닥(±5cm 안 후보), 더 낮은 slope limit 기각, 하나의 static mesh component에 두 slab로 만든 1cm 단차 성공, 별도 mesh 턱 기각 |
+| TRSH-004/030 | `Cleaning.Clearance.PhysicalObstaclesAndWall` | native BlockAllDynamic 사용한 수건(높이 3cm) 윗면/옆·Movable 3cm 판·WorldStatic이지만 Movable인 판·PhysicsActor 열쇠/설비 아이템·품목 박스·시설 윗면/옆 기각; 벽 R 안 기각/R 밖 성공; 낮은 욕탕 바닥 기각 |
+| TRSH-029 | `Cleaning.Clearance.PawnsAndRagdoll` | 실제 FirstPersonCharacter·Customer capsule 발밑/옆 성공; SKM_Manny_Simple+PA_Mannequin의 실제 ragdoll skeletal mesh가 PhysicsBody query에 blocking overlap으로 잡힘을 확인한 뒤 두 zone 생성 성공 |
+| TRSH-005, 기존 바닥 계약 | `Cleaning.Litter.FloorAndVariation` | tag·height·경사·간격·시설/박스/벽 기각, 두 종류 trace/overlap 통과, seeded mesh/yaw; 기존 Pawn 기각을 생성 허용으로 정정 |
+| 기존 물걸레/zone 회귀 | `Cleaning.CarryHoldZoneAndRegistry` | 기존 carry·청소·재고 전체 검증 유지, 실제 stain zone Pawn 허용 계약과 Static floor fixture 정정 |
+| native 삭제·serialized 로드 | `Cleaning.BlueprintLoad` | 세 property 부재, 복사본/원본 BP 부모·subobject·SpawnFloor 부착과 package clean; DefaultMap external director/zone instance 로드 |
 
-전체 100개 중 warning 없는 성공은 90개, warning을 동반한 성공은 10개다. warning 22개는 기존 invalid-authoring fixture·판매 pool/수거함·preview material 미지정·수건 slot/payload 거부와 Template의 Boiler/Cooler/Circulator instance 없음(CDO 호환성 확인), 이동 불가 static mesh 등을 보고했다. 새 cue 테스트는 warning/error 0이다.
-전체에 Towel 4개, Service 22개, Interaction 16개(held-use 포함), Utility 10개가 포함된다. 이전 F1~F4의 99개에 이번 새 테스트 1개가 추가됐다. 이전 빌드/회귀 상세는 Saved/ImplementationUnit2/Rework/ 및 CueRefresh/Before/.md/PROMPT_REVIEW.md에 유지돼 있다.
-초기 DefaultMap 테스트 01·02는 새 테스트 1개가 실패했다(각 error 2): RefreshFollowsTransfersAndRepeats의 Shelf/UsedBin query revision 14/7 기대값에 0이 반환됐다. 비활성 query fixture가 PackagePhysicalRoot trace 충돌을 끈 뒤 복구하지 않아 suppression 해제에서 조준을 잃은 것이었다. 충돌 복구와 매 cue 검사 실제 focus 확인을 추가한 뒤 03에서 전부 통과했다. 냉장고 default query probe도 조준선 밖에 둔다. 실패 로그를 삭제하거나 테스트를 제외하지 않았다.
-startup의 optional profiling DLL·Zen/DDC·Rider/EOS 환경 메시지는 전체 로그에 남겼다. DDC는 명시한 memory fallback으로 초기화돼 테스트까지 실행됐으며 fatal 없이 정상 종료했다. Automation test event와 startup 메시지를 구별한다.
+- fixture의 Box helper는 기존 Movable 계약을 유지하고 **바닥 fixture만 Static**으로 설정한다. Static 지형의 fixture pose를 바꿀 때 Movable→pose 변경→Static 순서로 authoring한다.
+- transient stepped mesh와 component 설정은 저장하지 않는다. ragdoll mesh/PhysicsAsset는 기존 asset을 읽기만 하며 Customer/StateTree Source는 변경하지 않았다.
 
-## 보존 확인과 API/Editor 영향
+## 빌드·회귀와 실패 이력
 
-- 시작 전 UnrealEditor 종료를 확인했고 검증 종료 뒤 headless process도 종료됐다.
-- Content/Config status 전체 문자열과 변경 13개 uasset SHA256이 시작/종료에 동일하다. Content가 clean이었다는 뜻이 아니다. 기존 Shower·Washer·Dryer·상품·DefaultMap external actor 및 신규 Vanity/DA 작업물을 그대로 유지했다. Config 변경 없음.
-- 시작 snapshot: Saved/ImplementationUnit2/CueRefresh/content_before.json·files_before.json. 종료 확인: verification_final.json. 기존 Source 중 위 8개 외 파일은 SHA256 동일하며 신규 Source 파일도 없다.
-- 6개 production 변경에서 지정 revision 추가 부분만 제거하면 시작 SHA256과 일치한다(production_delta_verified.json). 따라서 cue Update·owner observer·뚜껑/HUD/transfer 조건의 기존 구현은 보존했다.
-- 종료 검사 중 FEEDBACK_BACKLOG.md의 별도 변경을 감지했다. 구현 단계는 이 파일을 수정하지 않았고 현재 내용을 보존했다. 이 별도 변경은 verification_final.json에서 구현 변경과 구분한다.
-- Architecture·Unreal 정본·구현/재작업 입력·QNA는 수정하지 않았다. 정본은 이미 선택된 경로를 확정한 입력이므로 이번 결과를 중복 기록하지 않는다.
-- additive query UPROPERTY뿐이며 reflected rename/삭제·parent/subobject 변경·Core Redirect·BP migration이 없다. 구현 프롬프트가 정한 DefaultMap 단일 로드 gate를 최종 실행으로 통과했다. asset Save·commit·push는 수행하지 않았다.
+로그와 report의 공통 경로는 `Saved/ImplementationUnit3/ClearanceRework/`다.
 
-## 리뷰 중점과 남은 PIE
+- UE 5.8 `Build.bat BathhouseSimEditor Win64 Development -WaitMutex -NoHotReloadFromIDE` 최종 성공: `build_05.log`. 첫 build부터 성공했으며 후속 build는 fixture와 load gate 정리다.
+- 전체 `Automation RunTests BathhouseSim`: **116/116 성공, 실패 0, 미실행 0**. clean success 105, 경고 포함 success 11. `full_02.log`, `Reports/Full02/index.json`.
+- 기존 112개와 신규 4개를 모두 실행했다. Cleaning 전체 **17/17 경고 없는 성공**이며 물걸레·상점 TrashBin·Service·Placement·Interaction·Combat·Customer·Towel·Utility 회귀를 제외하지 않았다.
+- 기존 11개 테스트의 경고는 invalid 설정/포화/수건 slot·fixture preview/수거함·startup lease·utility CDO/mobility/provider 등이며 이름과 entries는 report에 남아 있다. 신규 4개는 경고 없는 성공이다.
+- 초기 `Cleaning01`은 13/17 성공, 실패 4: PawnsAndRagdoll(잘못된 skeletal asset 경로), PhysicalObstaclesAndWall(Static fixture 이동), FloorAndVariation·CarryHoldZoneAndRegistry(Static fixture 회전). 실제 mesh 경로와 pose authoring을 수정했다.
+- `Cleaning02`는 17/17 성공, 3개 테스트에 Static 자식/Movable 부모 attachment 경고가 있었다. 공용 fixture Box의 기존 Mobility를 복원하고 바닥만 Static으로 지정해 최종 전체 실행에서는 청소 17개 경고가 모두 없어졌다. 이후 쓰레기 zone 15cm·얼룩 zone 30cm의 기본 반경으로 신규 fixture를 확인하고 최종 Full02를 실행했다. 실패를 제외하거나 기대값을 낮추지 않았다.
+- git diff --check, focused 삭제 참조·LOCTEXT 검색, Source whitespace·인계 문서 소유권/줄 수·입력/유지 범위 SHA256 검사를 통과했다.
 
-revision 합이 모든 반환 경로에 채워지는지, Equals 외 실행/반복 조건을 바꾸지 않는지, 바구니만 변하는 경우도 갱신되는지, 새 자동화가 observer 생략을 우회하지 않는지를 리뷰한다.
-[PROMPT_UNREAL.md](PROMPT_UNREAL.md) 맨 앞에 네 수건 대상 연속 LMB/RMB 매 장 cue 이동과 조준 중 실제 손님 획득을 추가했다. 이번 새 authoring·저장 대상은 없다.
-headless transform 검증은 실제 화면 반투명/외곽선·lid animation·authored mesh bounds·실제 손님 이동 PIE 확인을 대체하지 않는다. 이 시각/통합 확인은 다음 단계에 남긴다.
+## copy-first load gate와 데이터 보존
+
+- 시작 시 UnrealEditor가 모두 종료됐으며 `git --no-optional-locks status --short -- Content Config`는 비어 있었다. 종료 후 같은 결과다.
+- 백업: `Saved/MigrationBackup/20261001_clearance_rework/`의 BP_CleaningDirector·BP_StainSpawnZone 두 asset.
+- `Content/Developers/MigrationCheck/`에 checksum이 같은 두 복사본을 만들고 `-BathhouseCleaningLoadCopies -BathhouseCleaningClearanceRework`로 BlueprintLoad 실행: **1/1 경고 없는 성공**, `load_copies.log`, `Reports/LoadCopies/index.json`.
+- 복사본 두 파일은 exact path·hash·디렉터리 contents를 확인한 뒤 제거했다. 다른 파일과 부모 디렉터리는 제거하지 않았다.
+- Template 원본 6 BP는 최종 Full02 BlueprintLoad에서 성공했다. DefaultMap은 `-BathhouseCleaningLoadDefaultMap -BathhouseCleaningClearanceRework`로 별도 실행: **1/1 성공**, `load_defaultmap.log`, `Reports/LoadDefaultMap/index.json`.
+- DefaultMap director 1·stain zone 2·trash bin 1과 기존 external package가 로드됐다. SpawnIntervalSeconds=15.000 유지, surviving native parent/subobject와 SpawnFloor를 확인했고 package dirty 없음.
+- asset Fatal·Serial size mismatch·asset Failed to load 없음. optional DLL 부재·DDC memory fallback·Rider/HTTP 환경 메시지는 asset migration 실패와 구분한다.
+- Content·Config·Level **1,405개 파일 경로와 SHA256 동일**. 시작/끝 상태 기록은 `content_config_status_before.txt`·`content_config_status_after.txt`, rework 입력 snapshot은 `before.json`이다.
+
+## 영향 파일과 성장
+
+아래 전/후는 재작업 시작 Source 기준이다. 경로는 `Source/BathhouseSim/` 아래다.
+
+| 파일 | 전 | 후 |
+|---|---:|---:|
+| `Private/Cleaning/CleaningDirectorActor.cpp` | 163 | 163 |
+| `Private/Cleaning/CleaningSpawnRules.cpp` | 127 | 125 |
+| `Private/Cleaning/CleaningSpawnRules.h` | 40 | 39 |
+| `Private/Cleaning/LitterSpawnZoneActor.cpp` | 73 | 71 |
+| `Private/Cleaning/LitterTongsActor.cpp` | 397 | 397 |
+| `Private/Cleaning/StainSpawnZoneActor.cpp` | 73 | 71 |
+| `Private/Cleaning/TrashBagActor.cpp` | 378 | 378 |
+| `Private/Tests/CleaningBlueprintLoadAutomationTests.cpp` | 183 | 196 |
+| `Private/Tests/CleaningLitterAutomationTestSupport.h` | 143 | 142 |
+| `Private/Tests/CleaningLitterSpawnAutomationTests.cpp` | 343 | 343 |
+| `Private/Tests/CleaningSpawnClearanceAutomationTests.cpp` | 0 | 288 |
+| `Private/Tests/CleaningTowelAutomationTests.cpp` | 1099 | 1104 |
+| `Public/Cleaning/CleaningDirectorActor.h` | 71 | 69 |
+| `Public/Cleaning/LitterSpawnZoneActor.h` | 68 | 65 |
+| `Public/Cleaning/StainSpawnZoneActor.h` | 63 | 60 |
+
+- 기존 14개 수정·신규 테스트 1개다. 바닥 helper cpp 127→125, 두 zone cpp 73→71로 줄고 독립 상태/lifecycle을 추가하지 않았다.
+- 397줄 Tongs·378줄 Bag에는 LOCTEXT 키만 바꿨다. 기존 큰 CleaningTowel 테스트는 호출 인자와 floor fixture 정정만 반영했으며 신규 4개는 별도 288줄 테스트 파일로 분리했다.
+- `.md/Architecture/*`는 변경하지 않았다. 확정 Floor Rule의 내부 버그 수정과 승인된 삭제를 구현했으며 구조를 새로 설계하지 않았다.
+- Editor 인계 `.md/PROMPT_UNREAL.md`: 기존 3단위 authoring allowlist 유지, Pawn 여유 삭제 resave·DefaultMap floor object/Mobility 확인·배치 구역/물건/벽/Pawn/경사 PIE 관찰을 추가했다.
+
+## 재리뷰 중점
+
+- response pair와 bBlockingHit 기준이 실제 query-only bounds를 통과시키고 물리 물체/벽을 막는지 확인한다.
+- floor component 제외 전 WorldStatic/Static guard와 interface·height 조건, 다른 component/mesh를 제외하지 않는 범위를 확인한다.
+- Pawn 면제는 APawn owner 검사에 한정된다. clock의 손님 수 판정과 다른 시스템의 Pawn clearance를 바꾸지 않았는지 확인한다.
+- 세 reflected 삭제의 복사본/원본/DefaultMap no-save gate와 Editor resave 인계, 유지 범위 checksum을 확인한다.

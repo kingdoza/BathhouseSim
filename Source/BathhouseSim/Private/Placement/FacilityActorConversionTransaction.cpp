@@ -1,6 +1,8 @@
 #include "Placement/FacilityActorConversionTransaction.h"
+#include "Placement/FacilityPlacementEventSubsystem.h"
 
 #include "Components/PrimitiveComponent.h"
+#include "Components/BoxComponent.h"
 #include "Engine/World.h"
 #include "Interaction/PlayerCarryComponent.h"
 #include "Placement/FacilityPlacementCollisionUtils.h"
@@ -496,6 +498,14 @@ AActor* FFacilityActorConversionTransaction::PlaceItemAsFacility(
 		if (NewFacilityWeak.IsValid() && NewPlacementWeak.IsValid())
 		{
 			NewPlacementWeak->EndTransition();
+			if (UBoxComponent* Footprint = NewPlacementWeak->GetPlacementFootprint())
+			{
+				if (auto* Events = World->GetSubsystem<UFacilityPlacementEventSubsystem>())
+				{
+					Events->BroadcastFacilityPlaced(
+						{NewFacilityWeak, Footprint->GetComponentTransform(), Footprint->GetUnscaledBoxExtent()});
+				}
+			}
 		}
 	}
 	// Item Destroy callbacks may independently remove the committed facility.

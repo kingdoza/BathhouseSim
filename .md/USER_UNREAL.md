@@ -1,5 +1,15 @@
 # 사용자 Unreal 후속 작업
 
+## 서비스 3단위 (쓰레기·수거) — PIE 수용 대기
+
+MCP·Python으로 authoring·Compile·Data Validation·개별 Save·재로드 대조는 끝났다(`.md/Unreal/CleaningSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). MCP로 입력·console을 실행할 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 통합 리뷰를 승인하지 않는다.
+
+1. **대표 PIE 전체** (`.md/PROMPT_UNREAL.md`의 "대표 PIE 검증"): TRSH-001~030, COLL-001~009. 특히 ① 빈손 쓰레기 조준 HUD·Visibility trace, ② 거치대 집게 E→쓰레기 LMB 3회 `봉투 3/20`, ③ RMB 봉투 묶기·실패 문구, ④ 집게 거치/G/낙하 복구, ⑤ 봉투 들기·수거(`bathhouse.Debug.TrashCollection.CollectNow`)·제외 대상, ⑥ 손님 체류 시 쓰레기·얼룩 발생(탈의 구역), ⑦ 새 RMB 행(`WBP_InteractionPrompt`) 표시. 실패하면 조준 위치와 Output Log를 남긴다.
+2. **배치·임시 도형 화면 확인**: 제안 위치가 맞는지(쓰레기 구역 `(1050,-280)` 탈의 구역 하나만 덮음, 집게 거치대 `(650,750,43)`, 수거 구역 `(-800,450)` 출입구 밖, 겹침 없음), 집게(긴 Cube)·봉투(Cube)·쓰레기(병/면봉/휴지 대용)가 보이는 크기, 수거 구역 바닥 표시(초록 plane)가 경계를 설명하는지, RMB 행이 다른 행과 겹치지 않는지(위쪽 여백 640/680 제안값). 욕탕 바닥·다른 체류 영역이 필요하면 구역 추가를 요청한다. 어긋나면 값을 알려 주면 재작업한다.
+3. **바닥 mesh 조건**: `Studio_floor`는 Static·`WorldStatic`으로 확인했다. 다른 바닥 mesh를 추가하면 같은 조건을 만족해야 쓰레기가 생성된다.
+
+---
+
 ## 서비스 2단위 (화장대·비품 여섯 종) — PIE 수용 대기
 
 MCP로 authoring·Compile·개별 Save·재로드 대조는 끝났다(`.md/Unreal/ServiceSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). MCP는 입력·console 명령을 실행할 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 통합 리뷰를 승인하지 않는다.

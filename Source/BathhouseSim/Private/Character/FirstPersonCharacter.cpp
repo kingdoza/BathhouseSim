@@ -423,15 +423,28 @@ void AFirstPersonCharacter::SecondaryUseStartInput()
 	{
 		return;
 	}
-	if ((PlayerComputerUse && PlayerComputerUse->IsCapturingInput())
-		|| (PlayerFacilityPlacement && PlayerFacilityPlacement->IsPlacementActive())
-		|| (PlayerHeldTargetUse && PlayerHeldTargetUse->IsUseActive())
-		|| (PlayerEquipmentUse && PlayerEquipmentUse->HasUsableHeldEquipment()))
+	if ((PlayerComputerUse && PlayerComputerUse->IsCapturingInput()) ||
+		(PlayerFacilityPlacement && PlayerFacilityPlacement->IsPlacementActive()) ||
+		(PlayerHeldTargetUse && PlayerHeldTargetUse->IsUseActive()) ||
+		(PlayerEquipmentUse && PlayerEquipmentUse->IsEquipmentUseInputActive()))
 	{
 		SecondaryUsePressOwner = ESecondaryUsePressOwner::Ignored;
 		return;
 	}
 
+	if (PlayerEquipmentUse && PlayerEquipmentUse->HasUsableHeldEquipment())
+	{
+		if (PlayerEquipmentUse->HasSecondaryEquipmentUse())
+		{
+			SecondaryUsePressOwner = ESecondaryUsePressOwner::EquipmentSecondary;
+			PlayerEquipmentUse->ExecuteSecondaryEquipmentUse();
+		}
+		else
+		{
+			SecondaryUsePressOwner = ESecondaryUsePressOwner::Ignored;
+		}
+		return;
+	}
 	SecondaryUsePressOwner = ESecondaryUsePressOwner::HeldTargetUse;
 	if (PlayerHeldTargetUse)
 	{

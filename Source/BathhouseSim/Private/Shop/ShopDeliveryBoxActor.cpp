@@ -284,8 +284,7 @@ void AShopDeliveryBoxActor::RecoverPhysicalCarryable(UPlayerCarryComponent* Prev
 
 bool AShopDeliveryBoxActor::CanDiscardCarriedObject(FText& OutFailureReason) const
 {
-	if (Lifecycle != ELifecycle::Held || !Carrier.IsValid() || Carrier->GetHeldObject() != this
-		|| !bContentsInitialized)
+	if (Lifecycle != ELifecycle::Held || !Carrier.IsValid() || Carrier->GetHeldObject() != this || !CanDiscardKind())
 	{
 		OutFailureReason = LOCTEXT("BoxNotDiscardable", "이 배송 상자는 버릴 수 없습니다.");
 		return false;
@@ -404,5 +403,28 @@ EDataValidationResult AShopDeliveryBoxActor::IsDataValid(FDataValidationContext&
 	return Result == EDataValidationResult::NotValidated ? EDataValidationResult::Valid : Result;
 }
 #endif
+
+bool AShopDeliveryBoxActor::CanDiscardKind() const
+{
+	return bContentsInitialized;
+}
+
+bool AShopDeliveryBoxActor::CanDiscardFromWorld(FText& Failure) const
+{
+	return Lifecycle == ELifecycle::FreeWorld && !Carrier.IsValid() && CanDiscardKind();
+}
+
+void AShopDeliveryBoxActor::HandleDiscardFromWorldCommitted()
+{
+	FText Failure;
+	if (!CanDiscardFromWorld(Failure))
+	{
+		return;
+	}
+	Contents.Reset();
+	bContentsInitialized = false;
+	Lifecycle = ELifecycle::Consumed;
+	Destroy();
+}
 
 #undef LOCTEXT_NAMESPACE

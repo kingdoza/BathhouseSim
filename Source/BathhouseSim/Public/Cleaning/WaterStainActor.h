@@ -34,6 +34,18 @@ public:
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
 
+	float GetFloorRadius() const
+	{
+		return FloorRadiusCm * FMath::Max(SelectedXYScale.X, SelectedXYScale.Y);
+	}
+
+	float GetMaximumFloorRadius() const
+	{
+		return FloorRadiusCm * FMath::Max(MaxXYScale.X, MaxXYScale.Y);
+	}
+
+	void ClearForFacilityPlacement();
+
 	void SetSpawnZone(AStainSpawnZoneActor* InSpawnZone);
 	void ConfigureVisualVariationSeed(int32 InSeed);
 	AStainSpawnZoneActor* GetSpawnZone() const { return SpawnZone.Get(); }
@@ -64,6 +76,10 @@ public:
 	void ApplyStainMaterialVariant(UMaterialInterface* SelectedMaterial);
 
 protected:
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning", meta = (ClampMin = "0.1"))
+	float FloorRadiusCm = 30.0f;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cleaning")
 	TObjectPtr<USphereComponent> InteractionCollision;
 

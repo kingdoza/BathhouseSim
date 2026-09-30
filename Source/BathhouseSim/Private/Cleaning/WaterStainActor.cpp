@@ -246,6 +246,16 @@ void AWaterStainActor::ResetCleaning(const bool bNotify)
 	}
 }
 
+void AWaterStainActor::ClearForFacilityPlacement()
+{
+	if (bTerminalCommitted)
+	{
+		return;
+	}
+	CompleteCleaning();
+	Destroy();
+}
+
 void AWaterStainActor::CompleteCleaning()
 {
 	if (bTerminalCommitted)

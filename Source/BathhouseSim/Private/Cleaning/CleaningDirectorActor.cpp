@@ -1,10 +1,14 @@
 #include "Cleaning/CleaningDirectorActor.h"
-
+#include "Cleaning/CleaningSpawnRules.h"
 #include "Cleaning/CleaningWorldSubsystem.h"
 #include "Cleaning/StainSpawnZoneActor.h"
+#include "Cleaning/LitterSpawnZoneActor.h"
 #include "Cleaning/WaterStainActor.h"
+#include "Cleaning/LitterActor.h"
+#include "Components/BoxComponent.h"
+#include "Customer/BathhouseCustomerCharacter.h"
 #include "Engine/World.h"
-#include "Kismet/GameplayStatics.h"
+#include "EngineUtils.h"
 #include "TimerManager.h"
 
 ACleaningDirectorActor::ACleaningDirectorActor()
@@ -15,84 +19,145 @@ ACleaningDirectorActor::ACleaningDirectorActor()
 void ACleaningDirectorActor::BeginPlay()
 {
 	Super::BeginPlay();
-	GetWorldTimerManager().SetTimer(
-		SpawnTimerHandle,
-		this,
-		&ACleaningDirectorActor::TrySpawnStain,
-		FMath::Max(0.1f, SpawnIntervalSeconds),
-		true);
+	SpawnRandom.Initialize(FMath::Rand());
+	GetWorldTimerManager().SetTimer(SpawnTimerHandle, this, &ACleaningDirectorActor::UpdateSpawnSchedule,
+									FMath::Max(0.05f, SpawnUpdateIntervalSeconds), true);
 }
 
-void ACleaningDirectorActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void ACleaningDirectorActor::EndPlay(const EEndPlayReason::Type Reason)
 {
 	GetWorldTimerManager().ClearTimer(SpawnTimerHandle);
-	Super::EndPlay(EndPlayReason);
+	StainClocks.Reset();
+	LitterClocks.Reset();
+	Super::EndPlay(Reason);
 }
 
-void ACleaningDirectorActor::TrySpawnStain()
+void ACleaningDirectorActor::UpdateSpawnSchedule()
 {
-	UWorld* World = GetWorld();
-	UCleaningWorldSubsystem* Subsystem = World ? World->GetSubsystem<UCleaningWorldSubsystem>() : nullptr;
-	if (!World || !Subsystem || !StainClass || Subsystem->GetActiveStainCount() >= MaxActiveStains)
+	TArray<FVector> Locations;
+	for (TActorIterator<ABathhouseCustomerCharacter> It(GetWorld()); It; ++It)
+	{
+		Locations.Add(It->GetActorLocation());
+	}
+	AdvanceSpawnSchedule(FMath::Max(0.05f, SpawnUpdateIntervalSeconds), Locations);
+}
+
+void ACleaningDirectorActor::AdvanceSpawnSchedule(float DeltaSeconds, const TArray<FVector>& Locations)
+{
+	auto* Subsystem = GetWorld()->GetSubsystem<UCleaningWorldSubsystem>();
+	if (!Subsystem)
 	{
 		return;
 	}
-	TArray<AStainSpawnZoneActor*> EligibleZones = Subsystem->GetActiveZones().FilterByPredicate(
-		[Subsystem](const AStainSpawnZoneActor* Zone)
-		{
-			return IsValid(Zone)
-				&& Subsystem->GetActiveStainCountForZone(Zone) < Zone->GetMaxActiveStains();
-		});
-	FRandomStream RandomStream(FMath::Rand());
-	for (int32 Attempt = 0; Attempt < MaxPlacementAttemptsPerInterval && !EligibleZones.IsEmpty(); ++Attempt)
+	auto AdvanceZones = [&](auto& Clocks, const auto& Zones, float Mean, auto Spawn)
 	{
-		AStainSpawnZoneActor* Zone = SelectZone(EligibleZones, RandomStream);
-		FTransform SpawnTransform;
-		if (!Zone || !Zone->FindSpawnTransform(
-			RandomStream,
-			DefaultStainSpacing,
-			DefaultPawnClearance,
-			SpawnTransform))
+		for (auto It = Clocks.CreateIterator(); It; ++It)
+		{
+			if (!It.Key().IsValid() || !Zones.Contains(It.Key().Get()))
+			{
+				It.RemoveCurrent();
+			}
+		}
+		for (auto* Zone : Zones)
+		{
+			auto* Bounds = Zone->GetSpawnBounds();
+			if (!Bounds)
+			{
+				continue;
+			}
+			float* Remaining = Clocks.Find(Zone);
+			if (!Remaining)
+			{
+				Remaining = &Clocks.Add(Zone, FCleaningSpawnClock::SampleNext(SpawnRandom));
+			}
+			const int32 Count =
+				CountCustomersInBox(Locations, Bounds->GetComponentTransform(), Bounds->GetUnscaledBoxExtent());
+			if (FCleaningSpawnClock::Advance(*Remaining, Count, DeltaSeconds, Mean))
+			{
+				*Remaining = FCleaningSpawnClock::SampleNext(SpawnRandom);
+				Spawn(*Zone);
+			}
+		}
+	};
+	AdvanceZones(StainClocks, Subsystem->GetActiveZones(), SpawnIntervalSeconds,
+				 [this](AStainSpawnZoneActor& Zone)
+				 {
+					 TrySpawnStain(Zone);
+				 });
+	AdvanceZones(LitterClocks, Subsystem->GetActiveLitterZones(), LitterMeanIntervalPerCustomerSeconds,
+				 [this](ALitterSpawnZoneActor& Zone)
+				 {
+					 TrySpawnLitter(Zone);
+				 });
+}
+
+void ACleaningDirectorActor::TrySpawnStain(AStainSpawnZoneActor& Zone)
+{
+	auto* S = GetWorld()->GetSubsystem<UCleaningWorldSubsystem>();
+	if (!StainClass || !S || S->GetActiveStainCount() >= MaxActiveStains ||
+		S->GetActiveStainCountForZone(&Zone) >= Zone.GetMaxActiveStains())
+	{
+		return;
+	}
+	const auto* CDO = StainClass->GetDefaultObject<AWaterStainActor>();
+	for (int32 Attempt = 0; Attempt < MaxPlacementAttemptsPerInterval; ++Attempt)
+	{
+		FTransform Transform;
+		if (!Zone.FindSpawnTransform(SpawnRandom, DefaultStainSpacing, Transform, CDO->GetMaximumFloorRadius(),
+									 SpawnClearanceHeightCm))
 		{
 			continue;
 		}
-		AWaterStainActor* Stain = World->SpawnActorDeferred<AWaterStainActor>(
-			StainClass,
-			SpawnTransform,
-			this,
-			nullptr,
-			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		auto* Stain = GetWorld()->SpawnActorDeferred<AWaterStainActor>(StainClass, Transform, this, nullptr,
+																	   ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 		if (Stain)
 		{
-			Stain->ConfigureVisualVariationSeed(RandomStream.RandHelper(MAX_int32));
-			Stain->SetSpawnZone(Zone);
-			UGameplayStatics::FinishSpawningActor(Stain, SpawnTransform);
+			Stain->ConfigureVisualVariationSeed(SpawnRandom.RandHelper(MAX_int32));
+			Stain->SetSpawnZone(&Zone);
+			Stain->FinishSpawning(Transform);
 		}
 		return;
 	}
 }
 
-AStainSpawnZoneActor* ACleaningDirectorActor::SelectZone(
-	const TArray<AStainSpawnZoneActor*>& Zones,
-	FRandomStream& RandomStream) const
+void ACleaningDirectorActor::TrySpawnLitter(ALitterSpawnZoneActor& Zone)
 {
-	float TotalWeight = 0.0f;
-	for (const AStainSpawnZoneActor* Zone : Zones)
+	auto* S = GetWorld()->GetSubsystem<UCleaningWorldSubsystem>();
+	if (!LitterClass || !S || S->GetActiveLitterCount() >= MaxActiveLitter ||
+		S->GetActiveLitterCountForZone(&Zone) >= Zone.GetMaxActiveLitter())
 	{
-		TotalWeight += FMath::Max(0.0f, Zone->GetSelectionWeight());
+		return;
 	}
-	if (TotalWeight <= 0.0f)
+	const auto* CDO = LitterClass->GetDefaultObject<ALitterActor>();
+	for (int32 Attempt = 0; Attempt < MaxPlacementAttemptsPerInterval; ++Attempt)
 	{
-		return Zones.IsEmpty() ? nullptr : Zones[0];
-	}
-	float Choice = RandomStream.FRandRange(0.0f, TotalWeight);
-	for (AStainSpawnZoneActor* Zone : Zones)
-	{
-		Choice -= FMath::Max(0.0f, Zone->GetSelectionWeight());
-		if (Choice <= 0.0f)
+		FTransform Transform;
+		if (!Zone.FindSpawnTransform(SpawnRandom, DefaultLitterSpacing, Transform, CDO->GetFloorRadius(),
+									 SpawnClearanceHeightCm))
 		{
-			return Zone;
+			continue;
 		}
+		auto* Litter = GetWorld()->SpawnActorDeferred<ALitterActor>(LitterClass, Transform, this, nullptr,
+																	ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		if (Litter)
+		{
+			Litter->ConfigureVisualVariationSeed(SpawnRandom.RandHelper(MAX_int32));
+			Litter->SetSpawnZone(&Zone);
+			Litter->FinishSpawning(Transform);
+		}
+		return;
 	}
-	return Zones.Last();
 }
+#if WITH_DEV_AUTOMATION_TESTS
+void ACleaningDirectorActor::AdvanceSpawnScheduleForTesting(float DeltaSeconds, const TArray<FVector>& Locations)
+{
+	AdvanceSpawnSchedule(DeltaSeconds, Locations);
+}
+
+void ACleaningDirectorActor::SetSpawnRandomSeedForTesting(int32 Seed)
+{
+	SpawnRandom.Initialize(Seed);
+	StainClocks.Reset();
+	LitterClocks.Reset();
+}
+#endif

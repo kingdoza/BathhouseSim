@@ -234,9 +234,13 @@ fixed-slot placement는 cleaning, combat 또는 towel transaction이 아니다. 
 
 - `UPlayerCarryComponent::CommitConsumeHeldObject(Object, DomainCommit)`은 손에 든 물건을 알림 없이 떼고 `DomainCommit`이 성공하면 `OnHeldObjectChanged`를 한 번 방송하는 범용 commit이다. 실패하면 원래대로 되돌린다. 기존 `CommitReleasePhysicalObjectForPlacement`는 이 함수를 쓰는 wrapper로 남긴다(이름·동작 유지).
 - 상자 개봉과 쓰레기통이 이 경로를 쓴다. Actor 제거는 호출자가 commit 뒤에 한다. carry 상태에 제거 예정 Actor를 남기지 않는다.
-- `IPhysicalCarryDiscardable`(Interaction, C++ 전용, 선택): `CanDiscardCarriedObject(OutFailure)`, `HandleDiscardCommitted()`. 설비 아이템과 배송 상자만 구현한다. 열쇠와 exact 거치대 도구는 구현하지 않아 버릴 수 없다.
+- `IPhysicalCarryDiscardable`(Interaction, C++ 전용, 선택): `CanDiscardCarriedObject(OutFailure)`, `HandleDiscardCommitted()`. 설비 아이템·배송 상자·품목 박스(와 3단위 봉투)가 구현한다. 열쇠와 exact 거치대 도구는 구현하지 않아 버릴 수 없다.
 - 배송 상자는 `EPhysicalCarryKind::DeliveryBox`(enum 끝 append), capability `FreeDrop`만 쓴다. 다른 held 물품처럼 class 소유 `HeldTransform`의 location/rotation만 적용하고 CDO root scale을 모든 전이에서 보존한다. 상세는 [ShopSystem.md](ShopSystem.md)에 있다.
 - 품목 박스는 `EPhysicalCarryKind::ItemBox`(enum 끝 append), `FreeDrop`만, 배송 상자와 같은 held·scale·복구 규칙이다. `IPhysicalCarryable::GetHeldSummaryText()`(기본 빈 값)는 들고 있는 물건의 HUD 요약이다([ServiceSystem.md](ServiceSystem.md)).
+- 2026-10-01 서비스 3단위 설계([CleaningLitterSystem.md](CleaningLitterSystem.md)):
+  - `EPhysicalCarryKind::LitterTongs`(집게, 기본 `FreeDrop|FixedSlot`, 물걸레와 같은 도구 구조)와 `TrashBag`(묶은 봉투, `FreeDrop`만, 품목 박스와 같은 비도구 구조)를 끝에 append한다.
+  - `IPhysicalCarryDiscardable`에 world 버리기를 추가한다: `CanDiscardFromWorld(OutFailure) const`, `HandleDiscardFromWorldCommitted()`(기본 불가·no-op). FreeWorld 상태에서만 가능하고, 종류 규칙은 held 판정과 같은 private 함수를 공유한다. 수거 구역이 쓴다.
+  - 품목 박스·배송 상자·설비 아이템·봉투가 held·world 두 버리기를 구현한다. 설비 아이템의 world 버리기는 일반 EndPlay 복구가 돌지 않는 소비 상태로 전이한 뒤 Destroy한다.
 
 ## Recovery And EndPlay
 

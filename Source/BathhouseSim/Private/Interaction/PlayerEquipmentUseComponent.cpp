@@ -2,6 +2,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "Interaction/HeldEquipmentMotionComponent.h"
+#include "Interaction/HeldEquipmentSecondaryUsable.h"
 #include "Interaction/PhysicalCarryable.h"
 #include "Interaction/PlayerCarryComponent.h"
 #include "Interaction/PlayerInteractionComponent.h"
@@ -74,6 +75,15 @@ FPlayerInteractionQuery UPlayerEquipmentUseComponent::MergeEquipmentQuery(
 		return Result;
 	}
 
+	if (const auto* Secondary = Cast<IHeldEquipmentSecondaryUsable>(Equipment))
+	{
+		const auto Query = Secondary->QuerySecondaryEquipmentUse(Context);
+		Result.bHeldTakeVisible = Query.bVisible;
+		Result.bCanHeldTake = Query.bCanUse;
+		Result.HeldTakeActionName = Query.ActionName;
+		Result.HeldTakeFailureReason = Query.FailureReason;
+		Result.HeldTakeActivationMode = EPlayerInteractionActivationMode::Instant;
+	}
 	const FHeldEquipmentUseQuery EquipmentQuery = Usable->QueryEquipmentUse(Context);
 	Result.bEquipmentUseVisible = EquipmentQuery.bVisible;
 	Result.bCanEquipmentUse = EquipmentQuery.bCanUse;
@@ -118,6 +128,10 @@ FPlayerInteractionResult UPlayerEquipmentUseComponent::BeginEquipmentUse()
 	}
 
 	const FHeldEquipmentUseQuery Query = Usable->QueryEquipmentUse(Context);
+	if (!Query.bVisible && Query.FailureReason.IsEmpty())
+	{
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::EquipmentUse);
+	}
 	if (!Query.bVisible || !Query.bCanUse)
 	{
 		const FPlayerInteractionResult Result = FPlayerInteractionResult::Failed(
@@ -278,6 +292,40 @@ IHeldEquipmentUsable* UPlayerEquipmentUseComponent::GetHeldUsable(AActor*& OutEq
 {
 	OutEquipment = CarryComponent ? CarryComponent->GetHeldObject() : nullptr;
 	return IsValid(OutEquipment) ? Cast<IHeldEquipmentUsable>(OutEquipment) : nullptr;
+}
+
+bool UPlayerEquipmentUseComponent::HasSecondaryEquipmentUse() const
+{
+	AActor* Equipment = nullptr;
+	return GetHeldUsable(Equipment) && Cast<IHeldEquipmentSecondaryUsable>(Equipment);
+}
+
+FPlayerInteractionResult UPlayerEquipmentUseComponent::ExecuteSecondaryEquipmentUse()
+{
+	if (bInputActive)
+	{
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::HeldTake);
+	}
+	AActor* Equipment = nullptr;
+	GetHeldUsable(Equipment);
+	auto* Secondary = Cast<IHeldEquipmentSecondaryUsable>(Equipment);
+	FHeldEquipmentUseContext Context;
+	if (!Secondary || !BuildContext(Equipment, Context))
+	{
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::HeldTake);
+	}
+	const auto Query = Secondary->QuerySecondaryEquipmentUse(Context);
+	const auto UseResult = Query.bVisible && Query.bCanUse ? Secondary->ExecuteSecondaryEquipmentUse(Context)
+														   : FHeldEquipmentUseResult::Failed(Query.FailureReason);
+	const auto Result = UseResult.bSucceeded ? FPlayerInteractionResult::Succeeded(EPlayerInteractionIntent::HeldTake)
+											 : FPlayerInteractionResult::Failed(UseResult.FailureReason,
+																				EPlayerInteractionIntent::HeldTake);
+	if (InteractionComponent)
+	{
+		InteractionComponent->ReportExternalInteractionAttempt(Result);
+		InteractionComponent->RefreshInteractionQuery();
+	}
+	return Result;
 }
 
 void UPlayerEquipmentUseComponent::ClearActiveUse()

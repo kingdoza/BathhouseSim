@@ -187,6 +187,7 @@ private:
 	friend class FBathhouseComputerSessionTest;
 	friend class FBathhouseEquipmentUseRoutingTest;
 	friend class FBathhouseHeldTargetUseOwnerRoutingTest;
+	friend class FCleaningLitterInputRoutingTest;
 	friend class FBathhousePhysicalCarryFallRecoveryTest;
 
 	enum class EPrimaryUsePressOwner : uint8
@@ -203,7 +204,8 @@ private:
 	{
 		None,
 		HeldTargetUse,
-		Ignored
+		Ignored,
+		EquipmentSecondary
 	};
 
 	bool bComputerOwnsInteractPress = false;

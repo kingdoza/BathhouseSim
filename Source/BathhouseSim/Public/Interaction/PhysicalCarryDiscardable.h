@@ -17,4 +17,13 @@ class BATHHOUSESIM_API IPhysicalCarryDiscardable
 public:
 	virtual bool CanDiscardCarriedObject(FText& OutFailureReason) const = 0;
 	virtual void HandleDiscardCommitted() = 0;
+
+	virtual bool CanDiscardFromWorld(FText& OutFailureReason) const
+	{
+		return false;
+	}
+
+	virtual void HandleDiscardFromWorldCommitted()
+	{
+	}
 };

@@ -219,6 +219,8 @@ worst case는 약 (11 × 4 + 8 × 3) layout × 10 물품 × 3 query다. 클릭 �
 
 ## Trash Bin
 
+2026-10-01 서비스 3단위 설계(Q39 A): 쓰레기통은 레벨에서 제거하고 코드는 그대로 둔다. 버리기 수단은 쓰레기 수거 구역이 되고, 같은 종류 판정을 world 버리기로 공유한다([CleaningLitterSystem.md](CleaningLitterSystem.md) World Discard And Collection). 아래는 코드에 남는 held 경로다.
+
 `ABathhouseTrashBinActor`: root `BinMesh`(static, Visibility Block). 배치·회수·carry 대상이 아니다. 개수·위치는 Level authoring이다.
 
 | 들고 있는 것 | query | E |

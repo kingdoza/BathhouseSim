@@ -171,7 +171,7 @@ Cash는 carry 대상이 아니며 Economy System의 즉시 획득 interaction으
 - target `UPlayerFacilityPlacementComponent`
 - first-person camera 하위 `HeldKeyAnchor`
 - E Started/Completed/Canceled, F/G Started, Q Started/Completed/Canceled, LCtrl Started/Completed, MouseWheel axis와 LMB lifecycle을 Interaction/Carry/Placement/Equipment에 의도로 전달한다. Q hold elapsed와 자동 commit은 입력 반복 이벤트가 아니라 Placement Component Tick이 소유한다.
-- LMB owner는 `Computer > Placement > Equipment(장비를 든 경우) > HeldTargetUse` 순서로 하나만 선택한다. RMB(`SecondaryUseAction`)는 HeldTargetUse Take만 쓴다. 상세 순서는 [HeldTargetUseSystem.md](HeldTargetUseSystem.md) Input Ownership이다.
+- LMB owner는 `Computer > Placement > Equipment(장비를 든 경우) > HeldTargetUse` 순서로 하나만 선택한다. RMB(`SecondaryUseAction`)는 장비 보조 사용이 있으면 Equipment secondary, 장비가 없으면 HeldTargetUse Take를 쓴다. 상세 순서는 [HeldTargetUseSystem.md](HeldTargetUseSystem.md) Input Ownership이다.
 - computer session이 input을 capture하면 해당 session이 E lifecycle을 소비하고 Interaction에는 전달하지 않는다.
 
 Character는 focus 규칙과 key transaction을 직접 구현하지 않는다. PlayerController는 mapping context 등록·해제 책임을 유지한다.
@@ -188,7 +188,8 @@ Blueprint 조회·표현 API:
 - `UPlayerInteractionComponent::OnInteractionAttemptFinishedNative`는 C++ 전용 실행 결과 계약이며 BlueprintAssignable로 노출하지 않는다.
 - `UPlayerInteractionComponent::SetInteractionSuppressed`, `IsInteractionSuppressed`는 외부 focus owner가 사용하는 C++ 전용 계약이며 Blueprint에 노출하지 않는다.
 - `IPlayerInteractionFocusObserver`는 target 표현용 C++ 전용 계약이며 Blueprint에 노출하지 않는다.
-- `IPhysicalCarryDiscardable`은 쓰레기통 판정용 C++ 전용 선택 계약이다([PhysicalCarrySystem.md](PhysicalCarrySystem.md)).
+- `IPhysicalCarryDiscardable`은 쓰레기통(held)과 수거 구역(world) 판정용 C++ 전용 선택 계약이다([PhysicalCarrySystem.md](PhysicalCarrySystem.md)).
+- `IHeldEquipmentSecondaryUsable`은 장비의 RMB 보조 사용(press당 한 번, 조준 무관) C++ 전용 계약이다. `UPlayerEquipmentUseComponent`가 RMB 행 query와 실행을 맡는다(2026-10-01, [CleaningLitterSystem.md](CleaningLitterSystem.md) Input Routing)
 - `UPlayerCarryComponent::IsHandEmpty`
 - `UPlayerCarryComponent::GetHeldKey`
 - generic held object와 held kind 조회, `OnHeldObjectChanged`

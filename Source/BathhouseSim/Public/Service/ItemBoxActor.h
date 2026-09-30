@@ -88,6 +88,8 @@ public:
 	virtual void RecoverPhysicalCarryable(UPlayerCarryComponent* PreviousCarry) override;
 	virtual bool CanDiscardCarriedObject(FText& OutFailureReason) const override;
 	virtual void HandleDiscardCommitted() override;
+	virtual bool CanDiscardFromWorld(FText& OutFailureReason) const override;
+	virtual void HandleDiscardFromWorldCommitted() override;
 	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
 
 #if WITH_EDITORONLY_DATA
@@ -120,6 +122,8 @@ protected:
 	float UpwardThrowImpulseStrength = 15.0f;
 
 private:
+
+	bool CanDiscardKind() const;
 	enum class ELifecycle : uint8
 	{
 		Staged,

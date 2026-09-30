@@ -2,6 +2,8 @@
 
 ## Implementation Status
 
+2026-10-01 서비스 3단위 설계(Source 미반영): 물 얼룩 생성 규칙 변경과 쓰레기·집게·봉투·수거 구역은 [CleaningLitterSystem.md](CleaningLitterSystem.md)가 정본이다.
+
 물걸레의 범용 LMB equipment Hold 청소, target 유무와 독립된 mopping state/motion, bath/dressing floor의 무작위 얼룩 생성과 spawn별 seeded material/local yaw/XY scale variation이 Source에 구현되어 있다. 물걸레의 exact fixed slot, held-position free drop과 fixed-slot 우선 recovery도 [PhysicalCarrySystem.md](PhysicalCarrySystem.md)에 따라 구현되어 있다.
 
 이번 범위는 물 얼룩과 물걸레 하나만 구현한다. 다른 얼룩·청소 도구, 물통, 물걸레 세척, 내구도와 소모품은 제외한다.
@@ -33,7 +35,7 @@ Source/BathhouseSim/Private/Tests/
 - 물 얼룩과 spawn zone의 runtime 등록
 - Editor authoring interval, 전체/구역별 제한에 따른 random spawn
 - 얼룩별 seeded material/yaw/XY scale variation 선택
-- 유효 바닥, 기존 얼룩 간격과 Pawn overlap 검증
+- 유효 바닥과 기존 얼룩 간격 검증(3단위부터 플레이어·손님 위치와 무관)
 - 물걸레를 요구하는 LMB equipment Hold 청소 transaction
 - target 유무와 분리된 mopping state와 held Actor loop motion
 - 청소 진행·취소·완료 상태와 Blueprint 표현 event
@@ -46,8 +48,8 @@ Cleaning은 player 입력 mapping, carry slot, UI 상태와 고객 routine을 �
 | 책임 | Owner |
 |---|---|
 | 활성 zone/stain 등록부 | `UCleaningWorldSubsystem` |
-| spawn timer와 전체 제한 | `ACleaningDirectorActor` |
-| 구역 범위와 구역별 제한 | `AStainSpawnZoneActor` |
+| 구역별 발생 clock과 전체 제한 | `ACleaningDirectorActor` |
+| 구역 범위·바닥 높이와 구역별 제한 | `AStainSpawnZoneActor` |
 | 청소자, 진행률과 terminal commit | `AWaterStainActor` |
 | 선택된 material/yaw/XY scale과 visual root | `AWaterStainActor` |
 | 물걸레 world/held presentation·mopping state | `AWetMopActor` |
@@ -57,7 +59,7 @@ Cleaning은 player 입력 mapping, carry slot, UI 상태와 고객 routine을 �
 
 ## Types
 
-`ECleaningStainType`은 확장 경계이며 이번 구현 값은 `Water` 하나다.
+`ECleaningStainType`은 확장 경계이며 이번 구현 값은 `Water` 하나다. `EStainSpawnZoneKind`는 삭제한다(3단위).
 
 `EStainCleaningState`:
 
@@ -69,39 +71,42 @@ Cleaning은 player 입력 mapping, carry slot, UI 상태와 고객 routine을 �
 
 ## Spawn Architecture
 
-`UCleaningWorldSubsystem`은 zone/stain의 등록과 compact만 담당한다. 매 spawn마다 world actor scan을 수행하지 않는다.
+2026-10-01 서비스 3단위: 생성 규칙이 구역별·손님 수 기반으로 바뀌고 쓰레기와 같은 규칙을 쓴다. 발생 clock, 바닥 판정, 삭제된 구역 property, 배치 확정 시 발밑 정리는 [CleaningLitterSystem.md](CleaningLitterSystem.md) Spawn Schedule·Floor Rule·Footprint Clear On Placement가 정본이다.
+
+`UCleaningWorldSubsystem`은 zone/stain(과 쓰레기)의 등록·compact와 발밑 정리만 담당한다. 매 spawn마다 world actor scan을 수행하지 않는다.
 
 `ACleaningDirectorActor`는 level에 하나를 배치하는 authoring actor다.
 
-- `SpawnIntervalSeconds`
+- `SpawnIntervalSeconds`: 손님 1명당 평균 간격(이름 유지, 의미 변경)
 - `MaxActiveStains`
-- `MaxPlacementAttemptsPerInterval`
+- `MaxPlacementAttemptsPerInterval`: 생성 1회당 자리 시도 수
 - `StainClass`
-- default stain spacing/Pawn clearance
+- default stain spacing(Pawn clearance는 3단위에서 삭제)
+- 쓰레기 값과 공통 update 간격은 하위 문서
 
-`AStainSpawnZoneActor`는 bath floor 또는 dressing floor의 유효 범위를 정의한다.
+`AStainSpawnZoneActor`는 물 얼룩이 생기는 범위를 정의한다.
 
-- zone kind와 selection weight
+- Box 기반 spawn bounds와 바닥 높이 정본 `SpawnFloor`, `FloorHeightToleranceCm`
 - `MaxActiveStainsInZone`
-- Box 기반 spawn bounds
 - floor trace channel/distance
 - optional required floor component tag
 - maximum floor slope
-- stain spacing과 Pawn clearance override
+- stain spacing override(Pawn clearance override는 3단위에서 삭제)
 
-한 interval의 spawn 절차:
+zone kind와 selection weight는 삭제한다(QNA_ARCHITECTURE Q1 A).
 
-1. 전체 active 제한과 등록된 zone을 확인한다.
-2. 구역 제한이 남은 zone을 weight random 선택한다.
-3. bounds 안 random XY에서 아래로 floor trace한다.
-4. blocking floor, component tag와 slope를 검증한다.
-5. 등록된 stain과 최소 거리를 확인한다.
-6. player/customer `Pawn` overlap을 확인한다.
-7. 전부 통과하면 floor hit transform에 stain을 deferred spawn하고 visual variation seed를 주입한다.
-8. spawn을 완료한 뒤 stain BeginPlay가 material/yaw/XY scale을 한 번 선택·적용하고 등록한다.
-9. bounded attempt 안에 후보가 없으면 이번 interval만 건너뛴다.
+한 생성 시도의 절차:
 
-Actor/component 이름이나 전체 world scan으로 floor를 추측하지 않는다. Level designer가 zone과 floor collision/tag를 명시한다.
+1. 구역 clock이 발생하면 전역·구역 제한을 확인한다.
+2. bounds 안 random XY에서 아래로 floor trace한다.
+3. 바닥 높이, 설비·휴대물 hit, floor tag와 slope를 검증한다.
+4. 바닥 위 clearance box가 설비·놓인 물건·벽과 겹치지 않는지 확인한다(쓰레기는 무시).
+5. 등록된 stain과 최소 거리를 확인한다. 플레이어·손님 위치는 보지 않는다.
+6. 전부 통과하면 floor hit transform에 stain을 deferred spawn하고 visual variation seed를 주입한다.
+7. spawn을 완료한 뒤 stain BeginPlay가 material/yaw/XY scale을 한 번 선택·적용하고 등록한다.
+8. bounded attempt 안에 후보가 없으면 이번 발생만 건너뛴다.
+
+Actor/component 이름이나 전체 world scan으로 floor를 추측하지 않는다. Level designer가 zone, `SpawnFloor`와 floor collision/tag를 명시한다.
 
 ## Water Stain Visual Variation
 
@@ -160,8 +165,9 @@ Runtime flow:
 
 Editor authoring:
 
-- director interval, 전체 제한, spawn attempt와 stain class
-- zone bounds, kind, weight, 구역 제한, floor filter와 clearance
+- director 손님 1명당 평균 간격, 전체 제한, spawn attempt와 stain class
+- zone bounds, `SpawnFloor` 바닥 높이, 구역 제한, floor filter와 clearance
+- stain `FloorRadiusCm`(clearance·발밑 정리 반경)
 - stain 제거 시간, decal/mesh/collision
 - stain material 후보, yaw 범위와 X/Y scale 범위
 - mop mesh/collision, held presentation, fixed slot과 약한 forward/upward release velocity
@@ -183,6 +189,7 @@ Blueprint는 material, decal, particle, sound와 animation만 담당한다. prog
 
 - Cleaning -> Interaction/Physical Carry의 query/equipment-use/motion/carry public 계약
 - Cleaning -> Engine collision/timer/world subsystem
+- Cleaning -> Customer(손님 위치 읽기), Placement(배치 확정 이벤트·collision helper) — 3단위, [CleaningLitterSystem.md](CleaningLitterSystem.md)
 - Character -> Interaction 입력 routing
 - UI -> Interaction 표시 데이터
 - Interaction은 Cleaning concrete class를 판별하지 않는다.
@@ -201,7 +208,7 @@ Blueprint는 material, decal, particle, sound와 animation만 담당한다. prog
 
 ## Manual Review Points
 
-- 얼룩이 zone 밖, invalid floor, 기존 stain/Pawn overlap 위치에 생성되지 않는지 확인한다.
+- 얼룩이 zone 밖, invalid floor, 기존 stain 간격 안에 생성되지 않는지 확인한다.
 - 같은 seed는 같은 material/yaw/XY scale을 만들고 다른 spawn은 lifetime 중 결과를 재추첨하지 않는지 확인한다.
 - visual root scale/rotation이 interaction sphere, floor alignment와 spawn registry 위치를 바꾸지 않는지 확인한다.
 - LMB를 누르는 동안 target 유무와 관계없이 mopping state/motion이 유지되는지 확인한다.

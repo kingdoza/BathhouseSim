@@ -1,95 +1,113 @@
-# 재작업 프롬프트 — 서비스 2단위: 수건 프리뷰·강조가 옮긴 뒤 따라가지 않음
+# 재작업 프롬프트 — 서비스 3단위: 쓰레기·물 얼룩 생성 자리 판정 보완
 
 ## 재검토 결론
 
-- 2026-09-30 서비스 2단위 구현 사이클 완료 뒤 사용자 보고로 확인한 결함이다.
-  - 보고 내용: 수건 대상의 꺼내기 외곽선과 넣기 반투명 프리뷰 위치가 다른 진열 대상과 달리 적절하지 않다.
-  - 이 결과는 코드 리뷰 승인 시점에 놓친 것이다.
-- 결론: **아키텍처 재검토** 후 **구현 재검토**.
-- 원인은 설계 누락이다.
-  - `TowelSystem.md` Service Unit 2 Display Changes는 "알림 query로 자리를 정한다"만 적었다.
-  - 수량이 바뀐 뒤 알림이 다시 오는 경로는 정하지 않았다.
-- 대상 시나리오: TOWL-001, 004, 005, 006, 010, 013, 016, 017, 018.
-- 기능 계약 `.md/PROMPT_ARCHITECTURE.md`는 바꾸지 않는다. 계약 문구는 다음과 같다.
-  - TOWL-001: 넣으면 프리뷰가 "한 칸 위로 이동"
-  - TOWL-005: "다음 수건으로 강조 이동"
-  - TOWL-006: "프리뷰가 다음 자리로 이동"
-- 이번 문서 작성에서 Source·Content·Config는 수정하지 않았다.
+- 2026-10-01 코드 리뷰 결론: **아키텍처 재검토**(F1 규칙 확정) 후 **구현 재검토**(F1~F3).
+- 입력
+  - `.md/PROMPT_REVIEW.md`(서비스 3단위 C++ 완료)와 현재 작업 트리
+  - 기능 계약 `.md/PROMPT_ARCHITECTURE.md`: TRSH-001~028, COLL-001~009
+  - 단계: **수직 구현(단위 확장)**
+- 확인된 사항
+  - 작업명·시나리오 ID·단계가 입력 문서 사이에서 일치한다.
+  - UE 5.8 `Build.bat` 성공. 로그 `build_10_pass` 이후 바뀐 Source가 없다.
+  - 전체 회귀 `Full05` 112/112 통과(성공 101, 경고 포함 성공 11, 실패 0, 미실행 0). 신규 Cleaning 12개도 모두 성공이다.
+  - copy-first 로드와 DefaultMap 로드가 각각 1/1 성공했다.
+  - Content·Config 변경이 없다.
+- Editor 단계로 넘기지 않는다. F1 때문에 대표 시나리오 "탈의실 구역에 쓰레기가 생긴다"와 TRSH-019(물 얼룩 생성)가 실제 DefaultMap에서 성립하지 않을 가능성이 높다.
 
-## 증상
+## F1 — 치명: 배치 구역 박스가 바닥 전체의 생성을 막는다 (아키텍처 결정 필요)
 
-첫 조준에서는 프리뷰와 외곽선이 맞는 자리에 뜬다. 넣거나 뺀 뒤에는 **이전 자리에 남는다.**
+### 근거
 
-| 조작 | 실제 결과 | 기대 결과 |
-|---|---|---|
-| LMB 1장 넣기 | 수건은 프리뷰 자리에 놓임. 프리뷰는 그 수건과 겹쳐 남음. 외곽선은 이전 맨 위(한 칸 아래)에 남음 | 프리뷰는 다음 자리로 이동, 외곽선은 새 맨 위 |
-| RMB 1장 빼기 | 외곽선이 방금 비워진 자리에 남음. 프리뷰는 맨 위보다 두 칸 위 | 외곽선은 새 맨 위, 프리뷰는 방금 빠진 자리 |
-| LMB·RMB 누른 채 연속 | 어긋남이 누적됨 | 매 1장마다 따라감 |
-| 손님이 선반에서 수건을 가져감 | 조준 중인 플레이어의 cue가 갱신되지 않음 | 새 맨 위 기준 |
+1. `FCleaningFloorSpawnQuery::Find`(`Private/Cleaning/CleaningSpawnRules.cpp`)의 clearance 검사
+   - `OverlapMultiByObjectType(WorldStatic | WorldDynamic | PhysicsBody)`를 쓰고, 물 얼룩·쓰레기가 아닌 Actor가 하나라도 걸리면 기각한다.
+   - 검사 박스 범위: 바닥 위 1cm ~ 1cm + `SpawnClearanceHeightCm`(기본 30cm).
+2. UE의 오브젝트 타입 query는 **상대 컴포넌트의 충돌 응답을 보지 않는다.**
+   - query가 켜져 있고 오브젝트 타입이 목록에 있으면 결과에 포함된다.
+   - 따라서 모든 채널을 Ignore하는 QueryOnly 트리거 박스도 "겹침"으로 잡힌다.
+3. `AFacilityPlacementZoneActor::ZoneBounds`(`Private/Placement/FacilityPlacementZoneActor.cpp` 27행)
+   - QueryOnly이고, 전용 zone trace 채널만 Block하며 나머지 응답은 Ignore다.
+   - 오브젝트 타입은 기본값(WorldDynamic 계열)이라 위 query에 포함된다.
+4. DefaultMap 배치 구역(`.md/Unreal/WorldSystem.md`)
+   - Location `(600,-100,0)`, `ZoneBounds` Extent `(1400,900,10)`
+   - 바닥 Z=0 기준 −10~+10cm 높이로 2800×1800cm를 덮는다.
+   - clearance 박스(바닥 위 1~31cm)와 높이 1~10cm 구간이 겹친다.
+5. 결과: 배치 구역 안에서는 **모든 후보가 clearance에서 기각**된다. 그 범위의 쓰레기·물 얼룩이 생기지 않는다.
+   - 기존 물 얼룩 생성 구역이 배치 구역 안에 있으면 이번 변경 전에는 생기던 물 얼룩도 멈춘다(회귀).
+6. 자동화가 놓친 이유: `FloorAndVariation` fixture에 배치 구역이나 QueryOnly 트리거 박스가 없다.
+7. 같은 성질의 다른 QueryOnly 박스(진열 공간, 설비 router, 수건 투입구 등)는 설비 주변이라 기각되어도 계약상 문제없다. 바닥 전체를 덮는 배치 구역이 문제다.
 
-cue가 제자리로 돌아오는 경우는 query가 우연히 바뀔 때뿐이다: 조준을 뗐다 다시 함, 가능 여부가 바뀜(가득 참·비어 있음·상태 변화), 기계 상태 변화.
+### 아키텍처 단계가 정할 것
 
-선반(Stack), 사용 수건통(Stack), 세탁기·건조기(Pile) 모두 같다. 진열 공간·화장대·샤워기는 해당하지 않는다.
+리뷰는 규칙을 고르지 않는다. `CleaningLitterSystem.md` Floor Rule 5단계를 다음을 만족하도록 확정한다.
 
-## 근거
+- 막아야 하는 것(계약 TRSH-004): 설비 몸체, 바닥에 놓인 물건(품목 박스·설비 아이템·배송 상자·묶은 봉투·도구·열쇠·바닥 수건), 벽 가장자리
+- 막지 말아야 하는 것
+  - 배치 구역처럼 영역만 표시하는 query 전용 박스
+  - 물 얼룩·쓰레기(Q62 B)
+  - 생성 구역·수거 구역 자신
+- 판정 기준을 정한다. 후보(선택은 아키텍처 단계):
+  - 충돌 응답 기반 판정: 가상의 바닥 물체 template 또는 채널을 정하고 Block 응답만 인정한다. `FacilityPlacementCollision::HasBlockingOverlap`과 같은 방식이다.
+  - 오브젝트 타입 query는 유지하되 특정 응답 조건이나 class를 제외한다.
+  - 그 밖의 방식
+- 바닥 자체는 막지 않아야 한다. 경사가 허용 범위(기본 25°) 안이면 clearance 박스가 바닥 면과 겹치지 않도록 기준 높이를 정한다. 현재는 바닥 위 1cm부터라 약 4° 이상 경사 바닥이나 줄눈 단차에서 바닥 자체와 겹쳐 기각될 수 있다(아래 F2).
 
-1. cue는 focus 알림에서만 다시 계산된다.
-   - `ACleanTowelStackActor::NotifyInteractionFocusChanged`
-   - `AUsedTowelBinActor::NotifyInteractionFocusChanged`
-   - `UTowelTransferPortComponent::NotifyInteractionFocusChanged`
-   - 모두 `TowelDisplayCueUtils::Update`를 호출한다.
-2. focus 알림은 query가 이전과 달라질 때만 보내진다.
-   - `UPlayerInteractionComponent::CommitQuery` / `SyncFocusObservers`
-   - `Private/Interaction/PlayerInteractionComponent.cpp` 544, 609행: `LastFocusObserverQuery.Equals(CurrentQuery)`면 생략
-3. 수건 대상의 query는 수량이 바뀌어도 같다.
-   - `TargetName` 고정: `CleanTowelStackActor.cpp` 48행 "깨끗한 수건 선반", `UsedTowelBinActor.cpp` 52행 "사용 수건통", `TowelTransferPortComponent.cpp` 35행 "수건 투입구"
-   - 행동명 고정. 가능 여부도 정원·빈 상태에 닿기 전까지 같다.
-   - 수건 바구니는 `GetHeldSummaryText`를 구현하지 않아 `HeldObjectSummary`도 비어 있다.
-4. 1단위 진열은 이 조건을 명시적으로 이용했다.
-   - `ServiceSystem.md` 131행: "이동 뒤 Count가 바뀌면 TargetName이 바뀌어 query가 바뀌므로 다음 알림에서 자리가 따라간다."
-   - 화장대·샤워기 router도 TargetName에 수량이 들어 있어 같은 방식으로 따라간다.
-   - 수건 설계는 이 전제를 옮겨 오지 않았다.
-5. 위치 계산 자체는 맞다.
-   - `GetIndexPresentation(Count / Count−1)`, Stack·Pile 결정적 배치, cue와 bucket의 부모 좌표계(수건 visual component)가 모두 일치한다.
-   - "프리뷰 자리 = 실제 놓이는 자리"도 성립한다.
-   - 결함은 **다음 계산이 호출되지 않는 것**뿐이다.
-6. 자동화가 놓친 이유: `Private/Tests/TowelDisplayCueAutomationTests.cpp`는 옮길 때마다 `NotifyInteractionFocusChanged`를 직접 호출한다(106·116·170·214·224행). 실제 경로의 Equals 생략 조건을 거치지 않는다.
+### 재검증 조건
 
-## 아키텍처 단계가 정할 것
+- 바닥 판정 자동화에 다음 두 경우를 추가한다.
+  - DefaultMap과 같은 구성의 `AFacilityPlacementZoneActor`(QueryOnly, 바닥을 덮는 얇은 bounds) 안에서 생성이 성공한다.
+  - 같은 영역에 겹쳐 둔 물 얼룩 구역·쓰레기 구역이 서로를 막지 않는다.
+- 기존 기각 경우는 그대로 기각된다: 설비 윗면, 박스, 벽, 욕탕 바닥, Pawn.
+- director 통합 경로(실제 zone `FindSpawnTransform`)로 배치 구역 안 구역에서 쓰레기·물 얼룩이 생기는 것을 확인한다.
+- `PROMPT_UNREAL.md` PIE 절차에 "배치 구역 안 탈의실·욕실 바닥에서 손님이 있을 때 실제로 생성됨"을 관찰 항목으로 명시한다.
 
-리뷰는 구조를 고르지 않는다. 다음 불변식을 만족하는 **수량 변화 → cue 재계산 경로**를 `TowelSystem.md` Service Unit 2 Display Changes에 확정하고, 필요하면 Interaction 정본에도 반영한다.
+## F2 — 보통: 경사·단차 바닥에서 바닥 자체가 clearance에 걸림 (F1과 함께 정리)
 
-- 조준 중에 대상 inventory의 수량·상태가 바뀌면 같은 프레임 안에 프리뷰와 외곽선이 새 Count 기준 자리로 옮겨 간다.
-  - 수량이 바뀌는 원인: 플레이어 넣기·빼기, 연속 반복, 손님 가져가기, 기계 상태 전환
-- cue는 표현 전용이다. 이동 조건, 기계 상태, HUD 문구를 바꾸지 않는다.
-  - HUD 문구를 바꾸는 해법은 기능 명세 승인이 필요하다.
-- focus 종료, suppression, 작동 시작에서 숨김·닫힘 규칙은 그대로다.
-- 진열 공간, 화장대·샤워기 router, 냉장고의 기존 동작은 바뀌지 않는다.
-- `UPlayerInteractionComponent`의 성장 정책(CoreSystem Class Growth Policy)을 지킨다.
+- clearance 박스는 hit 지점 위 1cm부터 수평 사각형(반폭 R)으로 검사한다.
+- 반폭 15cm(쓰레기)·30cm 이상(물 얼룩) 박스는 경사 약 4°(쓰레기)·2°(물 얼룩)를 넘거나 1cm 이상 단차가 있으면 바닥 mesh와 겹친다.
+- 경사 허용값 `MaximumSlopeDegrees`(기본 25°)와 실제 판정이 맞지 않는다.
+- F1의 판정 기준을 정할 때 함께 정리하고, 경사 바닥 fixture를 자동화에 추가한다.
 
-선택지(참고, 결정은 아키텍처 단계):
+## F3 — 낮음: 복사 흔적 LOCTEXT 키
 
-| 안 | 내용 | 영향 |
-|---|---|---|
-| A | 수건 owner가 focus 중에 자기 inventory 변경 이벤트를 받아 마지막 알림 query로 cue를 다시 계산한다 | Towel 안에서 끝난다. 마지막 query·source 보관과 focus 종료 시 해제가 필요하다 |
-| B | 수건 대상 TargetName에 수량을 넣는다(예: "깨끗한 수건 선반 5/30") | 기존 알림 경로를 그대로 쓴다. HUD 문구 변경이라 **기능 명세 승인 필요** |
-| C | `FPlayerInteractionQuery`에 표현 갱신용 필드(예: 대상 revision)를 추가하고 `Equals`에 넣는다 | `HeldUseTargetKey`와 같은 방식이다. Interaction 계약이 바뀌고, 반복 query 비교에 영향이 있는지 검토해야 한다 |
+- 문구는 맞지만 다른 class에서 복사한 키 이름이 남아 있다.
+  - `LitterTongsActor.cpp`: `TakeMop`, `MopNotHeldForDrop`
+  - `TrashBagActor.cpp`: `InvalidBoxActivation`, `BoxPhysicsFailed`, `BoxNotDiscardable`, `InvalidBoxAuthoring`
+- 현지화 키 혼동을 막도록 이 class에 맞는 키로 바꾼다. 동작은 바꾸지 않는다.
 
-## 구현 단계 재검증 조건
+## 유지할 것 (리뷰에서 문제없음)
 
-- 새 자동화는 `NotifyInteractionFocusChanged`를 직접 부르지 않는다. 다음 **실제 경로**로 검증한다.
-  - `UPlayerInteractionComponent::RefreshInteractionQuery`
-  - `UPlayerHeldTargetUseComponent`의 `BeginUse` + Tick 반복
-- 선반·사용 수건통·대기 세탁기·대기 건조기 각각에서 확인한다.
-  - LMB 1장마다 프리뷰가 다음 자리로 이동하고, 외곽선이 새 맨 위로 이동한다.
-  - RMB 1장마다 외곽선이 새 맨 위로 이동하고, 프리뷰가 방금 빠진 자리로 이동한다.
-  - 연속 반복 중 매 1장마다 위 규칙을 지킨다.
-  - 손님 쪽 수량 변화(선반에서 가져감) 뒤에도 cue가 새 Count 기준이다.
-- 기존 `BathhouseSim.Towel.Display.CuesDeterministicPileAndLid`, Towel 전체, Service 전체, Interaction held-use 회귀를 유지한다.
-- `PROMPT_UNREAL.md` 또는 통합 PIE 절차에 "누른 채 연속 넣기·빼기 중 프리뷰·외곽선이 1장마다 따라가는지"를 관찰 항목으로 추가한다.
+- **발생 clock**
+  - Exp(1) 표본, n=0 불변, update당 구역 1회, 이월 없음, 구역 weak key 관리
+  - 손님 위치는 update마다 한 번만 수집한다.
+- **RMB 입력 순서**
+  - Computer·배치·held-use·LMB 장비 입력 중에는 무시한다.
+  - 보조 사용이 있는 장비는 실행하고, 없는 장비는 무시한다(기존).
+  - 그 밖에는 held-use Take다. 해제는 보조 사용 owner면 아무것도 하지 않는다.
+- **HUD 합성**: `MergeEquipmentQuery`가 held-use 필드를 지운 뒤 보조 사용을 RMB 행(`HeldTake*`, Instant)으로 채운다. 쓰레기 아닌 곳에서 LMB는 행도 결과 보고도 없다.
+- **집게**
+  - 줍기는 Instant 1개이고, 쓰레기 제거 → 개수 증가 순서다.
+  - 묶기는 정면 자리 찾기 → 봉투 생성 → 성공한 뒤에만 개수를 0으로 만든다.
+  - carry·fixed slot·복구는 물걸레와 같은 구조다.
+- **봉투**
+  - 생성 시 개수를 한 번만 초기화하고, 활성화가 실패하면 제거한다.
+  - held·world 버리기 모두 Consumed 상태로 전이한 뒤 Destroy한다.
+- **world 버리기**
+  - 네 휴대물이 held 판정과 같은 private 종류 함수를 쓰고, FreeWorld에서만 가능하다.
+  - 설비 아이템은 `PlacementConsumed` 상태라 EndPlay의 carrier 통지가 생략된다.
+- **수거 구역**
+  - AllObjects overlap 결과에서 discardable·FreeWorld 휴대물만 고른다.
+  - carry primitive bounds 중심으로 안팎을 판정한다.
+  - 목록을 먼저 만든 뒤 제거한다. held 물건은 collision이 꺼져 있어 제외된다.
+- **배치 확정 이벤트**
+  - 성공 publication 블록 안에서만 한 번 발행하고, preview·실패·취소에서는 발행하지 않는다.
+  - 정리 handler는 제거 목록을 먼저 만든 뒤 제거하고, Placement는 Cleaning을 참조하지 않는다.
+- **쓰레기 본체**: Visibility만 Block이라 물 얼룩 조준을 가린다(Q62 B). Pawn·물건·Navigation에는 영향이 없다.
+- **삽**: 장비가 아니라 held-use 경로로 "집게가 필요합니다"가 표시된다(TRSH-020).
 
 ## 재작업 후 리뷰 입력
 
-- 갱신된 `TowelSystem.md`(필요 시 `InteractionSystem.md`·`HeldTargetUseSystem.md`)와 `PROMPT_IMPLEMENTATION.md` 재작업 절
-- 재작성된 `PROMPT_REVIEW.md`: 선택된 경로, 실제 경로 기반 자동화, 전체 회귀 수치
-- Content·Config 무변경을 유지한다. native 구조가 바뀌면 해당 BP copy-first load gate를 다시 실행한다.
+- 갱신된 `CleaningLitterSystem.md` Floor Rule(F1·F2)과 `PROMPT_IMPLEMENTATION.md` 재작업 절
+- 재작성된 `PROMPT_REVIEW.md`: 선택된 판정 기준, 배치 구역·겹친 구역·경사 fixture 자동화, 전체 회귀 수치
+- `PROMPT_UNREAL.md` PIE 관찰 항목 보강
+- Content·Config 무변경을 유지한다. native 구조가 바뀌지 않으면 load gate를 다시 실행할 필요는 없다.

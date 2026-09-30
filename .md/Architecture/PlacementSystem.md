@@ -223,6 +223,17 @@ Actor collision restore는 실패 가능한 domain rollback 뒤에 수행한다.
 
 placement staged 순서(2026-09-30 확정): `SpawnActorDeferred` → `PrepareForStagedPlacement` → `ImportPlacementPayload`(construction 전, native subobject만 존재) → `FinishSpawning`(Blueprint SCS component 생성) → `IPlaceableFacility::FinalizePlacementPayloadAfterConstruction(OutFailure)` → collision snapshot 확정·검증 → `QueryFacilityPlacement` → `BeginTransition` → domain 등록 → item 소비 → publication. 새 단계는 default `true`이며 기존 설비의 순서·결과를 바꾸지 않는다. 실패하면 기존 import 실패와 같이 staged Actor를 제거하고 item 소비·publication 없이 실패를 반환한다. Blueprint component에 의존하는 payload 적용은 이 단계에서만 한다([ServiceSystem.md](ServiceSystem.md) Placement Payload Extension).
 
+배치 확정 이벤트(2026-10-01 서비스 3단위 설계, Source 미반영):
+
+- `UFacilityPlacementEventSubsystem : UWorldSubsystem`(Public/Placement, 신규)은 C++ 전용 `FOnFacilityPlacedNative`를 소유한다.
+  - 이벤트 값 `FFacilityPlacedEvent`(non-reflected struct): placed Actor weak, `PlacementFootprint` world transform, unscaled box extent.
+  - `BroadcastFacilityPlaced(const FFacilityPlacedEvent&)`로 발행한다.
+- `FFacilityActorConversionTransaction::PlaceItemAsFacility`가 `PublishPlacedDomainRegistration()`과 `EndTransition()` 뒤에 한 번 발행한다. placed Actor와 footprint가 아직 유효할 때만 발행한다.
+  - preview, 취소, 모든 실패 경로와 회수에서는 발행하지 않는다.
+  - 신규 설치와 회수 아이템 재배치 모두 이 함수를 지난다.
+- Placement는 구독자를 모른다. Cleaning이 구독해 겹치는 쓰레기·물 얼룩을 지운다([CleaningLitterSystem.md](CleaningLitterSystem.md) Footprint Clear On Placement). 쓰레기·물 얼룩은 preview validity에 관여하지 않는다.
+- 이 파일은 이미 500줄을 넘었다. 추가는 발행 호출 몇 줄로 한정하고 footprint 판정·구독 로직을 넣지 않는다.
+
 ## Fresh Install Payload And Discard Tag
 
 - 상점 구매 아이템은 `Definition`만 있고 `InstanceData`가 null인 **신규 설치 payload**를 가진다. `FFacilityPlacementPayload::Validate`는 null `InstanceData`를 허용하고 `IsFreshInstall()`로 구분한다. 회수 export는 항상 domain data를 채우므로 둘이 섞이지 않는다.
@@ -306,6 +317,7 @@ Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후�
 ## Dependencies
 
 - Shop -> Placement Definition·fresh item factory·collision helper
+- Cleaning -> Placement 배치 확정 이벤트 subsystem·collision helper(3단위)
 - Placement -> Interaction carry/query/result contract
 - Facility/Towel -> Placement placeable-facility contract
 - Bath Water Operations utility -> Placement placeable-facility/typed-payload contract

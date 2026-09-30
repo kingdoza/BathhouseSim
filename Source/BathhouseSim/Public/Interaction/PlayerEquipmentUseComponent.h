@@ -27,6 +27,8 @@ public:
 
 	FPlayerInteractionQuery MergeEquipmentQuery(const FPlayerInteractionQuery& BaseQuery) const;
 	bool HasUsableHeldEquipment() const;
+	bool HasSecondaryEquipmentUse() const;
+	FPlayerInteractionResult ExecuteSecondaryEquipmentUse();
 	FPlayerInteractionResult BeginEquipmentUse();
 	void UpdateEquipmentUse(float DeltaTime);
 	void EndEquipmentUse();

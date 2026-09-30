@@ -98,6 +98,7 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 - `UtilityLeverSystem.md`: Utility 하위 순환기 조작부·레버 왕복 경계.
 - `ShopSystem.md`: `Public/Shop`, `Private/Shop`의 상품 목록·장바구니·주문·배송·상자·개봉·쓰레기통 경계.
 - `ServiceSystem.md`: `Public/Service`, `Private/Service`의 품목 정의·품목 박스·진열 공간·음료 냉장고·판매 적립·수거함과 꺼내기 외곽선 경계. 프로젝트 렌더 설정 Custom Depth-Stencil Pass(Enabled with Stencil)의 사용처다.
+- `CleaningLitterSystem.md`: Cleaning 하위 쓰레기·집게·봉투·수거 구역·인원 기반 생성·발밑 정리·RMB 장비 보조 사용 경계.
 - `ServiceFacilityDisplaySystem.md`: Service 하위 설비 전체 조준 진열·소모품·화장대·샤워 비품·진열 payload 일반화·공용 표시 도구 경계.
 - `PlacementSystem.md`: 설비 mode/preview/placement/recovery, 확장 단계와 락커 capacity lease 경계
 - `EconomySystem.md`: wallet과 cash claim 경계
@@ -134,6 +135,8 @@ Cleaning/Towel/Computer, Combat/Customer Recovery, Physical Carry와 Bath Water 
 - utility base에 연료·계기·문·레버 로직을 누적하지 않는다. Operation과 바늘은 labor intermediate, 투입 Volume·문은 fuel intermediate, 조작부·레버는 circulator가 조립한다. 연료 transaction, pivot 회전 baseline과 owner input guard는 private helper가 맡는다. 문 열림은 전용 표현 component, 레버 왕복은 레버 노동 component가 소유한다.
 - 설치 락커 용량, customer lease와 임시 action-slot 후보는 `ULockerCapacitySubsystem`에 두며 Customer Session이나 설비 Actor에 전역 합계를 복제하지 않는다.
 - 상점: cart는 PlayerState component, 주문·배송은 world subsystem, 개봉 위치·transaction은 private helper가 맡는다. 이미 600줄을 넘은 `UPlayerCarryComponent`에는 기존 placement 소모를 일반화한 consume commit만 추가하고 상점 판정을 넣지 않는다. Widget은 cart·주문·돈을 보관하지 않는다.
+
+- 청소 생성(3단위): 두 종류의 발생 clock은 `ACleaningDirectorActor`, 바닥 판정·clock 수학·footprint 겹침은 private `CleaningSpawnRules` helper가 소유한다. 쓰레기 구역은 기존 stain zone의 부모를 바꾸지 않은 독립 class다. 500줄을 넘은 `FacilityActorConversionTransaction.cpp`에는 배치 확정 이벤트 발행만 추가한다. 400줄을 넘은 품목 박스·배송 상자·설비 아이템 cpp에는 기존 버리기 책임의 world 변형만 추가한다. `UPlayerCarryComponent`·`UPlayerInteractionComponent`는 변경하지 않는다.
 
 ## Manual Review Points
 

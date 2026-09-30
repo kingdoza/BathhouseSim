@@ -2,8 +2,8 @@
 
 ## 문서 기준
 
-- 기준일: 2026-09-30(KST), 서비스 1단위 완료(`5b42a47`)와 2단위(진열 확장) 설계 반영
-- 상태: 보일러 노동 수직은 완료·승인됐다. 쿨러·순환기 확장은 Source 구현 뒤 통합 승인 전이다. 컴퓨터 포커스 수정은 구현됐다. 상점 주문·배송 상자·쓰레기통 수직(샤워기)은 2026-09-28 구현됐다(`94f0f11`). 같은 날 상점 확장(7종 판매·개봉 물품 흩어짐·배송 상자 scale 정책)이 구현되고 사용자가 통합 승인했다. 설비 회수 아이템 scale 읽기 수정(Placement)은 구현됐다. 들고 있는 물건 조작 LMB·RMB 통일은 구현됐다(`3934d09`). 2026-09-30 서비스 1단위 수직(음료 냉장고)은 아키텍처 재검토(construction 뒤 payload 적용) 재작업을 거쳐 완료됐다(사용자 확인).
+- 기준일: 2026-10-01(KST), 서비스 2단위 완료(`c9a1150`)와 3단위(쓰레기·수거) 설계 반영
+- 상태: 보일러 노동 수직은 완료·승인됐다. 쿨러·순환기 확장은 Source 구현 뒤 통합 승인 전이다. 컴퓨터 포커스 수정은 구현됐다. 상점 주문·배송 상자·쓰레기통 수직(샤워기)은 2026-09-28 구현됐다(`94f0f11`). 같은 날 상점 확장(7종 판매·개봉 물품 흩어짐·배송 상자 scale 정책)이 구현되고 사용자가 통합 승인했다. 설비 회수 아이템 scale 읽기 수정(Placement)은 구현됐다. 들고 있는 물건 조작 LMB·RMB 통일은 구현됐다(`3934d09`). 2026-09-30 서비스 1단위 수직(음료 냉장고)은 아키텍처 재검토(construction 뒤 payload 적용) 재작업을 거쳐 완료됐다(사용자 확인). 같은 날 2단위(진열 확장)가 완료됐고(`c9a1150`), 2026-10-01 3단위(쓰레기·수거)를 설계했다.
 - 정본 문서: `.md/0_ARCHITECTURE.md`와 `.md/Architecture/*.md`
 
 ## 분석 범위
@@ -35,6 +35,7 @@
 - [UtilityFuelSystem.md](Architecture/UtilityFuelSystem.md): 석탄·드라이아이스, 공급함, 삽, 보일러·쿨러 투입 Volume·자동 열림 문
 - [UtilityLeverSystem.md](Architecture/UtilityLeverSystem.md): 순환기 조작부, 레버 왕복·취소·복귀와 E 진행 표시
 - [ServiceSystem.md](Architecture/ServiceSystem.md): 품목 정의·품목 박스, 진열 공간 넣기·빼기·프리뷰·외곽선 강조, 음료 냉장고, 판매 적립과 공용 수거함
+- [CleaningLitterSystem.md](Architecture/CleaningLitterSystem.md): 쓰레기·물 얼룩 인원 기반 생성, 집게+봉투, 묶은 봉투, 수거 구역·world 버리기, 배치 확정 시 발밑 정리, RMB 장비 보조 사용
 - [ServiceFacilityDisplaySystem.md](Architecture/ServiceFacilityDisplaySystem.md): 설비 전체 조준 진열, 소모품, 공용 화장대, 샤워 비품, 진열 payload 일반화, 공용 표시 도구
 - [ShopSystem.md](Architecture/ShopSystem.md): 상품 목록, 장바구니, 주문·배송 FIFO, 배송 지점·상자, LMB 개봉 무리 배치, 쓰레기통
 - [CharacterSystem.md](Architecture/CharacterSystem.md): 1인칭 입력, 컨트롤러 입력 매핑, 이동, 점프, sprint, 캐릭터 조립
@@ -105,7 +106,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
   - Economy: player money와 cash claim 책임
   - Customer: StateTree routine과 customer session 책임
   - UI: interaction query의 local HUD 표현 책임
-  - Cleaning: zone/stain registry, 물 얼룩 spawn/equipment-use cleaning과 wet mop 책임
+  - Cleaning: zone/stain·쓰레기 registry, 구역별 인원 기반 spawn, equipment-use cleaning, wet mop·집게, 묶은 봉투와 수거 구역 책임
   - Towel: 수건 재고/전송, 설비, overflow, 처리 기계와 recovery ledger 책임
   - Computer: 월드 monitor, focus camera, 사용권과 player computer-use session 책임
   - Combat: 몽키스패너, camera-based melee attack과 공용 health 책임
@@ -138,6 +139,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - UI는 Interaction query를 표시하고 domain 상태를 직접 판단하거나 변경하지 않는다.
 - Computer는 빈손 primary interaction으로 진입하고 world-space monitor를 유지한 채 player별 camera/input session만 전환한다. 포커스아웃은 widget을 파괴하지 않아 actor lifetime 동안 마지막 화면 상태를 유지한다. 이탈은 E·ESC 한 번이며, 정상 이탈은 컴퓨터별 고정 발바닥 위치·방향(막히면 근처 도달 가능한 빈자리)으로 캐릭터를 옮긴 뒤 시점을 blend한다.
 - Cleaning은 zone 기반 water stain spawn, spawn별 material/yaw/XY scale variation과 wet mop hold-cleaning state를 소유한다.
+- (3단위 설계) Cleaning은 쓰레기·물 얼룩을 구역 안 손님 수에 비례한 무작위 시점에 바닥에만 만든다. 집게 LMB 줍기·RMB 봉투 묶기, 묶은 봉투 휴대물, 주기 수거 구역을 소유한다. 수거는 `IPhysicalCarryDiscardable` world 버리기로 판정하며 쓰레기통은 레벨에서 빠진다. 배치 확정 이벤트를 구독해 설치 자리와 겹치는 쓰레기·얼룩을 지운다.
 - Combat은 LMB Started 단발 몽키스패너 swing, camera-based multi shape trace와 공용 health/depleted event를 소유한다. 무기 World Mesh는 authoritative 피격 판정이 아니다.
 - Cleaning의 wet mop은 LMB Hold중 target 유무와 관계없이 mopping state/motion을 유지하고 유효한 정면 water stain에만 제거 progress를 commit한다.
 - Customer Recovery는 health 0을 death가 아닌 일시 래그돌로 처리한다. session 타이머·자원·예약과 StateTree hierarchy를 보존하고, 기립 후 queue member는 최신 visible point 위치·Yaw 복귀 gate를 완료한 다음 미완료 국소 행동을 재시작한다.
@@ -173,6 +175,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - UI -> Shop, Computer screen context interface
 - Computer -> UMG/Engine Camera/PlayerController
 - Cleaning -> Interaction
+- Cleaning -> Customer(손님 위치 읽기), Placement(배치 확정 이벤트 subsystem·collision helper)
 - Towel -> Interaction
 - Towel -> Facility
 - Towel Presentation -> Towel
@@ -197,7 +200,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 새 시스템·Blueprint 계약은 관련 정본을 함께 갱신하고 Content 변경은 승인된 Editor 단계에서만 수행한다.
 - Player carry는 inventory/hotbar가 아닌 key/wet mop/towel basket/monkey wrench/전용 설비 아이템 중 physical actor 하나만 허용한다. key/equipment의 exact slot, 모든 free-world item의 CCD와 cash 비소지 계약을 유지한다.
 - 모든 소지품을 통합하는 공통 Actor/Component는 만들지 않고 `IPhysicalCarryable`을 유지한다. Placement 전용 item과 placed Actor는 새 Actor stage/원본 마지막 제거 transaction을 사용한다. 후보 Z는 explicit zone floor에 footprint bottom offset을 한 번 역산하고, staged/recovery는 Actor collision을 끈 뒤 성공/rollback에서 authored 상태를 복원한다. pre-placed locker는 stable runtime ID 순서의 단일 subsystem reconciliation 후 facility/capacity/Nav를 함께 활성화한다.
-- E는 world primary/fixed slot, F는 world secondary, G는 free drop, Q Hold는 facility recovery, LCtrl/휠/LMB는 placement snap/rotation/confirm이다. Character는 intent만 routing한다.
+- E는 world primary/fixed slot, F는 world secondary, G는 free drop, Q Hold는 facility recovery, LCtrl/휠/LMB는 placement snap/rotation/confirm이다. RMB는 장비 보조 사용(집게 봉투 묶기)이 있으면 그것, 없으면 held-use Take다. Character는 intent만 routing한다.
 - 모든 towel endpoint 이동은 source 감소와 destination 증가를 단일 native transaction으로 commit한다.
 - Customer routine의 gameplay 상태 변경은 native C++ API를 통해 수행하고 StateTree/Blueprint asset에 domain mutation을 두지 않는다.
 - Bath 물 양·조작부·threshold는 native C++만 변경하고 임계 수위는 Project Settings, 유량/control/수면 transform은 Bath authoring이 정본이다. 순환·목표 수온과 utility 회수는 Operations candidate transaction만 commit하며 UI/Actor가 전역 합계나 다른 Bath를 직접 변경하지 않는다.
@@ -223,4 +226,5 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 설비 회수 아이템 scale 읽기 수정(PlacementSystem): 2026-09-28 구현(`72f85ec`).
 - 들고 있는 물건 조작 LMB·RMB 통일(HeldTargetUseSystem): 구현(`3934d09`).
 - 서비스 1단위(ServiceSystem): 2026-09-30 완료(`5b42a47`).
-- 서비스 2단위(ServiceFacilityDisplaySystem·Towel 2단위 절): 2026-09-30 설계 확정(사용자 승인), Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
+- 서비스 2단위(ServiceFacilityDisplaySystem·Towel 2단위 절): 2026-09-30 완료(`c9a1150`).
+- 서비스 3단위(CleaningLitterSystem): 2026-10-01 설계·Source 구현. 코드 리뷰 F1~F3(생성 자리 clearance 판정)을 재작업하는 중이다. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md` 재작업 절이다.

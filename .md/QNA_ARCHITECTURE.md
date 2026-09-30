@@ -1,159 +1,59 @@
-# QNA — 설비 배치 Authoring 단순화 기술 설계
+# QNA — 서비스 3단위(쓰레기·수거) 기술 설계
 
-각 질문의 `답변:` 뒤에 선택지를 하나 적어 주세요. 하나의 질문은 하나의 기술 결정만 다룹니다.
+2026-09-30 작성. 입력은 `.md/PROMPT_ARCHITECTURE.md`(서비스 3단위)다. 각 질문의 `답변:` 뒤에 선택지를 하나 적어 주세요. 하나의 질문은 하나의 기술 결정만 다룹니다.
+
+이 파일의 이전 내용(설비 배치 Authoring 단순화)은 Git 이력에 있다.
 
 ## 확인된 현재 구조
 
-- 설비 아이템의 공통 소지 위치는 현재 `APlaceableFacilityItemActor.HeldTransform`에 reflected 값으로 남아 있습니다.
-- Definition은 `PreviewActorClass`와 `FootprintCellsX/Y`를 별도로 authoring합니다.
-- Zone 후보 Z에 `ZoneBounds` 반높이를 더한 뒤 footprint 반높이를 다시 더해 48/50/60cm 부양이 발생합니다.
-- 공통 `PlacementNavModifier`가 `Placed` 전환과 함께 Navigation relevancy를 켭니다.
-- 락커는 Authority보다 먼저 `BeginPlay`하면 한도 0으로 등록 실패한 뒤 Authority 변경 delegate에서 재시도합니다.
+- 물 얼룩 생성은 레벨의 `ACleaningDirectorActor` 하나가 전역 타이머(`SpawnIntervalSeconds`, C++ 기본 15초)마다 한 번 실행한다. 이때 구역 제한이 남은 `AStainSpawnZoneActor` 중 하나를 `SelectionWeight` 가중치로 고른다.
+- `AStainSpawnZoneActor::ZoneKind`(`EStainSpawnZoneKind` BathFloor/DressingFloor)는 저장만 되고 어떤 코드도 읽지 않는다.
+- Content에서 이 계약을 참조하는 것: `BP_CleaningDirector`, `BP_StainSpawnZone`, `BP_TrashBin`, DefaultMap external actor 4개.
+- 없어진 UPROPERTY는 tagged serialization이 로드 때 건너뛰므로, 삭제해도 asset 로드가 실패하지 않는다. resave하면 남은 값이 정리된다.
 
-## 확정 전제
+## 확정 전제 (설계 결정, 질문 아님)
 
-- `UFacilityPlacementSettings`의 공통 `HeldTransform`만 모든 설비 아이템이 사용하며 Scale은 항상 단위값으로 정규화합니다.
-- cell 수는 scaled `PlacementFootprint` 전체 X/Y 크기와 전역 `GridSizeCm`에서 계산합니다.
-- Zone의 명시적 바닥 plane과 footprint 바닥면으로 Actor transform을 한 번만 역산합니다.
-- 실제 몸체 collision primitive만 Navigation geometry가 됩니다.
-- `PlacementFootprint`, 상호작용 Box, 슬롯, Action/Approach Point는 Navigation에 영향을 주지 않습니다.
-- runtime raw geometry 생성·제거를 위해 Recast Runtime Generation은 `Dynamic`을 사용합니다.
-- 범용 네이티브 프리뷰는 collision, physics, Navigation과 domain 등록을 모두 비활성화합니다.
+- 물 얼룩 1명 기준 평균 간격은 기존 `SpawnIntervalSeconds` property를 그대로 쓰고 의미만 "손님 1명당 평균 간격"으로 바꾼다. 레벨 값이 옮겨 적기 없이 보존된다. 이름을 바꾸지 않으므로 Core Redirect도 필요 없다.
+- 전체·구역별 최대, 얼룩 간격, Pawn 여유와 `MaxPlacementAttemptsPerInterval`은 의미가 유지되므로 그대로 둔다.
+- 구역 선택 가중치는 새 규칙(구역마다 따로 계산)에서 쓸 곳이 없다.
 
-## Q1. 기존 reflected `HeldTransform`은 어떻게 폐기할까요?
+## Q1. 쓸 곳이 없어지는 물 얼룩 구역 property는 어떻게 폐기할까요?
 
-- A: 기존 설비 아이템·legacy 설비 컴포넌트 필드를 한 migration cycle 동안 deprecated·숨김 상태로 보존하되 runtime에서는 무시
-- B: 기존 필드를 즉시 삭제하고 모든 asset을 같은 변경에서 resave
-- C: 기존 값이 단위 Transform이 아니면 공통 설정보다 우선하는 fallback으로 유지
-- 권장안: A — serialized asset 호환성을 지키면서 공통 Project Settings를 즉시 단일 정본으로 만들 수 있습니다.
-- 답변: B
+대상: `AStainSpawnZoneActor::SelectionWeight`, `AStainSpawnZoneActor::ZoneKind`, `EStainSpawnZoneKind` enum
 
-## Q2. 기존 serialized `FootprintCellsX/Y`는 어떻게 폐기할까요?
-
-- A: 한 migration cycle 동안 deprecated·숨김 상태로 보존하되 validation과 runtime 계산에서는 무시
-- B: 즉시 삭제하고 기존 Definition asset을 모두 resave
-- C: 계산된 cell 수를 기존 필드에 계속 자동 기록
-- 권장안: A — 이중 authoring은 즉시 제거하면서 기존 asset 로딩 위험을 줄입니다.
-- 답변: B
-
-## Q3. 기존 Definition의 `PreviewActorClass`는 어떻게 폐기할까요?
-
-- A: 한 migration cycle 동안 deprecated·숨김 상태로 보존하되 runtime에서는 공통 네이티브 preview class만 사용
-- B: 즉시 삭제하고 기존 Definition asset을 모두 resave
-- C: 값이 지정된 Definition만 기존 class를 우선 사용
-- 권장안: A — 설비별 preview 계약은 즉시 끊으면서 serialized 참조는 안전하게 정리할 수 있습니다.
-- 답변: B
-
-## Q4. PlacementZone의 명시적 바닥 plane은 무엇으로 표현할까요?
-
-- A: `ZoneBounds`와 분리된 `USceneComponent`를 두고 그 component의 XY plane을 사용
-- B: Zone Actor root의 local XY plane을 사용
-- C: Zone마다 숫자형 Z offset을 별도로 입력
-- 권장안: A — Bounds 두께와 독립적이고 Editor에서 위치·회전을 직접 확인할 수 있습니다.
+- A: 이번 단위에서 즉시 삭제한다. Editor 단계에서 `BP_StainSpawnZone`과 레벨 구역 instance를 load·compile·resave해 남은 값을 정리한다.
+- B: 한 migration cycle 동안 deprecated·숨김으로 보존하고 runtime에서 무시한다. 삭제는 다음 단위에서 한다.
+- C: 그대로 두고 무시한다(Editor에 계속 보임).
+- 권장안: A. 이전 배치 authoring QNA(Q1~Q3)에서도 즉시 삭제를 선택하셨습니다. 로드 위험이 없고, 의미 없는 값이 Editor에 남지 않습니다.
 - 답변: A
 
-## Q5. 설비의 footprint 바닥 authoring 계약은 무엇으로 고정할까요?
+## 기능 명세 단계 확인 필요 (이 문서에서 답하지 않음)
 
-- A: Actor local 설치 바닥을 Z=0으로 두고 `PlacementFootprint`의 바닥면도 정확히 Z=0에 맞춤
-- B: `PlacementFootprint` 중심을 Actor local Z=0으로 유지하고 별도 설치 높이 값을 입력
-- C: 설비마다 별도 `InstallationPivot` component를 추가해 footprint 바닥과 연결
-- 권장안: A — 설비별 보정값이나 추가 pivot 없이 footprint 상대 Z와 높이만으로 일관되게 검증할 수 있습니다.
-- 답변: A
+다음은 사용자에게 보이는 결과라 설계 단계가 정하지 않는다. 기능 명세 단계에서 `.md/QNA_FEATURE_SPEC.md`로 확정한 뒤 `.md/PROMPT_ARCHITECTURE.md`에 반영해야 한다.
 
-## Q6. 범용 프리뷰가 복제할 visual component는 어떻게 찾을까요?
+상태: 모두 해결. F1~F4는 NextWork QNA Q62 B, Q63 A, Q64 A, Q65 A로 답변됐고, F5는 기능 명세 정정(Q63 반영 정정, TRSH-020 수정·TRSH-028 추가)으로 반영됐다. 설계는 `.md/Architecture/CleaningLitterSystem.md`에 반영했다.
 
-- A: `PlacedFacilityClass`의 class-default hierarchy에서 표시 가능한 Static Mesh component를 자동 수집하고 helper·숨김·editor-only component는 제외
-- B: 이름이 정확히 `VisualMesh`인 component 하나만 사용
-- C: Definition마다 preview용 component reference 배열을 별도로 authoring
-- 권장안: A — 복합 설비 외형을 지원하면서 preview용 중복 authoring을 만들지 않습니다.
-- 답변: A
+- F5(해결). Q63 반영본(본문 "집게 없이(빈손·다른 물건)", TRSH-020 "대걸레·몽키스패너")이 기존 도구 동작 유지 계약과 충돌한다.
+  - 현재 LMB가 자기 행동을 가진 물건은 조준 대상과 무관하게 LMB 행에 그 행동을 표시하고, 실제로 LMB를 누르면 그 행동을 한다.
+    - 대걸레: `물걸레질`
+    - 몽키스패너: `휘두르기`
+    - 배송 상자: `상자 열기`
+    - 설비 아이템: 배치 확정
+  - 물 얼룩을 몽키스패너로 조준할 때도 `물걸레가 필요합니다`가 아니라 `휘두르기`가 보인다. 따라서 Q63의 "물 얼룩과 같은 방식"과 TRSH-020이 서로 다르다.
+  - 이 물건들로 쓰레기를 조준할 때 `집게가 필요합니다`를 보이면, HUD는 불가라고 하는데 LMB는 휘두르기·상자 열기를 실행하게 된다.
+  - 확인 필요: 이 네 경우 LMB 행에 기존 도구 행동을 유지하고, 빈손·품목 박스·수건바구니·삽처럼 LMB가 조준 대상에 쓰이는 경우에만 `집게가 필요합니다`를 보이는지.
 
-## Q7. Navigation geometry를 배치 시스템이 별도로 식별할까요?
+- F1. 쓰레기와 물 얼룩이 서로 겹쳐 생겨도 되는가. 겹치면 위에 있는 쓰레기가 조준을 가려, 쓰레기를 치우기 전에는 그 얼룩을 물걸레로 닦지 못할 수 있다.
+- F2. 집게 없이(빈손·다른 물건) 쓰레기를 조준했을 때 HUD. 물 얼룩처럼 LMB 행에 이유("집게가 필요합니다")를 보이는지, 대상 이름은 "쓰레기" 하나인지 외형별 이름("빈 병" 등)인지.
+- F3. 배치 확정 때 사라지는 범위. 설치 자리와 조금이라도 겹치는 쓰레기·얼룩까지인지, 중심이 설치 자리 안인 것만인지. 중심 기준이면 설비 가장자리에 반쯤 깔린 얼룩이 남는다.
+- F4. 정면에 공간이 없어 봉투를 묶지 못할 때 HUD 이유 문구(TRSH-012). 다른 거부 문구는 정해져 있지만 이것만 정해지지 않았다.
 
-- A: 별도 수집 없이 Unreal 기본 Navigation relevancy와 기존 메시 collision에 맡기고 배치 transaction은 Actor collision 상태만 전환
-- B: `UFacilityPlacementComponent`가 몸체 primitive reference 배열을 명시적으로 소유
-- C: 공통 `NavModifier` 또는 component tag로 별도 Navigation 형상을 지정
-- 권장안: A — `RecastNavMesh = Dynamic`이 실제 collision 변경을 자동 반영하므로 중복 형상·배열 authoring이 필요 없습니다.
-- 답변: A. 실제 몸체 메시의 기존 collision과 Unreal 기본 Navigation relevancy를 정본으로 사용한다. staged placement와 recovery unregistration에서는 Actor collision을 끄고, commit 또는 rollback에서는 transaction이 캡처한 이전 Actor collision 상태를 복원한다. `PlacementNavModifier`는 사용하지 않으며 `PlacementFootprint`, 상호작용 Box, 슬롯과 Action/Approach Point는 `Can Ever Affect Navigation = false`를 강제한다.
+### 2026-10-01 코드 리뷰 재검토 중 사용자 결정 (기능 명세 반영 완료: TRSH-029·030, QNA_FEATURE_SPEC 정정 기록)
 
-## Q8. 기존 `PlacementNavModifier` component는 어떻게 폐기할까요?
-
-- A: 한 migration cycle 동안 deprecated component로 보존하되 항상 navigation 비활성화하고 runtime에서는 무시
-- B: 네이티브 component를 즉시 삭제하고 관련 Blueprint를 같은 변경에서 전부 resave
-- C: 실제 몸체 primitive가 없을 때만 fallback으로 계속 사용
-- 권장안: A — `FailsafeExtent` fallback은 즉시 차단하면서 Blueprint 상속 자산의 migration 위험을 줄입니다.
-- 답변: B
-
-## Q9. Authority 준비 전 pre-placed 락커의 pending 등록은 누가 소유할까요?
-
-- A: Facility Subsystem이 Authority readiness와 pending actor를 소유하고 Locker Capacity Subsystem이 용량 검증·등록을 담당
-- B: Locker Capacity Subsystem이 readiness, pending actor와 facility 등록 조율까지 모두 소유
-- C: 각 락커 Actor가 pending 상태와 재등록 시도를 개별 소유
-- 권장안: A — 기존 Authority owner와 capacity owner 경계를 유지하면서 Actor별 재시도를 제거할 수 있습니다.
-- 답변: A
-
-## Q10. reconciliation 성공 publication은 어떤 단위로 발행할까요?
-
-- A: 등록된 락커마다 facility와 capacity 변경을 각각 한 번씩 발행
-- B: 모든 pending 락커의 내부 등록을 끝낸 뒤 facility 변경 한 번과 capacity 변경 한 번만 일괄 발행
-- C: 초기 pre-placed 등록에서는 publication을 생략
-- 권장안: B — BeginPlay 순서와 락커 수에 따른 중간 상태 노출 없이 최종 상태를 한 번만 공개합니다.
-- 답변: B
-
-## Q11. QNA_FEATURE_SPEC Q2에서 A를 선택할 경우 락커의 고정 순서는 무엇으로 정할까요?
-
-- A: 락커 instance에 저장되는 runtime persistent `RegistrationId` GUID 순서
-- B: runtime Actor 이름·경로 문자열 순서
-- C: 별도 `RegistrationPriority` 값을 추가
-- 권장안: A — Editor가 ID를 자동 생성하게 하면 rename과 BeginPlay 순서에 영향받지 않고 cooked build에서도 같은 결과를 유지합니다.
-- 답변: A. UE의 `AActor::ActorGuid`는 Editor-only이므로 사용하지 않고, 락커 instance에 자동 생성·저장되는 runtime `FGuid RegistrationId`를 사용한다.
-
-## Q12. PlacementZone의 런타임 그리드 표현 component는 누가 소유할까요?
-
-- A: `BP_FacilityPlacementZone`이 표현 전용 component를 소유하고 기존 `OnGridVisibilityChanged`를 구현
-- B: `AFacilityPlacementZoneActor`가 native 그리드 component를 기본 subobject로 소유
-- C: 별도 그리드 Actor를 배치 프리뷰마다 생성
-- 권장안: B — component lifecycle, DMI 갱신과 모든 호환 Zone의 가시성을 네이티브에서 일관되게 보장하면서 Editor는 mesh와 material만 authoring할 수 있습니다.
-- 답변: B. `AFacilityPlacementZoneActor`가 `GridVisual` `UStaticMeshComponent`, 그리드 표현 설정, DMI와 가시성 상태를 소유한다. Blueprint는 inherited `GridVisual`에 mesh와 MI를 지정하고 표현 기본값만 조정한다.
-
-## Q13. PlacementZone 그리드의 실제 렌더링 방식은 무엇으로 할까요?
-
-- A: 평면 Static Mesh 하나와 반복형 그리드 머터리얼 사용
-- B: 바닥에 투영하는 Decal Component 사용
-- C: 셀이나 선마다 별도 mesh component 생성
-- 권장안: A — `PlacementFloor` plane과 Bounds에 정확히 맞고 component 수가 Zone 크기에 따라 증가하지 않습니다.
-- 답변: A
-
-## Q14. 시각 그리드의 셀 간격은 전역 `GridSizeCm`과 어떻게 동기화할까요?
-
-- A: native `AFacilityPlacementZoneActor`가 Project Settings 값을 직접 읽어 DMI 파라미터로 전달
-- B: 그리드 머터리얼에 현재 기본값 10cm를 직접 입력
-- C: PlacementZone Blueprint에 별도 셀 크기 변수를 추가
-- 권장안: A — Blueprint getter나 중복 변수 없이 실제 스냅과 시각 그리드가 같은 전역 정본을 사용합니다.
-- 답변: A. Zone Blueprint graph는 `GridSizeCm`을 읽거나 전달하지 않으며 native Actor가 DMI를 갱신한다.
-
-## Q15. 그리드 머터리얼 asset은 어떻게 구성할까요?
-
-- A: 배치 시스템 전용 Master Material과 Material Instance를 새로 생성
-- B: 기존 `/Game/LevelPrototyping/Materials/M_PrototypeGrid`를 그대로 사용
-- C: Engine 기본 디버그 머터리얼을 사용
-- 권장안: A — 10cm/100cm 선, 투명도와 게임용 표현을 프로토타입 바닥 머터리얼과 독립적으로 조정할 수 있습니다.
-- 답변: A. `M_FacilityPlacementGrid`와 `MI_FacilityPlacementGrid`를 만들고, `BP_FacilityPlacementZone` Class Default의 inherited `GridVisual` Material Element 0에 MI를 한 번 지정한다. Level의 Zone instance마다 별도로 지정하지 않는다. native Actor가 DMI를 만들고 갱신한다.
-
-  native Actor에는 `GridLineThicknessCm`, `GridZOffsetCm`, `MajorGridIntervalCells`를 Blueprint Class Default 및 Level instance에서 조정 가능한 property로 노출한다. DMI에는 정확히 `GridSizeCm`, `ZoneSizeXCm`, `ZoneSizeYCm`, `LineThicknessCm`, `MajorGridEveryNCells`를 설정한다. 전역 셀 크기는 Developer Settings, Zone 크기는 `ZoneBounds`, 나머지는 Zone property에서 가져온다. `GridZOffsetCm`은 MI 파라미터가 아니라 `PlacementFloor` 기준 `GridVisual.RelativeLocation.Z`에 적용한다. 선 색상·투명도와 굵은 선의 굵기 비율은 `MI_FacilityPlacementGrid` 공통 기본값이다. 가시성은 native `GridVisual.SetVisibility()`로 제어하고 `OnGridVisibilityChanged`는 추가 Blueprint 표현을 위한 선택적 통지만 담당한다.
-
-## Q16. GridVisual의 크기는 `ZoneBounds` 변경과 어떻게 동기화할까요?
-
-- A: native `OnConstruction`이 `ZoneBounds`의 전체 X/Y 크기로 자동 조정
-- B: 각 PlacementZone instance에서 GridVisual scale을 수동 입력
-- C: 모든 Zone이 같은 고정 크기를 사용
-- 권장안: A — Blueprint graph 없이 Bounds를 수정할 때 그리드 범위를 자동으로 맞추고 중복 authoring을 제거합니다.
-- 답변: A. native `OnConstruction`이 지정된 plane mesh의 실제 local bounds를 기준으로 `GridVisual` X/Y scale과 `GridZOffsetCm`을 적용한다.
-
-## 설계 전 읽기 전용 Unreal 확인 범위
-
-- 배치 대상 Blueprint CDO의 visual component hierarchy와 `PlacementFootprint` 상대 transform
-- 현재 설비별 preview Blueprint 및 material 연결
-- PlacementZone instance의 Bounds와 바닥 기준 authoring 상태
-- 각 설비의 실제 몸체 collision primitive와 Navigation relevancy
-- Level의 RecastNavMesh Runtime Generation과 모든 Facility/Queue Approach Point 투영 상태
+- F6. 벽 가장자리: **A 유지.** 벽에서 종류별 바닥 반경 R(쓰레기 약 15cm, 물 얼룩 30~45cm) 안에는 쓰레기·물 얼룩이 생기지 않는다. 벽에 반쯤 묻혀 보이지 않게 하기 위함이다. 현재 명세의 금지 목록에 벽이 없으므로 추가가 필요하다.
+- F7. 생성 위치는 플레이어·손님과 무관하다. 그들 바로 옆이나 발밑에도 생길 수 있다. 현재 명세의 다음 문구와 반대이므로 삭제·수정이 필요하다.
+  - `PROMPT_ARCHITECTURE.md` 53행(물 얼룩 현재·목표 "겹침 방지는 유지")
+  - 102행(쓰레기 금지 목록 "플레이어·손님과 겹치는 자리")
+  - 125행(물 얼룩 "플레이어·손님과 겹침 방지는 그대로다")
+  - NextWork 전체 명세 299행
+- 설계 반영: `Architecture/CleaningLitterSystem.md` Floor Rule(Pawn 검사 삭제, Pawn component 무시, 벽 유지), `PROMPT_IMPLEMENTATION.md` 재작업 절 2-1.

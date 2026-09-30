@@ -1,6 +1,8 @@
 #include "Cleaning/StainSpawnZoneActor.h"
 
 #include "Cleaning/CleaningWorldSubsystem.h"
+#include "Cleaning/CleaningSpawnRules.h"
+#include "Components/SceneComponent.h"
 #include "Components/BoxComponent.h"
 #include "Engine/World.h"
 
@@ -11,6 +13,10 @@ AStainSpawnZoneActor::AStainSpawnZoneActor()
 	SetRootComponent(SpawnBounds);
 	SpawnBounds->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SpawnBounds->InitBoxExtent(FVector(300.0f, 300.0f, 100.0f));
+	SpawnFloor = CreateDefaultSubobject<USceneComponent>(TEXT("SpawnFloor"));
+	SpawnFloor->SetupAttachment(SpawnBounds);
+	SpawnFloor->SetRelativeLocation(FVector(0, 0, -100));
+	SpawnBounds->SetCanEverAffectNavigation(false);
 }
 
 void AStainSpawnZoneActor::BeginPlay()
@@ -34,63 +40,32 @@ void AStainSpawnZoneActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-bool AStainSpawnZoneActor::FindSpawnTransform(
-	FRandomStream& RandomStream,
-	const float DefaultStainSpacing,
-	const float DefaultPawnClearance,
-	FTransform& OutTransform) const
+bool AStainSpawnZoneActor::FindSpawnTransform(FRandomStream& Stream, float DefaultStainSpacing,
+											  FTransform& OutTransform, float FloorRadius, float ClearanceHeight) const
 {
-	const UWorld* World = GetWorld();
-	if (!World || !SpawnBounds)
+	UWorld* World = GetWorld();
+	auto* Subsystem = World ? World->GetSubsystem<UCleaningWorldSubsystem>() : nullptr;
+	if (!World || !Subsystem || !SpawnBounds || !SpawnFloor)
 	{
 		return false;
 	}
-	const FVector Extent = SpawnBounds->GetUnscaledBoxExtent();
-	const FVector LocalCandidate(
-		RandomStream.FRandRange(-Extent.X, Extent.X),
-		RandomStream.FRandRange(-Extent.Y, Extent.Y),
-		Extent.Z);
-	const FVector TraceStart = SpawnBounds->GetComponentTransform().TransformPosition(LocalCandidate);
-	const FVector TraceEnd = TraceStart - FVector::UpVector * (Extent.Z * 2.0f + FloorTraceDistance);
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CleaningFloorPlacement), true, this);
-	FHitResult FloorHit;
-	if (!World->LineTraceSingleByChannel(FloorHit, TraceStart, TraceEnd, FloorTraceChannel, QueryParams)
-		|| !FloorHit.Component.IsValid())
-	{
-		return false;
-	}
-	if (!RequiredFloorComponentTag.IsNone() && !FloorHit.Component->ComponentHasTag(RequiredFloorComponentTag))
-	{
-		return false;
-	}
-	const float MinimumUpDot = FMath::Cos(FMath::DegreesToRadians(MaximumFloorSlopeDegrees));
-	if (FVector::DotProduct(FloorHit.ImpactNormal.GetSafeNormal(), FVector::UpVector) < MinimumUpDot)
-	{
-		return false;
-	}
-	const FVector HitLocal = SpawnBounds->GetComponentTransform().InverseTransformPosition(FloorHit.ImpactPoint);
-	if (FMath::Abs(HitLocal.X) > Extent.X || FMath::Abs(HitLocal.Y) > Extent.Y)
-	{
-		return false;
-	}
-	UCleaningWorldSubsystem* Subsystem = World->GetSubsystem<UCleaningWorldSubsystem>();
-	const float Spacing = StainSpacingOverride > 0.0f ? StainSpacingOverride : DefaultStainSpacing;
-	if (!Subsystem || !Subsystem->IsStainLocationClear(FloorHit.ImpactPoint, Spacing))
-	{
-		return false;
-	}
-	const float PawnClearance = PawnClearanceOverride > 0.0f ? PawnClearanceOverride : DefaultPawnClearance;
-	FCollisionObjectQueryParams PawnObjects;
-	PawnObjects.AddObjectTypesToQuery(ECC_Pawn);
-	if (PawnClearance > 0.0f && World->OverlapAnyTestByObjectType(
-		FloorHit.ImpactPoint,
-		FQuat::Identity,
-		PawnObjects,
-		FCollisionShape::MakeSphere(PawnClearance),
-		QueryParams))
-	{
-		return false;
-	}
-	OutTransform = FTransform(FRotationMatrix::MakeFromZ(FloorHit.ImpactNormal).ToQuat(), FloorHit.ImpactPoint);
-	return true;
+	FCleaningFloorSpawnSettings Settings;
+	Settings.BoxTransform = SpawnBounds->GetComponentTransform();
+	Settings.Extent = SpawnBounds->GetUnscaledBoxExtent();
+	Settings.TraceChannel = FloorTraceChannel;
+	Settings.TraceDistance = FloorTraceDistance;
+	Settings.RequiredFloorTag = RequiredFloorComponentTag;
+	Settings.MaximumSlopeDegrees = MaximumFloorSlopeDegrees;
+	Settings.FloorZ = SpawnFloor->GetComponentLocation().Z;
+	Settings.FloorTolerance = FloorHeightToleranceCm;
+	Settings.Radius = FloorRadius;
+	Settings.ClearanceHeight = ClearanceHeight;
+	Settings.Spacing = StainSpacingOverride > 0 ? StainSpacingOverride : DefaultStainSpacing;
+	return FCleaningFloorSpawnQuery::Find(
+		*World, this, Settings, Stream,
+		[Subsystem](const FVector& Location, float Spacing)
+		{
+			return Subsystem->IsStainLocationClear(Location, Spacing);
+		},
+		OutTransform);
 }

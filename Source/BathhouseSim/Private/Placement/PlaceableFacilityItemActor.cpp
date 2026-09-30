@@ -392,10 +392,7 @@ bool APlaceableFacilityItemActor::IsHeldForPlacement() const
 
 bool APlaceableFacilityItemActor::CanDiscardCarriedObject(FText& OutFailureReason) const
 {
-	if (Lifecycle != ELifecycle::Held || !Carrier.IsValid() || Carrier->GetHeldObject() != this
-		|| !IsValid(Payload.Definition.Get())
-		|| !Payload.Definition->FacilityTags.HasTag(TAG_Facility_Discardable)
-		|| Payload.Definition->LockerSlotCount > 0)
+	if (Lifecycle != ELifecycle::Held || !Carrier.IsValid() || Carrier->GetHeldObject() != this || !CanDiscardKind())
 	{
 		OutFailureReason = LOCTEXT("FacilityItemNotDiscardable", "이 설비 아이템은 버릴 수 없습니다.");
 		return false;
@@ -426,6 +423,29 @@ void APlaceableFacilityItemActor::SetFreeWorldPhysics(const bool bEnabled)
 	ItemRoot->SetCollisionEnabled(
 		bEnabled ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 	ItemRoot->SetSimulatePhysics(bEnabled);
+}
+
+bool APlaceableFacilityItemActor::CanDiscardKind() const
+{
+	return IsValid(Payload.Definition.Get()) && Payload.Definition->FacilityTags.HasTag(TAG_Facility_Discardable) &&
+		   Payload.Definition->LockerSlotCount <= 0;
+}
+
+bool APlaceableFacilityItemActor::CanDiscardFromWorld(FText& Failure) const
+{
+	return Lifecycle == ELifecycle::FreeWorld && !Carrier.IsValid() && CanDiscardKind();
+}
+
+void APlaceableFacilityItemActor::HandleDiscardFromWorldCommitted()
+{
+	FText Failure;
+	if (!CanDiscardFromWorld(Failure))
+	{
+		return;
+	}
+	Payload.Reset();
+	Lifecycle = ELifecycle::PlacementConsumed;
+	Destroy();
 }
 
 #undef LOCTEXT_NAMESPACE

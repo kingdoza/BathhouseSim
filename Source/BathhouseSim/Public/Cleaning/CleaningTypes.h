@@ -16,10 +16,3 @@ enum class EStainCleaningState : uint8
 	Cleaning,
 	Removed
 };
-
-UENUM(BlueprintType)
-enum class EStainSpawnZoneKind : uint8
-{
-	BathFloor,
-	DressingFloor
-};

@@ -354,8 +354,7 @@ void AItemBoxActor::RecoverPhysicalCarryable(UPlayerCarryComponent* PreviousCarr
 
 bool AItemBoxActor::CanDiscardCarriedObject(FText& OutFailureReason) const
 {
-	if (Lifecycle != ELifecycle::Held || !Carrier.IsValid() || Carrier->GetHeldObject() != this
-		|| !bContentsInitialized)
+	if (Lifecycle != ELifecycle::Held || !Carrier.IsValid() || Carrier->GetHeldObject() != this || !CanDiscardKind())
 	{
 		OutFailureReason = LOCTEXT("BoxNotDiscardable", "이 품목 박스는 버릴 수 없습니다.");
 		return false;
@@ -474,5 +473,28 @@ EDataValidationResult AItemBoxActor::IsDataValid(FDataValidationContext& Context
 	return Result == EDataValidationResult::NotValidated ? EDataValidationResult::Valid : Result;
 }
 #endif
+
+bool AItemBoxActor::CanDiscardKind() const
+{
+	return bContentsInitialized;
+}
+
+bool AItemBoxActor::CanDiscardFromWorld(FText& Failure) const
+{
+	return Lifecycle == ELifecycle::FreeWorld && !Carrier.IsValid() && CanDiscardKind();
+}
+
+void AItemBoxActor::HandleDiscardFromWorldCommitted()
+{
+	FText Failure;
+	if (!CanDiscardFromWorld(Failure))
+	{
+		return;
+	}
+	Contents = FServiceItemStack();
+	bContentsInitialized = false;
+	Lifecycle = ELifecycle::Consumed;
+	Destroy();
+}
 
 #undef LOCTEXT_NAMESPACE
