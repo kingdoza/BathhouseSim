@@ -4,7 +4,7 @@
 
 [AGENT_UNREAL_EDITOR.md](AGENT_UNREAL_EDITOR.md)의 연결·세션 운영 절차다. asset 승인·도구 선택·결과물은 Unreal Editor 역할 정본을 따른다.
 공통 세션 정책은 MCP, Python, 기존 C++ helper와 headless 검증에 모두 적용한다. 별도 세션 문서를 필수로 추가하지 않는다.
-Python 절차는 [UNREAL_PYTHON_API.md](UNREAL_PYTHON_API.md), 버전·빌드·headless 기본 옵션은 [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md)를 따른다.
+Python 절차는 [UNREAL_PYTHON_API.md](UNREAL_PYTHON_API.md), 버전·빌드·headless 기본 옵션은 [UE_BUILD_POLICY.md](UE_BUILD_POLICY.md)를 따른다.
 
 ## 1. 대상과 소유권 확인
 
@@ -106,7 +106,7 @@ HTTP 200, 포트 개방, `codex mcp list`·클라이언트 설정만으로 Edito
 
 ## 6. 새 프로세스·headless 검증
 
-- 모든 headless Editor 실행은 `AGENT_WORKFLOW.md`의 `-DDC-ForceMemoryCache` 등 공통 정책을 적용한다.
+- 모든 headless Editor 실행은 [UE_BUILD_POLICY.md](UE_BUILD_POLICY.md)의 `-DDC-ForceMemoryCache` 등 공통 정책을 적용한다.
 - Python commandlet는 Python 절차를, 기존 Automation·UAT는 실제 task·test filter·출력을 확인한다.
 - 종료 코드·이번 로그·검증 결과를 함께 확인한다. 오래된 PASS를 이번 실행에 사용하지 않는다.
 - 새 프로세스 전에는 기존 작업용 Editor를 안전하게 종료하고 PID 소멸을 확인한다.
