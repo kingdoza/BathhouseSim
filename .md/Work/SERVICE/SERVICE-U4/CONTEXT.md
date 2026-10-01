@@ -1,6 +1,6 @@
 # CONTEXT — SERVICE-U4 서비스 4단위 (안마의자·평상·TV·세신)
 - 목표 / 상위·선행·관련 작업: 안마의자·평상·TV·세신대 서비스 설비. 상위 `SERVICE`(폴더 없음, 채택 전 작업). 선행 SERVICE-U1~U3(모두 PIE 수용 대기, 폴더 없음).
-- 현재 단계와 재개 지점: 사용자 PIE 검증 대기(`PIE_CHECKLIST.md`, 10행 현상 1·11행 현상 2 포함). 실패 시 같은 작업 폴더에서 새 리뷰어 진단.
+- 현재 단계와 재개 지점: 사용자 PIE 통과(2026-10-01). main 병합 대기 — 사전 허용 없음, 사용자 확인 후 `--no-ff` 병합.
 - 명세 승인 일자와 사전 허용: 채택 전 작업. 명세·설계·Editor 결과물은 `f15742a`의 루트 `.md/PROMPT_ARCHITECTURE.md`, `PROMPT_IMPLEMENTATION.md`, `PROMPT_REVIEW.md`, `PROMPT_UNREAL.md`, `PROMPT_INTEGRATION_REVIEW.md`로 읽는다. 사전 허용 기록 없음(병합은 이미 main에 커밋된 상태).
 - 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/SERVICE-U4`(main `fcc982d`에서 분기). 진단 커밋 `3b0e2ca` = 구현 시작 커밋, 구현 커밋 `57bc9b9` = 리뷰 승인 커밋.
 - 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: PIE 실패 재작업 1회차 리뷰 1회 승인(진단 리뷰어 재검증), 아키텍처 자동 복귀 미사용. Editor 작업 생략 — `PROMPT_UNREAL.md` Content 변경 없음, `3b0e2ca..57bc9b9` Content·Config 무변경 확인.
