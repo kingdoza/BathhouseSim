@@ -43,8 +43,10 @@ bool FCleaningLitterToolTest::RunTest(const FString&)
 	auto Query = Player.Interaction->GetCurrentInteractionQuery();
 	Query = Player.EquipmentUse->MergeEquipmentQuery(Query);
 	TestTrue(TEXT("RMB always offers tie"),
-			 Query.bHeldTakeVisible && Query.HeldTakeActionName.ToString() == TEXT("봉투 묶기"));
-	TestEqual(TEXT("Empty bag reason"), Query.HeldTakeFailureReason.ToString(), FString(TEXT("봉투가 비어 있음")));
+			 Query.bEquipmentSecondaryVisible && Query.EquipmentSecondaryActionName.ToString() == TEXT("봉투 묶기"));
+	TestFalse(TEXT("Tie is not a held-use Take row"), Query.bHeldTakeVisible || Query.bCanHeldTake);
+	TestEqual(TEXT("Empty bag reason"), Query.EquipmentSecondaryFailureReason.ToString(),
+			  FString(TEXT("봉투가 비어 있음")));
 	for (int32 I = 0; I < 20; ++I)
 	{
 		auto* L = Litter(World, FVector(300 + I * 30, 0, 0));

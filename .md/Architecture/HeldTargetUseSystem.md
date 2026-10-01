@@ -139,12 +139,12 @@ Character default subobject `PlayerHeldTargetUse`. `Configure(Interaction, Carry
 [UISystem.md](UISystem.md) Interaction Prompt의 추가 규칙:
 
 - LMB 행: `bEquipmentUseVisible`이면 equipment 필드, 아니면 held Apply 필드를 쓴다. 두 source를 두 행으로 동시에 표시하지 않는다.
-- RMB 행: held Take 필드를 쓴다. 새 `BindWidgetOptional` `HeldTakeActionNameText`, `HeldTakeFailureReasonText`(UTextBlock)다. 장비 보조 사용이 있으면 `MergeEquipmentQuery`가 이 필드를 그 query로 채우고, 실행 결과도 intent `HeldTake`로 보고한다(`HeldTake` = RMB 행 결과).
+- RMB 행: held Take 필드를 쓴다. 새 `BindWidgetOptional` `HeldTakeActionNameText`, `HeldTakeFailureReasonText`(UTextBlock)다. 장비 보조 사용이 있으면 별도 `EquipmentSecondary*` 필드와 intent `EquipmentSecondaryUse`를 RMB 행에 쓴다. held Take 필드는 대상 → 물건 방향 신호로만 남긴다(focus observer가 읽음, [CleaningLitterSystem.md](CleaningLitterSystem.md) Input Routing).
 - 키 라벨: `BindWidgetOptional` `PrimaryKeyText`, `LmbKeyText`, `RmbKeyText`(UTextBlock)와 EditDefaultsOnly 표시값 `PrimaryKeyLabel`(E), `LmbKeyLabel`(LMB), `RmbKeyLabel`(RMB). native가 해당 행과 같이 보이기·접기를 적용한다.
 - E 행은 `ActionName`이 비면 키·행동·이유를 모두 접는다.
 - F 행은 기존대로 `bSecondaryVisible`을 따른다. 이번 대상에서는 모두 false다(CTRL-025).
 - 대상 이름 표시와 root visible/enabled 조건에 held 두 방향 행을 포함한다.
-- transient failure: intent `HeldApply`는 LMB 행, `HeldTake`는 RMB 행에 표시한다. 기존 1.5초 규칙을 따른다.
+- transient failure: intent `HeldApply`는 LMB 행, `HeldTake`·`EquipmentSecondaryUse`는 RMB 행에 표시한다. 기존 1.5초 규칙을 따른다.
 - 새 Blueprint event는 추가하지 않는다. 기존 hook signature를 바꾸지 않는다.
 
 ## Compatibility

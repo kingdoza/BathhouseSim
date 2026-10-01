@@ -73,6 +73,8 @@ void UInteractionPromptWidget::HandleInteractionAttemptFinished(const FPlayerInt
 		ExpiredDelegate.BindUObject(this, &UInteractionPromptWidget::HandleHeldApplyTransientFailureExpired);
 		break;
 	case EPlayerInteractionIntent::HeldTake:
+	case EPlayerInteractionIntent::EquipmentSecondaryUse:
+		// Both intents surface in the single RMB row.
 		FailureReason = &HeldTakeTransientFailureReason;
 		TimerHandle = &HeldTakeFailureTimerHandle;
 		ExpiredDelegate.BindUObject(this, &UInteractionPromptWidget::HandleHeldTakeTransientFailureExpired);
@@ -213,9 +215,13 @@ void UInteractionPromptWidget::ApplyCurrentPresentation()
 	const bool bHeldApplyRowVisible = !bEquipmentRowVisible && CachedQuery.bHeldApplyVisible;
 	const bool bLmbRowVisible = bEquipmentRowVisible || bHeldApplyRowVisible
 		|| bHasEquipmentTransientFailure || bHasHeldApplyTransientFailure;
-	const bool bHeldTakeRowVisible = CachedQuery.bHeldTakeVisible || bHasHeldTakeTransientFailure;
+	// RMB row source: the equipment's own secondary action wins over the target's held-use Take.
+	const bool bRmbFromEquipment = CachedQuery.bEquipmentSecondaryVisible;
+	const bool bRmbVisible = bRmbFromEquipment || CachedQuery.bHeldTakeVisible;
+	const bool bRmbCanUse = bRmbFromEquipment ? CachedQuery.bCanEquipmentSecondary : CachedQuery.bCanHeldTake;
+	const bool bHeldTakeRowVisible = bRmbVisible || bHasHeldTakeTransientFailure;
 	const bool bHasPersistentTarget = CachedQuery.bVisible || CachedQuery.bEquipmentUseVisible
-		|| CachedQuery.bHeldApplyVisible || CachedQuery.bHeldTakeVisible;
+		|| CachedQuery.bHeldApplyVisible || bRmbVisible;
 	const bool bHasTransientFailure = bHasPrimaryTransientFailure || bHasSecondaryTransientFailure
 		|| bHasHeldApplyTransientFailure || bHasHeldTakeTransientFailure
 		|| bHasEquipmentTransientFailure || bHasPlacementTransientFailure || bHasRecoveryTransientFailure;
@@ -254,11 +260,14 @@ void UInteractionPromptWidget::ApplyCurrentPresentation()
 	const bool bShowLmbFailure = bLmbRowVisible && !EffectiveLmbFailureReason.IsEmpty();
 	const bool bShowLmbHold = bEquipmentRowVisible
 		&& CachedQuery.EquipmentActivationMode == EPlayerInteractionActivationMode::Hold;
-	const FText& HeldTakeActionName = CachedQuery.bHeldTakeVisible
-		? CachedQuery.HeldTakeActionName : EmptyText;
+	const FText& HeldTakeActionName = bRmbFromEquipment
+		? CachedQuery.EquipmentSecondaryActionName
+		: (CachedQuery.bHeldTakeVisible ? CachedQuery.HeldTakeActionName : EmptyText);
+	const FText& RmbRowFailureReason = bRmbFromEquipment
+		? CachedQuery.EquipmentSecondaryFailureReason : CachedQuery.HeldTakeFailureReason;
 	const FText& EffectiveHeldTakeFailureReason = bHasHeldTakeTransientFailure
 		? HeldTakeTransientFailureReason
-		: (CachedQuery.bHeldTakeVisible ? CachedQuery.HeldTakeFailureReason : EmptyText);
+		: (bRmbVisible ? RmbRowFailureReason : EmptyText);
 	const bool bShowHeldTakeFailure = bHeldTakeRowVisible && !EffectiveHeldTakeFailureReason.IsEmpty();
 
 	const bool bPlacementVisible = CachedQuery.bPlacementVisible || bHasPlacementTransientFailure;
@@ -335,9 +344,8 @@ void UInteractionPromptWidget::ApplyCurrentPresentation()
 	if (HeldTakeActionNameText)
 	{
 		HeldTakeActionNameText->SetText(HeldTakeActionName);
-		HeldTakeActionNameText->SetIsEnabled(
-			CachedQuery.bHeldTakeVisible && CachedQuery.bCanHeldTake);
-		HeldTakeActionNameText->SetVisibility(CachedQuery.bHeldTakeVisible
+		HeldTakeActionNameText->SetIsEnabled(bRmbVisible && bRmbCanUse);
+		HeldTakeActionNameText->SetVisibility(bRmbVisible
 			? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	}
 	if (HeldTakeFailureReasonText)
@@ -397,6 +405,7 @@ bool UInteractionPromptWidget::IsPromptRootEnabled(const FPlayerInteractionQuery
 		|| (Query.bEquipmentUseVisible && Query.bCanEquipmentUse)
 		|| (Query.bHeldApplyVisible && Query.bCanHeldApply)
 		|| (Query.bHeldTakeVisible && Query.bCanHeldTake)
+		|| (Query.bEquipmentSecondaryVisible && Query.bCanEquipmentSecondary)
 		|| (Query.bPlacementVisible && Query.bCanPlace)
 		|| (Query.bRecoveryVisible && Query.bCanRecover);
 }
@@ -423,6 +432,7 @@ bool UInteractionPromptWidget::ClearTransientFailure(
 		TimerHandle = &HeldApplyFailureTimerHandle;
 		break;
 	case EPlayerInteractionIntent::HeldTake:
+	case EPlayerInteractionIntent::EquipmentSecondaryUse:
 		FailureReason = &HeldTakeTransientFailureReason;
 		TimerHandle = &HeldTakeFailureTimerHandle;
 		break;

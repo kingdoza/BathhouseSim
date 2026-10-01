@@ -102,6 +102,7 @@ protected:
 private:
 	friend class FBathhouseTowelPresentationTest;
 	friend class FBathhouseTowelDisplayCueTest;
+	friend class FCleaningTongsNoFalseTakeCueTest;
 
 	UFUNCTION()
 	void HandleInventoryChanged(

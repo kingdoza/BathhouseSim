@@ -217,10 +217,16 @@ Public/Placement/
 - `IHeldEquipmentSecondaryUsable`(C++ 전용): `QuerySecondaryEquipmentUse(Context) const → FHeldEquipmentUseQuery`, `ExecuteSecondaryEquipmentUse(Context) → FHeldEquipmentUseResult`. press당 한 번이며 반복·hold가 없다.
 - `UPlayerEquipmentUseComponent`:
   - `HasSecondaryEquipmentUse()`
-  - `ExecuteSecondaryEquipmentUse()`: 재평가 → 실행 → `ReportExternalInteractionAttempt(intent HeldTake)` → query refresh.
-  - `MergeEquipmentQuery`: held-use 필드를 지운 뒤 장비가 보조 사용을 구현하면 `HeldTake*` 필드(RMB 행)를 그 query로 채운다. mode는 Instant다.
+  - `ExecuteSecondaryEquipmentUse()`: 재평가 → 실행 → `ReportExternalInteractionAttempt(intent EquipmentSecondaryUse)` → query refresh.
+  - `MergeEquipmentQuery`: held-use 필드(Apply·Take)를 지운 뒤, 장비가 보조 사용을 구현하면 **별도 필드** `bEquipmentSecondaryVisible`, `bCanEquipmentSecondary`, `EquipmentSecondaryActionName`, `EquipmentSecondaryFailureReason`을 그 query로 채운다. mode는 항상 Instant라 필드가 없다.
+  - `HeldTake*` 필드는 "조준 대상 → 들고 있는 물건" 방향 신호로만 쓴다. 냉장고 진열 공간·수건 대상의 꺼내기 강조와 수건 기계 뚜껑이 focus observer로 이 필드를 읽기 때문이다. 장비 보조 사용을 이 필드에 담지 않는다(2026-10-01 버그 `.md/BugReports/2026-10-01_litter_tongs_false_take_highlight.md` 재설계).
   - `BeginEquipmentUse`: 장비 query가 `!bVisible && 이유 비움`이면 result를 보고하지 않고 끝난다(집게의 쓰레기 아닌 곳 LMB 무반응). 다른 장비는 항상 visible이라 결과가 같다.
-- `HeldTake` intent는 "RMB 행 결과"로 쓴다. widget 변경은 없다.
+- `EPlayerInteractionIntent::EquipmentSecondaryUse`(끝에 append)가 보조 사용 결과 intent다.
+- `UInteractionPromptWidget` RMB 행:
+  - `bEquipmentSecondaryVisible`이면 장비 보조 필드를, 아니면 기존 held Take 필드를 쓴다. 한 행에 한 source만 쓴다.
+  - transient failure는 `HeldTake`·`EquipmentSecondaryUse` 두 intent가 같은 RMB 행 slot을 쓴다.
+  - root 표시·enabled 조건에 새 필드를 포함한다.
+  - BindWidget 변경은 없다.
 - Character RMB Started 순서:
   1. Computer capture, Placement active, held-use 진행 중, LMB 장비 입력 진행 중 → 무시
   2. 장비를 들었고 보조 사용 있음 → `ExecuteSecondaryEquipmentUse`

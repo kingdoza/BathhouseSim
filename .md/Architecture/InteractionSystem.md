@@ -195,7 +195,8 @@ Blueprint 조회·표현 API:
 - generic held object와 held kind 조회, `OnHeldObjectChanged`
 - exact fixed-slot take/store와 actual-held-pose free-drop result
 - combined equipment-use query/result의 optional LMB action/failure/mode/progress
-- held-use Apply·Take의 visible/can/action/failure/mode 필드와 `HeldApply`·`HeldTake` result intent
+- held-use Apply·Take의 visible/can/action/failure/mode 필드와 `HeldApply`·`HeldTake` result intent. Take 필드는 대상 → 물건 방향 신호이며 target focus observer가 읽는다
+- 장비 보조 사용 RMB 행 `bEquipmentSecondaryVisible`, `bCanEquipmentSecondary`, `EquipmentSecondaryActionName`, `EquipmentSecondaryFailureReason`(BlueprintReadOnly, `Equals` 포함)와 `EquipmentSecondaryUse` result intent(2026-10-01)
 - `HeldObjectSummary`: 들고 있는 carryable의 `GetHeldSummaryText()`. `UPlayerEquipmentUseComponent::MergeEquipmentQuery`가 채운다(2026-09-30, [ServiceSystem.md](ServiceSystem.md) HUD)
 - `HeldUseTargetKey`(int32, 기본 `INDEX_NONE`): 같은 target 안의 하위 대상 key. held-use 반복은 key가 바뀌면 멈춘다(2026-09-30, [ServiceFacilityDisplaySystem.md](ServiceFacilityDisplaySystem.md) Held-Use Extension)
 - `PresentationRevision`(int64, 기본 0, `UPROPERTY()` Blueprint 비노출, `Equals` 포함): target 표현 상태의 revision. HUD 문구가 같아도 target 표현이 바뀌면 query를 달라지게 해 focus observer가 다시 알림을 받게 한다. 동작 판정·held-use 반복 조건에는 쓰지 않는다(2026-09-30, [TowelSystem.md](TowelSystem.md) Service Unit 2 Display Changes cue 재계산 경로)

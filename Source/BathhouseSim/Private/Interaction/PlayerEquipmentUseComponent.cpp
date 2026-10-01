@@ -78,11 +78,10 @@ FPlayerInteractionQuery UPlayerEquipmentUseComponent::MergeEquipmentQuery(
 	if (const auto* Secondary = Cast<IHeldEquipmentSecondaryUsable>(Equipment))
 	{
 		const auto Query = Secondary->QuerySecondaryEquipmentUse(Context);
-		Result.bHeldTakeVisible = Query.bVisible;
-		Result.bCanHeldTake = Query.bCanUse;
-		Result.HeldTakeActionName = Query.ActionName;
-		Result.HeldTakeFailureReason = Query.FailureReason;
-		Result.HeldTakeActivationMode = EPlayerInteractionActivationMode::Instant;
+		Result.bEquipmentSecondaryVisible = Query.bVisible;
+		Result.bCanEquipmentSecondary = Query.bCanUse;
+		Result.EquipmentSecondaryActionName = Query.ActionName;
+		Result.EquipmentSecondaryFailureReason = Query.FailureReason;
 	}
 	const FHeldEquipmentUseQuery EquipmentQuery = Usable->QueryEquipmentUse(Context);
 	Result.bEquipmentUseVisible = EquipmentQuery.bVisible;
@@ -304,7 +303,7 @@ FPlayerInteractionResult UPlayerEquipmentUseComponent::ExecuteSecondaryEquipment
 {
 	if (bInputActive)
 	{
-		return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::HeldTake);
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::EquipmentSecondaryUse);
 	}
 	AActor* Equipment = nullptr;
 	GetHeldUsable(Equipment);
@@ -312,14 +311,14 @@ FPlayerInteractionResult UPlayerEquipmentUseComponent::ExecuteSecondaryEquipment
 	FHeldEquipmentUseContext Context;
 	if (!Secondary || !BuildContext(Equipment, Context))
 	{
-		return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::HeldTake);
+		return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::EquipmentSecondaryUse);
 	}
 	const auto Query = Secondary->QuerySecondaryEquipmentUse(Context);
 	const auto UseResult = Query.bVisible && Query.bCanUse ? Secondary->ExecuteSecondaryEquipmentUse(Context)
 														   : FHeldEquipmentUseResult::Failed(Query.FailureReason);
-	const auto Result = UseResult.bSucceeded ? FPlayerInteractionResult::Succeeded(EPlayerInteractionIntent::HeldTake)
-											 : FPlayerInteractionResult::Failed(UseResult.FailureReason,
-																				EPlayerInteractionIntent::HeldTake);
+	const auto Result = UseResult.bSucceeded
+		? FPlayerInteractionResult::Succeeded(EPlayerInteractionIntent::EquipmentSecondaryUse)
+		: FPlayerInteractionResult::Failed(UseResult.FailureReason, EPlayerInteractionIntent::EquipmentSecondaryUse);
 	if (InteractionComponent)
 	{
 		InteractionComponent->ReportExternalInteractionAttempt(Result);

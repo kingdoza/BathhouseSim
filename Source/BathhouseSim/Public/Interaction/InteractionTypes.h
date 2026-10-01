@@ -19,7 +19,8 @@ enum class EPlayerInteractionIntent : uint8
 	PlacementConfirm,
 	FacilityRecovery,
 	HeldApply,
-	HeldTake
+	HeldTake,
+	EquipmentSecondaryUse
 };
 
 UENUM(BlueprintType)
@@ -198,6 +199,19 @@ struct BATHHOUSESIM_API FPlayerInteractionQuery
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	FText HeldObjectSummary;
 
+	/** Held equipment's own RMB action (for example tying a litter bag). Never a held-use Take row. */
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	bool bEquipmentSecondaryVisible = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	bool bCanEquipmentSecondary = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	FText EquipmentSecondaryActionName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	FText EquipmentSecondaryFailureReason;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	int32 HeldUseTargetKey = INDEX_NONE;
 
@@ -244,7 +258,11 @@ struct BATHHOUSESIM_API FPlayerInteractionQuery
 			&& HeldTakeActionName.EqualTo(Other.HeldTakeActionName)
 			&& HeldTakeFailureReason.EqualTo(Other.HeldTakeFailureReason)
 			&& HeldTakeActivationMode == Other.HeldTakeActivationMode
-			&& HeldObjectSummary.EqualTo(Other.HeldObjectSummary);
+			&& HeldObjectSummary.EqualTo(Other.HeldObjectSummary)
+			&& bEquipmentSecondaryVisible == Other.bEquipmentSecondaryVisible
+			&& bCanEquipmentSecondary == Other.bCanEquipmentSecondary
+			&& EquipmentSecondaryActionName.EqualTo(Other.EquipmentSecondaryActionName)
+			&& EquipmentSecondaryFailureReason.EqualTo(Other.EquipmentSecondaryFailureReason);
 	}
 };
 

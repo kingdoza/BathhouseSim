@@ -227,4 +227,4 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 들고 있는 물건 조작 LMB·RMB 통일(HeldTargetUseSystem): 구현(`3934d09`).
 - 서비스 1단위(ServiceSystem): 2026-09-30 완료(`5b42a47`).
 - 서비스 2단위(ServiceFacilityDisplaySystem·Towel 2단위 절): 2026-09-30 완료(`c9a1150`).
-- 서비스 3단위(CleaningLitterSystem): 2026-10-01 설계·Source 구현. 코드 리뷰 F1~F3(생성 자리 clearance 판정)을 재작업하는 중이다. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md` 재작업 절이다.
+- 서비스 3단위(CleaningLitterSystem): 2026-10-01 완료(`2c14d8f`). 같은 날 버그(집게를 들면 빼기 강조 표시) 수정 설계로 장비 보조 사용을 별도 query 필드로 분리했다. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.

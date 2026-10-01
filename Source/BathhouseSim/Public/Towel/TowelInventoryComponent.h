@@ -52,6 +52,7 @@ private:
 	friend class FBathhousePhysicalCarryFixedSlotTest;
 	friend class FBathhouseHeldTargetUseRepeatTest;
 	friend class FBathhouseFacilityPlacementRuntimeTest;
+	friend class FCleaningTongsNoFalseTakeCueTest;
 
 	void ConfigureDefaults(ETowelState InState, int32 InCount, int32 InCapacity);
 	bool TryBeginTransaction();
