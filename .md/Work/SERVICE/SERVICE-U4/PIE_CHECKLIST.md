@@ -2,7 +2,7 @@
 
 - 작업 ID: `SERVICE-U4`
 - 단계: 사용자 PIE 검증
-- 상태: 보류 — 세신 포커스 때수건 버그 수정 중, 코드 리뷰 진단·구현, 수정 반영 후 재개
+- 상태: 완료
 
 상세 절차는 `f15742a`의 `.md/PROMPT_UNREAL.md` "대표 PIE 절차와 관찰"을 따른다. 디버그 콘솔: `bathhouse.Debug.Service.SpawnTestUser/KnockdownTestUser/StandUpTestUser/RemoveTestUser`. 고장 관찰은 테스트 세션에서만 `BreakChancePercent=100`으로 바꾸고 저장하지 않는다(저장 값 10).
 
