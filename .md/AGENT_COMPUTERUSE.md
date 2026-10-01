@@ -67,7 +67,7 @@ PIE 시작·입력·플레이 시나리오 검증은 하지 않는다. `Source/`
 ## Unreal 정본 갱신
 
 - Compile, 개별 Save와 재로드가 성공한 asset만 관련 `.md/Unreal/*System.md`에 반영한다.
-- exact path, Parent, 핵심 component/binding, 기능 관련 default·override·collision·transform과 전역 설정만 기록한다.
+- exact path, Parent, 핵심 component/binding, 기능 관련 default·override의 위치와 계약 여부, collision·transform과 전역 설정만 기록한다. 조정값 수치는 복제하지 않고 원본 위치를 적는다([AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) 조정값 원본 원칙).
 - 날짜별 작업 이력, transient 상태와 저장되지 않은 예정값은 기록하지 않는다.
 - 새 시스템 문서를 만들면 `.md/Unreal/0_UNREAL.md`에 실제 링크를 추가한다.
 

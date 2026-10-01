@@ -31,7 +31,7 @@
 - exact asset path와 native Parent Class
 - C++ 계약에 필요한 component 이름·타입·attachment hierarchy
 - DataAsset, class, mesh, material, montage, widget와 StateTree 연결
-- 기능에 영향을 주는 Class Default와 허용된 Level instance override
+- 기능에 영향을 주는 Class Default와 허용된 Level instance override의 위치(asset·프로퍼티)와 계약 여부
 - collision, physics, Navigation과 trace 역할
 - transform, pivot, bounds, 단위와 local/world 좌표 기준
 - StateTree schema, evaluator/task/condition과 binding source
@@ -47,6 +47,7 @@
 - 저장되지 않았거나 재로드로 확인되지 않은 예정 상태
 - Source 코드에 이미 충분히 정의된 내부 구현
 - 근거 없는 asset 값과 경로
+- 조정값 수치. 원본 asset·프로퍼티 위치만 적는다([AGENT_WORKFLOW.md](../AGENT_WORKFLOW.md) 조정값 원본 원칙이 이 문서의 값 기록 규칙보다 우선한다)
 
 ## 갱신 규칙
 
