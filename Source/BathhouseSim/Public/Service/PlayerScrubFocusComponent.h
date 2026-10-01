@@ -61,6 +61,8 @@ private:
 	void CompleteFocusOut();
 	void ForceCleanup(bool RestoreView);
 	void HandleSessionEnded();
+	void HideHeldTowel();
+	void RestoreHeldTowelVisibility();
 	void UpdateCursor();
 	bool HasValidContext() const;
 	APlayerController* ResolveController() const;
@@ -76,11 +78,14 @@ private:
 	TWeakObjectPtr<APlayerController> SessionController;
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AActor> PreviousViewTarget;
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AActor> HiddenHeldTowel;
 	EPlayerScrubFocusPhase Phase = EPlayerScrubFocusPhase::Inactive;
 	EMovementMode SavedMovementMode = MOVE_None;
 	uint8 SavedCustomMovementMode = 0;
 	bool bSavedCursorVisible = false;
 	bool bSnapshotValid = false;
+	bool bHiddenHeldTowelWasHidden = false;
 	bool bRubbing = false;
 	FVector2D CursorLocal = FVector2D::ZeroVector;
 	FTimerHandle BlendTimer;

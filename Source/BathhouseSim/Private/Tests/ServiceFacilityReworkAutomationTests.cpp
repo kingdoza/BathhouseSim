@@ -35,7 +35,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBathhouseServiceReservationCycleTest,
 bool FBathhouseServiceReservationCycleTest::RunTest(const FString& Parameters)
 {
 	FScopedUtilityLaborWorld Scope(TEXT("ServiceReservationCycleWorld"));
-	FFixture Fixture(Scope.Get());
+	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!Fixture.Install(*this, true))
 	{
 		return false;
@@ -105,7 +105,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBathhouseServiceCancelAvailabilityTest,
 bool FBathhouseServiceCancelAvailabilityTest::RunTest(const FString& Parameters)
 {
 	FScopedUtilityLaborWorld Scope(TEXT("ServiceCancelAvailabilityWorld"));
-	FFixture Fixture(Scope.Get());
+	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!Fixture.Install(*this, true))
 	{
 		return false;
@@ -173,7 +173,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBathhouseServiceRouterNameTest,
 bool FBathhouseServiceRouterNameTest::RunTest(const FString& Parameters)
 {
 	FScopedUtilityLaborWorld Scope(TEXT("ServiceRouterNameWorld"));
-	FFixture Fixture(Scope.Get());
+	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!Fixture.Install(*this))
 	{
 		return false;

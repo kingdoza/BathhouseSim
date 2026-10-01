@@ -14,7 +14,7 @@ bool FBathhouseServiceFacilityPayloadTest::RunTest(const FString& Parameters)
 	for (bool bShower : {false, true})
 	{
 		FScopedUtilityLaborWorld Scope(bShower ? TEXT("ShowerPayloadWorld") : TEXT("VanityPayloadWorld"));
-		FFixture Fixture(Scope.Get());
+		ServiceFacilityTest::FFixture Fixture(Scope.Get());
 		if (!TestTrue(TEXT("Construction-created facility installs"), Fixture.Install(*this, bShower)))
 		{
 			return false;
