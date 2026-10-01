@@ -12,6 +12,8 @@
 
 다음은 사용자에게 보이는 결과라 설계 단계가 정하지 않는다. 기능 명세 단계에서 `.md/QNA_FEATURE_SPEC.md`로 확정한 뒤 `.md/PROMPT_ARCHITECTURE.md`에 반영해야 한다.
 
+상태: 모두 해결. G1 → Q66 A, G2 → Q67 A, G3·G4는 기능 명세 정정으로 반영됐다(2026-10-01). 설계는 `Architecture/ServiceAmenitySystem.md`에 반영했다.
+
 - G1. 이용 중 손님이 쓰러질 때의 규칙이 기존 손님 회복 계약과 충돌한다(공통 81행, MASS-011).
   - 명세: 쓰러지거나 사라지면 이용이 요금 없이 끝나고 설비가 다시 이용 가능해진다.
   - 기존 `CustomerRecoverySystem.md` 계약: 쓰러짐은 일시 중단이다.

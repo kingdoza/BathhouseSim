@@ -10,6 +10,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Computer/PlayerComputerUseComponent.h"
+#include "Service/PlayerScrubFocusComponent.h"
 #include "EnhancedInputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "InputActionValue.h"
@@ -62,6 +63,9 @@ AFirstPersonCharacter::AFirstPersonCharacter(const FObjectInitializer& ObjectIni
 		PlayerCarry,
 		ComputerWidgetInteraction);
 
+	PlayerScrubFocus = CreateDefaultSubobject<UPlayerScrubFocusComponent>(TEXT("PlayerScrubFocus"));
+	PlayerScrubFocus->Configure(FirstPersonMovement, PlayerInteraction, PlayerCarry);
+
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = true;
 	bUseControllerRotationRoll = false;
@@ -86,6 +90,7 @@ AFirstPersonCharacter::AFirstPersonCharacter(const FObjectInitializer& ObjectIni
 void AFirstPersonCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	PlayerScrubFocus->Configure(FirstPersonMovement, PlayerInteraction, PlayerCarry);
 
 	// These links are runtime-only state. Re-establish them on the fully constructed
 	// player instance so Blueprint archetype loading cannot leave the recovery
@@ -229,7 +234,7 @@ void AFirstPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 void AFirstPersonCharacter::MoveInput(const FInputActionValue& Value)
 {
-	if (PlayerComputerUse && PlayerComputerUse->IsCapturingInput())
+	if (IsFocusCapturingInput())
 	{
 		return;
 	}
@@ -239,7 +244,12 @@ void AFirstPersonCharacter::MoveInput(const FInputActionValue& Value)
 
 void AFirstPersonCharacter::LookInput(const FInputActionValue& Value)
 {
-	if (PlayerComputerUse && PlayerComputerUse->IsCapturingInput())
+	if (PlayerScrubFocus && PlayerScrubFocus->GetPhase() == EPlayerScrubFocusPhase::Active)
+	{
+		PlayerScrubFocus->AddRubInput(Value.Get<FVector2D>());
+		return;
+	}
+	if (IsFocusCapturingInput())
 	{
 		return;
 	}
@@ -249,7 +259,7 @@ void AFirstPersonCharacter::LookInput(const FInputActionValue& Value)
 
 void AFirstPersonCharacter::SprintStartInput()
 {
-	if ((PlayerComputerUse && PlayerComputerUse->IsCapturingInput()) || !FirstPersonMovement)
+	if (IsFocusCapturingInput() || !FirstPersonMovement)
 	{
 		return;
 	}
@@ -265,7 +275,7 @@ void AFirstPersonCharacter::SprintStartInput()
 
 void AFirstPersonCharacter::SprintReleaseInput()
 {
-	if ((PlayerComputerUse && PlayerComputerUse->IsCapturingInput()) || !FirstPersonMovement || bSprintToggle)
+	if (IsFocusCapturingInput() || !FirstPersonMovement || bSprintToggle)
 	{
 		return;
 	}
@@ -282,6 +292,13 @@ void AFirstPersonCharacter::InteractStartInput()
 		return;
 	}
 
+	if (PlayerScrubFocus && PlayerScrubFocus->IsCapturingInput())
+	{
+		bScrubOwnsInteractPress = true;
+		PlayerScrubFocus->RequestEndScrubFocus();
+		return;
+	}
+	bScrubOwnsInteractPress = false;
 	bComputerOwnsInteractPress = false;
 	if (PlayerInteraction)
 	{
@@ -291,10 +308,20 @@ void AFirstPersonCharacter::InteractStartInput()
 	{
 		bComputerOwnsInteractPress = true;
 	}
+
+	if (PlayerScrubFocus && PlayerScrubFocus->IsCapturingInput())
+	{
+		bScrubOwnsInteractPress = true;
+	}
 }
 
 void AFirstPersonCharacter::InteractEndInput()
 {
+	if (bScrubOwnsInteractPress)
+	{
+		bScrubOwnsInteractPress = false;
+		return;
+	}
 	if (bComputerOwnsInteractPress)
 	{
 		bComputerOwnsInteractPress = false;
@@ -308,7 +335,7 @@ void AFirstPersonCharacter::InteractEndInput()
 
 void AFirstPersonCharacter::SecondaryInteractInput()
 {
-	if (PlayerComputerUse && PlayerComputerUse->IsCapturingInput())
+	if (IsFocusCapturingInput())
 	{
 		return;
 	}
@@ -320,7 +347,7 @@ void AFirstPersonCharacter::SecondaryInteractInput()
 
 void AFirstPersonCharacter::DropCarryInput()
 {
-	if (PlayerComputerUse && PlayerComputerUse->IsCapturingInput())
+	if (IsFocusCapturingInput())
 	{
 		return;
 	}
@@ -336,6 +363,10 @@ void AFirstPersonCharacter::CancelInput()
 	{
 		PlayerComputerUse->RequestEndComputerUse();
 	}
+	else if (PlayerScrubFocus && PlayerScrubFocus->IsCapturingInput())
+	{
+		PlayerScrubFocus->RequestEndScrubFocus();
+	}
 }
 
 void AFirstPersonCharacter::PrimaryUseStartInput()
@@ -348,6 +379,12 @@ void AFirstPersonCharacter::PrimaryUseStartInput()
 	{
 		PrimaryUsePressOwner = EPrimaryUsePressOwner::Computer;
 		bComputerOwnsPointerPress = PlayerComputerUse->PressPointer();
+		return;
+	}
+	if (PlayerScrubFocus && PlayerScrubFocus->IsCapturingInput())
+	{
+		PrimaryUsePressOwner = EPrimaryUsePressOwner::Scrub;
+		PlayerScrubFocus->SetRubbing(true);
 		return;
 	}
 	if (PlayerFacilityPlacement && PlayerFacilityPlacement->IsPlacementActive())
@@ -398,6 +435,11 @@ void AFirstPersonCharacter::PrimaryUseEndInput()
 {
 	const EPrimaryUsePressOwner PreviousOwner = PrimaryUsePressOwner;
 	PrimaryUsePressOwner = EPrimaryUsePressOwner::None;
+	if (PreviousOwner == EPrimaryUsePressOwner::Scrub && PlayerScrubFocus)
+	{
+		PlayerScrubFocus->SetRubbing(false);
+		return;
+	}
 	if (PreviousOwner == EPrimaryUsePressOwner::Computer)
 	{
 		if (bComputerOwnsPointerPress && PlayerComputerUse)
@@ -423,8 +465,7 @@ void AFirstPersonCharacter::SecondaryUseStartInput()
 	{
 		return;
 	}
-	if ((PlayerComputerUse && PlayerComputerUse->IsCapturingInput()) ||
-		(PlayerFacilityPlacement && PlayerFacilityPlacement->IsPlacementActive()) ||
+	if (IsFocusCapturingInput() || (PlayerFacilityPlacement && PlayerFacilityPlacement->IsPlacementActive()) ||
 		(PlayerHeldTargetUse && PlayerHeldTargetUse->IsUseActive()) ||
 		(PlayerEquipmentUse && PlayerEquipmentUse->IsEquipmentUseInputActive()))
 	{
@@ -464,7 +505,7 @@ void AFirstPersonCharacter::SecondaryUseEndInput()
 
 void AFirstPersonCharacter::RecoverFacilityStartInput()
 {
-	if ((!PlayerComputerUse || !PlayerComputerUse->IsCapturingInput()) && PlayerFacilityPlacement)
+	if (!IsFocusCapturingInput() && PlayerFacilityPlacement)
 	{
 		PlayerFacilityPlacement->BeginRecoveryHold();
 	}
@@ -488,7 +529,7 @@ void AFirstPersonCharacter::RecoverFacilityCanceledInput()
 
 void AFirstPersonCharacter::PlacementSnapStartInput()
 {
-	if ((!PlayerComputerUse || !PlayerComputerUse->IsCapturingInput()) && PlayerFacilityPlacement)
+	if (!IsFocusCapturingInput() && PlayerFacilityPlacement)
 	{
 		PlayerFacilityPlacement->SetSnapHeld(true);
 	}
@@ -504,7 +545,7 @@ void AFirstPersonCharacter::PlacementSnapEndInput()
 
 void AFirstPersonCharacter::PlacementRotateInput(const FInputActionValue& Value)
 {
-	if ((!PlayerComputerUse || !PlayerComputerUse->IsCapturingInput()) && PlayerFacilityPlacement)
+	if (!IsFocusCapturingInput() && PlayerFacilityPlacement)
 	{
 		PlayerFacilityPlacement->AddRotationInput(Value.Get<float>());
 	}
@@ -522,7 +563,7 @@ void AFirstPersonCharacter::ComputerClickEndInput()
 
 void AFirstPersonCharacter::DoMove(float Right, float Forward)
 {
-	if ((PlayerComputerUse && PlayerComputerUse->IsCapturingInput()) || !Controller)
+	if (IsFocusCapturingInput() || !Controller)
 	{
 		return;
 	}
@@ -533,7 +574,7 @@ void AFirstPersonCharacter::DoMove(float Right, float Forward)
 
 void AFirstPersonCharacter::DoLook(float Yaw, float Pitch)
 {
-	if ((PlayerComputerUse && PlayerComputerUse->IsCapturingInput()) || !Controller)
+	if (IsFocusCapturingInput() || !Controller)
 	{
 		return;
 	}
@@ -544,7 +585,7 @@ void AFirstPersonCharacter::DoLook(float Yaw, float Pitch)
 
 void AFirstPersonCharacter::DoJumpStart()
 {
-	if (PlayerComputerUse && PlayerComputerUse->IsCapturingInput())
+	if (IsFocusCapturingInput())
 	{
 		return;
 	}
@@ -554,4 +595,10 @@ void AFirstPersonCharacter::DoJumpStart()
 void AFirstPersonCharacter::DoJumpEnd()
 {
 	StopJumping();
+}
+
+bool AFirstPersonCharacter::IsFocusCapturingInput() const
+{
+	return (PlayerComputerUse && PlayerComputerUse->IsCapturingInput()) ||
+		   (PlayerScrubFocus && PlayerScrubFocus->IsCapturingInput());
 }

@@ -6,6 +6,8 @@
 
 2026-09-26 설계(Source 미반영): 포커스인 뒤 클릭 없이 E로 이탈, ESC 이탈, 진입마다 커서 화면 중앙, 컴퓨터별 고정 위치·방향 이탈과 막힘 시 근처 빈자리 탐색을 추가한다. 입력은 `.md/PROMPT_ARCHITECTURE.md`(컴퓨터 포커스 진입·이탈 수정, CMP-001~020)와 `.md/QNA_FEATURE_SPEC.md` Q62~Q68이다.
 
+2026-10-01 서비스 4단위 설계: 세신 포커스(`UPlayerScrubFocusComponent`)가 이탈 위치 helper `FComputerFocusExitPlacement::Resolve`를 재사용한다. 컴퓨터 component는 수정하지 않는다. Character의 컴퓨터 전용 입력 차단 검사는 `IsFocusCapturingInput()`(컴퓨터 || 세신)로 바뀌며, 컴퓨터 쪽 결과는 같다([ServiceAmenitySystem.md](ServiceAmenitySystem.md)).
+
 기존 수직 범위는 컴퓨터 한 대의 포커스 진입/이탈과 클릭 확인용 샘플 화면이다. 다음 구현은 같은 session 계약 위에 욕탕 관리 화면을 연결한다. 범용 운영체제, 프로그램 목록과 저장 시스템은 포함하지 않는다.
 
 ## Source Scope

@@ -22,7 +22,8 @@ enum class EPhysicalCarryKind : uint8
 	DeliveryBox,
 	ItemBox,
 	LitterTongs,
-	TrashBag
+	TrashBag,
+	ScrubTowel
 };
 
 UENUM(BlueprintType, meta = (Bitflags))

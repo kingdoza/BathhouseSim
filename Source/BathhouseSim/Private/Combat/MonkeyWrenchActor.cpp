@@ -1,6 +1,7 @@
 #include "Combat/MonkeyWrenchActor.h"
 
 #include "Combat/MeleeAttackComponent.h"
+#include "Combat/WrenchRepairSession.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Interaction/PlayerCarryComponent.h"
@@ -13,6 +14,7 @@
 
 AMonkeyWrenchActor::AMonkeyWrenchActor()
 {
+	RepairSession.Reset(new FWrenchRepairSession());
 	PrimaryActorTick.bCanEverTick = false;
 	WorldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorldMesh"));
 	SetRootComponent(WorldMesh);
@@ -20,6 +22,22 @@ AMonkeyWrenchActor::AMonkeyWrenchActor()
 	WorldMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	WorldMesh->SetUseCCD(true);
 	MeleeAttack = CreateDefaultSubobject<UMeleeAttackComponent>(TEXT("MeleeAttack"));
+}
+
+void FWrenchRepairSessionDeleter::operator()(FWrenchRepairSession* Session) const
+{
+	delete Session;
+}
+
+AMonkeyWrenchActor::~AMonkeyWrenchActor() = default;
+
+void AMonkeyWrenchActor::ResetRepair()
+{
+	if (RepairSession->IsActive())
+	{
+		RepairSession->Reset();
+		OnRepairActiveChanged(false);
+	}
 }
 
 void AMonkeyWrenchActor::BeginPlay()
@@ -32,6 +50,7 @@ void AMonkeyWrenchActor::BeginPlay()
 void AMonkeyWrenchActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	bEndingPlay = true;
+	ResetRepair();
 	if (MeleeAttack)
 	{
 		MeleeAttack->CancelAttack();
@@ -243,6 +262,10 @@ bool AMonkeyWrenchActor::NotifyPhysicalDropCommitted(UPlayerCarryComponent& Carr
 
 void AMonkeyWrenchActor::PublishPhysicalCarryCommit(const EPhysicalCarryCommitTransition Transition)
 {
+	if (Transition != EPhysicalCarryCommitTransition::TakenIntoHand)
+	{
+		ResetRepair();
+	}
 	OnHeldPresentationChanged.Broadcast(
 		Transition == EPhysicalCarryCommitTransition::TakenIntoHand);
 }
@@ -258,6 +281,7 @@ void AMonkeyWrenchActor::RecoverPhysicalCarryable(UPlayerCarryComponent* Previou
 	{
 		return;
 	}
+	ResetRepair();
 	if (MeleeAttack)
 	{
 		MeleeAttack->CancelAttack();
@@ -296,12 +320,24 @@ FHeldEquipmentUseQuery AMonkeyWrenchActor::QueryEquipmentUse(const FHeldEquipmen
 			? LOCTEXT("AttackInProgress", "이미 휘두르는 중입니다.")
 			: LOCTEXT("WrenchNotHeld", "몽키스패너를 들고 있어야 합니다.");
 	}
+	if (FWrenchRepairSession::IsRepairTarget(Context.FocusHit.GetActor()))
+	{
+		Query.ActionName = LOCTEXT("Repair", "수리");
+		Query.ActivationMode = EPlayerInteractionActivationMode::Hold;
+		Query.Progress = RepairSession->GetProgress(Context.FocusHit.GetActor());
+	}
 	return Query;
 }
 
 FHeldEquipmentUseResult AMonkeyWrenchActor::BeginEquipmentUse(const FHeldEquipmentUseContext& Context)
 {
 	const FHeldEquipmentUseQuery Query = QueryEquipmentUse(Context);
+	if (Query.bCanUse && Query.ActivationMode == EPlayerInteractionActivationMode::Hold &&
+		RepairSession->Begin(Context.FocusHit.GetActor()))
+	{
+		OnRepairActiveChanged(true);
+		return FHeldEquipmentUseResult::Succeeded();
+	}
 	if (!Query.bCanUse || !MeleeAttack || !MeleeAttack->StartAttack(Context.User, this, Context.Camera, Context.MotionComponent))
 	{
 		return FHeldEquipmentUseResult::Failed(
@@ -312,6 +348,15 @@ FHeldEquipmentUseResult AMonkeyWrenchActor::BeginEquipmentUse(const FHeldEquipme
 
 FHeldEquipmentUseUpdate AMonkeyWrenchActor::UpdateEquipmentUse(const FHeldEquipmentUseContext& Context, float DeltaTime)
 {
+	if (RepairSession->IsActive())
+	{
+		auto Result = RepairSession->Update(Context.FocusHit.GetActor(), DeltaTime);
+		if (Result.State != EPlayerHoldInteractionState::Running)
+		{
+			OnRepairActiveChanged(false);
+		}
+		return Result;
+	}
 	FHeldEquipmentUseUpdate Update;
 	Update.State = EPlayerHoldInteractionState::Succeeded;
 	Update.Progress = 1.0f;
@@ -320,11 +365,13 @@ FHeldEquipmentUseUpdate AMonkeyWrenchActor::UpdateEquipmentUse(const FHeldEquipm
 
 FHeldEquipmentUseResult AMonkeyWrenchActor::EndEquipmentUse(const FHeldEquipmentUseContext& Context)
 {
+	ResetRepair();
 	return FHeldEquipmentUseResult::Succeeded();
 }
 
 void AMonkeyWrenchActor::CancelEquipmentUse(const FHeldEquipmentUseContext& Context)
 {
+	ResetRepair();
 	if (MeleeAttack)
 	{
 		MeleeAttack->CancelAttack();

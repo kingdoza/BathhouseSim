@@ -25,3 +25,5 @@ Shop Actor Blueprint 세 개는 개별 compile/save와 생성 세션 readback까
 Shop 기능 책임과 API는 [Architecture/ShopSystem.md](../Architecture/ShopSystem.md)에 있다. MCP 미지원 Editor 작업은 [USER_UNREAL.md](../USER_UNREAL.md)의 상점 후속 항목을 참조한다.
 
 DefaultMap의 기존 `BP_TrashBin` level instance는 서비스 3단위에서 제거됐다([CleaningSystem.md](CleaningSystem.md)). `BP_TrashBin` Blueprint asset은 유지된다.
+
+서비스 4단위로 상품 4개가 추가돼 총 20개다: `MassageChair`(안마의자 60,000), `RestBench`(평상 15,000), `Television`(TV 25,000), `ScrubTable`(세신대 20,000). 각각 해당 `DA_FacilityPlacement_*`를 `PlacementDefinition`으로 지정하고 `ItemBoxDefinition`은 비웠다. 기존 16개 상품과 순서는 유지된다. 상세는 [ServiceSystem.md](ServiceSystem.md).

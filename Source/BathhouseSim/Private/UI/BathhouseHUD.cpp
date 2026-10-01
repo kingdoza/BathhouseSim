@@ -11,6 +11,8 @@
 #include "TimerManager.h"
 #include "UI/InteractionPromptWidget.h"
 #include "UI/MoneyHudWidget.h"
+#include "UI/ScrubFocusHudWidget.h"
+#include "Service/PlayerScrubFocusComponent.h"
 #include "UI/ShopNoticeWidget.h"
 
 void ABathhouseHUD::BeginPlay()
@@ -53,6 +55,18 @@ void ABathhouseHUD::BeginPlay()
 		}
 	}
 
+	if (ScrubFocusHudWidgetClass)
+	{
+		ScrubFocusHudWidget = CreateWidget<UScrubFocusHudWidget>(PlayerController, ScrubFocusHudWidgetClass);
+		if (ScrubFocusHudWidget)
+		{
+			ScrubFocusHudWidget->AddToViewport();
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("BathhouseHUD: ScrubFocusHudWidgetClass is not assigned."));
+	}
 	RebindPawn(PlayerController->GetPawn());
 	TryBindWallet();
 }
@@ -85,6 +99,12 @@ void ABathhouseHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		ShopNoticeWidget->RemoveFromParent();
 		ShopNoticeWidget = nullptr;
 	}
+	if (ScrubFocusHudWidget)
+	{
+		ScrubFocusHudWidget->SetFocusComponent(nullptr);
+		ScrubFocusHudWidget->RemoveFromParent();
+		ScrubFocusHudWidget = nullptr;
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -97,6 +117,11 @@ void ABathhouseHUD::HandlePossessedPawnChanged(APawn* OldPawn, APawn* NewPawn)
 
 void ABathhouseHUD::RebindPawn(APawn* Pawn)
 {
+	if (ScrubFocusHudWidget)
+	{
+		ScrubFocusHudWidget->SetFocusComponent(Pawn ? Pawn->FindComponentByClass<UPlayerScrubFocusComponent>()
+													: nullptr);
+	}
 	if (InteractionPromptWidget)
 	{
 		InteractionPromptWidget->SetInteractionComponent(Pawn ? Pawn->FindComponentByClass<UPlayerInteractionComponent>() : nullptr);

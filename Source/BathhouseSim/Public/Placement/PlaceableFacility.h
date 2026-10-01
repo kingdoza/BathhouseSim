@@ -46,7 +46,14 @@ public:
 		OutFailureReason = FText::GetEmpty();
 		return true;
 	}
-	virtual void CancelFacilityRecoveryHold() {}
+
+	virtual void CancelFacilityRecoveryHold()
+	{
+	}
+
+	virtual void SetFacilityRecoveryInstigator(AActor* Instigator)
+	{
+	}
 	virtual bool ExportPlacementPayload(
 		APlaceableFacilityItemActor& PayloadOwner,
 		FFacilityPlacementPayload& OutPayload,

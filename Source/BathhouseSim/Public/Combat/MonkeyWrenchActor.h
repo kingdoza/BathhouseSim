@@ -7,6 +7,12 @@
 #include "Interaction/PlayerInteractable.h"
 #include "MonkeyWrenchActor.generated.h"
 
+class FWrenchRepairSession;
+
+struct FWrenchRepairSessionDeleter
+{
+	void operator()(FWrenchRepairSession* Session) const;
+};
 class UMeleeAttackComponent;
 class UPlayerCarryComponent;
 class UStaticMeshComponent;
@@ -20,6 +26,9 @@ class BATHHOUSESIM_API AMonkeyWrenchActor : public AActor, public IPlayerInterac
 
 public:
 	AMonkeyWrenchActor();
+	virtual ~AMonkeyWrenchActor() override;
+	UFUNCTION(BlueprintImplementableEvent, Category = "Combat|Presentation")
+	void OnRepairActiveChanged(bool Active);
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
@@ -87,6 +96,8 @@ protected:
 private:
 	friend class FBathhousePhysicalCarryFixedSlotTest;
 
+	void ResetRepair();
+	TUniquePtr<FWrenchRepairSession, FWrenchRepairSessionDeleter> RepairSession;
 	void ApplyHeldTransform();
 	void SetWorldPhysics(bool bEnabled);
 

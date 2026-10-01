@@ -55,11 +55,6 @@ FPlayerInteractionQuery UPlayerEquipmentUseComponent::MergeEquipmentQuery(
 		return Result;
 	}
 
-	Result.bHeldApplyVisible = false;
-	Result.bCanHeldApply = false;
-	Result.HeldApplyActionName = FText::GetEmpty();
-	Result.HeldApplyFailureReason = FText::GetEmpty();
-	Result.HeldApplyActivationMode = EPlayerInteractionActivationMode::Instant;
 	Result.bHeldTakeVisible = false;
 	Result.bCanHeldTake = false;
 	Result.HeldTakeActionName = FText::GetEmpty();
@@ -69,6 +64,10 @@ FPlayerInteractionQuery UPlayerEquipmentUseComponent::MergeEquipmentQuery(
 	FHeldEquipmentUseContext Context;
 	if (!BuildContext(Equipment, Context))
 	{
+		Result.bHeldApplyVisible = false;
+		Result.bCanHeldApply = false;
+		Result.HeldApplyActionName = FText::GetEmpty();
+		Result.HeldApplyFailureReason = FText::GetEmpty();
 		Result.bEquipmentUseVisible = true;
 		Result.bCanEquipmentUse = false;
 		Result.EquipmentFailureReason = LOCTEXT("InvalidUseContext", "장비 사용 상태를 확인할 수 없습니다.");
@@ -84,6 +83,19 @@ FPlayerInteractionQuery UPlayerEquipmentUseComponent::MergeEquipmentQuery(
 		Result.EquipmentSecondaryFailureReason = Query.FailureReason;
 	}
 	const FHeldEquipmentUseQuery EquipmentQuery = Usable->QueryEquipmentUse(Context);
+	if (EquipmentQuery.bVisible)
+	{
+		Result.bHeldApplyVisible = false;
+		Result.bCanHeldApply = false;
+		Result.HeldApplyActionName = FText::GetEmpty();
+		Result.HeldApplyFailureReason = FText::GetEmpty();
+		Result.HeldApplyActivationMode = EPlayerInteractionActivationMode::Instant;
+	}
+	else
+	{
+		Result.bCanHeldApply = false;
+		Result.HeldApplyActionName = FText::GetEmpty();
+	}
 	Result.bEquipmentUseVisible = EquipmentQuery.bVisible;
 	Result.bCanEquipmentUse = EquipmentQuery.bCanUse;
 	Result.EquipmentActionName = EquipmentQuery.ActionName;
@@ -129,7 +141,15 @@ FPlayerInteractionResult UPlayerEquipmentUseComponent::BeginEquipmentUse()
 	const FHeldEquipmentUseQuery Query = Usable->QueryEquipmentUse(Context);
 	if (!Query.bVisible && Query.FailureReason.IsEmpty())
 	{
-		return FPlayerInteractionResult::Failed(FText::GetEmpty(), EPlayerInteractionIntent::EquipmentUse);
+		const auto FocusQuery =
+			InteractionComponent ? InteractionComponent->GetCurrentInteractionQuery() : FPlayerInteractionQuery();
+		const auto Result =
+			FPlayerInteractionResult::Failed(FocusQuery.HeldApplyFailureReason, EPlayerInteractionIntent::EquipmentUse);
+		if (InteractionComponent && !FocusQuery.HeldApplyFailureReason.IsEmpty())
+		{
+			InteractionComponent->ReportExternalInteractionAttempt(Result);
+		}
+		return Result;
 	}
 	if (!Query.bVisible || !Query.bCanUse)
 	{

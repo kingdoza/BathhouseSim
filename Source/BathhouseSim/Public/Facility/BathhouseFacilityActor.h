@@ -53,6 +53,16 @@ public:
 	virtual FFacilityPlacementTransactionResult QueryFacilityRecovery() const override;
 	virtual bool TryBeginFacilityRecoveryHold(FText& OutFailureReason) override;
 	virtual void CancelFacilityRecoveryHold() override;
+
+	virtual void SetFacilityRecoveryInstigator(AActor* InInstigator) override
+	{
+		RecoveryInstigator = InInstigator;
+	}
+
+	AActor* GetFacilityRecoveryInstigator() const
+	{
+		return RecoveryInstigator.Get();
+	}
 	bool IsRecoveryHoldActive() const { return bRecoveryHoldActive; }
 	virtual bool ExportPlacementPayload(APlaceableFacilityItemActor& Item, FFacilityPlacementPayload& OutPayload, FText& OutFailureReason) const override;
 	virtual bool ImportPlacementPayload(const APlaceableFacilityItemActor& Item, const FFacilityPlacementPayload& Payload, FText& OutFailureReason) override;
@@ -173,4 +183,6 @@ private:
 	bool bPlacedDomainRegistered = false;
 	bool bEndingPlay = false;
 	bool bRecoveryHoldActive = false;
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AActor> RecoveryInstigator;
 };

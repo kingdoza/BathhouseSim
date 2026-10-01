@@ -2,6 +2,8 @@
 
 ## Implementation Status
 
+2026-10-01 서비스 4단위 설계(Source 미반영): 고장 난 안마의자를 조준하면 LMB Hold 수리를 하고 휘두르기는 하지 않는다. `IWrenchRepairable`과 private `FWrenchRepairSession`이 담당한다. 정본은 [ServiceAmenitySystem.md](ServiceAmenitySystem.md) Wrench Repair다.
+
 이 문서는 단일 physical carry 계약을 사용하는 몽키스패너, 범용 LMB 장비 사용, 카메라 기준 근접 피격과 공용 체력의 현재 native 구현을 정의한다. wrench exact fixed slot, held-position free drop과 placement 전 active attack cancel도 [PhysicalCarrySystem.md](PhysicalCarrySystem.md)에 따라 구현되어 있다.
 
 고객 전용 래그돌, 기립과 루틴 재시작은 [CustomerRecoverySystem.md](CustomerRecoverySystem.md)가 소유한다.

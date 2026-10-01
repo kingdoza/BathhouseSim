@@ -8,6 +8,7 @@
 
 class UCameraComponent;
 class UPlayerComputerUseComponent;
+class UPlayerScrubFocusComponent;
 class UPlayerEquipmentUseComponent;
 class UHeldEquipmentMotionComponent;
 class UFirstPersonCameraShakeComponent;
@@ -58,6 +59,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Facility Placement")
 	UPlayerFacilityPlacementComponent* GetPlayerFacilityPlacement() const { return PlayerFacilityPlacement; }
+
+	UFUNCTION(BlueprintPure, Category = "Service")
+
+	UPlayerScrubFocusComponent* GetPlayerScrubFocus() const
+	{
+		return PlayerScrubFocus;
+	}
 
 protected:
 	void MoveInput(const FInputActionValue& Value);
@@ -119,6 +127,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Computer", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPlayerComputerUseComponent> PlayerComputerUse;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Service")
+	TObjectPtr<UPlayerScrubFocusComponent> PlayerScrubFocus;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UHeldEquipmentMotionComponent> HeldEquipmentMotion;
@@ -184,6 +195,9 @@ protected:
 	bool bSprintToggle = true;
 
 private:
+
+	bool IsFocusCapturingInput() const;
+	friend class FServiceAmenityInputTest;
 	friend class FBathhouseComputerSessionTest;
 	friend class FBathhouseEquipmentUseRoutingTest;
 	friend class FBathhouseHeldTargetUseOwnerRoutingTest;
@@ -197,7 +211,8 @@ private:
 		Placement,
 		Equipment,
 		HeldTargetUse,
-		Ignored
+		Ignored,
+		Scrub
 	};
 
 	enum class ESecondaryUsePressOwner : uint8
@@ -208,6 +223,7 @@ private:
 		EquipmentSecondary
 	};
 
+	bool bScrubOwnsInteractPress = false;
 	bool bComputerOwnsInteractPress = false;
 	bool bComputerOwnsPointerPress = false;
 	EPrimaryUsePressOwner PrimaryUsePressOwner = EPrimaryUsePressOwner::None;

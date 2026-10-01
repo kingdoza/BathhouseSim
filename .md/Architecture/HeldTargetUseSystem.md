@@ -49,7 +49,7 @@ Private/Towel/TowelHeldTransferRules.h/.cpp            신규, 수건 방향 규
 - `IPlayerInteractable::ExecuteHeldTargetUse(Context, Direction)`(C++ virtual, 기본 빈 이유 실패): 조건을 재검증하고 한 단위만 실행한다. 결과 intent는 `HeldApply`/`HeldTake`다.
 - `UPlayerEquipmentUseComponent`:
   - `HasUsableHeldEquipment() const`(public, 신규): 들고 있는 Actor가 `IHeldEquipmentUsable`인지.
-  - `MergeEquipmentQuery`: 들고 있는 Actor가 장비면 held-use 두 방향 필드를 모두 비운다. 장비가 LMB를 authoritative하게 소유하고 RMB는 아무 일도 없다(CTRL-026).
+  - `MergeEquipmentQuery`: 들고 있는 Actor가 장비면 held-use 두 방향 필드를 모두 비운다. 장비가 LMB를 authoritative하게 소유하고 RMB는 아무 일도 없다(CTRL-026). 2026-10-01 Q67 A: 장비 LMB query가 `!bVisible`이면 Apply 이유만 안내로 남긴다(`bCanHeldApply=false`, 행동명 비움). 정본은 [ServiceAmenitySystem.md](ServiceAmenitySystem.md) Equipment Merge.
 
 ## Input Ownership
 

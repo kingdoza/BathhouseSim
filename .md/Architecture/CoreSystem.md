@@ -98,6 +98,7 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 - `UtilityLeverSystem.md`: Utility 하위 순환기 조작부·레버 왕복 경계.
 - `ShopSystem.md`: `Public/Shop`, `Private/Shop`의 상품 목록·장바구니·주문·배송·상자·개봉·쓰레기통 경계.
 - `ServiceSystem.md`: `Public/Service`, `Private/Service`의 품목 정의·품목 박스·진열 공간·음료 냉장고·판매 적립·수거함과 꺼내기 외곽선 경계. 프로젝트 렌더 설정 Custom Depth-Stencil Pass(Enabled with Stencil)의 사용처다.
+- `ServiceAmenitySystem.md`: Service 하위 안마의자·평상·TV·세신대·때수건·세신 포커스·테스트 인형 경계.
 - `CleaningLitterSystem.md`: Cleaning 하위 쓰레기·집게·봉투·수거 구역·인원 기반 생성·발밑 정리·RMB 장비 보조 사용 경계.
 - `ServiceFacilityDisplaySystem.md`: Service 하위 설비 전체 조준 진열·소모품·화장대·샤워 비품·진열 payload 일반화·공용 표시 도구 경계.
 - `PlacementSystem.md`: 설비 mode/preview/placement/recovery, 확장 단계와 락커 capacity lease 경계
@@ -137,6 +138,8 @@ Cleaning/Towel/Computer, Combat/Customer Recovery, Physical Carry와 Bath Water 
 - 상점: cart는 PlayerState component, 주문·배송은 world subsystem, 개봉 위치·transaction은 private helper가 맡는다. 이미 600줄을 넘은 `UPlayerCarryComponent`에는 기존 placement 소모를 일반화한 consume commit만 추가하고 상점 판정을 넣지 않는다. Widget은 cart·주문·돈을 보관하지 않는다.
 
 - 청소 생성(3단위): 두 종류의 발생 clock은 `ACleaningDirectorActor`, 바닥 판정·clock 수학·footprint 겹침은 private `CleaningSpawnRules` helper가 소유한다. 쓰레기 구역은 기존 stain zone의 부모를 바꾸지 않은 독립 class다. 500줄을 넘은 `FacilityActorConversionTransaction.cpp`에는 배치 확정 이벤트 발행만 추가한다. 400줄을 넘은 품목 박스·배송 상자·설비 아이템 cpp에는 기존 버리기 책임의 world 변형만 추가한다. `UPlayerCarryComponent`·`UPlayerInteractionComponent`는 변경하지 않는다.
+
+- 배치형 서비스(4단위): 안마의자·TV·세신대는 `ABathhouseFacilityActor` 하위 class로 자기 상태를 소유하고, base에는 회수 수행자 Transient 필드만 더한다. 렌치 수리 진행은 400줄 경고선 근처의 렌치 대신 private `FWrenchRepairSession`이 맡는다. 세신 포커스는 승인된 컴퓨터 component를 바꾸지 않고 새 component로 두며 이탈 위치 helper만 공유한다. 500줄을 넘은 Character에는 입력 분기와 `IsFocusCapturingInput()` 정리만 추가한다. 415줄 `PlayerFacilityPlacementComponent`에는 회수 수행자 전달 두 호출만 추가한다.
 
 ## Manual Review Points
 

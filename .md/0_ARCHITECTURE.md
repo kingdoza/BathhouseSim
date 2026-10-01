@@ -35,6 +35,7 @@
 - [UtilityFuelSystem.md](Architecture/UtilityFuelSystem.md): 석탄·드라이아이스, 공급함, 삽, 보일러·쿨러 투입 Volume·자동 열림 문
 - [UtilityLeverSystem.md](Architecture/UtilityLeverSystem.md): 순환기 조작부, 레버 왕복·취소·복귀와 E 진행 표시
 - [ServiceSystem.md](Architecture/ServiceSystem.md): 품목 정의·품목 박스, 진열 공간 넣기·빼기·프리뷰·외곽선 강조, 음료 냉장고, 판매 적립과 공용 수거함
+- [ServiceAmenitySystem.md](Architecture/ServiceAmenitySystem.md): 안마의자(동전함·고장·렌치 수리), 평상, TV, 세신대·때수건·세신 포커스, 테스트 인형과 검증 명령
 - [CleaningLitterSystem.md](Architecture/CleaningLitterSystem.md): 쓰레기·물 얼룩 인원 기반 생성, 집게+봉투, 묶은 봉투, 수거 구역·world 버리기, 배치 확정 시 발밑 정리, RMB 장비 보조 사용
 - [ServiceFacilityDisplaySystem.md](Architecture/ServiceFacilityDisplaySystem.md): 설비 전체 조준 진열, 소모품, 공용 화장대, 샤워 비품, 진열 payload 일반화, 공용 표시 도구
 - [ShopSystem.md](Architecture/ShopSystem.md): 상품 목록, 장바구니, 주문·배송 FIFO, 배송 지점·상자, LMB 개봉 무리 배치, 쓰레기통
@@ -112,7 +113,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
   - Combat: 몽키스패너, camera-based melee attack과 공용 health 책임
   - Customer Recovery: Customer Source 내 knockdown, soft interruption과 restartable Task 책임
   - Shop: cart, 주문·배송, 배송 상자·개봉과 쓰레기통 책임
-  - Service: 품목 박스·진열 공간·음료 냉장고·판매 적립·수거함 책임
+  - Service: 품목 박스·진열 공간·음료 냉장고·판매 적립·수거함, 안마의자·TV·세신대·때수건·세신 포커스 책임
   - Core: 모듈/redirect/문서 경계 책임
 
 ## 시스템 간 책임 흐름
@@ -170,7 +171,8 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - Computer/UI -> Interaction과 Bath Water Operations snapshot/request API
 - Utility -> Interaction/Placement 계약, Facility utility base. Facility Capacity는 주입된 Operation 가동 query만 사용하며 전역 합계는 Operations에 둔다.
 - Shop -> Economy/Placement/Interaction 계약, DeveloperSettings, Service 품목 정의·박스 class
-- Service -> Interaction/Facility/Placement/Economy 계약, GameplayTags, DeveloperSettings
+- Service -> Interaction/Facility/Placement/Economy 계약, GameplayTags, DeveloperSettings, Combat `IWrenchRepairable`, Computer 이탈 위치 helper(4단위)
+- Character -> Service 세신 포커스 component(4단위)
 - Towel -> Service 표시 도구(`UDisplayCueComponent`)·Interaction 열림 표현
 - UI -> Shop, Computer screen context interface
 - Computer -> UMG/Engine Camera/PlayerController
@@ -227,4 +229,5 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 들고 있는 물건 조작 LMB·RMB 통일(HeldTargetUseSystem): 구현(`3934d09`).
 - 서비스 1단위(ServiceSystem): 2026-09-30 완료(`5b42a47`).
 - 서비스 2단위(ServiceFacilityDisplaySystem·Towel 2단위 절): 2026-09-30 완료(`c9a1150`).
-- 서비스 3단위(CleaningLitterSystem): 2026-10-01 완료(`2c14d8f`). 같은 날 버그(집게를 들면 빼기 강조 표시) 수정 설계로 장비 보조 사용을 별도 query 필드로 분리했다. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
+- 서비스 3단위(CleaningLitterSystem): 2026-10-01 완료(`2c14d8f`). 같은 날 버그(집게를 들면 빼기 강조 표시) 수정 설계로 장비 보조 사용을 별도 query 필드로 분리했다. 버그 수정은 `4111e20`로 완료됐다.
+- 서비스 4단위(ServiceAmenitySystem): 2026-10-01 설계, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.

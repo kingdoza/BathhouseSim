@@ -130,7 +130,7 @@ Public/Placement/
 - E query(월드·거치대 밖): 빈손이면 물걸레와 같은 들기 문구, 표시 이름 `집게`.
 - LMB `QueryEquipmentUse`(`Instant`):
   - focus hit Actor가 유효한 `ALitterActor`이면 visible, action `줍기`. `BagCount ≥ BagCapacity`면 불가, `봉투 가득 참`.
-  - 그 밖이면 `bVisible=false`, 이유 비움이다. 행이 없고 누르면 아무 일도 없다(TRSH-024).
+  - 그 밖이면 `bVisible=false`, 이유 비움이다. 누르면 아무 행동도 없다(TRSH-024). 2026-10-01 Q67 A부터는 대상이 요구하는 이유가 있으면 LMB 행과 누름 결과에 그 이유가 보인다([ServiceAmenitySystem.md](ServiceAmenitySystem.md) Equipment Merge).
 - `BeginEquipmentUse`: query를 재평가한 뒤 `Litter->CommitCollected()` → `BagCount + 1` 순서로 실행한다. 두 단계 모두 검증 뒤라 실패하지 않는다. Instant이므로 누른 채 유지해도 한 개다(TRSH-007~009).
 - RMB `QuerySecondaryEquipmentUse`(조준 무관): visible, action `봉투 묶기`. `BagCount == 0`이면 불가, `봉투가 비어 있음`.
 - `ExecuteSecondaryEquipmentUse`:

@@ -223,7 +223,9 @@ Actor collision restore는 실패 가능한 domain rollback 뒤에 수행한다.
 
 placement staged 순서(2026-09-30 확정): `SpawnActorDeferred` → `PrepareForStagedPlacement` → `ImportPlacementPayload`(construction 전, native subobject만 존재) → `FinishSpawning`(Blueprint SCS component 생성) → `IPlaceableFacility::FinalizePlacementPayloadAfterConstruction(OutFailure)` → collision snapshot 확정·검증 → `QueryFacilityPlacement` → `BeginTransition` → domain 등록 → item 소비 → publication. 새 단계는 default `true`이며 기존 설비의 순서·결과를 바꾸지 않는다. 실패하면 기존 import 실패와 같이 staged Actor를 제거하고 item 소비·publication 없이 실패를 반환한다. Blueprint component에 의존하는 payload 적용은 이 단계에서만 한다([ServiceSystem.md](ServiceSystem.md) Placement Payload Extension).
 
-배치 확정 이벤트(2026-10-01 서비스 3단위 설계, Source 미반영):
+회수 수행자(2026-10-01 서비스 4단위 설계): `IPlaceableFacility::SetFacilityRecoveryInstigator(AActor*)`(기본 no-op)를 `UPlayerFacilityPlacementComponent`가 Hold 시작 직전 owner pawn으로, 취소 시 nullptr로 호출한다. 회수 commit 뒤의 지급(안마의자 동전함)은 설비가 publication callback에서 한다. Placement는 지갑을 모른다([ServiceAmenitySystem.md](ServiceAmenitySystem.md) Recovery Instigator).
+
+배치 확정 이벤트(2026-10-01 서비스 3단위 설계):
 
 - `UFacilityPlacementEventSubsystem : UWorldSubsystem`(Public/Placement, 신규)은 C++ 전용 `FOnFacilityPlacedNative`를 소유한다.
   - 이벤트 값 `FFacilityPlacedEvent`(non-reflected struct): placed Actor weak, `PlacementFootprint` world transform, unscaled box extent.

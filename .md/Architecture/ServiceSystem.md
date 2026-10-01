@@ -4,6 +4,7 @@
 
 - 2026-09-30 설계. 입력은 `.md/PROMPT_ARCHITECTURE.md`(서비스 1단위: 진열 기반, 음료 냉장고)와 `.md/NextWork/QNA_FEATURE_SPEC.md`의 해당 Q다. 사용자 결정: 꺼내기 강조는 Custom Depth Stencil + 후처리 외곽선(2026-09-30).
 - 구현 상태: 1단위 완료(2026-09-30 사용자 확인, 커밋 `5b42a47`). Source 구현, 코드 리뷰의 아키텍처 재검토(F1~F5) 재작업, Editor authoring까지 끝났다.
+- 4단위(배치형 서비스) 설계: 2026-10-01, [ServiceAmenitySystem.md](ServiceAmenitySystem.md)가 정본이다.
 - 2단위(진열 확장) 설계: 2026-09-30, [ServiceFacilityDisplaySystem.md](ServiceFacilityDisplaySystem.md)가 정본이다. 이 문서의 1단위 구조 중 다음을 일반화한다.
   - 냉장고 payload → 공용 `UServiceDisplayManagerComponent`와 설비 extension
   - 공간 proxy → `UDisplayCueComponent`

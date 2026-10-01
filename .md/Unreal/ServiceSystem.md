@@ -43,3 +43,26 @@ DefaultMap의 `BP_DrinkCollectionBox` 배치는 저장되지 않았다(사용자
 - `BP_CleanTowelStack`/`BP_UsedTowelBin`: native `DisplayCue` 1개와 `TowelPresentationVisual` 상속 확인(저장 변경 없음). `BP_DrinkFridge`: native `DisplayManager`(슬롯 1, 소모 false)와 SelfAim 공간 4개·slot 1개 상속 확인(변경 없음).
 - `DisplaySpaceComponent` collision 설정은 `bodyInstance.collisionProfileName`만 바꾸면 `collisionEnabled`가 그대로다. FacilityRouted는 `bodyInstance.collisionEnabled=NoCollision`을 명시해야 native 검증을 통과한다.
 - `DisplaySpaceComponent.SlotTransforms`처럼 기본값이 있는 배열은 개수를 바꾸면서 값을 바꾸는 요청이 MCP에서 거부된다. 기존 값 그대로 개수만 줄이는 요청 뒤 값을 지정한다.
+
+## 서비스 4단위 (안마의자·평상·TV·세신대)
+
+저장·새 프로세스 재로드로 확인한 상태다. 임시 mesh는 `/Engine/BasicShapes/Cube.Cube`뿐이고 새 재질은 없다. 네 설비 Actor scale은 모두 `(1,1,1)`, grid는 20cm다.
+
+| Blueprint (`/Game/Bathhouse/Blueprints/Service/`) | Parent / FacilityType | body (SceneRoot 자식, BlockAllDynamic·Navigation on) | footprint (extent, 위치 Z) | slot (모두 `BathhouseFacilitySlotComponent`, enabled) |
+|---|---|---|---|---|
+| `BP_MassageChair` | `MassageChairActor` / MassageChair | `ChairBody` `(0,0,50)` scale `(.8,.8,1)` | `(40,40,50)`, Z50 | `CustomerSlot` 1: 위치 `(0,0,0)`, approach `(80,0,0)`, yaw 0 |
+| `BP_RestBench` | `BathhouseFacilityActor` / **RestBench**(부모 기본 Bath를 변경) | `BenchBody` `(0,0,25)` scale `(3.6,1,.5)` | `(180,50,25)`, Z25 | `SeatSlot0~2`: X -120/0/120, approach `(0,90,0)`, yaw 90 |
+| `BP_Television` | `TelevisionActor` / Television | `TvBody` `(0,0,90)` scale `(.8,.4,1.8)` | `(40,20,90)`, Z90 | 없음(0개) |
+| `BP_ScrubTable` | `ScrubTableActor` / ScrubTable | `TableBody` `(0,0,45)` scale `(2,.8,.9)` | `(100,40,45)`, Z45 | `CustomerSlot` 1: 위치 `(0,0,90)`, approach `(0,-110,-90)`(바닥), yaw 90 |
+
+- 모든 footprint는 NoCollision·Navigation off이고 full X/Y가 20cm의 정수배다. 각 설비의 `FacilityPlacement.Definition`은 아래 Definition이다.
+- `BP_MassageChair`: `UseSeconds 60`, `UseFee 3000`, `BreakChancePercent 10`, `RepairSeconds 3`. `BrokenLabel`(TextRender "고장", 위치 `(0,0,125)`, NoCollision·Navigation off, 기본 hidden). Event Graph: `BeginPlay`에서 `IsBroken()`을 읽어 `BrokenLabel` Visibility 설정, `OnBrokenStateChanged(Broken)`에서 Visibility만 반전. 돈·고장 판정은 graph에 없다.
+- `BP_Television`: `ScreenOnVisual`(Cube `(21,0,105)` scale `(.02,.7,1.1)`, `MI_FacilityPreview_Valid` 재질, NoCollision·Navigation off, 기본 hidden). Event Graph: `OnPowerChanged(PoweredOn)`에서 Visibility만 설정.
+- `BP_ScrubTable` 기본값: `ScrubFee 20000`, `WaitLimitSeconds 90`, `RequiredRubDistanceCm 3000`, `RubCmPerInputUnit 1`, `ExitSearchRadiusCm 100`, 블렌드 in/out 0.35/0.25, `CashOfferClass=BP_BathhouseCashPayment_C`. 여섯 native component(이름 유지, 중복 SCS 없음): `ScrubCamera` `(0,-170,240)` pitch -45/yaw 90, `ScrubArea` `(0,0,95)` **회전 Pitch 180·Yaw 90·Roll 0(Details 패널 `(Roll,Pitch,Yaw)` 표기로 `(0,180,90)`), extent `(35,90,1)`**(NoCollision·Navigation off; 사용자 PIE에서 확정·저장, 새 프로세스 디스크 읽기로 확인), `ScrubCursor` Cube scale `(.18,.12,.03)`(NoCollision·Navigation off·HiddenInGame), `ScrubExitPoint` `(0,-120,0)` yaw 90, `CashOfferPoint` `(0,-160,110)`, `CashStandPoint` **`(0,-200,0)`** yaw 90(프롬프트 초기값 -180에서 조정: 이탈점과 60cm 간격이면 캡슐이 겹쳐 80cm로 벌렸다).
+- `ScrubArea` 축 규약: 코드가 마우스 오른쪽(+)을 영역 로컬 Y로, 마우스 아래(+, 입력 Y 반전 때문)를 로컬 X로 보낸다. 위 회전에서 로컬 X = 월드 -Y(카메라 쪽, 화면 아래), 로컬 Y = 월드 -X(화면 오른쪽), **로컬 Z는 아래를 향한다**("+Z가 표면 법선" 계약과 다르며 코드에서 법선은 커서 높이 계산에만 쓰인다). 그래서 extent는 X(깊이)=35, Y(가로)=90이다. 프롬프트 초기값(회전 0, extent `(90,35,1)`)은 마우스 방향이 90° 어긋났다.
+- 카메라 기하(초기 extent 기준, FOV 90·16:9 계산): 네 모서리와 커서가 모두 화면 안에 있고 몸체에 가려지지 않는다. 이탈점은 몸체 앞면에서 80cm 앞이며 바닥 Z=0이다. 실제 포커스 화면 판정은 PIE 확인 대기.
+- `BP_ScrubTowel`: `WorldMesh` Cube scale `(.25,.18,.03)`(QueryAndPhysics, CCD, Pawn Ignore), `HeldTransform` `(45,15,-30)` scale 1. `BP_ServiceTestUser`: `WorldMesh` Cube scale `(.5,.5,1.7)`, 상대 Z 85(발 기준 원점), NoCollision·Navigation off, 물리 없음.
+- Definition `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_{MassageChair,RestBench,Television,ScrubTable}`: `StableId=Facility.<이름>`, 태그 Placeable·Discardable, `PlacedFacilityClass=BP_<이름>_C`, 공통 회수 아이템 class, `RecoveryItemMesh` 비움, 잠금 칸 0.
+- 상속 확인만(변경 없음): `BP_Shower`(슬롯 2·진열 공간·manager), `BP_MonkeyWrench`(`WorldMesh`·`MeleeAttack`), `BP_FirstPersonCharacter`(`PlayerScrubFocus` 정확히 1개, 컴퓨터 component 유지).
+- DefaultMap의 때수건과 전용 거치대는 [WorldSystem.md](WorldSystem.md)에 있다.
+

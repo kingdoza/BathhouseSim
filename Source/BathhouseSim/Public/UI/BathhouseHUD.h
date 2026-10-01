@@ -9,6 +9,7 @@ class APawn;
 class UInteractionPromptWidget;
 class UMoneyHudWidget;
 class UShopNoticeWidget;
+class UScrubFocusHudWidget;
 
 UCLASS(Blueprintable)
 class BATHHOUSESIM_API ABathhouseHUD : public AHUD
@@ -29,7 +30,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Shop")
 	TSubclassOf<UShopNoticeWidget> ShopNoticeWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Service")
+	TSubclassOf<UScrubFocusHudWidget> ScrubFocusHudWidgetClass;
+
 private:
+
+	UPROPERTY(Transient)
+	TObjectPtr<UScrubFocusHudWidget> ScrubFocusHudWidget;
 	UFUNCTION()
 	void HandlePossessedPawnChanged(APawn* OldPawn, APawn* NewPawn);
 

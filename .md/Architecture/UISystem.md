@@ -173,6 +173,10 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - focus-out은 widget을 파괴하지 않아 같은 computer Actor lifetime 동안 선택과 표시 상태를 유지한다.
 - 기존 `UComputerSampleScreenWidget`과 WBP는 rename/delete하지 않는다. 관리 WBP assignment는 Editor 단계에서 수행한다.
 
+## Scrub Focus HUD
+
+2026-10-01 서비스 4단위 설계: `UScrubFocusHudWidget`(BindWidget `ScrubGaugeBar`, `ScrubWaitText`)을 `ABathhouseHUD`가 생성하고 `UPlayerScrubFocusComponent`를 주입한다. 세신 포커스 Active 동안만 보이고, NativeTick이 세신대의 게이지·남은 대기를 표시한다. 정본은 [ServiceAmenitySystem.md](ServiceAmenitySystem.md) Scrub Focus Session이다.
+
 ## Computer Tab Root, Shop And Money HUD
 
 2026-09-27 설계, Source 미반영. 계약은 [ShopSystem.md](ShopSystem.md) UI 절이 정본이다.

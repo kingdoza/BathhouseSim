@@ -15,7 +15,11 @@ enum class EBathhouseFacilityType : uint8
 	Exit,
 	TowelShelf,
 	DrinkFridge,
-	Vanity
+	Vanity,
+	MassageChair,
+	RestBench,
+	Television,
+	ScrubTable
 };
 
 UENUM(BlueprintType)

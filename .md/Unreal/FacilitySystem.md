@@ -6,6 +6,10 @@
 |---|---|---|
 | `/Game/Bathhouse/Blueprints/Facility/BP_Bath` | `/Script/BathhouseSim.BathhouseBathFacilityActor` | Bath 시설, 3개 Facility Slot과 물 표현 composition root |
 | `/Game/Bathhouse/Blueprints/Facility/BP_Shower` | `/Script/BathhouseSim.BathhouseFacilityActor` | Shower 시설과 2개 Facility Slot, 비품 manager·router·공간 2개([ServiceSystem.md](ServiceSystem.md)) |
+| `/Game/Bathhouse/Blueprints/Service/BP_MassageChair` | `/Script/BathhouseSim.MassageChairActor` | 안마의자(slot 1, 고장 표시 graph, [ServiceSystem.md](ServiceSystem.md)) |
+| `/Game/Bathhouse/Blueprints/Service/BP_RestBench` | `/Script/BathhouseSim.BathhouseFacilityActor` | 평상(`SeatSlot0~2`, FacilityType RestBench) |
+| `/Game/Bathhouse/Blueprints/Service/BP_Television` | `/Script/BathhouseSim.TelevisionActor` | TV(slot 0, 화면 표현 graph) |
+| `/Game/Bathhouse/Blueprints/Service/BP_ScrubTable` | `/Script/BathhouseSim.ScrubTableActor` | 세신대(slot 1, native 세신 component 6개) |
 | `/Game/Bathhouse/Blueprints/Service/BP_Vanity` | `/Script/BathhouseSim.BathhouseFacilityActor` | 화장대(비품 진열 4그룹, Facility Slot 1개, [ServiceSystem.md](ServiceSystem.md)) |
 | `/Game/Bathhouse/Blueprints/Facility/BP_ClothesLocker` | `/Script/BathhouseSim.BathhouseFacilityActor` | 1칸 Clothes Locker |
 | `/Game/Bathhouse/Blueprints/Facility/BP_ClothesLocker_4` | `/Script/BathhouseSim.BathhouseFacilityActor` | 4칸 Clothes Locker |

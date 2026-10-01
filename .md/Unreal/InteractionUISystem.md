@@ -36,3 +36,7 @@ UE 5.8 DLL 빌드 후 새 Editor에서 다섯 WBP와 컴퓨터 BP의 Data Valida
 ## 서비스 단계 연결
 
 `BP_FirstPersonCharacter.FirstPersonCamera`의 PostProcessSettings `WeightedBlendables`에 `/Game/Bathhouse/Materials/Service/M_PP_TakeHighlightOutline`(weight 1)이 저장돼 있다(레벨 PostProcessVolume 아님). `/Game/Bathhouse/UI/WBP_InteractionPrompt`에는 `HeldSummaryText`(TextBlock, `BindWidgetOptional`)가 `PromptRoot`(Overlay) 자식으로 저장돼 있다. Overlay slot padding top 600·Left/Top 정렬, 폰트·색·그림자는 `ActionNameText`와 동일(Roboto Bold 24), 기본 Visibility Collapsed(C++가 표시 제어). 기존 필수 BindWidget 15개는 모두 유지된다. RMB 행으로 `RmbKeyText`("RMB", 위쪽 640·왼쪽 0), `HeldTakeActionNameText`(640·80), `HeldTakeFailureReasonText`(680·80) TextBlock 세 개가 `PromptRoot` 자식으로 저장돼 있다(Collapsed 기본, 기존 `ActionNameText`와 같은 폰트·색·그림자, `BindWidgetOptional`). 텍스트·표시는 C++가 제어한다. `PrimaryKeyText`·`LmbKeyText`는 이 WBP에 없다.
+
+## 세신 HUD
+
+`/Game/Bathhouse/UI/WBP_ScrubFocusHud`(parent `ScrubFocusHudWidget`)는 루트 `RootOverlay` 아래 하단 중앙 `ScrubColumn`(VerticalBox, 아래 여백 90)에 `ScrubGaugeBar`(ProgressBar, 360×22 SizeBox 안, 노란색)와 `ScrubWaitText`(TextBlock, 중앙 정렬, Roboto Bold 24, 그림자)를 둔다(둘 다 BindWidget). `TickFrequency=Auto`이고 root 기본 Visibility는 SelfHitTestInvisible이며 graph는 없다. `BP_BathhouseHUD.ScrubFocusHudWidgetClass=WBP_ScrubFocusHud_C`이고 기존 InteractionPrompt·MoneyHud·ShopNotice class는 유지된다. 기존 Input Action/Mapping 변경은 없다.

@@ -304,8 +304,10 @@ bool UPlayerFacilityPlacementComponent::BeginRecoveryHold()
 		return false;
 	}
 	FText HoldFailureReason;
+	Placeable->SetFacilityRecoveryInstigator(GetOwner());
 	if (!Placeable->TryBeginFacilityRecoveryHold(HoldFailureReason))
 	{
+		Placeable->SetFacilityRecoveryInstigator(nullptr);
 		ReportResult(FPlayerInteractionResult::Failed(
 			HoldFailureReason.IsEmpty() ? LOCTEXT("RecoveryHoldBeginFailed", "설비 회수 준비를 시작할 수 없습니다.") : HoldFailureReason,
 			EPlayerInteractionIntent::FacilityRecovery));
@@ -385,6 +387,7 @@ void UPlayerFacilityPlacementComponent::CancelRecovery()
 		Target->OnDestroyed.RemoveDynamic(this, &UPlayerFacilityPlacementComponent::HandleRecoveryTargetDestroyed);
 		if (IPlaceableFacility* Placeable = Cast<IPlaceableFacility>(Target))
 		{
+			Placeable->SetFacilityRecoveryInstigator(nullptr);
 			Placeable->CancelFacilityRecoveryHold();
 		}
 	}
