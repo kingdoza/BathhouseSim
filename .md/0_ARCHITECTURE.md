@@ -125,7 +125,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - Camera는 owner의 이동 상태, sprint 상태, falling/landing 상태를 읽고 camera shake 재생/중단을 결정한다.
 - Camera는 player camera manager를 통해 상하 시야각 제한 기본값을 제공하고, Blueprint 파생 class에서 값을 조정할 수 있게 한다.
 - Camera는 비로컬 플레이어에서 Tick interval 조정과 shake 중단으로 비용을 줄인다.
-- Character는 E/F/G/Q, LCtrl/MouseWheel과 범용 LMB·RMB를 의도로 전달한다. LMB owner는 `Computer > Placement > Equipment(장비) > HeldTargetUse` 순서, RMB는 HeldTargetUse Take이며 Character가 domain 상태를 변경하지 않는다. 들고 있는 물건으로 대상에 하는 일은 LMB(물건 → 대상)·RMB(대상 → 물건), 손으로 하는 일은 E, 내려놓기는 G다. F는 예약이다.
+- Character는 E/F/G/Q, LCtrl/MouseWheel과 범용 LMB·RMB를 의도로 전달한다. MouseWheel은 computer capture 중 computer 화면 스크롤, 그 밖에는 배치 회전으로 간다(`COMPUTER-WHEEL-SCROLL` 설계). LMB owner는 `Computer > Placement > Equipment(장비) > HeldTargetUse` 순서, RMB는 HeldTargetUse Take이며 Character가 domain 상태를 변경하지 않는다. 들고 있는 물건으로 대상에 하는 일은 LMB(물건 → 대상)·RMB(대상 → 물건), 손으로 하는 일은 E, 내려놓기는 G다. F는 예약이다.
 - Interaction은 camera trace, equipment/placement/recovery prompt 합성과 held motion 표현을 소유한다. Physical Carry는 key/wet mop/towel basket/monkey wrench/전용 설비 아이템 중 하나의 held state, exact fixed slot과 free-drop transaction을 소유한다.
 - 모든 일반 carryable은 별도 예외가 없으면 G free drop과 exact assigned fixed slot을 지원한다. 전용 설비 아이템은 명시적 `FreeDrop` 전용 예외이며, free drop은 actual held pose에서 질량 무시 약한 velocity change로 시작하고 free-world item은 Pawn을 무시하며 CCD를 사용한다.
 - Facility는 다중 use slot, check-in/checkout 독립 FIFO와 revision을 소유한다. queue point는 Location/Yaw 전체를 사용하고 checkout visible capacity를 넘은 entry는 같은 FIFO 순번을 유지한 채 전용 NavMesh volume assignment를 받는다.
@@ -232,3 +232,4 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 서비스 3단위(CleaningLitterSystem): 2026-10-01 완료(`2c14d8f`). 같은 날 버그(집게를 들면 빼기 강조 표시) 수정 설계로 장비 보조 사용을 별도 query 필드로 분리했다. 버그 수정은 `4111e20`로 완료됐다.
 - 서비스 4단위(ServiceAmenitySystem): 2026-10-01 설계, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
 - 버그 `BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`: 2026-10-01 설계, Source 미반영. 관리 화면 slider 확정값 동기화([BathWaterManagementUISystem.md](Architecture/BathWaterManagementUISystem.md))와 컴퓨터 키보드 focus 불변식 회귀 자동화([ComputerSystem.md](Architecture/ComputerSystem.md))다. 입력은 `.md/Work/BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out/PROMPT_IMPLEMENTATION.md`이다.
+- `COMPUTER-WHEEL-SCROLL`: 2026-10-01 설계, Source 미반영, 위 BUG 병합 뒤 구현. 컴퓨터 Active 동안 휠을 virtual pointer로 화면에 주입해 커서 아래 스크롤 영역을 스크롤한다. Content 변경은 없다([ComputerSystem.md](Architecture/ComputerSystem.md) Screen Wheel Scroll, [CharacterSystem.md](Architecture/CharacterSystem.md)). 입력은 `.md/Work/COMPUTER-WHEEL-SCROLL/PROMPT_IMPLEMENTATION.md`이다.
