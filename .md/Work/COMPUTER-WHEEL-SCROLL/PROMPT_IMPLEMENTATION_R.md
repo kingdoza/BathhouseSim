@@ -1,11 +1,22 @@
-# PROMPT_IMPLEMENTATION_R — COMPUTER-WHEEL-SCROLL 코드 리뷰 1회차 재작업
+# PROMPT_IMPLEMENTATION_R — COMPUTER-WHEEL-SCROLL 코드 리뷰 재작업
 
 - 작업 ID: `COMPUTER-WHEEL-SCROLL`
 - 단계: 코드 리뷰
 - 상태: 완료
-- 출처: 코드 리뷰 1회차
+- 출처: 코드 리뷰 2회차
 
-## 리뷰 대상과 결론
+## 2회차 재검증 결과 (`git diff e271f83 263fef4`)
+
+- F2: 해결. `CharacterSystem.md` 63행 상태가 `ComputerSystem.md` 11행과 같다.
+- 마스터 추가(`ComputerSystem.md` 203행 "(엔진 기본 32)" 제거): 확인.
+- F3: 생략 수용. Source·Config·Content는 `863d964` 이후 바뀌지 않아 재빌드가 필요 없다.
+- F1: 미해결. 수정된 `PROMPT_UNREAL.md` 2번이 "현재 값은 Editor 단계가 읽어 기록한다"로 바뀌었다. 수치를 쓰는 주체만 구현에서 Editor로 옮겼을 뿐, Unreal 정본에 `WheelScrollMultiplier` 현재 수치를 복제하라는 지시는 그대로다. 조정값 원본 원칙(문서는 원본 위치만 참조하며 이 원칙이 정본 값 기록 규칙보다 우선한다)과 1회차 재검증 조건("수치 미기록 지시")을 충족하지 않는다.
+  - 수정 방향: 2번에서 "현재 값은 Editor 단계가 읽어 기록한다"를 지운다. 대신 "multiplier·cvar의 현재 수치는 정본에 적지 않고 원본 프로퍼티 위치만 적는다. 현재 값 확인은 Editor에서 해당 ScrollBox를 읽거나 자동화 C의 `AddInfo` 로그로 한다"를 명시한다.
+- 미이행 조건: `PROMPT_REVIEW.md`에 재작업 범위 한두 줄 추가가 빠졌다. 이번에 F1 수정과 함께 추가한다.
+- 마스터 참고(이 재작업 범위 밖, 아키텍처 소유): `ComputerSystem.md` 205행 "현재 asset 값은 Unreal `InteractionUISystem.md`가 기록한다"도 정본에 수치를 기록한다는 전제다. F1과 같은 원칙으로 "원본은 각 ScrollBox 프로퍼티"로 맞추는 것이 일관된다.
+- 3회차 재검증 조건: `PROMPT_UNREAL.md` 2번에 수치 기록 지시가 없고 "수치 미기록" 지시가 있다. `PROMPT_REVIEW.md`에 재작업 기록이 있다. `git diff 863d964 -- Source Config Content`가 비어 있다.
+
+## 1회차 리뷰 대상과 결론
 
 - 범위: `git diff 5dae4d4 863d964`(구현 커밋 `863d964`). BUG 작업 변경은 범위 밖.
 - Source 판정: 통과. 지적 사항 없음. production 분기·gate(`MouseWheelInput`, `ScrollPointerWheel`, `CanInjectPointerWheel` 5조건), 금지 우회 부재, reflected 이름 불변, fixture 추출(복제 없음), test-only UCLASS(기존 `*TestProbe.h` 선례), `BathhouseComputerActor.h` friend 한 줄(보호 멤버 `ComputerMesh`·`FocusBlendIn/OutSeconds`·`FocusExitPoint` 접근용, 동작 불변)을 모두 허용한다.
