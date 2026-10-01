@@ -70,6 +70,7 @@ struct FScopedShopSettingsOverride
 	int32 PerProductQuantityLimit = Settings->PerProductQuantityLimit;
 	float DeliveryDelaySeconds = Settings->DeliveryDelaySeconds;
 	float DeliveryAttemptIntervalSeconds = Settings->DeliveryAttemptIntervalSeconds;
+	float DeliveryNoticeSeconds = Settings->DeliveryNoticeSeconds;
 	float UnboxOverlapDepthCm = Settings->UnboxOverlapDepthCm;
 
 	~FScopedShopSettingsOverride()
@@ -80,6 +81,7 @@ struct FScopedShopSettingsOverride
 		Settings->PerProductQuantityLimit = PerProductQuantityLimit;
 		Settings->DeliveryDelaySeconds = DeliveryDelaySeconds;
 		Settings->DeliveryAttemptIntervalSeconds = DeliveryAttemptIntervalSeconds;
+		Settings->DeliveryNoticeSeconds = DeliveryNoticeSeconds;
 		Settings->UnboxOverlapDepthCm = UnboxOverlapDepthCm;
 	}
 };

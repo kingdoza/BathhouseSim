@@ -232,7 +232,7 @@ Editor authoring 값:
 - trace 거리와 collision channel
 - `HeldKeyAnchor` transform
 - key, wet mop, towel basket, monkey wrench Blueprint class default의 개별 `HeldTransform`
-- item별 약한 forward/upward velocity change: 각 carryable class의 `ThrowImpulseStrength`·`UpwardThrowImpulseStrength`(cm/s). 기본값은 각 class header 초기값, 실제 값은 각 Blueprint Class Defaults(EditAnywhere인 class는 레벨 instance override 가능)다. `IPhysicalCarryable`의 기본 구현과 배치 설비 Actor의 `FacilityPlacement` 없음 fallback은 현재 코드 상수이고, `AUtilityShovelActor`는 자기 property를 읽지 않아 그 기본 구현 상수를 쓴다. 모두 이전 예정이다(`.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`).
+- item별 약한 forward/upward velocity change: 각 carryable class의 `ThrowImpulseStrength`·`UpwardThrowImpulseStrength`(cm/s). 기본값은 각 class header 초기값, 실제 값은 각 Blueprint Class Defaults(EditAnywhere인 class는 레벨 instance override 가능)다. `IPhysicalCarryable`의 두 getter는 pure virtual이라 구현체가 자기 값을 소유하며(`AUtilityShovelActor`도 자기 property), 배치 설비 Actor의 `FacilityPlacement` 없음 fallback은 `UFacilityPlacementComponent` CDO의 같은 getter다.
 - deprecated `ThrowSpawnDistance`, `DropSweepChannel`, `DropSweepClearance`는 호환용으로만 보존
 - equipment fixed slot의 exact `AssignedItem`, `bStartOccupied`, `ItemAnchor`
 - key `KeyPhysicsRoot` bounds와 collision

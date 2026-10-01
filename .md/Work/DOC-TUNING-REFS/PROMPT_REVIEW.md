@@ -39,7 +39,7 @@
 
 - 빌드: UE 5.8 `BathhouseSimEditor Win64 Development` 성공(Editor 미실행 확인). 로그 `Saved/Logs/DocTuningBuild.log`.
 - Automation: `Automation RunTests BathhouseSim` 전체, 통과 154, 실패 0, `EXIT CODE: 0`. 신규 `Shop.SettingsDefaults`·`Utility.Labor.ShovelReleaseVelocityUsesProperty` 포함. 로그 `Saved/Logs/DocTuningAutomation.log`, 리포트 `Saved/Automation/Reports/20261001/DocTuning`.
-- Source 식별값: HEAD `fc8e43825d3c906354883065f937a1460a11e931`, `git diff fc8e438 -- Source Config | sha256sum` = `348f2413840e9cf54cb0240be182359512194b7bfb4dfa569d45bddc0ceec636`(빌드·테스트 이후 Source 수정 없음).
+- Source 식별값: 기준 `fc8e43825d3c906354883065f937a1460a11e931`, `git diff fc8e438 -- Source Config | sha256sum` = `cbd613c6481539435420a077ca7581cb60b9f9fffb9baf808be9bda6a4989d78`(코드 리뷰 1회차 재작업 후 값이며 빌드·테스트 이후 Source 수정 없음. 재작업 전 값은 `348f2413…c636`. HEAD는 재작업 입력 커밋 `4279abf`에서 작업 트리 변경을 더한 상태).
 - `git diff --check`는 이 작업 트리의 LF/CRLF 정규화 경고만 낸다(공백 오류 없음).
 
 ## 6. 리뷰 중점과 미검증
@@ -49,3 +49,9 @@
 - `CleaningLitterSpawnAutomationTests`·`CleaningTowelAutomationTests` 등이 fixture 반경·허용 오차를 로컬 값으로 둠(제품 값 고정 아님).
 - 범위 밖 참고: `BathhouseEconomyTests.cpp`의 `StartingMoney == 100000` 등 데이터 기본값 고정 단언(설계 4절 말미).
 - 미검증: 상점 화면 남은 시간 갱신 간격과 삽 BP CDO 값은 UI·Editor 의존(사용자 PIE·`PROMPT_UNREAL.md`). Architecture 정본의 "이전 예정" 문구는 설계 7절대로 구현 후 아키텍처·마스터가 갱신하며 구현 단계는 정본을 수정하지 않았다.
+
+## 7. 코드 리뷰 1회차 재작업 기록
+
+- F1: `FScopedShopSettingsOverride`가 `DeliveryNoticeSeconds`를 저장·복원한다(`ShopAutomationTests.cpp`). F2: `CleaningSpawnRules.h` 주석을 사실대로 정정(주석만, 동작 불변).
+- 정본 갱신: `ShopSystem.md`(Settings 표에 `DeliveryAttemptIntervalSeconds` 추가, 이전 예정 문구 3곳), `CleaningLitterSystem.md` 2곳, `InteractionSystem.md` 1곳, `0_ARCHITECTURE.md` 상태 줄을 원본 property 참조로 교체. 작업 폴더 링크·수치 없음.
+- 재검증: 빌드 성공(`Saved/Logs/DocTuningBuild2.log`), `BathhouseSim.Shop`+`BathhouseSim.Cleaning` 필터 42건 전부 Success, EXIT CODE 0(`Saved/Logs/DocTuningAutomation2.log`). 전체 재실행은 하지 않았다.

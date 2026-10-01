@@ -90,7 +90,7 @@ Public/Placement/
      - 물 얼룩·쓰레기는 1단계 trace가 통과해 지나간다(구현 유지).
   4. 기존 조건(구역 XY 포함, 경사, 선택 tag)을 확인한다.
   5. clearance box로 **충돌 응답 기반** 검사를 한다(2026-10-01 코드 리뷰 F1·F2 재검토).
-     - box: 반폭 = 종류의 바닥 반경 R, 높이 `SpawnClearanceHeightCm`, 바닥 hit 위 띄움 높이부터, 축 정렬. 띄움 높이는 현재 `CleaningSpawnRules.cpp`의 코드 상수이며 director 값으로 이전 예정이다(`.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`).
+     - box: 반폭 = 종류의 바닥 반경 R, 높이 `SpawnClearanceHeightCm`, 바닥 hit 위 띄움 높이부터, 축 정렬. 띄움 높이는 `ACleaningDirectorActor::SpawnClearanceFloorOffsetCm`이다.
      - "바닥에 놓인 물리 물체" 가정으로 `OverlapMultiByChannel`을 쓴다. query 채널은 `ECC_PhysicsBody`, 응답은 WorldStatic·WorldDynamic·PhysicsBody Block, 나머지 Ignore다. `bBlockingHit`인 결과만 막힘으로 센다(`FacilityPlacementCollision::HasBlockingOverlap`과 같은 응답 기반).
        - 막힘: 설비 몸체(BlockAllDynamic), 바닥에 놓인 휴대물·사용한 수건(physics 응답), 벽.
        - 막히지 않음: 영역 표시용 QueryOnly box(배치 구역 `ZoneBounds`, 진열 공간, router, 투입구 등 PhysicsBody Ignore), 생성·수거 구역(NoCollision), 물 얼룩·쓰레기(Visibility만 Block).
@@ -223,7 +223,7 @@ Public/Placement/
   - handler는 등록된 모든 물 얼룩·쓰레기에 `FCleaningFootprintOverlap::Intersects`를 적용하고, 겹치면 `ClearForFacilityPlacement()`를 호출한다.
 - 겹침(Q64 A, 조금이라도):
   - XY: 대상 중심 원(반경 R)과 footprint 사각형(extent × |scale|, footprint 회전)의 최근접 거리 ≤ R.
-  - Z: 대상 Z가 footprint 바닥 − 높이 허용 오차 ~ 윗면 + 높이 허용 오차 안. 허용 오차는 현재 `CleaningSpawnRules.cpp`(`FCleaningFootprintOverlap::Intersects`)의 코드 상수이며 종류별 Actor 값으로 이전 예정이다(`.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`).
+  - Z: 대상 Z가 footprint 바닥 − 높이 허용 오차 ~ 윗면 + 높이 허용 오차 안. 허용 오차는 종류별 Actor의 `PlacementClearHeightToleranceCm`(`AWaterStainActor`·`ALitterActor`)이며 `FCleaningFootprintOverlap::Intersects`가 인자로 받는다.
   - 물 얼룩 R은 `FloorRadiusCm × max(선택된 X, Y scale)`, 쓰레기 R은 `FloorRadiusCm`다.
 - 물걸레 진행 중인 얼룩도 제거된다. 기존 EndPlay 정리가 청소자 잠금을 풀고, 물걸레는 target 없이 mopping 상태만 유지한다.
 - 등록 해제로 전역·구역 수가 줄어 다시 생성될 수 있다(TRSH-025).

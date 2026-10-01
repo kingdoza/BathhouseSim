@@ -15,7 +15,8 @@ struct FCleaningFloorSpawnSettings
 	FTransform BoxTransform = FTransform::Identity;
 	FVector Extent = FVector::ZeroVector;
 	ECollisionChannel TraceChannel = ECC_Visibility;
-	// 조정값은 호출한 구역·director의 데이터에서 채운다. 중립 기본값은 누락 시 Find가 실패하도록 한다.
+	// 호출자(구역)가 모든 필드를 채운다. 0 기본값은 조정값 복제를 피하기 위한 것이며,
+	// Extent·Radius·ClearanceHeight 누락만 입력 검사로 실패한다.
 	float TraceDistance = 0;
 	FName RequiredFloorTag = NAME_None;
 	float MaximumSlopeDegrees = 0;

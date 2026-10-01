@@ -72,6 +72,7 @@ UI native class는 `Public/UI`, `Private/UI`에 둔다([UISystem.md](UISystem.md
 | `CartTotalQuantityLimit`, `PerProductQuantityLimit` | 장바구니 전체·상품별 상한 |
 | `DeliveryDelaySeconds` | 주문 → 배송 게임시간 |
 | `DeliveryNoticeSeconds` | `배송 도착` 표시 시간 |
+| `DeliveryAttemptIntervalSeconds` | 배송 대기 주문의 도착 재시도 간격(0이면 매 Tick) |
 | `UnboxOverlapDepthCm` | 개봉 물품끼리 목표 겹침 깊이 D. 클수록 세게 튄다(SHOP-043). 여유 shape `Dc`도 이 getter 값이다 |
 | `UnboxCluster*` | 무리 모양(Cluster Layout): 물품당 배치 시도 수, 고도각 하한·상한, 다른 쌍 깊이 허용 오차, 쌍 목표 깊이의 half extent 비율 |
 | `UnboxViewDistanceCm`, `UnboxViewMinDistanceCm`, `UnboxViewPullStepCm`, `UnboxViewLayoutAttempts` | 1단계 시선 앞: 카메라 → 무리의 가장 가까운 부분(시선 방향) 시작 거리·하한·당김 간격, 거리당 layout 시도 수 |
@@ -81,7 +82,7 @@ UI native class는 `Public/UI`, `Private/UI`에 둔다([UISystem.md](UISystem.md
 
 개봉 코드는 이 값들을 private `FShopUnboxingTuning::FromSettings(const UShopSettings&)` 한 곳에서 읽어 계산 helper에 인자로 넘긴다. 자동화도 같은 함수로 기대값을 계산한다.
 
-getter의 비유한 fallback 중 아직 초기값을 복제한 리터럴과 배송 재시도 간격은 현재 코드 상수다(Delivery 절, 이전 예정: `.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`).
+getter의 비유한 fallback과 member 초기값은 header의 `UShopSettings::Default*` 상수 한 곳을 같이 읽는다.
 
 시작 금액은 wallet 소유, 잔액 변화량 표시 시간은 HUD widget(`UMoneyHudWidget::DeltaDisplaySeconds`) 소유다.
 
@@ -111,7 +112,7 @@ getter의 비유한 fallback 중 아직 초기값을 복제한 리터럴과 배�
 
 ## Delivery
 
-subsystem Tick(고정 간격 throttle. 간격은 현재 `ShopOrderSubsystem.cpp`의 코드 상수이며 `UShopSettings`로 이전 예정, `.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`):
+subsystem Tick(고정 간격 throttle. 간격은 `UShopSettings::DeliveryAttemptIntervalSeconds`):
 
 1. FIFO 머리 주문만 본다. 머리가 준비되지 않았거나 공간이 없으면 뒤 주문도 처리하지 않는다(SHOP-015).
 2. 머리가 준비되면 등록된 배송 지점의 `FindDropTransform(BoxHalfExtent)`로 위치를 구한다.
@@ -251,7 +252,7 @@ worst case query 수는 (단계별 거리·단 수 × 시도 수의 합) × 물�
 
 - `UComputerScreenRootWidget`: BindWidget `ManagementTabButton`, `ShopTabButton`, `ScreenSwitcher`(UWidgetSwitcher), `ManagementScreen`(`UBathWaterManagementScreenWidget`), `ShopScreen`(`UShopScreenWidget`). 선택 탭 index는 widget 표시 상태이며 기본은 관리다. 컴퓨터 context와 사용자 변경을 두 자식에 전달한다([ComputerSystem.md](ComputerSystem.md)).
 - `UShopScreenWidget`: BindWidget `ProductScroll`(UScrollBox), `ProductGrid`(UWrapBox), `BalanceText`, `CartList`(UVerticalBox), `CartQuantityText`(`전체 수량/CartTotalQuantityLimit`), `CartTotalText`, `OrderButton`, `OrderFeedbackText`, `OrderList`(UVerticalBox). EditDefaultsOnly 행 widget class 3종.
-  - 사용자 PlayerState의 wallet `OnMoneyChanged`, cart `OnCartChanged`, subsystem `OnOrdersChanged`를 구독한다. 남은 시간만 고정 간격 NativeTick으로 갱신한다. 간격은 현재 `ShopScreenWidget.cpp`의 코드 상수이며 widget property로 이전 예정이다(`.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`).
+  - 사용자 PlayerState의 wallet `OnMoneyChanged`, cart `OnCartChanged`, subsystem `OnOrdersChanged`를 구독한다. 남은 시간만 고정 간격 NativeTick으로 갱신한다. 간격은 `UShopScreenWidget::CountdownRefreshIntervalSeconds`다.
   - 주문 버튼 활성·부족액·상한 안내는 매번 `EvaluatePlaceOrder`·`EvaluateAdd`로 계산한다(SHOP-006~008).
   - 주문 성공 시 `주문 완료`를 표시한다.
   - 상품이 넘치면 `ProductScroll`만 세로로 스크롤한다. cart·주문 panel은 `ProductScroll` 밖 형제로 둬 항상 보인다(SHOP-032, WBP layout).
