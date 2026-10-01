@@ -22,6 +22,7 @@
 | Service | [ServiceSystem.md](ServiceSystem.md) | 품목 정의, 품목 박스·음료 냉장고·수거함 Blueprint, 외곽선·프리뷰 Material |
 | Cleaning | [CleaningSystem.md](CleaningSystem.md) | 쓰레기·집게·봉투·수거 구역, 청소 director·물 얼룩·구역 Blueprint와 DefaultMap instance |
 | Towel | `TowelSystem.md` | 수건 설비·표현 Blueprint, mesh/material과 presentation 설정 |
+| Building | [BuildingSystem.md](BuildingSystem.md) | 공간 Actor Blueprint·DefaultMap 공간 3개, 건물 재질, 지형 재질·구멍, 설비 정의 종류 태그 |
 | World | [WorldSystem.md](WorldSystem.md) | map actor, World Settings, RecastNavMesh와 유일 Authority |
 
 아직 실제 작업으로 검증되지 않은 시스템 문서는 미리 추측해 만들지 않는다. 문서가 없으면 해당 영역은 Editor 기준선 미확정 상태이며, 기능 명세에서 필요할 때 Unreal Editor 읽기 전용 조사를 요청한다.

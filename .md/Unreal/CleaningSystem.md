@@ -19,17 +19,17 @@
 
 ## DefaultMap instance (World Partition external actor)
 
-바닥은 `Studio_floor`(Mobility Static, `ECC_WorldStatic`)이며 모든 지점에서 상단이 world Z=0이다.
+바닥은 공간 바닥 생성 형상(Mobility Static, `ECC_WorldStatic`, [BuildingSystem.md](BuildingSystem.md))이고 출입구 밖 마당은 지형(world Z=0)이다. 이전 기록의 `Studio_floor`는 mesh가 없는 빈 actor였고 삭제됐다.
+
+쓰레기·물 얼룩 생성 구역은 Level에 직접 두지 않는다. 공간 Actor가 BeginPlay에 `CleaningChunkKind`(홀 쓰레기, 목욕공간 물 얼룩, 작업공간 없음)에 맞는 조각을 spawn한다(class는 Project Settings Bathhouse Building). 이전 `LitterSpawnZone_Dressing`, `BathCleaningZone`, `DressingCleaningZone` instance는 삭제됐다(`EXP-U1`).
 
 | Actor | 위치/값 | external package |
 |---|---|---|
-| `BP_CleaningDirector_C_UAID_…1654552567` | 기존 instance, `SpawnIntervalSeconds=15` override 유지, `LitterClass`는 BP 상속 | `…/3/O2/M90TW0CJ9DL2TVTK3X0IZH` |
-| 기존 `BP_StainSpawnZone` 두 개 (`(2050,-300,0)`, `(1000,-700,0)`) | `SpawnFloor` 상대 Z -100 → 0(world 0) | `…/6/FX/6ZGWI7FB2UN1ZMP6Q1YON1`, `…/8/Q0/Y16QBOVVFUE29TAO7F2Z2S` |
-| `LitterSpawnZone_Dressing` (`BP_LitterSpawnZone`) | `(1050,-280,100)`, `SpawnFloor` world 0 | `…/0/TK/V08KR6A5F481MDJDVTC74B` |
-| `LitterTongs` (`BP_LitterTongs`) | `(650,750,43)` (걸레 거치대 옆) | `…/E/P0/9P6KFKB6KF1F4ILSN6P4PY` |
+| `BP_CleaningDirector_C_UAID_…1654552567` | 기존 instance, `SpawnIntervalSeconds=15` override 유지, `LitterClass`는 BP 상속. 위치 무관 | `…/3/O2/M90TW0CJ9DL2TVTK3X0IZH` |
+| `LitterTongs` (`BP_LitterTongs`) | 홀 안(걸레 거치대 옆), 위치는 Level instance 정본 | `…/E/P0/9P6KFKB6KF1F4ILSN6P4PY` |
 | `LitterTongsSlot` (`BP_PhysicalCarryFixedSlot`) | 집게와 같은 위치, `AssignedItem`=위 집게, `bStartOccupied=true`, `SlotDisplayName=집게 보관대`, `ItemAnchor` 상대 0 | `…/9/XK/X7UUCTLXTSCHPTZJCUD5EY` |
-| `TrashCollectionZone` (`BP_TrashCollectionZone`) | `(-800,450,0)` (출입구 밖) | `…/6/G0/ZUFRUBF564PZTSW1MN4J8A` |
+| `TrashCollectionZone` (`BP_TrashCollectionZone`) | 홀 서쪽 출입구 밖 마당(지형 위), Nav 범위 안 | `…/6/G0/ZUFRUBF564PZTSW1MN4J8A` |
 
-기존 `BP_TrashBin` level instance(`(-76,-717,0)`, package `…/5/OS/BNP2Y7NJ91BPOXIJVR7FXP`)는 제거됐고 파일이 삭제됐다. BP·Source는 유지. `DefaultMap.umap`은 저장하지 않았다. `BP_TrashBag` instance는 레벨에 두지 않는다(수거 시 C++가 spawn).
+기존 `BP_TrashBin` level instance는 제거됐다. `DefaultMap.umap`은 저장하지 않았다. `BP_TrashBag` instance는 레벨에 두지 않는다(수거 시 C++가 spawn).
 
-저장 경로: MCP `save_actor`는 이 external package에서 `Asset does not exist` 오류로 실패해(동일 오류 재확인, 재시도 안 함) Python API(`EditorLoadingAndSavingUtils.save_packages`)를 사용했다. 스크립트·백업: `Saved/Claude/Trash/`, `Saved/MigrationBackup/20261001_service_unit3/`.
+저장 경로: MCP `save_actor`는 external package에서 `Asset does not exist` 오류로 실패해 Python API(`EditorLoadingAndSavingUtils.save_packages`)를 사용한다. 스크립트·백업: `Saved/Claude/Trash/`, `Saved/Claude/EXP-U1/`, `Saved/MigrationBackup/20261002_EXP-U1/`.

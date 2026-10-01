@@ -5,6 +5,17 @@
 - 아래 기존 항목의 `PROMPT_UNREAL.md`, `PROMPT_INTEGRATION_REVIEW.md` 참조는 2026-10-01 삭제된 루트 결과물이며 Git 이력에서 읽는다.
 - 기존 항목에 섞인 PIE·플레이 검증은 해당 작업을 이어갈 때 마스터가 작업 폴더의 `PIE_CHECKLIST.md`로 옮긴다.
 
+## EXP-U1 공간 건물 — 지형 구멍 칠하기 (화면 작업 미승인·미지원)
+
+- 작업 ID: `EXP-U1` (작업 폴더 `.md/Work/EXPANSION-PURCHASE/EXP-U1/`)
+- 대상: `/Game/Maps/DefaultMap`의 `Landscape`(package `/Game/__ExternalActors__/Maps/DefaultMap/7/8G/YQ5PAMLY9QSGTKKMX2J27C`)와 영향 proxy 4개 `LandscapeStreamingProxy_3_3_0`(`…/E/5Y/MJQIJ8RYADZHO7ZS6IE5NM`), `_4_3_0`(`…/B/NX/PF1O5HWD53VE14YXX78A8H`), `_3_4_0`(`…/8/61/O4EPPPO4WKLHPLATERA1D9`), `_4_4_0`(`…/0/S5/922CTDWFCZ2LNJ49NPS2Z3`). 네 proxy가 world 원점에서 만난다.
+- 현재: 64개 Landscape actor의 재질은 구멍 지원 재질 `/Game/Bathhouse/Materials/World/M_Landscape_ProcGridHole`로 저장·재로드 확인됐다. 지형 Visibility(구멍) 레이어는 칠해져 있지 않다. 그래서 `Space_Hall`·`Space_Work` Data Validation에 `홀(Space_Hall)의 계단 0번: 계단 통로를 지형 등 다른 물체가 막고 있습니다.` 오류가 남고, 계단 구멍 안에 지형 면이 보이며 계단 중간을 지형 충돌이 막는다(EXP-001·EXP-004 실패 원인).
+- 목표: 0회 홀 안쪽 바닥 직사각형(= `Space_Hall` Location XY ± `Floor Size Cm`/2, 현재 Details 값으로 계산) 안쪽만 지형 구멍. 바깥 지형(벽 바깥 마당 포함)은 바꾸지 않는다. 홀 바닥 판이 가리는 범위라 위에서는 보이지 않는다.
+- 시도한 자동화: Python `LandscapeProxy.landscape_import_weightmap_from_render_target(rt, "__LANDSCAPE_VISIBILITY__", 0)`에 홀 안쪽 꼭짓점만 흰색인 임시 render target을 넣었다. 호출은 True였고 네 proxy의 weightmap이 다시 만들어졌지만, `force_layers_full_update` 뒤에도 충돌 trace와 화면에서 지형이 그대로였다(구멍이 최종 결과에 반영되지 않음). 같은 원인 두 번 제한으로 멈췄고, 검증되지 않은 변경은 저장하지 않고 디스크 상태로 되돌린 뒤(새 프로세스에서 확인) 재질 지정만 다시 저장했다. 대상 Landscape의 Visibility target layer는 `LayerInfoObj=None`이다.
+- 남은 조작: Landscape 모드 > Paint > Visibility 도구로 홀 안쪽 직사각형을 칠한다(브러시 falloff 0, 홀 벽 안쪽 면을 넘지 않게). 계단을 0회 홀 안쪽에서 옮겨도 다시 칠하지 않도록 계단 자리만이 아니라 홀 안쪽 전체를 칠한다. 칠한 뒤 Landscape actor와 바뀐 proxy package만 저장한다(`Save All` 금지).
+- 확인: `Space_Hall` Data Validation에서 위 오류가 사라짐, 계단 구멍 안에 지형이 보이지 않음, 바깥 마당 지형 변화 없음.
+- 먼저 끝내야 하는 PIE 시나리오: 없음(이 작업 뒤 EXP-001·EXP-004를 확인한다). 재개 조건: 사용자가 칠하기를 마치고 알리면 Editor 역할이 저장·재로드와 Validation을 확인하고 이 항목을 지운다.
+
 ## 서비스 4단위 (안마의자·평상·TV·세신) — PIE 수용 대기
 
 남은 실제 Editor 수정 작업 없음. PIE·화면 판정 항목은 `.md/Work/SERVICE/SERVICE-U4/PIE_CHECKLIST.md`로 옮겼다(2026-10-01).
@@ -166,16 +177,6 @@ Definition/Blueprint migration, footprint·body Navigation authoring, preview Ma
 
 현재 확인 상태: 두 Material은 Translucent/Unlit로 저장돼 있지만 Project Settings의 두 reference는 재시작 후 `None`으로 돌아왔다. MCP property setter는 메모리만 바꾸고 config를 저장하지 않았다.
 
-## 2. RecastNavMesh Dynamic 저장
-
-1. PIE를 중지하고 `/Game/Maps/DefaultMap`을 연다.
-2. Outliner에서 `RecastNavMesh`를 선택한다.
-3. **Runtime Generation**을 `Dynamic`으로 바꾼다. `Dynamic Modifiers Only`가 아니다.
-4. 해당 Recast external actor와 필요한 Map 패키지만 저장한다.
-5. `DefaultMap`을 닫았다가 다시 열고 값이 `Dynamic`으로 유지되는지 확인한다.
-
-현재 확인 상태: MCP 메모리에서는 `Dynamic` 적용이 됐지만 World Partition actor 저장 호출이 external actor 패키지를 에셋으로 찾지 못했다. 재시작 후 저장값은 다시 `Dynamic Modifiers Only`였다.
-
 ## 3. Definition Data Validation 네이티브 차단점
 
 다음 두 opt-out Definition은 의도대로 `PlacedFacilityClass=None`, `RecoveryItemClass=None` 상태지만 현재 native `UFacilityPlacementDefinition::IsDataValid()`가 opt-out을 구분하지 않아 각각 세 개의 오류를 낸다.
@@ -191,7 +192,7 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 
 ## 4. 직접 플레이 검증
 
-1~3번을 마친 뒤 PIE에서 Bath, Shower, Locker 1/4/8, Washer, Dryer를 각각 확인한다.
+1·3번을 마친 뒤 PIE에서 Bath, Shower, Locker 1/4/8, Washer, Dryer를 각각 확인한다.
 
 1. 설비를 들었을 때 class-default의 모든 body mesh가 preview에 나타나는지 확인한다.
 2. 설치 가능 위치는 초록, 불가 위치는 빨강 반투명 재질이 모든 mesh slot에 적용되는지 확인한다.
@@ -229,7 +230,6 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 ## 재개 조건
 
 - Project Settings의 두 Material reference가 재시작 후 유지된다.
-- Recast `RuntimeGeneration=Dynamic`이 재시작 후 유지된다.
 - opt-out Definition 두 개의 native Data Validation 오류가 수정된다.
 - Definition 9개와 pre-placed Locker 두 개의 Data Validation이 통과한다.
 - 4번 직접 플레이 검증 결과를 기록한다.
