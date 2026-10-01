@@ -131,7 +131,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - Facility는 다중 use slot, check-in/checkout 독립 FIFO와 revision을 소유한다. queue point는 Location/Yaw 전체를 사용하고 checkout visible capacity를 넘은 entry는 같은 FIFO 순번을 유지한 채 전용 NavMesh volume assignment를 받는다.
 - Placement는 placed Actor↔전용 item transaction, 설비 preview, 명시적 zone floor/footprint 파생 snap과 Q Hold 회수를 조율한다. preview 세션은 호환 Zone 전체의 native 중립 grid를 표시하며 전역 셀·Held·preview material은 Settings, Zone별 선 두께·Z offset·강조 간격과 DMI는 PlacementZone이 소유한다.
 - Economy는 PlayerState wallet을 소유하고 cash claim을 한 번만 반영한다.
-- Shop은 PlayerState cart와 world 주문 subsystem을 소유한다. 주문은 wallet 차감·주문 생성·cart 비우기를 한 transaction으로 처리하고, 게임시간 딜레이 뒤 배송 지점에 상자를 FIFO로 쌓는다. 상자 LMB 개봉은 Placement factory로 신규 설치 설비 아이템을 정면 무작위 무리(물품끼리만 겹침, 엔진 충돌 해소로 튐)로 만들고, 쓰레기통은 `IPhysicalCarryDiscardable`로 판정해 carry consume으로 제거한다. 컴퓨터 화면은 관리·상점 탭 root widget이다.
+- Shop은 PlayerState cart와 world 주문 subsystem을 소유한다. 주문은 wallet 차감·주문 생성·cart 비우기를 한 transaction으로 처리하고, 게임시간 딜레이 뒤 배송 지점에 상자를 FIFO로 쌓는다. 상자 LMB 개봉은 Placement factory로 신규 설치 설비 아이템을 카메라 시선 앞 무작위 무리(물품끼리만 겹침, 엔진 충돌 해소로 튐, 막히면 바닥 정면·머리 위)로 만들고, 쓰레기통은 `IPhysicalCarryDiscardable`로 판정해 carry consume으로 제거한다. 컴퓨터 화면은 관리·상점 탭 root widget이다.
 - Customer StateTree는 routine을 조율하고 session/queue/facility/key/wallet API에 실행을 위임한다. 신발 단계와 key-locker 대응은 제거하고 탈의·착의마다 임의의 unnumbered locker action slot을 잠시 사용한다.
 - Customer bath stay는 pre-shower 완료부터 고정 60초다. 각 탐색 구간은 최대 10초이며 전역 설정 임계 수위 이상 Bath만 예약·이동·입욕하고 실제 입욕 시간만 별도 누적한다.
 - Bath Water는 욕탕별 순유량, control mesh E interaction, 수면 위치와 회수 동결을 소유하고 임계 하락을 이용 Customer에게 알린다. Operations는 utility 공용 용량과 욕탕 예약 요구량을 원자적으로 관리하며 condition은 수온·오염도·실제 입욕자 identity, UI는 snapshot/request만 사용한다.
@@ -231,4 +231,6 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 서비스 2단위(ServiceFacilityDisplaySystem·Towel 2단위 절): 2026-09-30 완료(`c9a1150`).
 - 서비스 3단위(CleaningLitterSystem): 2026-10-01 완료(`2c14d8f`). 같은 날 버그(집게를 들면 빼기 강조 표시) 수정 설계로 장비 보조 사용을 별도 query 필드로 분리했다. 버그 수정은 `4111e20`로 완료됐다.
 - 서비스 4단위(ServiceAmenitySystem): 2026-10-01 설계, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
-- 버그 `BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`: 2026-10-01 설계, Source 미반영. 관리 화면 slider 확정값 동기화([BathWaterManagementUISystem.md](Architecture/BathWaterManagementUISystem.md))와 컴퓨터 키보드 focus 불변식 회귀 자동화([ComputerSystem.md](Architecture/ComputerSystem.md))다. 입력은 `.md/Work/BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out/PROMPT_IMPLEMENTATION.md`이다.
+- 버그 `BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`: 2026-10-01 Source 반영(작업 브랜치, 코드 리뷰 승인, 사용자 PIE 대기). 관리 화면 slider 확정값 동기화([BathWaterManagementUISystem.md](Architecture/BathWaterManagementUISystem.md))와 컴퓨터 키보드 focus 불변식 회귀 자동화([ComputerSystem.md](Architecture/ComputerSystem.md))다.
+- 빈 박스 빼기 대상 선택 통일(ServiceFacilityDisplaySystem, `EMPTY-BOX-TAKE-TARGET`): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.
+- 플레이어 앞 생성 위치 카메라 시선 기준(UNBOX-SPAWN-VIEW, Shop·CleaningLitter·Interaction): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.

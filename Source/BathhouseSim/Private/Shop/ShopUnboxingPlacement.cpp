@@ -7,6 +7,7 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "Math/RotationMatrix.h"
+#include "Interaction/PlayerViewFrontPlacement.h"
 #include "Placement/FacilityPlacementCollisionUtils.h"
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/PlaceableFacilityItemActor.h"
@@ -14,18 +15,12 @@
 #include "Shop/ShopDeliveryBoxActor.h"
 #include "Shop/ShopUnboxingCluster.h"
 #include "Shop/ShopUnboxItemShape.h"
+#include "Shop/ShopUnboxingTuning.h"
 
 #define LOCTEXT_NAMESPACE "ShopUnboxingPlacement"
 
 namespace
 {
-constexpr int32 FrontLayoutAttempts = 4;
-constexpr int32 UpperLayoutAttempts = 3;
-constexpr int32 UpperHeightSteps = 8;
-constexpr float UpperHeightStepCm = 25.0f;
-constexpr float PlayerTopClearanceCm = 10.0f;
-constexpr float FloorClearanceCm = 20.0f;
-
 struct FUnboxCandidate
 {
 	FTransform Transform = FTransform::Identity;
@@ -170,43 +165,61 @@ bool IsCandidateSafe(
 		VisibilityParams);
 }
 
-bool TryMakeLayout(
-	UWorld& World,
-	AActor& Player,
-	AShopDeliveryBoxActor& Box,
-	const TArray<FShopUnboxItemShape>& Items,
+void MakeWorldBoxes(
+	const TArray<FShopUnboxClusterItem>& Layout,
 	const TArray<FVector>& HalfExtents,
-	const FVector& TargetXYCenter,
-	const float TargetLowestZ,
+	const FVector& Translation,
+	TArray<FViewFrontBox>& OutBoxes)
+{
+	OutBoxes.Reset(Layout.Num());
+	for (int32 Index = 0; Index < Layout.Num(); ++Index)
+	{
+		FViewFrontBox& Box = OutBoxes.AddDefaulted_GetRef();
+		Box.Center = Layout[Index].Center + Translation;
+		Box.YawDegrees = Layout[Index].YawDegrees;
+		Box.HalfExtent = HalfExtents[Index];
+	}
+}
+
+struct FPlacementContext
+{
+	UWorld& World;
+	AActor& Player;
+	AShopDeliveryBoxActor& Box;
+	const TArray<FShopUnboxItemShape>& Items;
+	const TArray<FVector>& HalfExtents;
+	const FShopUnboxingTuning& Tuning;
+	FRandomStream& RandomStream;
+};
+
+// One layout attempt: build a cluster, place it with BuildTranslation, and validate every item.
+bool TryMakeLayout(
+	const FPlacementContext& Context,
+	const TFunctionRef<FVector(const TArray<FShopUnboxClusterItem>&)>& BuildTranslation,
 	const FVector& VisibilityOrigin,
-	const float OverlapDepthCm,
-	FRandomStream& RandomStream,
-	const bool bUseEnvironmentClearance,
 	TArray<FTransform>& OutTransforms,
 	FText& OutFailureReason)
 {
 	TArray<FShopUnboxClusterItem> Layout;
-	if (!FShopUnboxingCluster::BuildLayout(HalfExtents, OverlapDepthCm, RandomStream, Layout))
+	if (!FShopUnboxingCluster::BuildLayout(
+		Context.HalfExtents,
+		Context.Tuning.OverlapDepthCm,
+		Context.Tuning.Cluster,
+		Context.RandomStream,
+		Layout))
 	{
 		return false;
 	}
 
-	const FVector Translation = GetClusterTranslation(
-		Layout,
-		HalfExtents,
-		TargetXYCenter,
-		TargetLowestZ);
+	const FVector Translation = BuildTranslation(Layout);
 	TArray<FTransform> CandidateTransforms;
-	CandidateTransforms.Reserve(Items.Num());
-	const float EnvironmentClearanceCm = bUseEnvironmentClearance
-		? FMath::Clamp(OverlapDepthCm, 0.0f, 50.0f)
-		: 0.0f;
+	CandidateTransforms.Reserve(Context.Items.Num());
 
-	for (int32 Index = 0; Index < Items.Num(); ++Index)
+	for (int32 Index = 0; Index < Context.Items.Num(); ++Index)
 	{
 		FUnboxCandidate Candidate;
 		if (!BuildCandidateAtShapeCenter(
-			Items[Index],
+			Context.Items[Index],
 			Layout[Index].Center + Translation,
 			Layout[Index].YawDegrees,
 			Candidate,
@@ -214,14 +227,13 @@ bool TryMakeLayout(
 		{
 			return false;
 		}
-		if (bUseEnvironmentClearance
-			&& !IsCandidateSafe(
-				World,
-				Candidate,
-				Player,
-				Box,
-				VisibilityOrigin,
-				EnvironmentClearanceCm))
+		if (!IsCandidateSafe(
+			Context.World,
+			Candidate,
+			Context.Player,
+			Context.Box,
+			VisibilityOrigin,
+			Context.Tuning.OverlapDepthCm))
 		{
 			return false;
 		}
@@ -231,6 +243,39 @@ bool TryMakeLayout(
 	OutTransforms = MoveTemp(CandidateTransforms);
 	return true;
 }
+
+// Layout attempts for every pull distance. Returns true on the first success. A shape-query failure
+// (non-empty OutFailureReason) is a hard failure the caller must propagate.
+bool TryPullDistances(
+	const FPlacementContext& Context,
+	const TArray<float>& Distances,
+	const int32 LayoutAttempts,
+	const TFunctionRef<FVector(const TArray<FShopUnboxClusterItem>&, float)>& BuildTranslation,
+	const FVector& VisibilityOrigin,
+	TArray<FTransform>& OutTransforms,
+	FText& OutFailureReason)
+{
+	for (const float DistanceCm : Distances)
+	{
+		for (int32 Attempt = 0; Attempt < LayoutAttempts; ++Attempt)
+		{
+			if (TryMakeLayout(
+				Context,
+				[&](const TArray<FShopUnboxClusterItem>& Layout) { return BuildTranslation(Layout, DistanceCm); },
+				VisibilityOrigin,
+				OutTransforms,
+				OutFailureReason))
+			{
+				return true;
+			}
+			if (!OutFailureReason.IsEmpty())
+			{
+				return false;
+			}
+		}
+	}
+	return false;
+}
 }
 
 bool FShopUnboxingPlacement::FindSpawnTransforms(
@@ -238,27 +283,33 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 	AActor& Player,
 	const UCapsuleComponent& PlayerCapsule,
 	AShopDeliveryBoxActor& Box,
-	const FVector& FootLocation,
-	const float ViewYaw,
 	const TArray<FShopUnboxItemShape>& Items,
-	const float ForwardDistanceCm,
+	const FShopUnboxingPlacementRequest& Request,
+	const FShopUnboxingTuning& Tuning,
 	FRandomStream& RandomStream,
-	const float OverlapDepthCm,
 	TArray<FTransform>& OutTransforms,
-	FText& OutFailureReason)
+	FText& OutFailureReason,
+	EShopUnboxPlacementStage* OutStage)
 {
 	OutTransforms.Reset();
 	OutFailureReason = FText::GetEmpty();
-	if (Items.IsEmpty() || FootLocation.ContainsNaN() || !FMath::IsFinite(ViewYaw)
-		|| !FMath::IsFinite(ForwardDistanceCm) || ForwardDistanceCm < 0.0f
-		|| !FMath::IsFinite(OverlapDepthCm) || OverlapDepthCm < 0.0f)
+	if (OutStage)
+	{
+		*OutStage = EShopUnboxPlacementStage::None;
+	}
+	if (Items.IsEmpty() || Request.FootLocation.ContainsNaN() || Request.CameraOrigin.ContainsNaN()
+		|| Request.CameraDirection.ContainsNaN() || Request.CameraDirection.IsNearlyZero()
+		|| !FMath::IsFinite(Tuning.OverlapDepthCm) || Tuning.OverlapDepthCm < 0.0f)
 	{
 		OutFailureReason = LOCTEXT("InvalidUnboxRequest", "상자 개봉 위치를 계산할 수 없습니다.");
 		return false;
 	}
 
-	const FRotator ViewRotation(0.0f, ViewYaw, 0.0f);
-	const FVector Forward = FRotationMatrix(ViewRotation).GetUnitAxis(EAxis::X);
+	const FVector ViewDirection = Request.CameraDirection.GetSafeNormal();
+	const FVector HorizontalView(ViewDirection.X, ViewDirection.Y, 0.0f);
+	const bool bHasHorizontalForward = !HorizontalView.IsNearlyZero();
+	const FVector Forward = bHasHorizontalForward ? HorizontalView.GetSafeNormal() : FVector::ForwardVector;
+	const float ProbeYaw = bHasHorizontalForward ? Forward.Rotation().Yaw : 0.0f;
 	const FVector PlayerCenter = PlayerCapsule.GetComponentLocation();
 	const float CapsuleHalfHeight = PlayerCapsule.GetScaledCapsuleHalfHeight();
 	if (PlayerCenter.ContainsNaN() || !FMath::IsFinite(CapsuleHalfHeight) || CapsuleHalfHeight <= 0.0f)
@@ -276,7 +327,7 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 		if (!BuildCandidateAtShapeCenter(
 			Item,
 			FVector::ZeroVector,
-			ViewYaw,
+			ProbeYaw,
 			Probe,
 			OutFailureReason))
 		{
@@ -285,61 +336,108 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 		HalfExtents.Add(GetCandidateHalfExtent(Probe));
 	}
 
-	for (float DistanceCm = ForwardDistanceCm;; DistanceCm = FMath::Max(0.0f, DistanceCm - 10.0f))
+	const FPlacementContext Context{World, Player, Box, Items, HalfExtents, Tuning, RandomStream};
+	const auto Succeed = [&OutStage](const EShopUnboxPlacementStage Stage)
 	{
-		const FVector TargetXYCenter = FootLocation + Forward * DistanceCm;
-		for (int32 Attempt = 0; Attempt < FrontLayoutAttempts; ++Attempt)
+		if (OutStage)
 		{
-			if (TryMakeLayout(
-				World,
-				Player,
-				Box,
-				Items,
-				HalfExtents,
-				TargetXYCenter,
-				FootLocation.Z + FloorClearanceCm,
-				PlayerCenter,
-				OverlapDepthCm,
-				RandomStream,
-				true,
-				OutTransforms,
-				OutFailureReason))
-			{
-				return true;
-			}
-			if (!OutFailureReason.IsEmpty())
-			{
-				return false;
-			}
+			*OutStage = Stage;
 		}
-		if (DistanceCm <= 0.0f)
+		return true;
+	};
+	TArray<float> Distances;
+
+	// Stage 1: in front of the camera along the view direction.
+	PlayerViewFrontPlacement::BuildPullDistances(
+		Tuning.ViewDistanceCm,
+		Tuning.ViewMinDistanceCm,
+		Tuning.ViewPullStepCm,
+		Distances);
+	const auto BuildViewTranslation = [&](const TArray<FShopUnboxClusterItem>& Layout, const float DistanceCm)
+	{
+		TArray<FViewFrontBox> Boxes;
+		MakeWorldBoxes(Layout, HalfExtents, FVector::ZeroVector, Boxes);
+		return PlayerViewFrontPlacement::ComputeViewFrontTranslation(
+			Boxes,
+			Request.CameraOrigin,
+			ViewDirection,
+			DistanceCm);
+	};
+	if (TryPullDistances(
+		Context,
+		Distances,
+		Tuning.ViewLayoutAttempts,
+		BuildViewTranslation,
+		Request.CameraOrigin,
+		OutTransforms,
+		OutFailureReason))
+	{
+		return Succeed(EShopUnboxPlacementStage::ViewFront);
+	}
+	if (!OutFailureReason.IsEmpty())
+	{
+		return false;
+	}
+
+	// Stage 2: on the floor in front of the player's feet, pushed off the camera when it would wrap it.
+	if (bHasHorizontalForward)
+	{
+		PlayerViewFrontPlacement::BuildPullDistances(
+			Tuning.ForwardDistanceCm,
+			Tuning.MinForwardDistanceCm,
+			Tuning.ForwardPullStepCm,
+			Distances);
+		const auto BuildFloorTranslation = [&](const TArray<FShopUnboxClusterItem>& Layout, const float DistanceCm)
 		{
-			break;
+			FVector Translation = GetClusterTranslation(
+				Layout,
+				HalfExtents,
+				Request.FootLocation + Forward * DistanceCm,
+				Request.FootLocation.Z + Tuning.ForwardFloorClearanceCm);
+			TArray<FViewFrontBox> Boxes;
+			MakeWorldBoxes(Layout, HalfExtents, Translation, Boxes);
+			Translation += Forward * PlayerViewFrontPlacement::GetCameraClearancePushCm(
+				Boxes,
+				Request.CameraOrigin,
+				Forward,
+				Tuning.CameraClearanceCm);
+			return Translation;
+		};
+		if (TryPullDistances(
+			Context,
+			Distances,
+			Tuning.ForwardLayoutAttempts,
+			BuildFloorTranslation,
+			PlayerCenter,
+			OutTransforms,
+			OutFailureReason))
+		{
+			return Succeed(EShopUnboxPlacementStage::FloorFront);
+		}
+		if (!OutFailureReason.IsEmpty())
+		{
+			return false;
 		}
 	}
 
-	for (int32 HeightIndex = 0; HeightIndex < UpperHeightSteps; ++HeightIndex)
+	// Stage 3: above the player's head.
+	for (int32 HeightIndex = 0; HeightIndex < Tuning.OverheadStepCount; ++HeightIndex)
 	{
-		const float LowestZ = CapsuleTop.Z + PlayerTopClearanceCm + UpperHeightStepCm * HeightIndex;
+		const float LowestZ = CapsuleTop.Z + Tuning.OverheadClearanceCm + Tuning.OverheadStepCm * HeightIndex;
 		const FVector TargetXYCenter(PlayerCenter.X, PlayerCenter.Y, 0.0f);
-		for (int32 Attempt = 0; Attempt < UpperLayoutAttempts; ++Attempt)
+		for (int32 Attempt = 0; Attempt < Tuning.OverheadLayoutAttempts; ++Attempt)
 		{
 			if (TryMakeLayout(
-				World,
-				Player,
-				Box,
-				Items,
-				HalfExtents,
-				TargetXYCenter,
-				LowestZ,
+				Context,
+				[&](const TArray<FShopUnboxClusterItem>& Layout)
+				{
+					return GetClusterTranslation(Layout, HalfExtents, TargetXYCenter, LowestZ);
+				},
 				CapsuleTop,
-				OverlapDepthCm,
-				RandomStream,
-				true,
 				OutTransforms,
 				OutFailureReason))
 			{
-				return true;
+				return Succeed(EShopUnboxPlacementStage::Overhead);
 			}
 			if (!OutFailureReason.IsEmpty())
 			{
@@ -348,8 +446,9 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 		}
 	}
 
+	// Stage 4: final stack, always succeeds.
 	OutTransforms.Reset();
-	float BaseZ = FootLocation.Z;
+	float BaseZ = Request.FootLocation.Z;
 	for (int32 Index = 0; Index < Items.Num(); ++Index)
 	{
 		const FVector& Extent = HalfExtents[Index];
@@ -358,7 +457,7 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 		if (!BuildCandidateAtShapeCenter(
 			Items[Index],
 			ShapeCenter,
-			ViewYaw,
+			ProbeYaw,
 			Candidate,
 			OutFailureReason))
 		{
@@ -385,7 +484,7 @@ bool FShopUnboxingPlacement::FindSpawnTransforms(
 		OutTransforms.Add(Candidate.Transform);
 		BaseZ = ShapeCenter.Z + Extent.Z;
 	}
-	return !OutTransforms.IsEmpty();
+	return !OutTransforms.IsEmpty() && Succeed(EShopUnboxPlacementStage::FinalStack);
 }
 
 #undef LOCTEXT_NAMESPACE

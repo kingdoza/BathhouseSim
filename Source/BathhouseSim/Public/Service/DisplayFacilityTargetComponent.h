@@ -30,8 +30,6 @@ public:
 	virtual void NotifyInteractionFocusChanged(const UPlayerInteractionComponent& Source,
 											   const FPlayerInteractionQuery& Query) override;
 	virtual void NotifyInteractionFocusEnded(const UPlayerInteractionComponent& Source) override;
-	static int32 SelectClosestSpace(TConstArrayView<FVector> Centers, TConstArrayView<int32> Indices,
-									const FVector& Start, const FVector& End);
 
 private:
 
