@@ -19,6 +19,15 @@ ALitterSpawnZoneActor::ALitterSpawnZoneActor()
 	SpawnBounds->SetCanEverAffectNavigation(false);
 }
 
+void ALitterSpawnZoneActor::SetSpawnAreaHalfSizeXY(const FVector2D& HalfSizeXY)
+{
+	if (SpawnBounds)
+	{
+		const FVector Current = SpawnBounds->GetUnscaledBoxExtent();
+		SpawnBounds->SetBoxExtent(FVector(HalfSizeXY.X, HalfSizeXY.Y, Current.Z), false);
+	}
+}
+
 void ALitterSpawnZoneActor::BeginPlay()
 {
 	Super::BeginPlay();

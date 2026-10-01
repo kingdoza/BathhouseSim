@@ -103,7 +103,7 @@ FFacilityPlacementTransactionResult UPlayerFacilityPlacementComponent::ValidateC
 	}
 	if (!OutZone->IsDefinitionAllowed(*Definition))
 	{
-		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::NoCompatibleZone, LOCTEXT("ZoneTagMismatch", "이 구역에는 해당 설비를 설치할 수 없습니다."));
+		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::NoCompatibleZone, AFacilityPlacementZoneActor::GetDefinitionNotAllowedReason());
 	}
 	if (Definition->LockerSlotCount > 0)
 	{
@@ -148,7 +148,7 @@ FFacilityPlacementTransactionResult UPlayerFacilityPlacementComponent::ValidateW
 		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::InvalidComponents, LOCTEXT("MissingItemRoot", "설비 아이템 충돌 설정이 올바르지 않습니다."));
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(FacilityPlacementOverlap), false, &Item);
 	Params.AddIgnoredActor(GetOwner());
-	Params.AddIgnoredActor(&Zone);
+	Params.AddIgnoredComponent(Zone.GetZoneBounds());
 	const FVector QueryExtent(HalfExtent.X * 0.98f, HalfExtent.Y * 0.98f, FMath::Max(1.0f, HalfExtent.Z * 0.9f));
 	if (FacilityPlacementCollision::HasBlockingOverlap(
 		*GetWorld(),

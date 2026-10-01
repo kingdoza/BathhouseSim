@@ -225,7 +225,7 @@ FFacilityPlacementTransactionResult ABathWaterUtilityFacilityActor::QueryFacilit
 	if (!Zone.IsDefinitionAllowed(*FacilityPlacement->GetDefinition()))
 	{
 		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::NoCompatibleZone,
-			LOCTEXT("UtilityZoneMismatch", "이 구역에는 해당 설비를 설치할 수 없습니다."));
+			AFacilityPlacementZoneActor::GetDefinitionNotAllowedReason());
 	}
 	return FFacilityPlacementTransactionResult::Succeeded();
 }

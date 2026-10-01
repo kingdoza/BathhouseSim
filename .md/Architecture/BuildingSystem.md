@@ -2,7 +2,7 @@
 
 ## Status And Scope
 
-- 2026-10-02 `EXP-U1` 설계(공간 건물). Source 미반영, 사용자 승인(2026-10-02). 같은 날 사후 결정 D1(공간별 조각 종류 하나), 아키텍처 Q1 A(지형 구멍), 넓힘 목록 형태 확정(U2 구현)을 반영했다. 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-001~015)이고 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md`다.
+- 2026-10-02 `EXP-U1` 설계·구현(공간 건물). Source 반영(2026-10-02 구현 단계, 코드 리뷰·Editor 작업 전), 사용자 승인(2026-10-02). 같은 날 사후 결정 D1(공간별 조각 종류 하나), 아키텍처 Q1 A(지형 구멍), 넓힘 목록 형태 확정(U2 구현)을 반영했다. 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-001~015)이고 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md`다.
 - 가게를 홀·목욕공간·작업공간(지하) 세 공간으로 나누고, 공간마다 직사각형 바닥 경계를 따라 벽·바닥·천장·조명·출입구·통로·계단을 만든다. 공간은 그 바닥의 설비 배치 구역이자 생성 조각의 생성자다(홀 = 쓰레기 조각, 목욕공간 = 물 얼룩 조각, 작업공간 = 없음, D1).
 - 비대상(U1): 확장 구입·넓힘 적용, 확장 탭, 열쇠·한도 변경, 락커 판매. 넓힘 데이터와 편집 미리보기의 형태는 아래 U2 Expansion Authoring Contract에 확정해 두고 U2가 구현한다.
 
@@ -193,6 +193,15 @@ Private/Tests/
 - 미리보기 횟수를 바꾸면 OnConstruction과 편집 동기화가 그 공간과 이웃 공간(통로 구멍)을 다시 짓는다. 형상·조명·통로·배치 구역 extent·조각 미리보기 선이 넓힌 모습을 따른다.
 - 표시: 미리보기 횟수가 0보다 크면 editor-only `UTextRenderComponent`(게임에서 없음, 충돌 없음)가 공간 위에 `넓힘 미리보기 N회`를 띄운다. 미리보기 상태의 layout에 겹침 등 문제가 있으면 같은 표시에 `겹침 있음`을 덧붙인다.
 - 검증: Data Validation은 미리보기 횟수와 무관하게 0회 상태와 목록 끝까지 넓힌 상태를 검사한다(위 넓힘 검증). 미리보기는 그 중간 모습을 보여 주기만 한다.
+
+## Implementation Notes (2026-10-02 구현)
+
+- 입력 snapshot(`FBathhouseSpaceSnapshot`)·형상 계획·순수 계산은 `Private/Building/BathhouseSpaceLayout.*`, 검사와 위치 제안은 `BathhouseSpaceValidation.*`다. 개구부·계단 위치는 Actor 기준 상대값으로 담고 world 값은 helper가 계산한다. 위치 제안의 이동 후보는 snapshot 복사본에 적용해 같은 검사를 다시 돌려 확인한 것만 문구에 붙는다.
+- 계단 구현 치수: 경사로 상자 두께 = 판 두께. 계단 판 윗면 = 그 판 중앙 위치의 경사로 윗면 높이. 계단 옆 벽은 `R`의 길이 방향 `[0, Run]`, 위·아래 끝 벽은 두께 `t`에 폭 방향으로 옆 벽 두께까지 포함한다. 위 입구 앞과 아래 출구 앞의 출입 자리는 계단 벽 바깥 `t` 지점부터 계단 폭만큼이다.
+- 계단 통로 장애물 trace는 구멍 안 3×3 지점에서 위층 바닥 윗면에서 아래층 천장 윗면까지 아래로 쏜다(공간 Actor가 아닌 WorldStatic·WorldDynamic blocking만 오류). 지형이 판 두께 범위에 걸려도 잡히도록 설계 범위보다 위쪽을 포함한다.
+- 검사는 `ValidateLayout`(순수, 위치 제안 포함), `ValidateNavigation`(순수, Nav bounds 상자를 받음), `ValidateWorld`(world에서 snapshot·`NavMeshBoundsVolume`·계단 trace·배치된 설비를 모아 위 둘을 합침)로 나뉜다. 편집 world의 `IsDataValid`와 BeginPlay 로그가 `ValidateWorld`를 쓴다.
+- 생성 component는 `CreationMethod = UserConstructionScript` + `RF_Transient`다. Engine construction 재실행이 이전 생성물을 파괴해도 shell이 `IsValid`로 걸러 다시 만든다.
+- 자동화는 접근용 friend(`FBathhouseBuildingAutomationAccess`, 공간 Actor)와 배치 검증용 friend(`FBathhouseSpacePlacementAutomationTest`, `UPlayerFacilityPlacementComponent`)를 쓴다.
 
 ## Dependencies
 

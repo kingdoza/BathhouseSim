@@ -159,7 +159,7 @@ ActorLocation = P - BottomOffsetWorld
 
 preview root transform, final deferred spawn transform, footprint world transform, containment와 네 모서리 floor-support trace는 모두 이 최종 Actor transform 하나를 사용한다. `ContainsFootprint`의 기존 Zone Bounds X/Y 포함 계약과 wheel rotation은 유지한다.
 
-### Space Zones (2026-10-02 EXP-U1 설계, Source 미반영)
+### Space Zones (2026-10-02 EXP-U1, Source 반영)
 
 - 설비 배치 구역은 공간마다 하나이며 공간 Actor `ABathhouseSpaceActor`가 `AFacilityPlacementZoneActor`를 상속해 그 자체로 구역이다([BuildingSystem.md](BuildingSystem.md)). 기존 단일 PlacementZone Level instance는 제거한다. base class 계약(`ZoneBounds`, `PlacementFloor`, grid, 후보 transform, `ContainsFootprint`)은 바뀌지 않는다. 공간 subclass만 root를 `SpaceRoot`로 바꾸고 `ZoneBounds`를 그 아래에 둔다.
 - 공간별 허용 설비: 각 Definition `FacilityTags`에 종류 태그 `Facility.Type.<종류>` 하나(락커 1·4·8칸은 `Facility.Type.ClothesLocker` 공유)를 두고, 공간 Actor의 상속 `AllowedFacilityTags`에 허용 종류를 나열한다. 판정은 기존 `IsDefinitionAllowed`(HasAny)다. 태그 목록은 `Config/DefaultGameplayTags.ini`, 공간별 허용 표는 공간 Level instance가 정본이다. 공간은 빈 허용 목록을 쓰지 않는다(검증 오류).

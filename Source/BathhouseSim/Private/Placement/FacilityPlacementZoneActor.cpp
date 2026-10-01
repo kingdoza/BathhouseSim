@@ -133,6 +133,11 @@ bool AFacilityPlacementZoneActor::IsDefinitionAllowed(const UFacilityPlacementDe
 	return AllowedFacilityTags.IsEmpty() || Definition.FacilityTags.HasAny(AllowedFacilityTags);
 }
 
+FText AFacilityPlacementZoneActor::GetDefinitionNotAllowedReason()
+{
+	return LOCTEXT("DefinitionNotAllowed", "이 공간에는 놓을 수 없는 설비입니다");
+}
+
 FTransform AFacilityPlacementZoneActor::MakeCandidateTransform(
 	const FVector& WorldPoint,
 	const float YawDegrees,
