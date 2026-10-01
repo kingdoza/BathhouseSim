@@ -5,6 +5,7 @@
 - 수직 단계(샤워기): 2026-09-27 설계, 2026-09-28 구현 완료(`94f0f11`). 계약 원문은 그 커밋의 `.md/PROMPT_ARCHITECTURE.md`(SHOP-001~037), 선택은 `.md/QNA_FEATURE_SPEC.md` Q1~Q25다.
 - 확장 단계: 2026-09-28 설계·구현, 같은 날 사용자 통합 승인. 입력은 현재 `.md/PROMPT_ARCHITECTURE.md`(Q26~Q30, SHOP-018~020·032~035·038~045)와 사용자 지시 "배송 상자 held transform·scale 정책을 기존 held 물품과 통일"이다. 범위는 7종 판매, 개봉 물품 흩어짐, 배송 상자 scale 정책이다.
 - 2026-09-28 코드 리뷰 재검토: 환경 여유를 아래 방향에 적용하지 않도록 고쳤다(World Placement). `Dc ≥ 20`에서 부푼 밑면이 바닥 여유 20cm를 넘어 트인 바닥에서도 정면 단계가 전부 실패하던 규칙 충돌을 없앤다.
+- 2026-10-01 UNBOX-SPAWN-VIEW 설계: 개봉 1단계를 카메라 시선 앞(pitch 포함)으로 바꾸고 기존 정면 규칙을 2단계(바닥 정면)로 남긴다. 입력은 `.md/Work/UNBOX-SPAWN-VIEW/PROMPT_ARCHITECTURE.md`(USV-001~021)다.
 - 주문 취소·환불, 재고·할인, 배송 지점 여러 곳, 저장·멀티플레이, 개봉 애니메이션은 만들지 않는다.
 
 ## Source Scope
@@ -69,7 +70,9 @@ UI native class는 `Public/UI`, `Private/UI`에 둔다([UISystem.md](UISystem.md
 | `CartTotalQuantityLimit` | 10 | ≥ 1 |
 | `PerProductQuantityLimit` | 99 | ≥ 1 |
 | `DeliveryDelaySeconds` | 10 | finite ≥ 0 |
-| `UnboxForwardDistanceCm` | 100 | finite ≥ 0 |
+| `UnboxViewDistanceCm` | 100 | finite ≥ 하한. 1단계: 카메라 → 무리의 가장 가까운 부분, 시선 방향 |
+| `UnboxViewMinDistanceCm` | 30 | finite ≥ 0. 시선 당김 하한 |
+| `UnboxForwardDistanceCm` | 100 | finite ≥ 0. 2단계 바닥 정면의 발바닥 기준 수평 중심 거리(의미 유지) |
 | `UnboxOverlapDepthCm` | 8 | finite, 0~50. 개봉 물품끼리 목표 겹침 깊이. 클수록 세게 튄다(SHOP-043) |
 | `DeliveryNoticeSeconds` | 3 | finite > 0 |
 
@@ -155,7 +158,7 @@ subsystem Tick(0.25초 간격 throttle):
 
 ## Unboxing
 
-개봉 물품은 정면에 무작위로 모인 3차원 무리로 생긴다. 물품끼리만 일부 겹쳐 생성돼 엔진 충돌 해소로 튄다(Q26~Q30). 추가 속도와 튐 상한은 없다.
+개봉 물품은 카메라 시선 앞에 무작위로 모인 3차원 무리로 생긴다. 물품끼리만 일부 겹쳐 생성돼 엔진 충돌 해소로 튄다(Q26~Q30). 추가 속도와 튐 상한은 없다.
 
 ### Cluster Layout
 
@@ -176,26 +179,27 @@ subsystem Tick(0.25초 간격 throttle):
 
 ### World Placement
 
-`FShopUnboxingPlacement::FindSpawnTransforms`는 기존 입력에 `FRandomStream&`과 `OverlapDepthCm`을 추가로 받는다. 물품 shape는 기존 `APlaceableFacilityItemActor::BuildDefinitionCollisionQuery`(CDO scale 포함)와 같고, Actor 위치 = shape 중심 − 회전 × (scale × bounds origin)이다.
+`FShopUnboxingPlacement::FindSpawnTransforms(World, Player, PlayerCapsule, Box, Items, Request, RandomStream, OutTransforms, OutFailureReason, OutStage)`. `FShopUnboxingPlacementRequest`는 카메라 위치·시선 방향(pitch 포함), 발바닥, 시선 거리·하한, 바닥 정면 거리, 겹침 깊이다. `EShopUnboxPlacementStage`(ViewFront/FloorFront/Overhead/FinalStack)는 자동화가 단계를 단언하는 결과다. 물품 shape는 기존 `APlaceableFacilityItemActor::BuildDefinitionCollisionQuery`(CDO scale 포함)와 같고, Actor 위치 = shape 중심 − 회전 × (scale × bounds origin)이다.
 
 물품마다 다음 world 검사를 한다. 하나라도 실패하면 그 layout을 버린다.
 
 - 여유 shape: `Dc = clamp(D, 0, 50)`. 수평과 위쪽으로만 부풀리고 밑면은 원래 위치에 둔다. 물품은 선 자세(yaw만)이므로 world Z 기준으로 half extent = `(Ex + Dc, Ey + Dc, Ez + Dc/2)`, 중심 = 원래 중심 + `(0, 0, Dc/2)`다.
   - 수평·위 여유는 겹침이 풀리며 밀려나도 벽·천장에 박혀 시작하지 않게 한다.
-  - 아래 여유는 두지 않는다. 가장 낮은 물품은 단계 바닥 기준(정면 발바닥 + 20cm, 위 단계 capsule 윗면 + 10cm)부터 시작해 이미 바닥과 떨어져 있고, 아래로 밀리면 바닥 collision과 CCD가 받는다. 아래 여유가 바닥 기준 간격 이상이면 트인 바닥에서도 모든 layout이 기각된다(2026-09-28 재검토, D ≥ 20에서 정면 단계 전부 실패).
+  - 아래 여유는 두지 않는다(모든 단계). 바닥 정면은 발바닥 + 20cm, 위 단계는 capsule 윗면 + 10cm부터 시작하고, 시선 앞은 원래 밑면의 바닥 overlap을 기각한다. 아래로 밀리면 바닥 collision과 CCD가 받는다. 아래 여유가 바닥 기준 간격 이상이면 트인 바닥에서도 모든 정면 layout이 기각된다(2026-09-28 재검토).
   - 바닥 기준 높이와 `UnboxOverlapDepthCm` 범위(0~50)는 바꾸지 않는다.
 - 환경: 여유 shape로 `FacilityPlacementCollision::HasBlockingOverlap`. player·상자는 무시한다. 원래 extent의 밑면이 바닥에 닿거나 파고들면 기각된다.
 - 손님: 같은 여유 shape로 `ECC_Pawn` object type overlap. player만 무시한다. item collision이 Pawn을 무시하므로 별도로 검사한다(SHOP-041).
 - 시야: 단계 기준점에서 shape 중심까지 Visibility line trace가 막히지 않는다(player·상자 무시). 벽 너머 생성을 막는다(SHOP-019, 042).
-- 같은 무리의 물품끼리는 검사하지 않는다.
+- player를 무시하므로 발밑을 보면 플레이어 몸 자리와 겹치는 자리도 쓴다(USV P9). 같은 무리의 물품끼리는 검사하지 않는다.
 
-단계(1·2단계 모두 같은 여유 shape를 쓴다):
+단계(1~3단계 모두 같은 여유 shape를 쓴다). 거리열은 `PlayerViewFrontPlacement::BuildPullDistances`(시작에서 10cm씩, 마지막 하한)다. 기하 helper는 [InteractionSystem.md](InteractionSystem.md) Player View-Front Spawn Geometry.
 
-1. 정면: 거리 d를 `UnboxForwardDistanceCm`부터 10cm씩 0까지 줄인다. d마다 새 layout을 최대 4회 만든다. XY 중심은 `발바닥 + 수평 시선 전방 × d`, 가장 낮은 바닥면은 발바닥 + 20cm, 시야 기준점은 capsule 중심이다(SHOP-018, 019, 033, 038~041).
-2. 위로 쌓기: XY 중심은 player XY, 가장 낮은 바닥면은 capsule 윗면 + 10cm + 25cm × k(k = 0~7). k마다 layout 최대 3회, 시야 기준점은 capsule 윗면 중심이다. 겹침·튐을 허용한다(SHOP-020).
-3. 최후: 기존 결정적 수직 쌓기(겹침 없음, player 위치, 경고 로그)를 유지한다. 정상 공간에서는 도달하지 않으며 개봉 항상 성공을 보장한다.
+1. 시선 앞: d = `UnboxViewDistanceCm` → `UnboxViewMinDistanceCm`. d마다 새 layout을 최대 4회 만든다. 무리 translation은 `ComputeViewFrontTranslation(layout, 카메라 위치, 시선 방향, d)`이다. 시선 방향 투영 최솟값이 d이고 카메라 right·up 투영 범위 중앙이 시선 ray라 카메라를 감싸지 않는다. 시야 기준점은 카메라 위치다(USV-001~006, 008, 012).
+2. 바닥 정면: 기존 정면 규칙이다. d = `UnboxForwardDistanceCm` → 0, d마다 layout 최대 4회, XY 중심은 `발바닥 + 수평 전방 × d`, 가장 낮은 바닥면은 발바닥 + 20cm, 시야 기준점은 capsule 중심이다(SHOP-018, 019, 033, 038~041). 수평 전방은 시선 방향의 수평 성분이며 0이면 이 단계를 건너뛴다. translation 뒤 `GetCameraClearancePushCm`만큼 수평 전방으로 민다. 무리 윗면이 카메라 − 10cm 이하이면 0이라 작은 무리는 현재 위치 그대로다. 높은 무리는 카메라 앞 10cm 밖으로 밀려 카메라를 감싸지 않는다(P10, USV-004, 007, 013).
+3. 위로 쌓기: XY 중심은 player XY, 가장 낮은 바닥면은 capsule 윗면 + 10cm + 25cm × k(k = 0~7). k마다 layout 최대 3회, 시야 기준점은 capsule 윗면 중심이다. 겹침·튐을 허용한다(SHOP-020).
+4. 최후: 기존 결정적 수직 쌓기(겹침 없음, player 위치, 경고 로그)를 유지한다. 정상 공간에서는 도달하지 않으며 개봉 항상 성공을 보장한다. 이 단계만 카메라를 감쌀 수 있다.
 
-worst case는 약 (11 × 4 + 8 × 3) layout × 10 물품 × 3 query다. 클릭 한 번의 동기 처리로 허용한다.
+worst case는 약 (8 × 4 + 11 × 4 + 8 × 3) layout × 10 물품 × 3 query다. 클릭 한 번의 동기 처리로 허용한다.
 
 ### Escape Guard
 
@@ -212,7 +216,7 @@ worst case는 약 (11 × 4 + 8 × 3) layout × 10 물품 × 3 query다. 클릭 �
 `FShopUnboxingTransaction::Open(Box, Context)`:
 
 1. 들고 있는 상자 identity, suppression·입력 owner, 내용 유효성과 재진입 guard를 확인한다.
-2. `FMath::Rand()`로 seed한 `FRandomStream`과 `UnboxOverlapDepthCm`으로 위치를 계산한다. 자동화는 placement helper에 seed를 직접 준다.
+2. `FMath::Rand()`로 seed한 `FRandomStream`과 request로 위치를 계산한다. request의 카메라 위치·방향은 장비 context(`CameraOrigin`, `CameraDirection`), 거리 세 값과 `UnboxOverlapDepthCm`은 Settings다. 자동화는 placement helper에 seed를 직접 준다.
 3. 모든 아이템을 Placement factory로 신규 설치 payload와 함께 생성하고 free-world로 활성화한다. 같은 호출 안에서 활성화하므로 같은 physics step에서 겹침을 푼다. 추가 속도는 주지 않는다(Q28). 하나라도 실패하면 이미 만든 아이템을 모두 제거하고 실패를 반환하며, 상자는 손에 남는다.
 4. `Carry->CommitConsumeHeldObject(Box, …)`로 손에서 뗀다. 실패하면 3에서 만든 아이템을 모두 제거한다.
 5. 상자 Actor를 제거한다. 결과적으로 빈손이다.
@@ -260,6 +264,7 @@ worst case는 약 (11 × 4 + 8 × 3) layout × 10 물품 × 3 query다. 클릭 �
 
 - 수직 신규 reflected: 위 class들, `FShopProductEntry`, `FShopOrderLine`, `UShopSettings` 값, `EPhysicalCarryKind::DeliveryBox`(append), `TAG_Facility_Discardable`(native tag `Facility.Discardable`), wallet `StartingMoney`, `IPhysicalCarryDiscardable`, `IComputerScreenContextReceiver`.
 - 확장 신규 reflected: `UShopSettings::UnboxOverlapDepthCm`, `AShopDeliveryBoxActor::HeldTransform`. property 추가만이므로 기존 export와 호환된다.
+- UNBOX-SPAWN-VIEW 신규 reflected: `UShopSettings::UnboxViewDistanceCm`, `UnboxViewMinDistanceCm`. 추가만이며 Config 키·Content 변경이 없다.
 - 기존 이름 rename·삭제 없음. Core Redirect 불필요.
 - Editor(수직, 완료): catalog·Project Settings·7종 `Facility.Discardable` 태그·WBP·Shop Actor Blueprint·DefaultMap 배송 지점과 쓰레기통.
 - Editor(확장):
@@ -279,8 +284,9 @@ worst case는 약 (11 × 4 + 8 × 3) layout × 10 물품 × 3 query다. 클릭 �
 | SHOP-016, 017, 021 | 상자 E·요약·drop 보존, 실패 rollback, 컴퓨터·배치 LMB 우선 |
 | 상자 scale | CDO root 0.8: half extent 0.8배, 배송 spawn·drop·집기·last-safe 복구 뒤 world scale 0.8 유지, validation 오류·경고 조건 |
 | 무리 계산 | anchor 깊이 = Dij, 다른 쌍 ≤ Dik + 0.5, yaw만 회전, 같은 seed 동일·다른 seed 다름(SHOP-038), 1개(SHOP-039), 혼합 크기 10개(SHOP-040), D = 0 접촉 |
-| SHOP-018~020, 041 | 트인 곳 d = 100, 50cm 앞 벽 당김·벽 너머 없음, 구석 위로 쌓기, 손님 capsule 회피, 환경 여유(수평·위만), 항상 개봉 |
-| 여유 방향 | 트인 바닥에서 D = 0, 8, 20, 30, 50 모두 정면 단계 채택·최저 바닥면 = 발바닥 + 20. 수평 `Dc` 안의 벽과 위 `Dc` 안의 천장은 기각, 발바닥 높이 바닥은 기각하지 않음 |
+| SHOP-018~020, 041 | 바닥 정면 단계 강제 시 d = 100·바닥 + 20, 50cm 앞 벽 당김·벽 너머 없음, 구석 위로 쌓기, 손님 capsule 회피, 환경 여유(수평·위만), 항상 개봉 |
+| USV-001~021 | 고정 seed: 시선 앞 가장 가까운 부분 = d·가운데 정렬·카메라 비포함, pitch −80~+45, 천장·벽 당김과 단계 전환, P10 분리, 봉투 경로([CleaningLitterSystem.md](CleaningLitterSystem.md)) |
+| 여유 방향 | 시선 단계를 막은 트인 바닥에서 D = 0, 8, 20, 30, 50 모두 바닥 정면 단계 채택·최저 바닥면 = 발바닥 + 20. 수평 `Dc` 안의 벽과 위 `Dc` 안의 천장은 기각, 발바닥 높이 바닥은 기각하지 않음 |
 | 튐 물리 | test world tick: 겹친 두 물품이 0.5초 안에 분리, 깊이 2 대 20의 최고 속도 비교(SHOP-043), 닫힌 방 10개 개봉 3초 뒤 모두 방 안·바닥 위(SHOP-042, 045) |
 | 7종 설비 | 실제 7종 Definition의 collision query·`SpawnFreshItem`·free-world 활성 성공(SHOP-035, 045 사전). 7종 판매 catalog 단언은 Editor authoring 뒤 확인 |
 | SHOP-022, 028 | 신규 설치 payload 배치 시 class 기본값, 보일러 잔량 0(SHOP-034), 회수 아이템 버리기 |

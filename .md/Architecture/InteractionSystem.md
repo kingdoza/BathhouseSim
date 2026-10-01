@@ -39,6 +39,7 @@ Source/BathhouseSim/Private/Interaction/
   HeldEquipmentMotionComponent.cpp
   BathhouseKeyActor.cpp
   BathhouseKeyHookActor.cpp
+  PlayerViewFrontPlacement.h/.cpp  # 카메라 시선 앞 생성 순수 기하(Shop 개봉·Cleaning 봉투 공유)
 
 Source/BathhouseSim/Private/Tests/
   BathhouseDomainTests.cpp  # single-key carry와 interaction attempt result coverage
@@ -104,6 +105,17 @@ Interaction은 cleaning progress, attack/damage/health, towel count/machine, cus
 context는 user/carry, camera origin/forward과 현재 focus hit를 제공한다. held equipment가 실제 domain owner API를 호출하며 `UPlayerEquipmentUseComponent`는 concrete wrench/mop을 cast하지 않는다.
 
 Equipment row 합성은 현재 held Actor가 `IHeldEquipmentUsable`이면 해당 query를 authoritative하게 사용하고, 대상이 채운 held-use Apply·Take 필드를 비운다. `HasUsableHeldEquipment()`는 Character owner 선택용 C++ 조회다. 사용 가능한 held equipment가 없을 때만 focus target이 `물걸레가 필요합니다` 같은 disabled equipment action/failure를 광고할 수 있다. 두 source를 두 LMB row로 동시 표시하지 않으며 focus target은 target name/hit context를 제공한다.
+
+## Player View-Front Spawn Geometry
+
+2026-10-01 UNBOX-SPAWN-VIEW. `Private/Interaction/PlayerViewFrontPlacement.h/.cpp`의 namespace `PlayerViewFrontPlacement`는 world·UObject에 접근하지 않는 순수 계산이다. 상자 개봉([ShopSystem.md](ShopSystem.md) World Placement)과 봉투 묶기([CleaningLitterSystem.md](CleaningLitterSystem.md) Front Drop Placement)가 공유한다. 카메라 입력은 `FHeldEquipmentUseContext::CameraOrigin/CameraDirection`이다.
+
+- `FViewFrontBox {Center, YawDegrees, HalfExtent}`: 선 자세(yaw만) box 하나.
+- `GetProjectionRange(Boxes, Origin, Axis)`: support function(`Center·Axis ± Σ e_k|Axis·local_k|`)으로 구한 정확한 투영 [Min, Max].
+- `ComputeViewFrontTranslation(Boxes, CameraOrigin, ViewDirection, DistanceCm)`: 축은 V와 `FRotationMatrix(V.Rotation())`의 Y·Z다. 결과에서 V 투영 최솟값 = DistanceCm("카메라에서 시선 방향으로 잰 가장 가까운 부분"), right·up 투영 범위 중앙 = 카메라. pitch ±90에서도 정의된다.
+- `GetCameraClearancePushCm(Boxes, CameraOrigin, HorizontalForward)`: 윗면 ≤ 카메라 Z − `CameraClearanceCm`(10) 또는 수평 전방 투영 최솟값 ≥ 10이면 0, 아니면 투영 최솟값을 10으로 만드는 추가 거리. 카메라와 무리를 평면 하나로 분리해 감싸지 않게 한다.
+- `BuildPullDistances(Start, Min)`: max(Start, Min)부터 `PullStepCm`(10)씩 줄이고 마지막은 Min 한 번.
+- 단계 순서, 충돌·시야·손님 검사와 실패 계약은 호출 시스템이 소유한다. 이 helper에 world query를 넣지 않는다.
 
 ## `UPlayerInteractionComponent`
 
@@ -235,6 +247,7 @@ Editor authoring 값:
 - Combat -> Interaction public carry/equipment-use/motion 계약
 - Towel -> Interaction public intent/carry/held-use target 계약
 - Shop -> Interaction public interactable/carry/equipment-use/discardable 계약
+- Shop, Cleaning -> Interaction private `PlayerViewFrontPlacement` 순수 기하(UNBOX-SPAWN-VIEW)
 - Utility -> Interaction public interactable/carry/focus-observer/held-use target 계약
 - Character -> Interaction
 - Computer -> Interaction public query/carry/suppression 계약
