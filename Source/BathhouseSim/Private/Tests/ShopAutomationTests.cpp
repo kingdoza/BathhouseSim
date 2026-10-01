@@ -690,10 +690,31 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	TArray<UFacilityPlacementDefinition*> Definitions = { Definition };
 	TArray<FTransform> SpawnTransforms;
 	FRandomStream RandomStream(1001);
+	const FShopUnboxingTuning FloorStageTuning = ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f);
+	{
+		// Open floor with the default view stage: the cluster is placed in front of the camera.
+		TArray<FTransform> ViewTransforms;
+		EShopUnboxPlacementStage ViewStage = EShopUnboxPlacementStage::None;
+		FRandomStream ViewStream(1000);
+		TestTrue(TEXT("Open floor with the settings tuning places in front of the camera"),
+			FShopUnboxingPlacement::FindSpawnTransforms(
+				*World, *Player, *Capsule, *BoxForQuery, ShopUnboxTest::MakeShapes(Definitions),
+				ShopUnboxTest::MakeRequest(*Player), ShopUnboxTest::MakeTuning(), ViewStream, ViewTransforms,
+				FailureReason, &ViewStage));
+		TestTrue(TEXT("Open floor selects the view-front stage"), ViewStage == EShopUnboxPlacementStage::ViewFront);
+	}
 	TestTrue(TEXT("Open floor chooses the configured forward row"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
-			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			ShopUnboxTest::MakeShapes(Definitions), 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
+		*World,
+		*Player,
+		*Capsule,
+		*BoxForQuery,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f),
+		RandomStream,
+		SpawnTransforms,
+		FailureReason));
 	TestEqual(TEXT("Open floor returns one spawn transform"), SpawnTransforms.Num(), 1);
 	if (SpawnTransforms.Num() == 1)
 	{
@@ -704,10 +725,10 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 		TestTrue(TEXT("Open-floor spawn uses the definition collision query"),
 			APlaceableFacilityItemActor::BuildDefinitionCollisionQuery(
 				*Definition, SpawnTransforms[0], ShapeCenter, ShapeRotation, Shape, CollisionTemplate, FailureReason));
-		TestTrue(TEXT("Open floor aligns cluster bounds center at the configured 100 cm forward position"),
-			FMath::IsNearlyEqual(ShapeCenter.X, FootLocation.X + 100.0f, 0.1f));
-		TestTrue(TEXT("Open floor keeps the lowest shape surface 20 cm above the feet"),
-			FMath::IsNearlyEqual(ShapeCenter.Z - Shape.GetExtent().Z, FootLocation.Z + 20.0f, 0.1f));
+		TestTrue(TEXT("Open floor aligns cluster bounds center at the configured forward position"),
+			FMath::IsNearlyEqual(ShapeCenter.X, FootLocation.X + FloorStageTuning.ForwardDistanceCm, 0.1f));
+		TestTrue(TEXT("Open floor keeps the lowest shape surface at the configured height above the feet"),
+			FMath::IsNearlyEqual(ShapeCenter.Z - Shape.GetExtent().Z, FootLocation.Z + FloorStageTuning.ForwardFloorClearanceCm, 0.1f));
 
 		APlaceableFacilityItemActor* SpawnedOpenFloorItem = APlaceableFacilityItemActor::SpawnFreshItem(
 			*World, *Definition, SpawnTransforms[0], FailureReason);
@@ -781,8 +802,16 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	RandomStream.Initialize(1002);
 	TestTrue(TEXT("A wall in front keeps the item on the near side"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
-			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			ShopUnboxTest::MakeShapes(Definitions), 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
+		*World,
+		*Player,
+		*Capsule,
+		*BoxForQuery,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f),
+		RandomStream,
+		SpawnTransforms,
+		FailureReason));
 	if (SpawnTransforms.Num() == 1 && Wall)
 	{
 		TestTrue(TEXT("Wall candidate uses the definition collision query"),
@@ -821,8 +850,16 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	RandomStream.Initialize(1003);
 	TestTrue(TEXT("Blocked forward row safely stacks above the capsule"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
-			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			ShopUnboxTest::MakeShapes(Definitions), 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
+		*World,
+		*Player,
+		*Capsule,
+		*BoxForQuery,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f),
+		RandomStream,
+		SpawnTransforms,
+		FailureReason));
 	if (SpawnTransforms.Num() == 1)
 	{
 		const float CapsuleTopZ = PlayerCenter.Z + Capsule->GetScaledCapsuleHalfHeight();
@@ -855,8 +892,16 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	RandomStream.Initialize(1004);
 	TestTrue(TEXT("A four-sided blocked corner stacks items above the capsule safely"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
-			*World, *Player, *Capsule, *BoxForQuery, FootLocation, 0.0f,
-			ShopUnboxTest::MakeShapes(Definitions), 100.0f, RandomStream, 8.0f, SpawnTransforms, FailureReason));
+		*World,
+		*Player,
+		*Capsule,
+		*BoxForQuery,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f),
+		RandomStream,
+		SpawnTransforms,
+		FailureReason));
 	if (SpawnTransforms.Num() == 1)
 	{
 		const float CapsuleTopZ = PlayerCenter.Z + CageHalfHeight;
@@ -1077,6 +1122,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	OpenContext.Equipment = OpenBox;
 	OpenContext.CarryComponent = Carry;
 	OpenContext.InteractionComponent = EquipmentInteraction;
+	OpenContext.CameraOrigin = ShopUnboxTest::MakeRequest(*Player).CameraOrigin;
 	OpenContext.CameraDirection = FVector::ForwardVector;
 	EquipmentInteraction->SetInteractionSuppressed(true);
 	CarryProbe->ResetHeldChanges();

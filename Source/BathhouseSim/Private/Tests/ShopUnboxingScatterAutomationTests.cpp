@@ -193,6 +193,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FShopUnboxingClusterLayoutAutomationTest::RunTest(const FString& Parameters)
 {
 	(void)Parameters;
+	const FShopUnboxingTuning Tuning = ShopUnboxTest::MakeTuning();
 	TArray<FVector> RealHalfExtents;
 	RealHalfExtents.Reserve(UE_ARRAY_COUNT(ShopDefinitionPaths));
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(ShopDefinitionPaths); ++Index)
@@ -218,7 +219,7 @@ bool FShopUnboxingClusterLayoutAutomationTest::RunTest(const FString& Parameters
 			FRandomStream Stream(Seed);
 			TArray<FShopUnboxClusterItem> Layout;
 			TestTrue(FString::Printf(TEXT("%d-item layout builds at seed %d"), Count, Seed),
-				FShopUnboxingCluster::BuildLayout(HalfExtents, 8.0f, Stream, Layout));
+				FShopUnboxingCluster::BuildLayout(HalfExtents, Tuning.OverlapDepthCm, Tuning.Cluster, Stream, Layout));
 			TestEqual(TEXT("Layout restores source item order and count"), Layout.Num(), Count);
 			if (Layout.Num() != Count)
 			{
@@ -245,15 +246,15 @@ bool FShopUnboxingClusterLayoutAutomationTest::RunTest(const FString& Parameters
 						continue;
 					}
 					const float TargetDepth = FMath::Min(
-						8.0f,
-						0.5f * FMath::Min(HalfExtents[ItemIndex].GetMin(), HalfExtents[OtherIndex].GetMin()));
+						Tuning.OverlapDepthCm,
+						Tuning.Cluster.PairDepthExtentRatio * FMath::Min(HalfExtents[ItemIndex].GetMin(), HalfExtents[OtherIndex].GetMin()));
 					const float Depth = FShopUnboxingCluster::ComputePenetrationDepth(
 						Item.Center, Item.YawDegrees, HalfExtents[ItemIndex],
 						Layout[OtherIndex].Center, Layout[OtherIndex].YawDegrees, HalfExtents[OtherIndex]);
 					ClosestTargetError = FMath::Min(ClosestTargetError, FMath::Abs(Depth - TargetDepth));
 					bHasPenetratingPeer |= Depth > 0.0f;
-					TestTrue(TEXT("Non-anchor pair stays within target depth plus 0.5 cm"),
-						Depth <= TargetDepth + 0.51f);
+					TestTrue(TEXT("Non-anchor pair stays within target depth plus the tolerance setting"),
+						Depth <= TargetDepth + Tuning.Cluster.DepthToleranceCm + 0.01f);
 				}
 				if (Count > 1)
 				{
@@ -275,9 +276,9 @@ bool FShopUnboxingClusterLayoutAutomationTest::RunTest(const FString& Parameters
 	FRandomStream FirstStream(711);
 	FRandomStream RepeatStream(711);
 	FRandomStream DifferentStream(712);
-	TestTrue(TEXT("D=0 layout builds"), FShopUnboxingCluster::BuildLayout(TwoExtents, 0.0f, FirstStream, FirstLayout));
-	TestTrue(TEXT("Same-seed layout builds"), FShopUnboxingCluster::BuildLayout(TwoExtents, 0.0f, RepeatStream, RepeatLayout));
-	TestTrue(TEXT("Different-seed layout builds"), FShopUnboxingCluster::BuildLayout(TwoExtents, 0.0f, DifferentStream, DifferentSeedLayout));
+	TestTrue(TEXT("D=0 layout builds"), FShopUnboxingCluster::BuildLayout(TwoExtents, 0.0f, Tuning.Cluster, FirstStream, FirstLayout));
+	TestTrue(TEXT("Same-seed layout builds"), FShopUnboxingCluster::BuildLayout(TwoExtents, 0.0f, Tuning.Cluster, RepeatStream, RepeatLayout));
+	TestTrue(TEXT("Different-seed layout builds"), FShopUnboxingCluster::BuildLayout(TwoExtents, 0.0f, Tuning.Cluster, DifferentStream, DifferentSeedLayout));
 	if (FirstLayout.Num() == 2 && RepeatLayout.Num() == 2 && DifferentSeedLayout.Num() == 2)
 	{
 		TestTrue(TEXT("Same seed reproduces the complete layout"),
@@ -295,10 +296,12 @@ bool FShopUnboxingClusterLayoutAutomationTest::RunTest(const FString& Parameters
 	const float PreviousDepth = Settings->UnboxOverlapDepthCm;
 	Settings->UnboxOverlapDepthCm = -2.0f;
 	TestEqual(TEXT("Overlap setting clamps below zero"), Settings->GetUnboxOverlapDepthCm(), 0.0f);
-	Settings->UnboxOverlapDepthCm = 80.0f;
-	TestEqual(TEXT("Overlap setting clamps above fifty"), Settings->GetUnboxOverlapDepthCm(), 50.0f);
+	Settings->UnboxOverlapDepthCm = UShopSettings::MaxUnboxOverlapDepthCm + 30.0f;
+	TestEqual(TEXT("Overlap setting clamps above its maximum"), Settings->GetUnboxOverlapDepthCm(),
+		UShopSettings::MaxUnboxOverlapDepthCm);
 	Settings->UnboxOverlapDepthCm = std::numeric_limits<float>::quiet_NaN();
-	TestEqual(TEXT("Non-finite overlap setting falls back to eight"), Settings->GetUnboxOverlapDepthCm(), 8.0f);
+	TestEqual(TEXT("Non-finite overlap setting falls back to the header default"), Settings->GetUnboxOverlapDepthCm(),
+		UShopSettings::DefaultUnboxOverlapDepthCm);
 	Settings->UnboxOverlapDepthCm = PreviousDepth;
 	return true;
 }
@@ -339,8 +342,16 @@ bool FShopUnboxingPawnAvoidanceAutomationTest::RunTest(const FString& Parameters
 	FRandomStream BaselineStream(31415);
 	FText FailureReason;
 	TestTrue(TEXT("Clear front area generates a baseline candidate"), FShopUnboxingPlacement::FindSpawnTransforms(
-		World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-		ShopUnboxTest::MakeShapes(Definitions), 500.0f, BaselineStream, 8.0f, BaselineTransforms, FailureReason));
+		World,
+		*Player,
+		*Player->GetCapsuleComponent(),
+		*Box,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(500.0f, 8.0f),
+		BaselineStream,
+		BaselineTransforms,
+		FailureReason));
 	if (BaselineTransforms.Num() != 1)
 	{
 		return false;
@@ -364,8 +375,16 @@ bool FShopUnboxingPawnAvoidanceAutomationTest::RunTest(const FString& Parameters
 	TArray<FTransform> SafeTransforms;
 	FRandomStream SafeStream(31415);
 	TestTrue(TEXT("Placement retries around a guest Pawn"), FShopUnboxingPlacement::FindSpawnTransforms(
-		World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-		ShopUnboxTest::MakeShapes(Definitions), 500.0f, SafeStream, 8.0f, SafeTransforms, FailureReason));
+		World,
+		*Player,
+		*Player->GetCapsuleComponent(),
+		*Box,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(500.0f, 8.0f),
+		SafeStream,
+		SafeTransforms,
+		FailureReason));
 	if (SafeTransforms.Num() == 1)
 	{
 		FVector CandidateCenter = FVector::ZeroVector;
@@ -411,8 +430,16 @@ bool FShopUnboxingPawnAvoidanceAutomationTest::RunTest(const FString& Parameters
 	FRandomStream EdgeSafeStream(31415);
 	TestTrue(TEXT("Placement retries around a guest only inside horizontal Dc clearance"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
-			World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-			ShopUnboxTest::MakeShapes(Definitions), 500.0f, EdgeSafeStream, 8.0f, EdgeSafeTransforms, FailureReason));
+		World,
+		*Player,
+		*Player->GetCapsuleComponent(),
+		*Box,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(500.0f, 8.0f),
+		EdgeSafeStream,
+		EdgeSafeTransforms,
+		FailureReason));
 	if (EdgeSafeTransforms.Num() == 1)
 	{
 		FVector CandidateCenter = FVector::ZeroVector;
@@ -764,7 +791,7 @@ float RunShopOverlapPhysicsCase(
 	TArray<FShopUnboxClusterItem> Layout;
 	TArray<FVector> PairExtents = { HalfExtent, HalfExtent };
 	Test.TestTrue(FString::Printf(TEXT("Two-item physics layout builds at D=%.0f"), DepthCm),
-		FShopUnboxingCluster::BuildLayout(PairExtents, DepthCm, Stream, Layout));
+		FShopUnboxingCluster::BuildLayout(PairExtents, DepthCm, ShopUnboxTest::MakeTuning().Cluster, Stream, Layout));
 	if (Layout.Num() != 2)
 	{
 		return 0.0f;
@@ -839,7 +866,7 @@ float RunShopOverlapPhysicsCase(
 		}
 		// The architecture defines the effective pair target as min(requested D, half the
 		// smaller half-extent). The corrected 0.6 shower scale caps D=20 at 15cm.
-		const float ExpectedInitialDepth = FMath::Min(DepthCm, 0.5f * HalfExtent.GetMin());
+		const float ExpectedInitialDepth = FMath::Min(DepthCm, ShopUnboxTest::MakeTuning().Cluster.PairDepthExtentRatio * HalfExtent.GetMin());
 		Test.TestTrue(FString::Printf(TEXT("Initial overlap sanity: effective target %.1fcm (requested D=%.1fcm, measured %.3fcm)"),
 			ExpectedInitialDepth, DepthCm, OutInitialDepth),
 			bInitialQueriesResolved && FMath::Abs(OutInitialDepth - ExpectedInitialDepth) <= 0.5f);
@@ -968,8 +995,16 @@ bool FShopUnboxingEnvironmentClearanceAutomationTest::RunTest(const FString& Par
 		FText FailureReason;
 		TestTrue(TEXT("Clear environment accepts the baseline front candidate"),
 			FShopUnboxingPlacement::FindSpawnTransforms(
-				World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-				ShopUnboxTest::MakeShapes(Definitions), ForwardDistanceCm, Stream, ClearanceCm, Result, FailureReason));
+		World,
+		*Player,
+		*Player->GetCapsuleComponent(),
+		*Box,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(ForwardDistanceCm, ClearanceCm),
+		Stream,
+		Result,
+		FailureReason));
 		if (Result.Num() != 1 && !FailureReason.IsEmpty())
 		{
 			AddError(FailureReason.ToString());
@@ -1028,8 +1063,16 @@ bool FShopUnboxingEnvironmentClearanceAutomationTest::RunTest(const FString& Par
 	FText FailureReason;
 	TestTrue(TEXT("Placement rejects or relocates a layout near a side wall"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
-			World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-			ShopUnboxTest::MakeShapes(Definitions), ForwardDistanceCm, SideSafeStream, ClearanceCm, SideSafeTransforms, FailureReason));
+		World,
+		*Player,
+		*Player->GetCapsuleComponent(),
+		*Box,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(ForwardDistanceCm, ClearanceCm),
+		SideSafeStream,
+		SideSafeTransforms,
+		FailureReason));
 	if (SideSafeTransforms.Num() != 1)
 	{
 		AddError(FailureReason.ToString());
@@ -1092,8 +1135,16 @@ bool FShopUnboxingEnvironmentClearanceAutomationTest::RunTest(const FString& Par
 	FRandomStream CeilingSafeStream(LayoutSeed);
 	TestTrue(TEXT("Placement rejects or relocates a layout below the ceiling"),
 		FShopUnboxingPlacement::FindSpawnTransforms(
-			World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-			ShopUnboxTest::MakeShapes(Definitions), ForwardDistanceCm, CeilingSafeStream, ClearanceCm, CeilingSafeTransforms, FailureReason));
+		World,
+		*Player,
+		*Player->GetCapsuleComponent(),
+		*Box,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(ForwardDistanceCm, ClearanceCm),
+		CeilingSafeStream,
+		CeilingSafeTransforms,
+		FailureReason));
 	if (CeilingSafeTransforms.Num() != 1)
 	{
 		AddError(FailureReason.ToString());
@@ -1153,16 +1204,32 @@ bool FShopUnboxingDepthPlacementObservationTest::RunTest(const FString& Paramete
 		FVector(10000.0f, 10000.0f, 50.0f)));
 	TArray<UFacilityPlacementDefinition*> Definitions = { Definition };
 	const FVector Forward = FRotationMatrix(FRotator(0.0f, 0.0f, 0.0f)).GetUnitAxis(EAxis::X);
+	// Overlap depth sweep: both property clamp ends from the property metadata plus values in between.
+	const FProperty* DepthProperty = UShopSettings::StaticClass()->FindPropertyByName(TEXT("UnboxOverlapDepthCm"));
+	const float DepthMin = DepthProperty ? FCString::Atof(*DepthProperty->GetMetaData(TEXT("ClampMin"))) : 0.0f;
+	const float DepthMax = DepthProperty ? FCString::Atof(*DepthProperty->GetMetaData(TEXT("ClampMax"))) : 0.0f;
+	TestTrue(TEXT("Overlap depth property exposes a clamp range"), DepthMax > DepthMin);
+	const TArray<float> DepthSweep = {
+		DepthMin, DepthMin + (DepthMax - DepthMin) * 0.16f, DepthMin + (DepthMax - DepthMin) * 0.4f,
+		DepthMin + (DepthMax - DepthMin) * 0.6f, DepthMax };
 	for (const float ForwardDistanceCm : { 100.0f, 500.0f })
 	{
-		for (const float DepthCm : { 0.0f, 8.0f, 20.0f, 30.0f, 50.0f })
+		for (const float DepthCm : DepthSweep)
 		{
 			FRandomStream Stream(FMath::RoundToInt(DepthCm * 100.0f + ForwardDistanceCm * 10.0f) + 31415);
 			TArray<FTransform> SpawnTransforms;
 			FText FailureReason;
 			const bool bFound = FShopUnboxingPlacement::FindSpawnTransforms(
-				World, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-				ShopUnboxTest::MakeShapes(Definitions), ForwardDistanceCm, Stream, DepthCm, SpawnTransforms, FailureReason);
+		World,
+		*Player,
+		*Player->GetCapsuleComponent(),
+		*Box,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(ForwardDistanceCm, DepthCm),
+		Stream,
+		SpawnTransforms,
+		FailureReason);
 			TestTrue(FString::Printf(TEXT("Open-floor placement succeeds at D=%.0f cm and forward distance %.0f cm"),
 				DepthCm, ForwardDistanceCm), bFound);
 			if (!bFound || SpawnTransforms.Num() != 1)
@@ -1185,13 +1252,14 @@ bool FShopUnboxingDepthPlacementObservationTest::RunTest(const FString& Paramete
 			const float LowestBottom = ShapeCenter.Z - Shape.GetExtent().Z;
 			const FVector ExpectedXYCenter = FootLocation + Forward * ForwardDistanceCm;
 			TestTrue(FString::Printf(TEXT("D=%.0f cm at %.0f cm selects the front stage"),
-				DepthCm, ForwardDistanceCm), FMath::IsNearlyEqual(LowestBottom, FootLocation.Z + 20.0f, 0.5f));
+				DepthCm, ForwardDistanceCm), FMath::IsNearlyEqual(LowestBottom, FootLocation.Z + ShopUnboxTest::MakeTuning().ForwardFloorClearanceCm, 0.5f));
 			TestTrue(FString::Printf(TEXT("D=%.0f cm at %.0f cm keeps the requested front position"),
 				DepthCm, ForwardDistanceCm),
 				FVector::Dist2D(ShapeCenter, ExpectedXYCenter) <= 0.5f);
 			AddInfo(FString::Printf(
 				TEXT("UnboxingDepthPlacement D=%.0fcm forward=%.0fcm stage=front lowestBottom=%.2fcm expected=%.2fcm"),
-				DepthCm, ForwardDistanceCm, LowestBottom, FootLocation.Z + 20.0f));
+				DepthCm, ForwardDistanceCm, LowestBottom,
+				FootLocation.Z + ShopUnboxTest::MakeTuning().ForwardFloorClearanceCm));
 		}
 	}
 	return true;
@@ -1293,8 +1361,16 @@ bool FShopUnboxingPhysicsAutomationTest::RunTest(const FString& Parameters)
 	FRandomStream RoomStream(20260928);
 	FText FailureReason;
 	TestTrue(TEXT("Ten mixed items find a safe opening inside the closed room"), FShopUnboxingPlacement::FindSpawnTransforms(
-		RoomWorld, *Player, *Player->GetCapsuleComponent(), *Box, FootLocation, 0.0f,
-		ShopUnboxTest::MakeShapes(Definitions), 100.0f, RoomStream, 8.0f, SpawnTransforms, FailureReason));
+		RoomWorld,
+		*Player,
+		*Player->GetCapsuleComponent(),
+		*Box,
+		ShopUnboxTest::MakeShapes(Definitions),
+		ShopUnboxTest::MakeRequest(*Player),
+		ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f),
+		RoomStream,
+		SpawnTransforms,
+		FailureReason));
 	TestEqual(TEXT("Closed-room unboxing returns ten transforms"), SpawnTransforms.Num(), 10);
 	TArray<APlaceableFacilityItemActor*> SpawnedItems;
 	for (int32 Index = 0; Index < FMath::Min(Definitions.Num(), SpawnTransforms.Num()); ++Index)
