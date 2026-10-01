@@ -203,7 +203,7 @@ void AFirstPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 	}
 	if (PlacementRotateAction)
 	{
-		EnhancedInputComponent->BindAction(PlacementRotateAction, ETriggerEvent::Triggered, this, &AFirstPersonCharacter::PlacementRotateInput);
+		EnhancedInputComponent->BindAction(PlacementRotateAction, ETriggerEvent::Triggered, this, &AFirstPersonCharacter::MouseWheelInput);
 	}
 
 	UInputAction* BoundPrimaryUseAction = PrimaryUseAction ? PrimaryUseAction.Get() : ComputerClickAction.Get();
@@ -543,11 +543,21 @@ void AFirstPersonCharacter::PlacementSnapEndInput()
 	}
 }
 
-void AFirstPersonCharacter::PlacementRotateInput(const FInputActionValue& Value)
+void AFirstPersonCharacter::MouseWheelInput(const FInputActionValue& Value)
 {
-	if (!IsFocusCapturingInput() && PlayerFacilityPlacement)
+	const float WheelDelta = Value.Get<float>();
+	if (PlayerComputerUse && PlayerComputerUse->IsCapturingInput())
 	{
-		PlayerFacilityPlacement->AddRotationInput(Value.Get<float>());
+		PlayerComputerUse->ScrollPointerWheel(WheelDelta);
+		return;
+	}
+	if (IsFocusCapturingInput())
+	{
+		return;
+	}
+	if (PlayerFacilityPlacement)
+	{
+		PlayerFacilityPlacement->AddRotationInput(WheelDelta);
 	}
 }
 

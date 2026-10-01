@@ -8,7 +8,7 @@
 
 2026-10-01 버그 `BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`: 클릭 없는 E 이탈 실패의 원인은 2026-09-25 당시 `SetWidgetToFocus(화면)`였으며 위 설계로 이미 수정됐다. 이번에는 production 변경 없이 아래 Keyboard Focus Invariant를 지키는 자동화만 추가한다.
 
-2026-10-01 `COMPUTER-WHEEL-SCROLL` 설계(Source 미반영, BUG 작업 병합 뒤 구현): Active 동안 실제 휠 양을 virtual pointer로 화면에 주입한다. 그러면 커서 아래 가장 안쪽 스크롤 영역이 엔진 규칙대로 스크롤된다. 아래 Input Routing과 `Screen Wheel Scroll`이 정본이고, 입력 계약은 `.md/Work/COMPUTER-WHEEL-SCROLL/`(CWS-001~020)이다.
+2026-10-01 `COMPUTER-WHEEL-SCROLL` 구현(Source 반영, 자동화 통과, 사용자 PIE 대기): Active 동안 실제 휠 양을 virtual pointer로 화면에 주입한다. 그러면 커서 아래 가장 안쪽 스크롤 영역이 엔진 규칙대로 스크롤된다. 아래 Input Routing과 `Screen Wheel Scroll`이 정본이고, 입력 계약은 `.md/Work/COMPUTER-WHEEL-SCROLL/`(CWS-001~020)이다.
 
 2026-10-01 서비스 4단위 설계: 세신 포커스(`UPlayerScrubFocusComponent`)가 이탈 위치 helper `FComputerFocusExitPlacement::Resolve`를 재사용한다. 컴퓨터 component는 수정하지 않는다. Character의 컴퓨터 전용 입력 차단 검사는 `IsFocusCapturingInput()`(컴퓨터 || 세신)로 바뀌며, 컴퓨터 쪽 결과는 같다([ServiceAmenitySystem.md](ServiceAmenitySystem.md)).
 
