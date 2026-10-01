@@ -7,14 +7,7 @@
 
 ## 서비스 4단위 (안마의자·평상·TV·세신) — PIE 수용 대기
 
-MCP·Python으로 authoring·Compile·Data Validation·개별 Save·재로드 대조는 끝났다(`.md/Unreal/ServiceSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). 입력·조준·마우스를 넣을 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 이 작업을 완료 처리하지 않는다.
-
-1. **대표 PIE 전체** (`.md/PROMPT_UNREAL.md`의 "대표 PIE 절차와 관찰"): SVC4-001/002(상점 4상품 구매→개봉→설치·회수·수거 구역 제거), TV REST-001~003/006, 평상 REST-004/005, 안마의자 MASS-001~015, 세신 SCRB-001~020, SVC4-003. 콘솔: `bathhouse.Debug.Service.SpawnTestUser/KnockdownTestUser/StandUpTestUser/RemoveTestUser`. 고장 관찰은 테스트 세션에서만 `BreakChancePercent=100`으로 바꾸고 **저장 상태에 남기지 않는다**(저장 값은 10).
-2. **화면 판정(제안값 확인)**: ⓪ 세신 영역은 사용자가 회전 `(0,180,90)`(Roll,Pitch,Yaw)·extent `(35,90,1)`로 저장했다(디스크 확인됨). 포커스 중 커서 때수건이 마우스 좌우·상하와 같은 방향으로 움직이고 세신대 밖으로 나가지 않는지 확인한다. ① 세신 포커스 camera `(0,-170,240)`·pitch -45에서 area 네 모서리와 커서가 모두 보이고 몸체에 가려지지 않는지, ② 이탈점 `(0,-120,0)`과 인형 위치 `(0,-200,0)`, 현금 `(0,-160,110)`이 겹치지 않고 E로 조준되는지, ③ 안마의자 "고장" 라벨과 TV 켜진 화면(초록 반투명 plane)이 꺼진 상태와 구별되는지, ④ 설비 body·footprint 크기, ⑤ `WBP_ScrubFocusHud` 게이지·"대기 N초"가 하단 중앙에서 기존 HUD와 겹치지 않는지(아래 여백 90 제안값). 어긋나면 값을 알려 주면 재작업한다.
-3. **세신 감도 결정**: 기본 `RequiredRubDistanceCm 3000`·`RubCmPerInputUnit 1`로 실제 마우스 움직임과 완료 시간을 관찰하고, 작은/큰 화면에서도 경계 clamp·LMB 조건이 유지되는지 본다. 바꾸고 싶으면 거리 임계값만 알려 주면 반영한다(fee/wait/input 규칙은 바꾸지 않는다).
-4. **때수건 거치대**: 레벨 `(300,900,43)`의 `ScrubTowel`/`ScrubTowelSlot`에서 E take/store·wrong-slot 거부·G drop·레벨 밖 복구·수거 구역 제외(SCRB-013/017/019), 거치·take 뒤 원래 크기 유지.
-5. **Shipping**: 디버그 명령은 소스상 non-shipping에서만 등록된다(확인함). Shipping 빌드 실행은 하지 않았다.
-6. **기존 회귀**: 컴퓨터 E/ESC/포인터·이탈, 집게 줍기/묶기, 대걸레·렌치 공격, 수건 이동/뚜껑·진열 cue, placement/recovery·상점·money HUD.
+남은 실제 Editor 수정 작업 없음. PIE·화면 판정 항목은 `.md/Work/SERVICE/SERVICE-U4/PIE_CHECKLIST.md`로 옮겼다(2026-10-01).
 
 ---
 
