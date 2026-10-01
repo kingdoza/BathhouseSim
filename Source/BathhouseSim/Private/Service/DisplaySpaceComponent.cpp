@@ -313,6 +313,24 @@ FVector UDisplaySpaceComponent::GetSlotsWorldCenter() const
 	return SlotTransforms.IsEmpty() ? GetComponentLocation() : Center / SlotTransforms.Num();
 }
 
+void UDisplaySpaceComponent::GetVisibleItemWorldLocations(TArray<FVector>& OutLocations) const
+{
+	OutLocations.Reset();
+	if (!Stock.Kind || Stock.Count <= 0)
+	{
+		return;
+	}
+	const UStaticMesh* Mesh = Stock.Kind->ResolveDisplayMesh();
+	const FVector BoundsOrigin = Mesh ? Mesh->GetBounds().Origin : FVector::ZeroVector;
+	const int32 Visible = FMath::Min(Stock.Count, SlotTransforms.Num());
+	for (int32 Index = 0; Index < Visible; ++Index)
+	{
+		// StockVisual is attached with a relative identity transform, so the component transform completes the chain.
+		OutLocations.Add((GetSlotWorldRelativeTransform(Index, *Stock.Kind) * GetComponentTransform())
+							 .TransformPosition(BoundsOrigin));
+	}
+}
+
 bool UDisplaySpaceComponent::ConsumeOneUse(bool& OutDepleted)
 {
 	if (!FDisplayStockRules::ConsumeOneUse(Stock, FixedKind, OutDepleted))

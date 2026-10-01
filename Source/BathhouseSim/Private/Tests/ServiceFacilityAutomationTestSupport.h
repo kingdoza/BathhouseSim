@@ -97,6 +97,12 @@ namespace ServiceFacilityTest
 			return Context;
 		}
 
+		void AimAtPoint(const FVector& Point)
+		{
+			Player.Camera->SetWorldLocationAndRotation(Point - FVector(180, 0, 0), FRotator::ZeroRotator);
+			Player.Interaction->RefreshInteractionQuery();
+		}
+
 		void AimAt(int32 Index)
 		{
 			auto Center = Facility->GetSpaces()[Index]->GetSlotsWorldCenter();

@@ -2,6 +2,8 @@
 #include "Service/ServiceDisplayManagerComponent.h"
 #include "Service/DisplaySpaceComponent.h"
 #include "Service/ItemBoxActor.h"
+#include "Service/DisplayFacilityTakeSelection.h"
+#include "Service/DisplayStockRules.h"
 #include "Interaction/PlayerCarryComponent.h"
 #include "Interaction/PlayerInteractionComponent.h"
 #if WITH_EDITOR
@@ -52,28 +54,6 @@ bool UDisplayFacilityTargetComponent::CollectSpaces(TArray<UDisplaySpaceComponen
 	return Manager && Manager->CollectSpaces(Out, Failure) && !Out.IsEmpty() && Out[0]->IsOperational();
 }
 
-int32 UDisplayFacilityTargetComponent::SelectClosestSpace(TConstArrayView<FVector> Centers,
-														  TConstArrayView<int32> Indices, const FVector& Start,
-														  const FVector& End)
-{
-	if (Centers.Num() != Indices.Num())
-	{
-		return INDEX_NONE;
-	}
-	double BestDistance = TNumericLimits<double>::Max();
-	int32 Best = INDEX_NONE;
-	for (int32 Index = 0; Index < Centers.Num(); ++Index)
-	{
-		const double Distance = FMath::PointDistToSegmentSquared(Centers[Index], Start, End);
-		if (Distance < BestDistance || (Distance == BestDistance && (Best == INDEX_NONE || Indices[Index] < Best)))
-		{
-			BestDistance = Distance;
-			Best = Indices[Index];
-		}
-	}
-	return Best;
-}
-
 UDisplaySpaceComponent* UDisplayFacilityTargetComponent::SelectSpace(
 	const FPlayerInteractionContext& Context, const TArray<UDisplaySpaceComponent*>& Spaces) const
 {
@@ -94,21 +74,23 @@ UDisplaySpaceComponent* UDisplayFacilityTargetComponent::SelectSpace(
 		}
 		return nullptr;
 	}
-	TArray<FVector> Centers;
-	TArray<int32> Indices;
+	TArray<FDisplayFacilityTakeCandidate> Candidates;
 	for (const auto* Space : Spaces)
 	{
 		if (Space->GetTargetMode() == EDisplaySpaceTargetMode::FacilityRouted)
 		{
-			Centers.Add(Space->GetSlotsWorldCenter());
-			Indices.Add(Space->GetSpaceIndex());
+			FDisplayFacilityTakeCandidate& Candidate = Candidates.AddDefaulted_GetRef();
+			Candidate.SpaceIndex = Space->GetSpaceIndex();
+			Candidate.Count = Space->GetStock().Count;
+			Candidate.TakeableCount = FDisplayStockRules::GetTakeableCount(Space->GetStock());
+			Space->GetVisibleItemWorldLocations(Candidate.ItemLocations);
 		}
 	}
-	const int32 Selected =
-		SelectClosestSpace(Centers, Indices, Context.HitResult.TraceStart, Context.HitResult.TraceEnd);
+	const int32 Selected = FDisplayFacilityTakeSelection::SelectSpaceIndex(Candidates, Context.HitResult.TraceStart,
+																		   Context.HitResult.TraceEnd);
 	for (auto* Space : Spaces)
 	{
-		if (Space->GetSpaceIndex() == Selected)
+		if (Space->GetTargetMode() == EDisplaySpaceTargetMode::FacilityRouted && Space->GetSpaceIndex() == Selected)
 		{
 			return Space;
 		}
