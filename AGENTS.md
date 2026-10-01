@@ -21,6 +21,7 @@ Read the relevant `.md/` documents before making architecture, implementation, o
 - `.md/UNREAL_MCP_CONNECTION.md`: shared Editor session operation and MCP connection
 - `.md/UNREAL_PYTHON_API.md`: Editor Python technical procedure
 - `.md/FEEDBACK_POLICY.md`: bug reports, return records, feedback, and retrospectives
+- `.md/UE_BUILD_POLICY.md`: fixed UE 5.8 build and headless Editor commands
 - `.md/0_ARCHITECTURE.md`: current architecture map
 - `.md/Architecture/*.md`: system-specific architecture documents
 - `.md/Unreal/0_UNREAL.md`: current Editor authoring/asset-contract map

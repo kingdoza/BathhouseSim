@@ -8,6 +8,23 @@ class AActor;
 class AShopDeliveryBoxActor;
 class UCapsuleComponent;
 class UWorld;
+struct FShopUnboxingTuning;
+
+enum class EShopUnboxPlacementStage : uint8
+{
+	None,
+	ViewFront,
+	FloorFront,
+	Overhead,
+	FinalStack
+};
+
+struct FShopUnboxingPlacementRequest
+{
+	FVector CameraOrigin = FVector::ZeroVector;
+	FVector CameraDirection = FVector::ForwardVector; // includes pitch, normalized internally
+	FVector FootLocation = FVector::ZeroVector;
+};
 
 class FShopUnboxingPlacement
 {
@@ -17,13 +34,11 @@ public:
 		AActor& Player,
 		const UCapsuleComponent& PlayerCapsule,
 		AShopDeliveryBoxActor& Box,
-		const FVector& FootLocation,
-		float ViewYaw,
 		const TArray<FShopUnboxItemShape>& Items,
-		float ForwardDistanceCm,
+		const FShopUnboxingPlacementRequest& Request,
+		const FShopUnboxingTuning& Tuning,
 		FRandomStream& RandomStream,
-		float OverlapDepthCm,
 		TArray<FTransform>& OutTransforms,
-		FText& OutFailureReason);
-
+		FText& OutFailureReason,
+		EShopUnboxPlacementStage* OutStage = nullptr);
 };

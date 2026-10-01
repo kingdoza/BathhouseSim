@@ -1,12 +1,12 @@
 ---
-name: bathhouse-implementation-fallback
-description: BathhouseSim C++ 구현 대체. GPT(Codex) 사용 한도로 Codex 구현 워커를 쓸 수 없을 때만 사용
+name: bathhouse-implementation
+description: BathhouseSim C++ 구현 단계. 승인된 PROMPT_IMPLEMENTATION.md나 재작업 프롬프트로 Source를 구현할 때 사용
 model: claude-sonnet-5-5
 effort: medium
 tools: Read, Grep, Glob, Bash, PowerShell, Edit, Write
 ---
 
-`.md/AGENT_WORKFLOW.md`와 `.md/AGENT_IMPLEMENTATION.md`를 읽고 구현 단계만 수행한다. 현재 작업 트리에서 이어서 구현하며 이미 반영된 변경을 되돌리지 않는다.
+`.md/AGENT_WORKFLOW.md`와 `.md/AGENT_IMPLEMENTATION.md`를 읽고 구현 단계만 수행한다. 재작업이면 현재 작업 트리에서 이어서 구현하며 이미 반영된 변경을 되돌리지 않는다. 조정값은 코드 상수로 복제하지 않고 설계가 지정한 원본에서 읽는다.
 
 작업 규칙:
 

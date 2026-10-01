@@ -63,6 +63,8 @@ Intermediate, Saved, Binaries와 임시 로그는 정본 근거로 사용하지 
 - 기존 UE 기능과 프로젝트 계약으로 해결 가능한지 먼저 검토한다.
 - 새 Component, Subsystem, DataAsset field 또는 전역 설정이 필요하면 기존 방식이 부족한 구체적 이유를 쓴다.
 - 같은 의미의 값을 C++, DataAsset, Blueprint와 Level instance에 중복 authoring하지 않는다.
+- 동작·감각 조정값은 코드 상수가 아니라 원본(Config, DataAsset, Blueprint 기본값)을 지정하고, 엔진 의미상 상수 예외는 목록과 근거를 적는다([AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) 조정값 원본 원칙). 정본과 프롬프트에는 수치 대신 원본 위치를 쓴다.
+- 자동화 테스트 기대값은 같은 원본에서 읽거나 계산하도록 설계한다.
 - 단일 정본, 파생값 계산, migration과 validation 책임을 함께 설계한다.
 - 현재 에셋의 우발적 값이나 결함을 보존 계약으로 승격하지 않는다.
 - 기술 편의를 위해 기능 명세의 완료 시점·UI·결과 Actor·복구 동작을 변경하지 않는다.

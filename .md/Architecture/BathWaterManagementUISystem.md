@@ -6,7 +6,7 @@
 - domain 정본: [BathWaterOperationsSystem.md](BathWaterOperationsSystem.md)
 - computer session 정본: [ComputerSystem.md](ComputerSystem.md)
 - 공통 native Widget 정책: [UISystem.md](UISystem.md)
-- 2026-10-01 버그 수정 설계(`BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`, Source 미반영): slider 손잡이를 요청 callback 안에서 확정값으로 되돌리고 polling 동기화를 cache gate 앞으로 옮긴다. 아래 `Slider Synchronization`이 정본이다.
+- 2026-10-01 버그 수정(`BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`, Source 반영, 사용자 PIE 대기): slider 손잡이를 요청 callback 안에서 확정값으로 되돌리고 polling 동기화를 cache gate 앞으로 옮긴다. 아래 `Slider Synchronization`이 정본이다.
 - 2026-09-24 Source 확장: [UtilityLaborSystem.md](UtilityLaborSystem.md)의 예약/가동/설치 값, 이중 부족 상태와 snapshot cache를 native summary에 반영했다. 기존 WBP의 줄바꿈/높이 확인은 Editor 단계에서 필요하며, 빌드와 automation은 미실행이다.
 
 ## Target Source Scope
@@ -95,7 +95,7 @@ UBathWaterManagementScreenWidget
 
 ### Slider Synchronization
 
-- 불변식: 요청 callback 밖에서 두 slider 손잡이는 항상 선택 욕탕의 domain 확정값(순환도 %, 0.5°C 단위 목표 수온)을 정규화한 위치다. 제한은 slider 속성(Min/Max/step/lock)이 아니라 subsystem 결과로만 표현한다.
+- 불변식: 요청 callback 밖에서 두 slider 손잡이는 항상 선택 욕탕의 domain 확정값(순환도 %, `UBathWaterSettings.TargetTemperatureStepC` 단위 목표 수온)을 정규화한 위치다. 제한은 slider 속성(Min/Max/step/lock)이 아니라 subsystem 결과로만 표현한다.
 - `SSlider`는 drag 중 손잡이를 커서 값으로 먼저 바꾼 뒤 `OnValueChanged`를 실행한다. 그래서 detail은 같은 callback 안에서 요청 결과(`CommittedValue`, 실패면 domain 또는 마지막 snapshot 값)로 해당 slider를 즉시 다시 쓴다. 이렇게 해야 한계 밖 손잡이가 한 frame도 그려지지 않는다.
 - subsystem은 확정값이 기존 값과 같으면 mutation·broadcast를 하지 않는다. 이 경우를 UI가 결과로 직접 보정하며, subsystem에 no-op 알림을 추가하지 않는다.
 - `USlider::SetValue`는 `OnValueChanged`를 다시 broadcast한다. 보정 쓰기는 재진입 guard 안에서 하고, guard 중 callback은 요청을 보내지 않는다. 재요청이 제한 피드백을 지우지 않게 하기 위해서다.

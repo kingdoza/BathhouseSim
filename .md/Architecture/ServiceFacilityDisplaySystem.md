@@ -6,6 +6,7 @@
 - 2026-09-30 설계. 구현 완료(커밋 `c9a1150`, 코드 리뷰 재작업 F1~F4와 수건 cue 재작업 포함). 입력은 `.md/PROMPT_ARCHITECTURE.md`(서비스 2단위, DISP-015~017·023·024, VANI-001~017, SHWR-001~011, TOWL-001~018, SHOP-S03·S04)이고 사용자가 설계를 승인했다.
 - 수건 쪽 변경(규칙·표현·뚜껑)은 [TowelSystem.md](TowelSystem.md), [TowelPresentationSystem.md](TowelPresentationSystem.md)의 2단위 절이 정본이다. 이 문서는 수건이 쓰는 공용 표시 도구만 정한다.
 - 1단위 구조(품목 정의·품목 박스·진열 공간·냉장고·외곽선)는 유지하며, 아래에서 일반화하는 부분만 바뀐다.
+- 2026-10-01 `EMPTY-BOX-TAKE-TARGET`(EBT-001~016) 설계: 빈 박스 빼기 대상 선택을 "꺼낼 수 있는 묶음 중 화면상 조준점에 가장 가까운 보이는 물품" 규칙으로 바꾼다. VANI-012 폐기, DISP-023 거리 기준 변경. 아래 Facility Target Router의 빈 박스 선택 절이 정본이다.
 
 ## Source Scope
 
@@ -15,6 +16,8 @@ Public/Service/
   DisplayFacilityTargetComponent.h    신규, 설비 전체 조준 router
   DisplayCueComponent.h               신규, 넣기 프리뷰·꺼내기 강조 proxy 공용 도구
   ServiceDisplayPlacementData.h       신규, 진열 payload 확장 data
+Private/Service/
+  DisplayFacilityTakeSelection.h/.cpp 2026-10-01 신규, 빈 박스 빼기 대상 선택 순수 규칙(EBT)
 Public/Facility/
   FacilityPlacementExtension.h        신규, 설비 payload 확장 component interface
 Public/Interaction/Presentation/
@@ -68,9 +71,23 @@ Public/Interaction/Presentation/
 
 - 묶음 선택(query와 execute가 같은 함수):
   - 비지 않은 품목 박스를 들었으면 `FixedKind == 박스 종류`인 묶음이다. 없으면 두 방향 모두 `여기에 넣을 수 없는 물건`이다(DISP-015).
-  - 빈 박스를 들었으면 조준선(`HitResult.TraceStart → TraceEnd`)에 가장 가까운 묶음이다. 기준점은 묶음 자리들의 world 중심이다. 같은 거리면 SpaceIndex가 작은 쪽이다(Q61 A, DISP-023). 빈 박스라 Apply는 `박스가 비어 있음`이다.
+  - 빈 박스를 들었으면 아래 "빈 박스 빼기 대상 선택"의 묶음이다. 빈 박스라 Apply는 `박스가 비어 있음`이다.
   - 품목 박스가 아니면 두 방향 모두 비운다.
-- 선택된 묶음으로 기존 `EvaluateApply/Take`, `TryApplyOne/TryTakeOne`을 호출한다. 두 방향 모두 `Repeat`다. 선택 묶음이 비었거나 사용 중인 것만 남았으면 다른 묶음에서 대신 빼지 않는다(VANI-012).
+- 선택된 묶음으로 기존 `EvaluateApply/Take`, `TryApplyOne/TryTakeOne`을 호출한다. 두 방향 모두 `Repeat`다.
+
+### 빈 박스 빼기 대상 선택 (2026-10-01, EBT-001~016)
+
+이전 규칙(조준선에 가장 가까운 묶음, 기준점은 모든 자리 중심, 빈 묶음도 선택, VANI-012)을 대체한다.
+
+- 순수 규칙 `FDisplayFacilityTakeSelection`(Private/Service, non-UObject, `FDisplayStockRules`와 같은 helper 형태)이 소유한다. 입력은 `FacilityRouted` 묶음마다 `{SpaceIndex, Count, TakeableCount, ItemLocations}`와 `HitResult.TraceStart`·`TraceEnd`(카메라 위치·화면 중앙 방향)다. 상태를 보관하지 않는다.
+- 후보: `TakeableCount`(= `FDisplayStockRules::GetTakeableCount`) > 0이고 보이는 물품이 1개 이상인 묶음(Q1 A, P8). 빈 묶음과 사용 중인 것만 남은 묶음은 후보가 아니다.
+- 거리: 묶음의 보이는 물품 위치마다 화면 중앙 방향과 이루는 각 `atan2(|D × (P − S)|, D · (P − S))`(D = 정규화한 `TraceEnd − TraceStart`, S = `TraceStart`)를 구하고 그 최솟값을 묶음 거리로 쓴다. 원근 투영에서 화면 중앙으로부터의 화면상 거리는 이 각에 대해 단조 증가하므로 깊이와 무관하게 "화면상 가장 가까워 보이는 것"과 순서가 같다(P2). 방향이나 `P − S`가 0이면 각은 0이다.
+- 보이는 물품 위치: `UDisplaySpaceComponent::GetVisibleItemWorldLocations`가 index 0..min(Count, 자리 수)−1(사용 중인 것 포함, P3)의 진열 외형 bounds 중심을 world로 낸다. transform은 `StockVisual` instance와 같은 `Kind->DisplayOffset * SlotTransforms[i]`에 공간 component transform을 곱한 것이다. 빈 자리는 쓰지 않는다.
+- 최소 거리 묶음이 대상이다. 거리가 정확히 같으면 SpaceIndex가 작은 쪽이다(P4).
+- 후보가 없으면 대체 묶음을 고른다: Count > 0인 묶음(사용 중인 것만 남은 묶음) 중 SpaceIndex가 가장 작은 것, 없으면 SpaceIndex가 가장 작은 묶음. 이 묶음의 기존 `EvaluateTake`가 P7 이유(`사용 중인 것은 꺼낼 수 없음` / `꺼낼 물건 없음`)를 내고 `TryTakeOne`도 같은 이유로 실패한다. 대체 묶음은 조준과 무관해 HUD가 흔들리지 않는다.
+- 일치 보장: query·execute가 같은 context로 같은 선택 함수를 부르고, focus observer는 그 query의 `HeldUseTargetKey` 묶음에만 강조를 보인다. 강조 위치는 그 묶음의 마지막 채운 자리(LIFO, Q2 A)이며 `TryTakeOne`이 빼는 물품과 같다. 불가면 강조가 없다. 대상 선택 지연·잠금 상태는 두지 않는다(P6).
+- 상태 변화: 손님 소모로 후보가 바뀌면 stock 요약 줄이 바뀌어 query가 달라지고 focus observer가 새 key로 다시 알림을 받는다(EBT-012). 별도 delegate 구독은 없다.
+- 채운 박스 선택(박스 종류 묶음)과 냉장고 `SelfAim` 공간은 바뀌지 않는다(P5, Q3 A).
 - `HeldUseTargetKey` = 선택 묶음의 SpaceIndex다(아래 held-use 확장). focus cue 경로와 반복 guard에 쓴다.
 - 빈 박스 연속 빼기(DISP-024, 2026-09-30 정정): 첫 1개가 빠지면 박스가 비지 않으므로 다음 query부터 박스 종류 묶음이 고정 선택된다. 조준이 다른 묶음 쪽으로 옮겨 가도 선택과 key는 그대로이며 같은 묶음에서 계속 뺀다. 별도 잠금 상태는 두지 않는다(선택 함수만으로 성립). 반복은 조준이 router 박스를 벗어나 target object가 바뀌거나, 묶음이 비거나(`꺼낼 물건 없음`/사용 중만 남음), 박스가 차면 기존 held-use 규칙대로 멈춘다.
 - TargetName: router의 `FacilityDisplayName`(FText, EditAnywhere, 비면 Validation 오류. 화장대 `화장대`, 샤워기 `샤워기`) 다음 줄부터 묶음마다 한 줄(SpaceIndex 순). router는 설비 종류를 분기하지 않는다(2026-09-30 리뷰 F4):
@@ -86,7 +103,7 @@ Public/Interaction/Presentation/
 
 - `FPlayerInteractionQuery::HeldUseTargetKey`(int32, 기본 `INDEX_NONE`, `Equals` 포함).
 - `UPlayerHeldTargetUseComponent`는 `BeginUse` 때 target query의 key를 저장한다. 반복 Tick에서 같은 target object여도 key가 다르면 조용히 멈춘다. 멈춘 뒤 재개 규칙은 기존과 같다.
-- 이 guard는 방어 규칙이다. DISP-024 연속 빼기에서는 key가 바뀌지 않아 발동하지 않는다. 발동 예: 넣기 반복 중 박스가 비어 선택이 조준선 최근접 묶음으로 바뀌는 경우(이때도 Apply는 `박스가 비어 있음`으로 멈춘다).
+- 이 guard는 방어 규칙이다. DISP-024 연속 빼기에서는 key가 바뀌지 않아 발동하지 않는다. 발동 예: 넣기 반복 중 박스가 비어 선택이 빈 박스 빼기 대상 선택 규칙으로 바뀌는 경우(이때도 Apply는 `박스가 비어 있음`으로 멈춘다).
 - key가 `INDEX_NONE`인 기존 대상(냉장고 공간·수건·삽)은 동작이 같다.
 
 ## Display Manager And Payload
@@ -179,8 +196,9 @@ Placeholder mesh 규칙(2026-09-30 리뷰 F3): 이 단위는 새 Mesh·Material 
 
 | 시나리오 | 자동화 |
 |---|---|
-| DISP-015~017, 023, 024 | router 묶음 선택: 박스 종류·빈 박스 조준선 최근접·동거리 규칙, 거부 이유. DISP-024: 빈 박스 첫 빼기 뒤 박스 종류 묶음 고정, 조준을 다른 묶음 쪽으로 옮겨도 같은 묶음에서 계속, router 이탈·묶음 빔·박스 가득에서 멈춤, 다른 묶음 품목은 빠지지 않음. key guard 단위 검증 |
-| VANI-001~005, 011~013, 015 | 묶음별 넣기·빼기, 정원, 사용 중 거부, 최근접 빼기, 다른 묶음 대체 금지, HUD 문구, 신규 빈 상태 |
+| DISP-015~017, 023, 024 | router 묶음 선택: 박스 종류, 빈 박스는 EBT 행, 거부 이유. DISP-024: 빈 박스 첫 빼기 뒤 박스 종류 묶음 고정, 조준을 다른 묶음 쪽으로 옮겨도 같은 묶음에서 계속, router 이탈·묶음 빔·박스 가득에서 멈춤, 다른 묶음 품목은 빠지지 않음. key guard 단위 검증 |
+| VANI-001~005, 011, 013, 015 | 묶음별 넣기·빼기, 정원, 사용 중 거부, 최근접 빼기, HUD 문구, 신규 빈 상태(VANI-012는 2026-10-01 폐기) |
+| EBT-001~006, 010, 012, 013 | 순수 선택 규칙(각 거리·깊이 무관·후보 제외·동거리·대체 묶음)과 화장대·샤워기 fixture의 실제 trace: query key·RMB 가능 여부·이유, 강조 proxy 위치, 실제로 빠지는 품목이 같은 묶음, 소모로 후보 전환, 강조 옵션 끔 |
 | VANI-006~009, 014, 017 | construction fixture와 slot Occupied 전이: 소모·당김·사용 중 시작, 빈 화장대 이용, 이용 중 조작 가능·회수 거부, 비품 불변, 보류 중 예약 거부 |
 | VANI-010, 016, SHWR-007 | payload 왕복(InUseRemaining 포함)·잘못된 값 거부·요약·버리기 |
 | SHWR-001~003, 006, 008 | 레벨 instance 빈 상태, 샤워기 넣기·빼기, 회수 거부 |

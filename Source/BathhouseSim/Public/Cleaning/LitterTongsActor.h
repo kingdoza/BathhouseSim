@@ -13,6 +13,7 @@ class USceneComponent;
 class UStaticMeshComponent;
 class ALitterActor;
 class ATrashBagActor;
+struct FTrashBagDropRequest;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLitterTongsHeldPresentationChanged, bool, bIsHeld);
 
@@ -48,6 +49,10 @@ public:
 	{
 		return BagCount;
 	}
+
+	// Fills the tie drop request: camera values from the use context, every tuning value from this CDO.
+	// The only reader of the Tie* tuning properties; the execution path and automation both use it.
+	void BuildTieDropRequest(const FHeldEquipmentUseContext& Context, FTrashBagDropRequest& OutRequest) const;
 
 	virtual FHeldEquipmentUseQuery QuerySecondaryEquipmentUse(const FHeldEquipmentUseContext& Context) const override;
 	virtual FHeldEquipmentUseResult ExecuteSecondaryEquipmentUse(const FHeldEquipmentUseContext& Context) override;
@@ -108,10 +113,30 @@ protected:
 	int32 BagCapacity = 20;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter Tongs")
 	TSubclassOf<ATrashBagActor> TiedBagClass;
+	/** 1단계(시선 앞) 시작 거리: 카메라에서 봉투의 가장 가까운 부분까지(시선 방향) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter Tongs", meta = (ClampMin = "0.0"))
+	float TieViewDistanceCm = 60.0f;
+	/** 1단계 시선 당김 하한 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter Tongs", meta = (ClampMin = "0.0"))
+	float TieViewMinDistanceCm = 30.0f;
+	/** 1단계 시선 당김 간격 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter Tongs", meta = (ClampMin = "0.01"))
+	float TieViewPullStepCm = 10.0f;
+	/** 2단계(바닥 정면)의 발바닥 기준 수평 거리 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter Tongs", meta = (ClampMin = "0.0"))
 	float TieForwardDistanceCm = 60;
+	/** 2단계 당김 하한 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter Tongs", meta = (ClampMin = "0.0"))
 	float TieMinForwardDistanceCm = 30;
+	/** 2단계 당김 간격 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter Tongs", meta = (ClampMin = "0.01"))
+	float TieForwardPullStepCm = 10.0f;
+	/** 2단계 봉투 밑면의 발바닥 위 높이 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter Tongs", meta = (ClampMin = "0.0"))
+	float TieFloorClearanceCm = 5.0f;
+	/** 바닥 정면 단계 봉투와 카메라의 최소 분리 여유 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter Tongs", meta = (ClampMin = "0.0"))
+	float TieCameraClearanceCm = 10.0f;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cleaning")
 	TObjectPtr<UStaticMeshComponent> WorldMesh;
 
