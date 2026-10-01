@@ -67,8 +67,7 @@ void UShopNoticeWidget::HandleOrderDelivered(const int64 OrderId)
 		NoticeText->SetText(NSLOCTEXT("ShopNotice", "DeliveryArrived", "배송 도착"));
 		NoticeText->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
-	const UShopSettings* Settings = GetDefault<UShopSettings>();
-	const float Duration = Settings ? Settings->GetDeliveryNoticeSeconds() : 3.0f;
+	const float Duration = GetDefault<UShopSettings>()->GetDeliveryNoticeSeconds();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(NoticeTimerHandle);

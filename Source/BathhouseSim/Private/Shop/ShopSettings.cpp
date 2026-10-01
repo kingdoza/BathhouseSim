@@ -21,7 +21,14 @@ TSubclassOf<AItemBoxActor> UShopSettings::LoadItemBoxClass() const
 
 float UShopSettings::GetDeliveryDelaySeconds() const
 {
-	return FMath::IsFinite(DeliveryDelaySeconds) ? FMath::Max(0.0f, DeliveryDelaySeconds) : 10.0f;
+	return FMath::IsFinite(DeliveryDelaySeconds) ? FMath::Max(0.0f, DeliveryDelaySeconds)
+		: DefaultDeliveryDelaySeconds;
+}
+
+float UShopSettings::GetDeliveryAttemptIntervalSeconds() const
+{
+	return FMath::IsFinite(DeliveryAttemptIntervalSeconds) ? FMath::Max(0.0f, DeliveryAttemptIntervalSeconds)
+		: DefaultDeliveryAttemptIntervalSeconds;
 }
 
 float UShopSettings::GetUnboxForwardDistanceCm() const
@@ -39,7 +46,8 @@ float UShopSettings::GetUnboxOverlapDepthCm() const
 
 float UShopSettings::GetDeliveryNoticeSeconds() const
 {
-	return FMath::IsFinite(DeliveryNoticeSeconds) ? FMath::Max(0.01f, DeliveryNoticeSeconds) : 3.0f;
+	return FMath::IsFinite(DeliveryNoticeSeconds) ? FMath::Max(0.01f, DeliveryNoticeSeconds)
+		: DefaultDeliveryNoticeSeconds;
 }
 
 namespace

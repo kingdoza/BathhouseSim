@@ -20,7 +20,7 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	bool FindSpawnTransform(FRandomStream& RandomStream, float DefaultStainSpacing, FTransform& OutTransform,
-							float FloorRadius = 30.0f, float ClearanceHeight = 30.0f) const;
+							float FloorRadius, float ClearanceHeight, float ClearanceFloorOffset) const;
 
 	UBoxComponent* GetSpawnBounds() const
 	{

@@ -71,8 +71,8 @@ public:
 	}
 	virtual UPrimitiveComponent* GetPhysicalCarryPrimitive() const { return nullptr; }
 	virtual float GetThrowSpawnDistance() const { return 0.0f; }
-	virtual float GetThrowImpulseStrength() const { return 120.0f; }
-	virtual float GetUpwardThrowImpulseStrength() const { return 15.0f; }
+	virtual float GetThrowImpulseStrength() const = 0;
+	virtual float GetUpwardThrowImpulseStrength() const = 0;
 
 	virtual AActor* GetAssignedPhysicalCarryFixedSlot() const { return nullptr; }
 	virtual bool TryBindPhysicalCarryFixedSlot(AActor& SlotActor, FText& OutFailureReason) { return false; }

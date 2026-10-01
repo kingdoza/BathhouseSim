@@ -47,7 +47,7 @@ void UShopOrderSubsystem::Tick(const float DeltaTime)
 	{
 		return;
 	}
-	NextDeliveryAttemptTime = Now + 0.25;
+	NextDeliveryAttemptTime = Now + GetDefault<UShopSettings>()->GetDeliveryAttemptIntervalSeconds();
 	ProcessReadyOrders(Now);
 }
 

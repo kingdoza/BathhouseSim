@@ -218,7 +218,8 @@ void UCleaningWorldSubsystem::HandleFacilityPlaced(const FFacilityPlacedEvent& E
 	for (auto Entry : Stains)
 	{
 		if (Entry.IsValid() && FCleaningFootprintOverlap::Intersects(Entry->GetActorLocation(), Entry->GetFloorRadius(),
-																	 Event.FootprintTransform, Event.UnscaledExtent))
+																	 Event.FootprintTransform, Event.UnscaledExtent,
+																	 Entry->GetPlacementClearHeightToleranceCm()))
 		{
 			RemoveStains.Add(Entry);
 		}
@@ -226,7 +227,8 @@ void UCleaningWorldSubsystem::HandleFacilityPlaced(const FFacilityPlacedEvent& E
 	for (auto Entry : LitterActors)
 	{
 		if (Entry.IsValid() && FCleaningFootprintOverlap::Intersects(Entry->GetActorLocation(), Entry->GetFloorRadius(),
-																	 Event.FootprintTransform, Event.UnscaledExtent))
+																	 Event.FootprintTransform, Event.UnscaledExtent,
+																	 Entry->GetPlacementClearHeightToleranceCm()))
 		{
 			RemoveLitter.Add(Entry);
 		}

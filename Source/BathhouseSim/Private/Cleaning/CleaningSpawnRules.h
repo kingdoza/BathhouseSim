@@ -15,14 +15,17 @@ struct FCleaningFloorSpawnSettings
 	FTransform BoxTransform = FTransform::Identity;
 	FVector Extent = FVector::ZeroVector;
 	ECollisionChannel TraceChannel = ECC_Visibility;
-	float TraceDistance = 300;
+	// 호출자(구역)가 모든 필드를 채운다. 0 기본값은 조정값 복제를 피하기 위한 것이며,
+	// Extent·Radius·ClearanceHeight 누락만 입력 검사로 실패한다.
+	float TraceDistance = 0;
 	FName RequiredFloorTag = NAME_None;
-	float MaximumSlopeDegrees = 25;
+	float MaximumSlopeDegrees = 0;
 	float FloorZ = 0;
-	float FloorTolerance = 5;
-	float Radius = 15;
-	float ClearanceHeight = 30;
-	float Spacing = 40;
+	float FloorTolerance = 0;
+	float Radius = 0;
+	float ClearanceHeight = 0;
+	float ClearanceFloorOffset = 0;
+	float Spacing = 0;
 };
 
 struct FCleaningFloorSpawnQuery
@@ -35,5 +38,5 @@ struct FCleaningFloorSpawnQuery
 struct FCleaningFootprintOverlap
 {
 	static bool Intersects(const FVector& Center, float Radius, const FTransform& FootprintTransform,
-						   const FVector& UnscaledExtent);
+						   const FVector& UnscaledExtent, float HeightToleranceCm);
 };

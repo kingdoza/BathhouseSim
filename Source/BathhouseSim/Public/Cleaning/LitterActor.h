@@ -37,6 +37,11 @@ public:
 		return FloorRadiusCm;
 	}
 
+	float GetPlacementClearHeightToleranceCm() const
+	{
+		return PlacementClearHeightToleranceCm;
+	}
+
 	bool CommitCollected();
 	void ClearForFacilityPlacement();
 #if WITH_EDITOR
@@ -52,6 +57,9 @@ protected:
 	TArray<TObjectPtr<UStaticMesh>> MeshVariants;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter", meta = (ClampMin = "0.1"))
 	float FloorRadiusCm = 15;
+	/** 설비 배치 확정 시 발밑 정리 판정의 Z 허용 오차 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Litter", meta = (ClampMin = "0.0"))
+	float PlacementClearHeightToleranceCm = 5.0f;
 
 private:
 

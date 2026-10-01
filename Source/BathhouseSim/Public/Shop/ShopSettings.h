@@ -14,6 +14,9 @@ class BATHHOUSESIM_API UShopSettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
+	static constexpr float DefaultDeliveryDelaySeconds = 10.0f;
+	static constexpr float DefaultDeliveryNoticeSeconds = 3.0f;
+	static constexpr float DefaultDeliveryAttemptIntervalSeconds = 0.25f;
 	static constexpr float DefaultUnboxForwardDistanceCm = 100.0f;
 	static constexpr float DefaultUnboxOverlapDepthCm = 8.0f;
 	static constexpr float MaxUnboxOverlapDepthCm = 50.0f;
@@ -46,6 +49,7 @@ public:
 	float GetUnboxForwardDistanceCm() const;
 	float GetUnboxOverlapDepthCm() const;
 	float GetDeliveryNoticeSeconds() const;
+	float GetDeliveryAttemptIntervalSeconds() const;
 	float GetUnboxViewDistanceCm() const;
 	float GetUnboxViewMinDistanceCm() const;
 	float GetUnboxViewPullStepCm() const;
@@ -81,7 +85,11 @@ public:
 	int32 PerProductQuantityLimit = 99;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Shop", meta = (ClampMin = "0.0"))
-	float DeliveryDelaySeconds = 10.0f;
+	float DeliveryDelaySeconds = DefaultDeliveryDelaySeconds;
+
+	/** 배송 대기 주문의 도착 재시도 간격. 0이면 매 Tick 시도 */
+	UPROPERTY(Config, EditAnywhere, Category = "Shop", meta = (ClampMin = "0.0"))
+	float DeliveryAttemptIntervalSeconds = DefaultDeliveryAttemptIntervalSeconds;
 
 	/** 2단계(바닥 정면)의 발바닥 기준 수평 중심 거리 */
 	UPROPERTY(Config, EditAnywhere, Category = "Shop", meta = (ClampMin = "0.0"))
@@ -91,7 +99,7 @@ public:
 	float UnboxOverlapDepthCm = DefaultUnboxOverlapDepthCm;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Shop", meta = (ClampMin = "0.01"))
-	float DeliveryNoticeSeconds = 3.0f;
+	float DeliveryNoticeSeconds = DefaultDeliveryNoticeSeconds;
 
 	/** 1단계(시선 앞) 시작 거리: 카메라에서 무리의 가장 가까운 부분까지(시선 방향) */
 	UPROPERTY(Config, EditAnywhere, Category = "Shop|Unboxing", meta = (ClampMin = "0.0"))

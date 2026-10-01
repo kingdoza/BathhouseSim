@@ -268,12 +268,14 @@ bool FBathhousePhysicalCarryFixedSlotTest::RunTest(const FString& Parameters)
 	World->Tick(LEVELTICK_All, 1.0f / 60.0f);
 	const FVector HeavyVelocity = Basket->GetPhysicalCarryPrimitive()->GetPhysicsLinearVelocity();
 	const FVector LightVelocity = LightBasket->GetPhysicalCarryPrimitive()->GetPhysicsLinearVelocity();
-	TestTrue(TEXT("Heavy basket receives the authored 120/15 velocity change"),
-		FMath::IsNearlyEqual(HeavyVelocity.X, 120.0f, 1.0f)
-		&& FMath::IsNearlyEqual(HeavyVelocity.Z, 15.0f, 1.0f));
-	TestTrue(TEXT("Light basket receives the authored 120/15 velocity change"),
-		FMath::IsNearlyEqual(LightVelocity.X, 120.0f, 1.0f)
-		&& FMath::IsNearlyEqual(LightVelocity.Z, 15.0f, 1.0f));
+	const float ExpectedForwardSpeed = Basket->GetThrowImpulseStrength();
+	const float ExpectedUpwardSpeed = Basket->GetUpwardThrowImpulseStrength();
+	TestTrue(TEXT("Heavy basket receives the authored velocity change"),
+		FMath::IsNearlyEqual(HeavyVelocity.X, ExpectedForwardSpeed, 1.0f)
+		&& FMath::IsNearlyEqual(HeavyVelocity.Z, ExpectedUpwardSpeed, 1.0f));
+	TestTrue(TEXT("Light basket receives the authored velocity change"),
+		FMath::IsNearlyEqual(LightVelocity.X, ExpectedForwardSpeed, 1.0f)
+		&& FMath::IsNearlyEqual(LightVelocity.Z, ExpectedUpwardSpeed, 1.0f));
 	TestTrue(TEXT("Velocity change is mass independent"), HeavyVelocity.Equals(LightVelocity, 1.0f));
 
 	HeldAnchor->SetWorldLocation(FVector(0.0f, 0.0f, 200.0f));

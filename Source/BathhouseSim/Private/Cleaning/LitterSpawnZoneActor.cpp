@@ -41,7 +41,8 @@ void ALitterSpawnZoneActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 }
 
 bool ALitterSpawnZoneActor::FindSpawnTransform(FRandomStream& Stream, float DefaultLitterSpacing,
-											   FTransform& OutTransform, float FloorRadius, float ClearanceHeight) const
+											   FTransform& OutTransform, float FloorRadius, float ClearanceHeight,
+											   float ClearanceFloorOffset) const
 {
 	UWorld* World = GetWorld();
 	auto* Subsystem = World ? World->GetSubsystem<UCleaningWorldSubsystem>() : nullptr;
@@ -60,6 +61,7 @@ bool ALitterSpawnZoneActor::FindSpawnTransform(FRandomStream& Stream, float Defa
 	Settings.FloorTolerance = FloorHeightToleranceCm;
 	Settings.Radius = FloorRadius;
 	Settings.ClearanceHeight = ClearanceHeight;
+	Settings.ClearanceFloorOffset = ClearanceFloorOffset;
 	Settings.Spacing = LitterSpacingOverride > 0 ? LitterSpacingOverride : DefaultLitterSpacing;
 	return FCleaningFloorSpawnQuery::Find(
 		*World, this, Settings, Stream,

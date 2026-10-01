@@ -44,6 +44,11 @@ public:
 		return FloorRadiusCm * FMath::Max(MaxXYScale.X, MaxXYScale.Y);
 	}
 
+	float GetPlacementClearHeightToleranceCm() const
+	{
+		return PlacementClearHeightToleranceCm;
+	}
+
 	void ClearForFacilityPlacement();
 
 	void SetSpawnZone(AStainSpawnZoneActor* InSpawnZone);
@@ -79,6 +84,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning", meta = (ClampMin = "0.1"))
 	float FloorRadiusCm = 30.0f;
+
+	/** 설비 배치 확정 시 발밑 정리 판정의 Z 허용 오차 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning", meta = (ClampMin = "0.0"))
+	float PlacementClearHeightToleranceCm = 5.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cleaning")
 	TObjectPtr<USphereComponent> InteractionCollision;

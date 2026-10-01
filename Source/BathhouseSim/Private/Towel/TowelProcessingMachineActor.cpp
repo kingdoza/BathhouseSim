@@ -165,8 +165,8 @@ bool ATowelProcessingMachineActor::HandleTakenBy(UPlayerCarryComponent& Carry, U
 }
 bool ATowelProcessingMachineActor::CanFreeDrop(FText& OutFailureReason) const { OutFailureReason = LOCTEXT("PlacedMachineNoDrop", "배치된 수건 처리기는 내려놓을 수 없습니다."); return false; }
 UPrimitiveComponent* ATowelProcessingMachineActor::GetPhysicalCarryPrimitive() const { return nullptr; }
-float ATowelProcessingMachineActor::GetThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetThrowImpulseStrength() : 120.0f; }
-float ATowelProcessingMachineActor::GetUpwardThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetUpwardThrowImpulseStrength() : 15.0f; }
+float ATowelProcessingMachineActor::GetThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetThrowImpulseStrength() : GetDefault<UFacilityPlacementComponent>()->GetThrowImpulseStrength(); }
+float ATowelProcessingMachineActor::GetUpwardThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetUpwardThrowImpulseStrength() : GetDefault<UFacilityPlacementComponent>()->GetUpwardThrowImpulseStrength(); }
 AActor* ATowelProcessingMachineActor::GetAssignedPhysicalCarryFixedSlot() const { return nullptr; }
 bool ATowelProcessingMachineActor::TryBindPhysicalCarryFixedSlot(AActor& SlotActor, FText& OutFailureReason) { OutFailureReason = LOCTEXT("PlacedMachineNoFixedSlot", "배치된 수건 처리기는 고정 슬롯을 지원하지 않습니다."); return false; }
 void ATowelProcessingMachineActor::ClearPhysicalCarryFixedSlotBinding(AActor& ExpectedSlot) {}

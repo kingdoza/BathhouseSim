@@ -43,7 +43,8 @@ bool FCleaningFloorSpawnQuery::Find(UWorld& World, const AActor* Zone, const FCl
 									FTransform& OutTransform)
 {
 	if (S.Extent.GetMin() <= 0 || !FMath::IsFinite(S.Radius) || S.Radius <= 0 || !FMath::IsFinite(S.ClearanceHeight) ||
-		S.ClearanceHeight <= 0)
+		S.ClearanceHeight <= 0 ||
+		!FMath::IsFinite(S.ClearanceFloorOffset) || S.ClearanceFloorOffset < 0)
 	{
 		return false;
 	}
@@ -91,7 +92,7 @@ bool FCleaningFloorSpawnQuery::Find(UWorld& World, const AActor* Zone, const FCl
 	Params.AddIgnoredComponent(Hit.GetComponent());
 	TArray<FOverlapResult> Overlaps;
 	World.OverlapMultiByChannel(
-		Overlaps, Hit.ImpactPoint + FVector(0, 0, 1 + S.ClearanceHeight / 2), FQuat::Identity, ECC_PhysicsBody,
+		Overlaps, Hit.ImpactPoint + FVector(0, 0, S.ClearanceFloorOffset + S.ClearanceHeight / 2), FQuat::Identity, ECC_PhysicsBody,
 		FCollisionShape::MakeBox(FVector(S.Radius, S.Radius, S.ClearanceHeight / 2)), Params, Responses);
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
@@ -111,11 +112,12 @@ bool FCleaningFloorSpawnQuery::Find(UWorld& World, const AActor* Zone, const FCl
 }
 
 bool FCleaningFootprintOverlap::Intersects(const FVector& Center, float Radius, const FTransform& Transform,
-										   const FVector& Extent)
+										   const FVector& Extent, float HeightToleranceCm)
 {
+	const float Tolerance = FMath::IsFinite(HeightToleranceCm) ? FMath::Max(0.0f, HeightToleranceCm) : 0.0f;
 	const FVector Scaled = Extent * Transform.GetScale3D().GetAbs();
 	const FVector Local = Transform.GetRotation().UnrotateVector(Center - Transform.GetLocation());
-	if (Local.Z < -Scaled.Z - 5 || Local.Z > Scaled.Z + 5)
+	if (Local.Z < -Scaled.Z - Tolerance || Local.Z > Scaled.Z + Tolerance)
 	{
 		return false;
 	}

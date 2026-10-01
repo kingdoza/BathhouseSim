@@ -104,7 +104,7 @@ void ACleaningDirectorActor::TrySpawnStain(AStainSpawnZoneActor& Zone)
 	{
 		FTransform Transform;
 		if (!Zone.FindSpawnTransform(SpawnRandom, DefaultStainSpacing, Transform, CDO->GetMaximumFloorRadius(),
-									 SpawnClearanceHeightCm))
+									 SpawnClearanceHeightCm, SpawnClearanceFloorOffsetCm))
 		{
 			continue;
 		}
@@ -133,7 +133,7 @@ void ACleaningDirectorActor::TrySpawnLitter(ALitterSpawnZoneActor& Zone)
 	{
 		FTransform Transform;
 		if (!Zone.FindSpawnTransform(SpawnRandom, DefaultLitterSpacing, Transform, CDO->GetFloorRadius(),
-									 SpawnClearanceHeightCm))
+									 SpawnClearanceHeightCm, SpawnClearanceFloorOffsetCm))
 		{
 			continue;
 		}

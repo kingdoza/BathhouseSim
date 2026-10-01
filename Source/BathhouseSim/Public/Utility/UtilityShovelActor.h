@@ -53,6 +53,8 @@ public:
 	virtual bool HandleTakenBy(UPlayerCarryComponent& Carry, USceneComponent* HeldAnchor) override;
 	virtual bool CanFreeDrop(FText& OutFailureReason) const override;
 	virtual UPrimitiveComponent* GetPhysicalCarryPrimitive() const override;
+	virtual float GetThrowImpulseStrength() const override { return ThrowImpulseStrength; }
+	virtual float GetUpwardThrowImpulseStrength() const override { return UpwardThrowImpulseStrength; }
 	virtual AActor* GetAssignedPhysicalCarryFixedSlot() const override { return FixedSlot.Get(); }
 	virtual bool TryBindPhysicalCarryFixedSlot(AActor& SlotActor, FText& OutFailureReason) override;
 	virtual void ClearPhysicalCarryFixedSlotBinding(AActor& ExpectedSlot) override;

@@ -47,7 +47,7 @@ Public/Placement/
 
 `ACleaningDirectorActor`가 두 종류를 같은 규칙으로 돌린다. 기존 전역 timer와 가중치 구역 선택은 삭제한다.
 
-- timer 간격 `SpawnUpdateIntervalSeconds`(EditDefaultsOnly, 기본 0.25, ≥ 0.05).
+- timer 간격 `SpawnUpdateIntervalSeconds`(EditDefaultsOnly, 아래 director 값 표의 정본 규칙).
 - update마다:
   1. `TActorIterator<ABathhouseCustomerCharacter>`로 손님 Actor 위치를 한 번 모은다. 플레이어는 제외된다.
   2. 구역마다 `n` = `SpawnBounds` oriented box 안의 손님 수. 행동과 관계없이 Actor 위치(capsule 중심)로 판정한다. 넘어진 동안은 capsule이 쓰러진 자리에 남으므로 그 위치로 센다.
@@ -58,18 +58,23 @@ Public/Placement/
 - clock은 director가 구역 weak key로 보관하며, 구역 등록·해제 시 추가·삭제된다. random stream은 director 소유이고 테스트는 seed를 주입한다.
 - 순수 계산은 `FCleaningSpawnClock`(Private)이다: `Advance(Remaining, CustomerCount, DeltaSeconds, MeanInterval) → bFire`, `SampleNext(Stream)`.
 
-| director 값 | 종류 | 기본 | 비고 |
-|---|---|---:|---|
-| `SpawnIntervalSeconds` | 물 얼룩 | 레벨 값 유지 | 의미만 "손님 1명당 평균 간격"으로 바뀐다. 이름을 유지해 레벨 값이 보존된다 |
-| `MaxActiveStains` | 물 얼룩 | 유지 | 전역 최대 |
-| `StainClass`, `DefaultStainSpacing` | 물 얼룩 | 유지 | |
-| `LitterMeanIntervalPerCustomerSeconds` | 쓰레기 | 120 | 신규, ≥ 1 |
-| `MaxActiveLitter` | 쓰레기 | 20 | 신규 |
-| `LitterClass` | 쓰레기 | Editor 지정 | 신규, `ALitterActor` 자식 |
-| `DefaultLitterSpacing` | 쓰레기 | 40 cm | 신규, 쓰레기끼리 최소 간격 |
-| (삭제) `DefaultPawnClearance` | 공통 | — | 2026-10-01 사용자 결정: 생성 위치는 플레이어·손님과 무관. Q1 A와 같은 즉시 삭제 |
-| `SpawnClearanceHeightCm` | 공통 | 30 | 신규, 바닥 위 겹침 검사 높이 |
-| `MaxPlacementAttemptsPerInterval` | 공통 | 유지 | 의미: 생성 1회당 자리 시도 수 |
+값의 정본: `ACleaningDirectorActor` UPROPERTY(Category `Cleaning Spawn`)다. 기본값은 `Public/Cleaning/CleaningDirectorActor.h` 초기값, 실제 값은 `/Game/Bathhouse/Blueprints/Cleaning/BP_CleaningDirector` Class Defaults(EditAnywhere 값은 레벨 instance override 가능, 저장 상태는 [Unreal/CleaningSystem.md](../Unreal/CleaningSystem.md)), 유효 범위는 `ClampMin`이다. 이 문서는 값을 적지 않는다(2026-10-01 사용자 지시).
+
+| director 값 | 종류 | 비고 |
+|---|---|---|
+| `SpawnUpdateIntervalSeconds` | 공통 | 신규, update timer 간격 |
+| `SpawnIntervalSeconds` | 물 얼룩 | 레벨 값 유지. 의미만 "손님 1명당 평균 간격"으로 바뀐다. 이름을 유지해 레벨 값이 보존된다 |
+| `MaxActiveStains` | 물 얼룩 | 유지. 전역 최대 |
+| `StainClass`, `DefaultStainSpacing` | 물 얼룩 | 유지 |
+| `LitterMeanIntervalPerCustomerSeconds` | 쓰레기 | 신규, 손님 1명당 평균 간격 |
+| `MaxActiveLitter` | 쓰레기 | 신규, 전역 최대 |
+| `LitterClass` | 쓰레기 | 신규, Editor 지정, `ALitterActor` 자식 |
+| `DefaultLitterSpacing` | 쓰레기 | 신규, 쓰레기끼리 최소 간격 |
+| (삭제) `DefaultPawnClearance` | 공통 | 2026-10-01 사용자 결정: 생성 위치는 플레이어·손님과 무관. Q1 A와 같은 즉시 삭제 |
+| `SpawnClearanceHeightCm` | 공통 | 신규, 바닥 위 겹침 검사 높이 |
+| `MaxPlacementAttemptsPerInterval` | 공통 | 유지. 의미: 생성 1회당 자리 시도 수 |
+
+구역 값(`FloorHeightToleranceCm`, `MaxActiveLitterInZone`/`MaxActiveStainsInZone`, floor filter 값)의 정본은 각 구역 class header 초기값과 `BP_LitterSpawnZone`·`BP_StainSpawnZone` Class Defaults·레벨 instance(EditAnywhere)다. 종류별 `FloorRadiusCm`의 정본은 `ALitterActor`·`AWaterStainActor` header 초기값과 `BP_Litter`·`BP_WaterStain` Class Defaults다.
 
 ## Floor Rule (생기는 자리)
 
@@ -78,18 +83,18 @@ Public/Placement/
 - 구역에 native `SpawnFloor`(`USceneComponent`, `SpawnBounds` 자식, 기본 relative Z = −기본 extent Z)를 둔다. `SpawnFloor`의 world Z가 그 구역의 **바닥 높이 정본**이다. `PlacementZone`의 `PlacementFloor`와 같은 방식이다.
 - 후보 절차:
   1. bounds 안 무작위 XY에서 bounds 위부터 아래로 `FloorTraceChannel` trace를 한다(기존).
-  2. hit Z가 바닥 높이 ± `FloorHeightToleranceCm`(기본 5) 밖이면 기각한다. 설비 윗면, 물건 위, 욕탕 바닥, 카운터 위가 여기서 빠진다.
+  2. hit Z가 바닥 높이 ± `FloorHeightToleranceCm` 밖이면 기각한다. 설비 윗면, 물건 위, 욕탕 바닥, 카운터 위가 여기서 빠진다.
   3. hit Actor가 `IPlaceableFacility` 또는 `IPhysicalCarryable`이면 기각한다. 또 hit component가 **고정 레벨 지형**이 아니면 기각한다. 조건은 object type `WorldStatic`이고 Mobility `Static`인 것이다.
-     - 2단계 허용 오차(±5cm) 안의 낮은 물체 윗면이 바닥으로 인정되는 것을 막는다. 예: 바닥에 놓인 사용한 수건(`AWorldUsedTowelActor`)은 휴대물이 아닌 BlockAllDynamic mesh라 3단계 interface 검사로는 걸리지 않는다(2026-10-01 재검토).
+     - 2단계 허용 오차 안의 낮은 물체 윗면이 바닥으로 인정되는 것을 막는다. 예: 바닥에 놓인 사용한 수건(`AWorldUsedTowelActor`)은 휴대물이 아닌 BlockAllDynamic mesh라 3단계 interface 검사로는 걸리지 않는다(2026-10-01 재검토).
      - 이 조건이 있어야 5단계가 hit component를 제외해도 안전하다. 제외되는 것은 항상 바닥 지형뿐이다.
      - 물 얼룩·쓰레기는 1단계 trace가 통과해 지나간다(구현 유지).
   4. 기존 조건(구역 XY 포함, 경사, 선택 tag)을 확인한다.
   5. clearance box로 **충돌 응답 기반** 검사를 한다(2026-10-01 코드 리뷰 F1·F2 재검토).
-     - box: 반폭 = 종류의 바닥 반경 R, 높이 `SpawnClearanceHeightCm`, 바닥 hit 위 1cm부터, 축 정렬.
+     - box: 반폭 = 종류의 바닥 반경 R, 높이 `SpawnClearanceHeightCm`, 바닥 hit 위 띄움 높이부터, 축 정렬. 띄움 높이는 `ACleaningDirectorActor::SpawnClearanceFloorOffsetCm`이다.
      - "바닥에 놓인 물리 물체" 가정으로 `OverlapMultiByChannel`을 쓴다. query 채널은 `ECC_PhysicsBody`, 응답은 WorldStatic·WorldDynamic·PhysicsBody Block, 나머지 Ignore다. `bBlockingHit`인 결과만 막힘으로 센다(`FacilityPlacementCollision::HasBlockingOverlap`과 같은 응답 기반).
        - 막힘: 설비 몸체(BlockAllDynamic), 바닥에 놓인 휴대물·사용한 수건(physics 응답), 벽.
        - 막히지 않음: 영역 표시용 QueryOnly box(배치 구역 `ZoneBounds`, 진열 공간, router, 투입구 등 PhysicsBody Ignore), 생성·수거 구역(NoCollision), 물 얼룩·쓰레기(Visibility만 Block).
-     - 1단계 floor trace가 맞힌 **바닥 component는 overlap에서 제외**한다(`AddIgnoredComponent`). 그래서 허용 경사(`MaximumFloorSlopeDegrees`) 안의 경사나 같은 mesh의 줄눈 단차가 바닥 자신과 겹쳐 기각되지 않는다. 다른 mesh의 1cm 이상 턱은 막힘으로 남긴다(보수적).
+     - 1단계 floor trace가 맞힌 **바닥 component는 overlap에서 제외**한다(`AddIgnoredComponent`). 그래서 허용 경사(`MaximumFloorSlopeDegrees`) 안의 경사나 같은 mesh의 줄눈 단차가 바닥 자신과 겹쳐 기각되지 않는다. 다른 mesh의 띄움 높이 이상 턱은 막힘으로 남긴다(보수적).
      - 물 얼룩·쓰레기 Actor는 방어적으로 한 번 더 무시한다(Q62 B).
      - `APawn` Actor의 component는 무시한다. 넘어진 손님의 ragdoll mesh(physics 응답)가 막지 않게 하기 위함이다. 생성 위치는 플레이어·손님과 무관하다.
      - 벽을 막힘으로 두어 벽 가장자리 반경 R 안에는 생기지 않는다(2026-10-01 사용자 결정 A, 벽에 묻혀 보이지 않게, TRSH-030).
@@ -97,20 +102,20 @@ Public/Placement/
   6. 같은 종류끼리는 subsystem 등록부로 간격을 확인한다. 물 얼룩은 얼룩끼리, 쓰레기는 쓰레기끼리만 본다.
   7. (삭제) Pawn clearance sphere 검사는 하지 않는다. 플레이어·손님 바로 옆이나 발밑에도 생긴다(2026-10-01 사용자 결정, TRSH-029).
 - 종류별 R:
-  - 물 얼룩: `AWaterStainActor::FloorRadiusCm`(신규, EditDefaultsOnly, 기본 30) × class 기본 `MaxXYScale`(최악값).
-  - 쓰레기: `ALitterActor::FloorRadiusCm`(기본 15, 모든 외형 후보를 덮는 값).
+  - 물 얼룩: `AWaterStainActor::FloorRadiusCm`(신규, EditDefaultsOnly) × class 기본 `MaxXYScale`(최악값).
+  - 쓰레기: `ALitterActor::FloorRadiusCm`(EditDefaultsOnly, 모든 외형 후보를 덮는 값으로 authoring).
 - `AStainSpawnZoneActor`: `SpawnFloor`, `FloorHeightToleranceCm`을 추가하고 `SelectionWeight`, `ZoneKind`와 `EStainSpawnZoneKind`는 삭제한다(Q1 A). `PawnClearanceOverride`와 director `DefaultPawnClearance`도 같은 방식으로 삭제한다(2026-10-01).
-- `ALitterSpawnZoneActor`: 같은 구성의 독립 class다(부모 변경 없음). `MaxActiveLitterInZone`(기본 5), `LitterSpacingOverride`, floor filter 값을 가진다. 두 구역은 따로 배치하며 같은 영역이어도 된다.
+- `ALitterSpawnZoneActor`: 같은 구성의 독립 class다(부모 변경 없음). `MaxActiveLitterInZone`, `LitterSpacingOverride`, floor filter 값을 가진다. 두 구역은 따로 배치하며 같은 영역이어도 된다.
 
 ## Litter
 
 `ALitterActor`(`BP_Litter`). 구현: `IPlayerInteractable`.
 
 - 컴포넌트:
-  - root `InteractionCollision`(`USphereComponent`, 기본 반경 12): QueryOnly, Visibility만 Block, 나머지 Ignore, Navigation off.
+  - root `InteractionCollision`(`USphereComponent`, 반경은 생성자 초기값과 `BP_Litter` component 값이 정본): QueryOnly, Visibility만 Block, 나머지 Ignore, Navigation off.
   - `LitterMesh`(`UStaticMeshComponent`): NoCollision, Navigation off.
   - 물리·이동이 없다. 밀리지 않고 Pawn·물건을 막지 않는다(TRSH-006). Visibility를 막으므로 뒤의 물 얼룩 조준을 가린다(Q62 B, TRSH-026).
-- 외형: `MeshVariants`(EditDefaultsOnly, `TArray<UStaticMesh>`)에서 seed로 하나를 고르고 yaw 0~360을 적용한다. 선택 방식은 물 얼룩 seed 계약(`ConfigureVisualVariationSeed` → BeginPlay 적용)과 같다(TRSH-005).
+- 외형: `MeshVariants`(EditDefaultsOnly, `TArray<UStaticMesh>`)에서 seed로 하나를 고르고 전체 원 범위의 무작위 yaw를 적용한다. 선택 방식은 물 얼룩 seed 계약(`ConfigureVisualVariationSeed` → BeginPlay 적용)과 같다(TRSH-005).
 - 등록: BeginPlay에서 `RegisterLitter`, EndPlay에서 해제한다. `SetSpawnZone`으로 구역별 수를 센다.
 - 상태: `Active → Removed`(terminal). `CommitCollected()`와 `ClearForFacilityPlacement()`는 같은 terminal 경로다. collision을 끄고, 등록 해제, Destroy 순서이며 중복 호출은 no-op이다.
 - query:
@@ -125,8 +130,9 @@ Public/Placement/
 `ALitterTongsActor`(`BP_LitterTongs`). 구현: `IPlayerInteractable`, `IPhysicalCarryable`, `IHeldEquipmentUsable`, `IHeldEquipmentSecondaryUsable`.
 
 - carry: `EPhysicalCarryKind::LitterTongs`(append), 기본 capability `FreeDrop|FixedSlot`. exact fixed slot, held-pose drop, CCD·Pawn Ignore, fixed slot 우선 복구는 `AWetMopActor`와 같은 구조다. 봉투 개수는 모든 carry 전이에서 유지된다(TRSH-013, 023).
-- 값: `BagCapacity`(EditDefaultsOnly, 20, ≥ 1), `TiedBagClass`(`ATrashBagActor` 자식), 봉투 놓기 값(아래 Front Drop Placement 표). 상태는 `BagCount`(Transient)다.
-- `GetHeldSummaryText()` = `봉투 n/20`(HUD, 조준 무관).
+- 값: `BagCapacity`(EditDefaultsOnly), `TiedBagClass`(`ATrashBagActor` 자식), 봉투 놓기 값(아래 Front Drop Placement 표). 상태는 `BagCount`(Transient)다.
+- `BagCapacity` 정본: 기본값은 `Public/Cleaning/LitterTongsActor.h` 초기값, 실제 값은 `/Game/Bathhouse/Blueprints/Cleaning/BP_LitterTongs` Class Defaults, 유효 범위는 `ClampMin`이다.
+- `GetHeldSummaryText()` = `봉투 n/BagCapacity`(HUD, 조준 무관).
 - E query(월드·거치대 밖): 빈손이면 물걸레와 같은 들기 문구, 표시 이름 `집게`.
 - LMB `QueryEquipmentUse`(`Instant`):
   - focus hit Actor가 유효한 `ALitterActor`이면 visible, action `줍기`. `BagCount ≥ BagCapacity`면 불가, `봉투 가득 참`.
@@ -193,7 +199,7 @@ Public/Placement/
 
 - 컴포넌트: root `CollectionBounds`(`UBoxComponent`): NoCollision, Navigation off.
 - 바닥 표시는 Blueprint가 NoCollision·Navigation off의 decal 또는 plane으로 한다.
-- `CollectionIntervalSeconds`: EditAnywhere, 기본 300, ≥ 1(COLL-005, 009).
+- `CollectionIntervalSeconds`: EditAnywhere(COLL-005, 009). 기본값은 `Public/Cleaning/TrashCollectionZoneActor.h` 초기값, 실제 값은 `/Game/Bathhouse/Blueprints/Cleaning/BP_TrashCollectionZone` Class Defaults와 레벨 instance override, 유효 범위는 `ClampMin`과 timer 설정 시 하한이다.
 - BeginPlay에 looping timer를 시작한다. game time이며 pause에 멈춘다. 첫 수거는 시작 후 한 주기 뒤다. EndPlay에 timer를 해제한다.
 - `CollectNow()`(C++ public, 테스트·디버그):
   1. zone box로 AllObjects overlap을 한다. held 물건은 collision이 꺼져 있어 빠진다.
@@ -203,7 +209,7 @@ Public/Placement/
      - `IPhysicalCarryable::GetPhysicalCarryPrimitive()` bounds 중심이 zone oriented box 안(COLL-007)
   3. 목록을 만든 뒤 각 대상의 `HandleDiscardFromWorldCommitted()`를 호출한다. 돈 변화·표시·방송은 없다(COLL-001, 004).
 - 배치된 설비, 쓰레기, 바닥 수건, 열쇠, 도구는 계약을 구현하지 않거나 FreeWorld 휴대물이 아니라서 남는다(COLL-002, 008).
-- 비 shipping 콘솔 `bathhouse.Debug.TrashCollection.CollectNow`: 레벨의 모든 수거 구역을 즉시 수거한다(PIE에서 300초를 기다리지 않기 위함).
+- 비 shipping 콘솔 `bathhouse.Debug.TrashCollection.CollectNow`: 레벨의 모든 수거 구역을 즉시 수거한다(PIE에서 수거 주기를 기다리지 않기 위함).
 
 ### Trash Bin
 
@@ -217,7 +223,7 @@ Public/Placement/
   - handler는 등록된 모든 물 얼룩·쓰레기에 `FCleaningFootprintOverlap::Intersects`를 적용하고, 겹치면 `ClearForFacilityPlacement()`를 호출한다.
 - 겹침(Q64 A, 조금이라도):
   - XY: 대상 중심 원(반경 R)과 footprint 사각형(extent × |scale|, footprint 회전)의 최근접 거리 ≤ R.
-  - Z: 대상 Z가 footprint 바닥 − 5 ~ 윗면 + 5 안.
+  - Z: 대상 Z가 footprint 바닥 − 높이 허용 오차 ~ 윗면 + 높이 허용 오차 안. 허용 오차는 종류별 Actor의 `PlacementClearHeightToleranceCm`(`AWaterStainActor`·`ALitterActor`)이며 `FCleaningFootprintOverlap::Intersects`가 인자로 받는다.
   - 물 얼룩 R은 `FloorRadiusCm × max(선택된 X, Y scale)`, 쓰레기 R은 `FloorRadiusCm`다.
 - 물걸레 진행 중인 얼룩도 제거된다. 기존 EndPlay 정리가 청소자 잠금을 풀고, 물걸레는 target 없이 mopping 상태만 유지한다.
 - 등록 해제로 전역·구역 수가 줄어 다시 생성될 수 있다(TRSH-025).
@@ -262,9 +268,9 @@ Public/Placement/
 
 | 시나리오 | 자동화 |
 |---|---|
-| TRSH-001, 002, 018, 019 | `FCleaningSpawnClock` 결정적 seed: n=0 발생 없음, n=2의 600초 기대 10±허용, n=1 대비 약 2배, 구역 이동 시 전환, 얼룩 평균간격 = `SpawnIntervalSeconds` |
+| TRSH-001, 002, 018, 019 | `FCleaningSpawnClock` 결정적 seed와 fixture 평균간격 M·시간 T: n=0 발생 없음, n=2 기대 2T/M ± 허용, n=1 대비 약 2배, 구역 이동 시 전환, 얼룩 평균간격 = `SpawnIntervalSeconds` |
 | TRSH-003, 025 | 전역·구역 최대에서 발생 건너뜀, 제거 뒤 재발생, 몰아서 생성 없음 |
-| TRSH-004, 029, 030 | 바닥 plane 허용 오차, 설비 윗면·박스·욕탕 바닥·벽 기각, 플레이어·손님(서 있음·넘어짐) 옆·발밑 생성 성공, clearance 겹침 기각, 쓰레기·얼룩 서로 무시. 배치 구역(DefaultMap 구성의 얇은 QueryOnly bounds)·겹친 물 얼룩/쓰레기 구역 안 생성 성공, 20° 경사 바닥·같은 mesh 1cm 단차 생성 성공 |
+| TRSH-004, 029, 030 | 바닥 plane 허용 오차, 설비 윗면·박스·욕탕 바닥·벽 기각, 플레이어·손님(서 있음·넘어짐) 옆·발밑 생성 성공, clearance 겹침 기각, 쓰레기·얼룩 서로 무시. 배치 구역(DefaultMap 구성의 얇은 QueryOnly bounds)·겹친 물 얼룩/쓰레기 구역 안 생성 성공, fixture로 설정한 `MaximumFloorSlopeDegrees` 안팎의 경사 바닥(안은 성공·밖은 기각)·같은 mesh의 작은 단차 생성 성공 |
 | TRSH-005 | 같은 seed 같은 외형·yaw |
 | TRSH-006, 020, 028 | 쓰레기 E 무변화, Pawn·물건 비충돌, 빈손·박스·바구니·삽 LMB 이유, 렌치·걸레·배송 상자 장비 행 유지 |
 | TRSH-007~012, 021, 022, 024 | 집게 줍기 1개, 가득 참, 묶기 조준 무관, 빈 봉투, 막힌 정면 무변화, press당 1회, 비대상 LMB 무반응 |
@@ -272,7 +278,7 @@ Public/Placement/
 | TRSH-013, 014, 023 | 거치대·drop·낙하 복구 개수 유지, 봉투 E·G·요약 |
 | TRSH-016, 017, 026, 027 | 실제 conversion transaction 배치: 겹침(가장자리 포함) 제거·수 감소·청소 중 얼룩 제거, preview·취소 무변화, 쓰레기가 얼룩 조준을 가림 |
 | COLL-001~004, 007, 008 | `CollectNow`: 종류별 제거·잔존, held 제외, 중심 판정, 내용물 동반 소멸, 지갑 불변 |
-| COLL-005, 009 | 간격 300·60 timer |
+| COLL-005, 009 | `CollectionIntervalSeconds` looping timer(class 기본값과 fixture 값) |
 | 회귀 | Cleaning(물걸레), Shop 쓰레기통 held 버리기, Service·Placement·Interaction held-use·Combat 전체 |
 
 PIE: 대표 시나리오, HUD 문구(RMB 행 포함), 쓰레기 외형·수거 구역 표시, 손님 수에 따른 빈도, 콘솔 즉시 수거.

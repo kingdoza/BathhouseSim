@@ -225,14 +225,14 @@ Editor authoring 값:
 - `AFirstPersonCharacter::DropCarryAction`
 - `AFirstPersonCharacter::PrimaryUseAction`
 - `AFirstPersonCharacter::SecondaryUseAction`(RMB)
-- `UPlayerHeldTargetUseComponent::RepeatIntervalSeconds`(기본 0.15)
+- `UPlayerHeldTargetUseComponent::RepeatIntervalSeconds`(기본값은 header 초기값, 실제 값은 `BP_FirstPersonCharacter`의 `PlayerHeldTargetUse` component, [HeldTargetUseSystem.md](HeldTargetUseSystem.md))
 - `AFirstPersonCharacter::RecoverFacilityAction`
 - `AFirstPersonCharacter::PlacementSnapAction`
 - `AFirstPersonCharacter::PlacementRotateAction`
 - trace 거리와 collision channel
 - `HeldKeyAnchor` transform
 - key, wet mop, towel basket, monkey wrench Blueprint class default의 개별 `HeldTransform`
-- item별 약한 forward/upward velocity change, 기본 `120/15 cm/s`
+- item별 약한 forward/upward velocity change: 각 carryable class의 `ThrowImpulseStrength`·`UpwardThrowImpulseStrength`(cm/s). 기본값은 각 class header 초기값, 실제 값은 각 Blueprint Class Defaults(EditAnywhere인 class는 레벨 instance override 가능)다. `IPhysicalCarryable`의 두 getter는 pure virtual이라 구현체가 자기 값을 소유하며(`AUtilityShovelActor`도 자기 property), 배치 설비 Actor의 `FacilityPlacement` 없음 fallback은 `UFacilityPlacementComponent` CDO의 같은 getter다.
 - deprecated `ThrowSpawnDistance`, `DropSweepChannel`, `DropSweepClearance`는 호환용으로만 보존
 - equipment fixed slot의 exact `AssignedItem`, `bStartOccupied`, `ItemAnchor`
 - key `KeyPhysicsRoot` bounds와 collision

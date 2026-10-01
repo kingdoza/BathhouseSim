@@ -847,8 +847,9 @@ bool FBathhouseHeldTargetUseBlueprintLoadTest::RunTest(const FString& Parameters
 			TestNotNull(TEXT("Character CDO contains PlayerHeldTargetUse"), HeldUse);
 			if (HeldUse)
 			{
-				TestEqual(TEXT("PlayerHeldTargetUse keeps the 0.15 second default"),
-					HeldUse->RepeatIntervalSeconds, 0.15f);
+				TestEqual(TEXT("PlayerHeldTargetUse keeps the C++ default repeat interval"),
+					HeldUse->RepeatIntervalSeconds,
+					GetDefault<UPlayerHeldTargetUseComponent>()->RepeatIntervalSeconds);
 				TestEqual(TEXT("Default subobject keeps its serialized name"),
 					HeldUse->GetFName(), FName(TEXT("PlayerHeldTargetUse")));
 			}
