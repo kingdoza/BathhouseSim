@@ -1,9 +1,9 @@
 # CONTEXT — UNBOX-SPAWN-VIEW 플레이어 앞 생성 위치를 카메라 정면 기준으로
 - 목표 / 상위·선행·관련 작업: 개봉 등 플레이어 앞에 새 물체가 생길 때 카메라 정면 기준으로 생기게 함. 상위 없음. 관련: 상점 확장(SHOP-018~020·033·038~041, `Architecture/ShopSystem.md` World Placement), 서비스 3단위 봉투 정면 놓기(`Architecture/CleaningLitterSystem.md` Front Drop Placement).
-- 현재 단계와 재개 지점: 구현(Claude 구현 워커, 메인 트리). PROMPT_IMPLEMENTATION의 worktree·`$ProjectRoot` 경로 지시는 사용자 결정(빌드는 메인 트리 브랜치 전환)으로 무효.
+- 현재 단계와 재개 지점: 사용자 PIE 대기(`PIE_CHECKLIST.md`). Editor 단계 생략.
 - 명세 승인 일자와 사전 허용: 2026-10-01 사용자 승인("셋다 승인") (P9·P10·P2 정정 포함). 사전 허용: 승인 범위 밖 asset 수정이 필요하면 멈추고 묻는다(S2 A), 사용자 PIE 통과 보고 시 자동 `--no-ff` 병합(S3 A).
-- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/UNBOX-SPAWN-VIEW`(worktree `.claude/worktrees/unbox`, main에서 분기). 아키텍처 시작 `fc5b59f`. 아키텍처 재작업 `98db7d6`(조정값 원본 이전). worktree 제거 후 메인 트리에서 구현.
-- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: Editor 사전 조사는 사용자 결정(S1)으로 진행·완료(`REPORT_UNREAL_DISCOVERY.md`). 수직 구현 없음(Q6 B 사용자 결정, 개봉·봉투 한 작업에서 구현·검증).
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/UNBOX-SPAWN-VIEW`(worktree `.claude/worktrees/unbox`, main에서 분기). 아키텍처 시작 `fc5b59f`. 아키텍처 재작업 `98db7d6`(조정값 원본 이전). worktree 제거 후 메인 트리에서 구현. 구현 시작 `bd95749`, 구현 `515c7d2`, 재작업 `fc33361` = 리뷰 승인 커밋.
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 리뷰 2회(1회차 테스트 리터럴·USV-015 재작업, 2회차 승인), 아키텍처 자동 복귀 미사용(아키텍처 재작업 1회는 사용자 지시). Editor 작업 생략(Content·Config 무변경). 경미 잔여: ShopAutomationTests 테스트 이름 문자열의 옛 수치 표기, RoomPhysics 회전 전 extent 판정.
 - 복귀 기록: 없음
 - 사용자 지시 모델 덮어쓰기: 없음
 - 결과물 목록과 사용자 지시 요약:
