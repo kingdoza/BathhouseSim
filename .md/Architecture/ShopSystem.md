@@ -60,20 +60,23 @@ UI native class는 `Public/UI`, `Private/UI`에 둔다([UISystem.md](UISystem.md
 - Data Validation은 위 규칙을 검사한다. 락커 판매와 "팔지만 버릴 수 없는 설비"를 데이터 단계에서 막는다.
 - 설비 정의에 가격을 넣지 않는다. 가격 편집 위치는 catalog 하나다.
 
-`UShopSettings : UDeveloperSettings`(Config=Game, Project Settings 노출):
+`UShopSettings : UDeveloperSettings`(Config=Game, Project Settings 노출).
 
-| 값 | 기본 | 범위 |
-|---|---:|---|
-| `Catalog` (soft) | 없음, Editor 지정 | 필수 |
-| `DeliveryBoxClass` (soft class) | 없음, Editor 지정 | `AShopDeliveryBoxActor` 자식 |
-| `CartTotalQuantityLimit` | 10 | ≥ 1 |
-| `PerProductQuantityLimit` | 99 | ≥ 1 |
-| `DeliveryDelaySeconds` | 10 | finite ≥ 0 |
-| `UnboxForwardDistanceCm` | 100 | finite ≥ 0 |
-| `UnboxOverlapDepthCm` | 8 | finite, 0~50. 개봉 물품끼리 목표 겹침 깊이. 클수록 세게 튄다(SHOP-043) |
-| `DeliveryNoticeSeconds` | 3 | finite > 0 |
+값의 정본: 기본값은 `Public/Shop/ShopSettings.h`의 UPROPERTY 초기값, 저장된 조정값은 `Config/DefaultGame.ini` `[/Script/BathhouseSim.ShopSettings]`(키가 없으면 기본값), 유효 범위는 각 UPROPERTY `ClampMin`/`ClampMax`와 getter다. 이 문서는 값을 적지 않는다(2026-10-01 사용자 지시). getter의 비유한 fallback은 현재 초기값을 복제한 리터럴이며, 초기값과 함께 쓰는 `Default*` 상수 하나로 묶을 예정이다(`.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`).
 
-시작 금액은 wallet 소유, 잔액 변화량 표시 2초는 HUD widget 소유다.
+| 값 | 의미 |
+|---|---|
+| `Catalog` (soft) | Editor 지정, 필수 |
+| `DeliveryBoxClass` (soft class) | Editor 지정, `AShopDeliveryBoxActor` 자식 |
+| `CartTotalQuantityLimit`, `PerProductQuantityLimit` | 장바구니 전체·상품별 상한 |
+| `DeliveryDelaySeconds` | 주문 → 배송 게임시간 |
+| `DeliveryNoticeSeconds` | `배송 도착` 표시 시간 |
+| `UnboxForwardDistanceCm` | 개봉 정면 단계의 발바닥 기준 수평 중심 시작 거리 |
+| `UnboxOverlapDepthCm` | 개봉 물품끼리 목표 겹침 깊이 D. 클수록 세게 튄다(SHOP-043) |
+
+배송 재시도 간격은 현재 코드 상수다(Delivery 절, 이전 예정).
+
+시작 금액은 wallet 소유, 잔액 변화량 표시 시간은 HUD widget(`UMoneyHudWidget::DeltaDisplaySeconds`) 소유다.
 
 ## Cart
 
@@ -101,7 +104,7 @@ UI native class는 `Public/UI`, `Private/UI`에 둔다([UISystem.md](UISystem.md
 
 ## Delivery
 
-subsystem Tick(0.25초 간격 throttle):
+subsystem Tick(고정 간격 throttle. 간격은 현재 `ShopOrderSubsystem.cpp`의 코드 상수이며 `UShopSettings`로 이전 예정, `.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`):
 
 1. FIFO 머리 주문만 본다. 머리가 준비되지 않았거나 공간이 없으면 뒤 주문도 처리하지 않는다(SHOP-015).
 2. 머리가 준비되면 등록된 배송 지점의 `FindDropTransform(BoxHalfExtent)`로 위치를 구한다.
@@ -114,12 +117,14 @@ subsystem Tick(0.25초 간격 throttle):
 
 ## Delivery Point
 
-`AShopDeliveryPointActor`: root `USceneComponent`, editor-only billboard·arrow(표시 전용). `MaxSearchHeightCm=1000`(EditAnywhere, > 0), `DropGapCm=10`(EditDefaultsOnly, ≥ 0). BeginPlay에 subsystem에 등록, EndPlay에 해제한다.
+`AShopDeliveryPointActor`: root `USceneComponent`, editor-only billboard·arrow(표시 전용). `MaxSearchHeightCm`(EditAnywhere), `DropGapCm`(EditDefaultsOnly). BeginPlay에 subsystem에 등록, EndPlay에 해제한다.
+
+값의 정본: 기본값은 `Public/Shop/ShopDeliveryPointActor.h` 초기값, 실제 값은 `/Game/Bathhouse/Blueprints/Shop/BP_ShopDeliveryPoint` Class Defaults(`MaxSearchHeightCm`은 레벨 instance override 가능), 유효 범위는 `ClampMin`과 `FindDropTransform` 입력 검사(비유한·`MaxSearchHeightCm ≤ 0`·`DropGapCm < 0`이면 공간 없음)다.
 
 `FindDropTransform(BoxHalfExtent, BoxCollisionTemplate)`:
 
 1. 지점 위치 B에서 위로 `MaxSearchHeightCm`까지 WorldStatic object type만 line trace해 천장 높이 Zc를 구한다. 상자·설비 아이템·Pawn은 천장으로 보지 않는다. 없으면 `Zc = B.Z + MaxSearchHeightCm`.
-2. `(B.XY, Zc - HalfZ - 1)`에서 `(B.XY, B.Z + HalfZ)`까지 상자 collision으로 box sweep한다. 시작이 이미 막혀 있으면 공간 없음이다.
+2. `(B.XY, Zc - HalfZ - ε)`(ε는 천장 접촉 회피용 고정 epsilon, 조정값 아님)에서 `(B.XY, B.Z + HalfZ)`까지 상자 collision으로 box sweep한다. 시작이 이미 막혀 있으면 공간 없음이다.
 3. hit가 있으면 그 중심 높이, 없으면 `B.Z + HalfZ`가 더미 위 중심이다. spawn 중심은 그 높이 + `DropGapCm`.
 4. spawn 상자 윗면이 Zc를 넘거나 spawn 위치 overlap이 있으면 공간 없음이다. 아니면 지점 yaw로 transform을 반환한다.
 
@@ -238,14 +243,15 @@ worst case는 약 (11 × 4 + 8 × 3) layout × 10 물품 × 3 query다. 클릭 �
 [UISystem.md](UISystem.md)의 Native Widget Policy를 따른다.
 
 - `UComputerScreenRootWidget`: BindWidget `ManagementTabButton`, `ShopTabButton`, `ScreenSwitcher`(UWidgetSwitcher), `ManagementScreen`(`UBathWaterManagementScreenWidget`), `ShopScreen`(`UShopScreenWidget`). 선택 탭 index는 widget 표시 상태이며 기본은 관리다. 컴퓨터 context와 사용자 변경을 두 자식에 전달한다([ComputerSystem.md](ComputerSystem.md)).
-- `UShopScreenWidget`: BindWidget `ProductScroll`(UScrollBox), `ProductGrid`(UWrapBox), `BalanceText`, `CartList`(UVerticalBox), `CartQuantityText`(`7/10`), `CartTotalText`, `OrderButton`, `OrderFeedbackText`, `OrderList`(UVerticalBox). EditDefaultsOnly 행 widget class 3종.
-  - 사용자 PlayerState의 wallet `OnMoneyChanged`, cart `OnCartChanged`, subsystem `OnOrdersChanged`를 구독한다. 남은 시간만 1초 간격 NativeTick으로 갱신한다.
+- `UShopScreenWidget`: BindWidget `ProductScroll`(UScrollBox), `ProductGrid`(UWrapBox), `BalanceText`, `CartList`(UVerticalBox), `CartQuantityText`(`전체 수량/CartTotalQuantityLimit`), `CartTotalText`, `OrderButton`, `OrderFeedbackText`, `OrderList`(UVerticalBox). EditDefaultsOnly 행 widget class 3종.
+  - 사용자 PlayerState의 wallet `OnMoneyChanged`, cart `OnCartChanged`, subsystem `OnOrdersChanged`를 구독한다. 남은 시간만 고정 간격 NativeTick으로 갱신한다. 간격은 현재 `ShopScreenWidget.cpp`의 코드 상수이며 widget property로 이전 예정이다(`.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`).
   - 주문 버튼 활성·부족액·상한 안내는 매번 `EvaluatePlaceOrder`·`EvaluateAdd`로 계산한다(SHOP-006~008).
   - 주문 성공 시 `주문 완료`를 표시한다.
   - 상품이 넘치면 `ProductScroll`만 세로로 스크롤한다. cart·주문 panel은 `ProductScroll` 밖 형제로 둬 항상 보인다(SHOP-032, WBP layout).
 - 행 widget: `UShopProductCardWidget`(Name/Price/Icon/AddButton), `UShopCartLineWidget`(Name/Quantity/LineTotal/Plus/Minus/Remove), `UShopOrderLineWidget`(Summary/Status). 버튼은 해당 domain API만 호출한다.
-- HUD: `ABathhouseHUD`가 `UMoneyHudWidget`(MoneyText, DeltaText, `DeltaDisplaySeconds=2`)과 `UShopNoticeWidget`(NoticeText)을 추가로 생성한다.
-  - money widget은 PlayerController의 PlayerState wallet에 bind한다. PlayerState가 아직 없으면 possession 변경과 짧은 재시도로 bind한다. bind 시 현재 금액을 바로 표시하고, `OnMoneyChanged(Previous, Current)`의 차이를 `+10,000`/`−30,000` 형식으로 2초 표시한다. 새 변화가 오면 새 값으로 바꾸고 2초를 다시 시작한다.
+- HUD: `ABathhouseHUD`가 `UMoneyHudWidget`(MoneyText, DeltaText, `DeltaDisplaySeconds`)과 `UShopNoticeWidget`(NoticeText)을 추가로 생성한다.
+  - `DeltaDisplaySeconds`(EditDefaultsOnly)의 기본값은 `Public/UI/MoneyHudWidget.h` 초기값, 실제 값은 `/Game/Bathhouse/UI/WBP_MoneyHud` Class Defaults, 범위는 `ClampMin`이다.
+  - money widget은 PlayerController의 PlayerState wallet에 bind한다. PlayerState가 아직 없으면 possession 변경과 짧은 재시도로 bind한다. bind 시 현재 금액을 바로 표시하고, `OnMoneyChanged(Previous, Current)`의 차이를 `+10,000`/`−30,000` 형식(형식 예시)으로 `DeltaDisplaySeconds` 동안 표시한다. 새 변화가 오면 새 값으로 바꾸고 표시 시간을 다시 시작한다.
   - notice widget은 `OnOrderDelivered`에 `배송 도착`을 `DeliveryNoticeSeconds` 동안 표시한다. HUD는 컴퓨터 사용 중에도 viewport에 남는다(SHOP-030).
 - 금액은 천 단위 구분 + `원`으로 표시한다.
 
@@ -264,7 +270,7 @@ worst case는 약 (11 × 4 + 8 × 3) layout × 10 물품 × 3 query다. 클릭 �
 - Editor(수직, 완료): catalog·Project Settings·7종 `Facility.Discardable` 태그·WBP·Shop Actor Blueprint·DefaultMap 배송 지점과 쓰레기통.
 - Editor(확장):
   - `DA_ShopCatalog`에 6종 entry 추가: `ProductId` Bath·Washer·Dryer·Boiler·Cooler·Circulator, `bForSale=true`, 표시 이름, 가격, 아이콘(선택). Definition은 기존 7종 `DA_FacilityPlacement_*`.
-  - `BP_ShopDeliveryBox`: `HeldTransform`을 authoring한다. 시작값은 현재 `FacilityItemHeldTransform`(위치 10, 50, −60)이다. root scale은 원하는 크기(예 0.8)로 둔다.
+  - `BP_ShopDeliveryBox`: `HeldTransform`을 authoring한다. 시작값은 당시 `UFacilityPlacementSettings::FacilityItemHeldTransform` 값이다. root scale은 원하는 크기로 둔다. 현재 값의 정본은 `BP_ShopDeliveryBox` Class Defaults다.
   - Project Settings `UnboxOverlapDepthCm`: PIE에서 "약간 튐"으로 정한다. 욕탕·샤워기 혼합 상자로 확인한다.
   - 상점 WBP: cart panel이 `ProductScroll` 밖인지 확인한다.
 
@@ -272,12 +278,12 @@ worst case는 약 (11 × 4 + 8 × 3) layout × 10 물품 × 3 query다. 클릭 �
 
 | 시나리오 | 자동화 |
 |---|---|
-| SHOP-001, 029 | wallet 시작 금액(InitializeComponent, 방송 없음), 손님 현금 +10,000 delegate |
-| SHOP-004~008 | cart 담기·±·삭제, 상품별 99·전체 10, 잔액 무관, 부족액 평가와 잔액 변화 후 재평가 |
+| SHOP-001, 029 | wallet 시작 금액(`UPlayerWalletComponent::StartingMoney`, InitializeComponent, 방송 없음), 손님 현금 +`ABathhouseCashPaymentActor::PaymentAmount` delegate |
+| SHOP-004~008 | cart 담기·±·삭제, 테스트가 Settings에 설정한 상품별·전체 상한(fixture, 저장·복원), 잔액 무관, 부족액 평가와 잔액 변화 후 재평가 |
 | SHOP-009, 010 | 주문 원자성, 차감 1회·주문 1개·cart 비움, 두 번째 호출 실패 |
-| SHOP-011~015, 030 | 게임시간 딜레이 10·0초, FIFO, 대기와 공간 회복 후 도착, 쌓임 높이, 도착 이벤트 |
+| SHOP-011~015, 030 | 게임시간 딜레이(fixture 양수 값과 0), FIFO, 대기와 공간 회복 후 도착, 쌓임 높이, 도착 이벤트 |
 | SHOP-016, 017, 021 | 상자 E·요약·drop 보존, 실패 rollback, 컴퓨터·배치 LMB 우선 |
-| 상자 scale | CDO root 0.8: half extent 0.8배, 배송 spawn·drop·집기·last-safe 복구 뒤 world scale 0.8 유지, validation 오류·경고 조건 |
+| 상자 scale | fixture class `AShopDeliveryBoxScaleAutomationActor`의 비단위 CDO root scale s: half extent s배, 배송 spawn·drop·집기·last-safe 복구 뒤 world scale s 유지, validation 오류·경고 조건 |
 | 무리 계산 | anchor 깊이 = Dij, 다른 쌍 ≤ Dik + 0.5, yaw만 회전, 같은 seed 동일·다른 seed 다름(SHOP-038), 1개(SHOP-039), 혼합 크기 10개(SHOP-040), D = 0 접촉 |
 | SHOP-018~020, 041 | 트인 곳 d = 100, 50cm 앞 벽 당김·벽 너머 없음, 구석 위로 쌓기, 손님 capsule 회피, 환경 여유(수평·위만), 항상 개봉 |
 | 여유 방향 | 트인 바닥에서 D = 0, 8, 20, 30, 50 모두 정면 단계 채택·최저 바닥면 = 발바닥 + 20. 수평 `Dc` 안의 벽과 위 `Dc` 안의 천장은 기각, 발바닥 높이 바닥은 기각하지 않음 |

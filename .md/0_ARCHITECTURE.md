@@ -230,4 +230,5 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 서비스 1단위(ServiceSystem): 2026-09-30 완료(`5b42a47`).
 - 서비스 2단위(ServiceFacilityDisplaySystem·Towel 2단위 절): 2026-09-30 완료(`c9a1150`).
 - 서비스 3단위(CleaningLitterSystem): 2026-10-01 완료(`2c14d8f`). 같은 날 버그(집게를 들면 빼기 강조 표시) 수정 설계로 장비 보조 사용을 별도 query 필드로 분리했다. 버그 수정은 `4111e20`로 완료됐다.
+- 조정값 원본 참조 정리(DOC-TUNING-REFS, Shop·CleaningLitter·Interaction): 2026-10-01 정본 숫자를 원본 위치 참조로 바꿨다. 남은 코드 상수의 데이터 이전은 사용자 지시로 구현 보류이며 입력은 `.md/Work/DOC-TUNING-REFS/PROMPT_IMPLEMENTATION.md`다.
 - 서비스 4단위(ServiceAmenitySystem): 2026-10-01 설계, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
