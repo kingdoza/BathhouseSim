@@ -77,7 +77,8 @@ bool FCleaningLitterToolTest::RunTest(const FString&)
 	TestEqual(TEXT("Recovered count persists"), T->GetBagCount(), 20);
 	TestTrue(TEXT("Retake after fall"), Player.Carry->TryTakeFromFixedSlot(Slot).bSucceeded);
 	C = Context(Player, T);
-	auto* Wall = Box(World, FVector(50, 0, 60), FVector(70, 100, 60));
+	// Full-height wall: blocks the view-front stage (eye level) as well as the floor-front stage.
+	auto* Wall = Box(World, FVector(50, 0, 170), FVector(70, 100, 170));
 	TestFalse(TEXT("TRSH-021: blocked tie fails"), T->ExecuteSecondaryEquipmentUse(C).bSucceeded);
 	TestEqual(TEXT("Failed tie preserves count"), T->GetBagCount(), 20);
 	Wall->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -321,10 +322,26 @@ bool FCleaningLitterBagScaleTest::RunTest(const FString&)
 	Root->SetRelativeScale3D(FVector(.3, .4, .5));
 	FTransform Transform;
 	const TArray<AActor*> Ignored = {Player.Pawn};
+	// Expectations come from the tie request (the tongs' tuning source) and the bag class shape, never literals.
+	const FTrashBagDropRequest Req = TieFloorOnlyRequest(World, Player);
+	auto* Capsule = Player.Pawn->FindComponentByClass<UCapsuleComponent>();
+	const FVector Feet = Capsule->GetComponentLocation() - FVector(0, 0, Capsule->GetScaledCapsuleHalfHeight());
+	FText Failure;
+	FVector QueryCenter;
+	FQuat QueryRotation;
+	FCollisionShape QueryShape;
+	const UPrimitiveComponent* QueryTemplate = nullptr;
 	TestTrue(
 		TEXT("Front placement uses class physical bounds"),
-		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(), 60, 30, Transform));
-	TestTrue(TEXT("Feet plus half height and clearance"), FMath::IsNearlyEqual(Transform.GetLocation().Z, 30.0, 0.1));
+		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(), TieFloorOnlyRequest(World, Player), Transform));
+	TestTrue(TEXT("Class collision query of the first drop resolves"),
+			 ATrashBagActor::BuildClassCollisionQuery(ATrashBagActor::StaticClass(), Transform, QueryCenter,
+													  QueryRotation, QueryShape, QueryTemplate, Failure));
+	const FVector ScaledHalfExtent = QueryShape.GetExtent().GetAbs();
+	TestTrue(TEXT("Feet plus half height and clearance"),
+			 FMath::IsNearlyEqual(QueryCenter.Z, Feet.Z + ScaledHalfExtent.Z + Req.FloorClearanceCm, 0.1));
+	TestTrue(TEXT("First candidate sits at the forward distance"),
+			 FMath::IsNearlyEqual(QueryCenter.X, Feet.X + Req.FloorForwardDistanceCm, 0.1));
 	auto* Bag = ATrashBagActor::SpawnTiedBag(*World, ATrashBagActor::StaticClass(), 3, Transform);
 	Root->SetRelativeScale3D(SavedScale);
 	if (!TestNotNull(TEXT("Scaled bag factory succeeds"), Bag))
@@ -332,7 +349,6 @@ bool FCleaningLitterBagScaleTest::RunTest(const FString&)
 		return false;
 	}
 	TestTrue(TEXT("Factory preserves nonuniform CDO root scale"), Bag->GetActorScale3D().Equals(FVector(.3, .4, .5)));
-	FText Failure;
 	TestTrue(TEXT("Take scaled bag"), Player.Carry->TryTakePhysicalObject(Bag, Failure));
 	TestTrue(TEXT("Held bag retains class scale"), Bag->GetActorScale3D().Equals(FVector(.3, .4, .5)));
 	TestTrue(TEXT("Drop scaled bag"), Player.Carry->TryFreeDropHeldObject(FVector::ForwardVector).bSucceeded);
@@ -341,17 +357,33 @@ bool FCleaningLitterBagScaleTest::RunTest(const FString&)
 	TestEqual(TEXT("Recovery keeps contents"), Bag->GetLitterCount(), 3);
 	Bag->Destroy();
 
-	auto* FarWall = Box(World, FVector(109, 0, 55), FVector(5, 200, 55));
+	// Wall that overlaps only the first candidate: its near face lies half a pull step inside the first candidate's
+	// far face, so the candidate one step nearer clears it.
+	const float WallHalfX = 5.f;
+	// The CDO scale was restored above, so the half extent has to be queried again.
+	TestTrue(TEXT("Restored-scale class collision query resolves"),
+			 ATrashBagActor::BuildClassCollisionQuery(ATrashBagActor::StaticClass(), Transform, QueryCenter,
+													  QueryRotation, QueryShape, QueryTemplate, Failure));
+	const FVector ClassHalfExtent = QueryShape.GetExtent().GetAbs();
+	const float FarWallNearFaceX =
+		Feet.X + Req.FloorForwardDistanceCm + ClassHalfExtent.X - 0.5f * Req.FloorPullStepCm;
+	auto* FarWall = Box(World, FVector(FarWallNearFaceX + WallHalfX, 0, Feet.Z + ClassHalfExtent.Z + Req.FloorClearanceCm),
+						FVector(WallHalfX, 200, ClassHalfExtent.Z + Req.FloorClearanceCm));
 	TestTrue(
 		TEXT("Blocked 60cm candidate retries a nearer clear drop"),
-		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(), 60, 30, Transform));
-	TestTrue(TEXT("Nearer search uses a 10cm step"), FMath::IsNearlyEqual(Transform.GetLocation().X, 50.0, .1));
+		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(), TieFloorOnlyRequest(World, Player), Transform));
+	TestTrue(TEXT("Class collision query of the nearer drop resolves"),
+			 ATrashBagActor::BuildClassCollisionQuery(ATrashBagActor::StaticClass(), Transform, QueryCenter,
+													  QueryRotation, QueryShape, QueryTemplate, Failure));
+	TestTrue(TEXT("Nearer search uses one pull step"),
+			 FMath::IsNearlyEqual(QueryCenter.X, Feet.X + Req.FloorForwardDistanceCm - Req.FloorPullStepCm, .1));
 	FarWall->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	auto* Wall = Box(World, FVector(55, 0, 55), FVector(5, 200, 55));
+	// Wall between the feet and the nearest candidate: every floor candidate's line of sight crosses it.
+	auto* Wall = Box(World, FVector(Feet.X + 0.5f * Req.FloorMinForwardDistanceCm, 0, Feet.Z + 55), FVector(5, 200, 55));
 
 	TestFalse(
 		TEXT("Large native bag cannot be placed through wall"),
-		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(), 60, 30, Transform));
+		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(), TieFloorOnlyRequest(World, Player), Transform));
 	Wall->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	const UStaticMesh* SavedMesh = CastChecked<UStaticMeshComponent>(Root)->GetStaticMesh();
@@ -360,22 +392,22 @@ bool FCleaningLitterBagScaleTest::RunTest(const FString&)
 	CastChecked<UStaticMeshComponent>(Root)->SetStaticMesh(OffsetMesh);
 	TestTrue(
 		TEXT("Off-center bag mesh has a valid front drop"),
-		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(), 60, 30, Transform));
-	FVector QueryCenter;
-	FQuat QueryRotation;
-	FCollisionShape QueryShape;
-	const UPrimitiveComponent* QueryTemplate = nullptr;
+		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(), TieFloorOnlyRequest(World, Player), Transform));
 	TestTrue(TEXT("Off-center class collision query is valid"),
 			 ATrashBagActor::BuildClassCollisionQuery(ATrashBagActor::StaticClass(), Transform, QueryCenter,
 													  QueryRotation, QueryShape, QueryTemplate, Failure));
 	TestTrue(TEXT("Front drop positions bounds center at forward/half-height clearance"),
-			 QueryCenter.Equals(FVector(60, 0, 55), .1));
+			 FMath::IsNearlyEqual(QueryCenter.X, Feet.X + Req.FloorForwardDistanceCm, .1) &&
+				 FMath::IsNearlyEqual(QueryCenter.Z, Feet.Z + QueryShape.GetExtent().Z + Req.FloorClearanceCm, .1));
 	CastChecked<UStaticMeshComponent>(Root)->SetStaticMesh(const_cast<UStaticMesh*>(SavedMesh));
 	Player.Camera->SetWorldRotation(FRotator(90, 0, 0));
 
-	TestFalse(
-		TEXT("Vertical camera has no horizontal placement"),
-		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(), 60, 30, Transform));
+	ETrashBagDropStage VerticalStage = ETrashBagDropStage::None;
+	TestTrue(
+		TEXT("Vertical camera places in front of the camera (no horizontal floor stage needed)"),
+		FTrashBagDropPlacement::Find(*World, Player.Pawn, Ignored, ATrashBagActor::StaticClass(),
+									 TieRequest(World, Player), Transform, &VerticalStage));
+	TestTrue(TEXT("Vertical camera uses the view-front stage"), VerticalStage == ETrashBagDropStage::ViewFront);
 
 	FDataValidationContext ValidBagContext;
 	TestTrue(TEXT("Native bag validates like item box"),

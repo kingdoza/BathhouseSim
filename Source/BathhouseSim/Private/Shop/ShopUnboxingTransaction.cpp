@@ -17,6 +17,7 @@
 #include "Shop/ShopProductRules.h"
 #include "Shop/ShopSettings.h"
 #include "Shop/ShopUnboxingPlacement.h"
+#include "Shop/ShopUnboxingTuning.h"
 
 #define LOCTEXT_NAMESPACE "ShopUnboxingTransaction"
 
@@ -40,7 +41,8 @@ bool FShopUnboxingTransaction::Open(
 	APawn* PlayerPawn = Cast<APawn>(Context.User);
 	UCapsuleComponent* Capsule = PlayerPawn ? PlayerPawn->FindComponentByClass<UCapsuleComponent>() : nullptr;
 	UWorld* World = Box.GetWorld();
-	if (!PlayerPawn || !Capsule || !World || Context.CameraDirection.IsNearlyZero())
+	if (!PlayerPawn || !Capsule || !World || Context.CameraDirection.IsNearlyZero()
+		|| Context.CameraOrigin.ContainsNaN())
 	{
 		OutFailureReason = LOCTEXT("MissingUnboxContext", "상자 개봉 위치를 계산할 플레이어 정보가 없습니다.");
 		return false;
@@ -106,8 +108,11 @@ bool FShopUnboxingTransaction::Open(
 		}
 	}
 	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
-	const FVector FootLocation = PlayerPawn->GetActorLocation() - FVector::UpVector * HalfHeight;
-	const float ViewYaw = Context.CameraDirection.Rotation().Yaw;
+	FShopUnboxingPlacementRequest PlacementRequest;
+	PlacementRequest.CameraOrigin = Context.CameraOrigin;
+	PlacementRequest.CameraDirection = Context.CameraDirection.GetSafeNormal();
+	PlacementRequest.FootLocation = PlayerPawn->GetActorLocation() - FVector::UpVector * HalfHeight;
+	const FShopUnboxingTuning Tuning = FShopUnboxingTuning::FromSettings(*Settings);
 	FRandomStream RandomStream(FMath::Rand());
 	TArray<FTransform> SpawnTransforms;
 	if (!FShopUnboxingPlacement::FindSpawnTransforms(
@@ -115,12 +120,10 @@ bool FShopUnboxingTransaction::Open(
 		*PlayerPawn,
 		*Capsule,
 		Box,
-		FootLocation,
-		ViewYaw,
 		Shapes,
-		Settings->GetUnboxForwardDistanceCm(),
+		PlacementRequest,
+		Tuning,
 		RandomStream,
-		Settings->GetUnboxOverlapDepthCm(),
 		SpawnTransforms,
 		OutFailureReason))
 	{
