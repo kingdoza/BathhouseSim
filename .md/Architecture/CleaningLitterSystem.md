@@ -106,6 +106,7 @@ Public/Placement/
   - 쓰레기: `ALitterActor::FloorRadiusCm`(EditDefaultsOnly, 모든 외형 후보를 덮는 값으로 authoring).
 - `AStainSpawnZoneActor`: `SpawnFloor`, `FloorHeightToleranceCm`을 추가하고 `SelectionWeight`, `ZoneKind`와 `EStainSpawnZoneKind`는 삭제한다(Q1 A). `PawnClearanceOverride`와 director `DefaultPawnClearance`도 같은 방식으로 삭제한다(2026-10-01).
 - `ALitterSpawnZoneActor`: 같은 구성의 독립 class다(부모 변경 없음). `MaxActiveLitterInZone`, `LitterSpacingOverride`, floor filter 값을 가진다. 두 구역은 따로 배치하며 같은 영역이어도 된다.
+- 공간 생성 조각(2026-10-02 EXP-U1 설계, Source 미반영): Level에 직접 둔 쓰레기·물 얼룩 구역은 제거하고, 홀·목욕공간 공간 Actor가 BeginPlay에 바닥을 같은 크기 조각으로 나눠 두 구역 class를 조각마다 spawn한다([BuildingSystem.md](BuildingSystem.md) Cleaning Chunks). 두 구역 class에는 C++ public `GetSpawnFloor()`와 deferred spawn 중에만 쓰는 `SetSpawnAreaHalfSizeXY(FVector2D)`(SpawnBounds X·Y extent만 바꾸고 Z·`SpawnFloor` 상대 위치는 유지)를 추가한다. 등록·clock·Floor Rule·구역 최대는 바뀌지 않는다. 조각 크기·class 정본은 `UBathhouseBuildingSettings`, 조각별 최대 개수 정본은 두 구역 Blueprint Class Defaults다.
 
 ## Litter
 
