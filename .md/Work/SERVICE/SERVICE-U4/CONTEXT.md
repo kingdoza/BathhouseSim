@@ -2,10 +2,10 @@
 - 목표 / 상위·선행·관련 작업: 안마의자·평상·TV·세신대 서비스 설비. 상위 `SERVICE`(폴더 없음, 채택 전 작업). 선행 SERVICE-U1~U3(모두 PIE 수용 대기, 폴더 없음).
 - 현재 단계와 재개 지점: 사용자 PIE 검증 대기 중 발견된 버그 `BugReports/2026-10-01_scrub_focus_towel_visual_and_cursor_motion.md` 처리. 현상 1(손에 든 때수건 숨김)은 새 코드 리뷰어 진단부터, 현상 2(커서 이동 방향)는 세신 영역 축 보정(`f15742a`, 사용자가 회전 `(0,180,90)` 저장) 뒤 PIE 확인 대기.
 - 명세 승인 일자와 사전 허용: 채택 전 작업. 명세·설계·Editor 결과물은 `f15742a`의 루트 `.md/PROMPT_ARCHITECTURE.md`, `PROMPT_IMPLEMENTATION.md`, `PROMPT_REVIEW.md`, `PROMPT_UNREAL.md`, `PROMPT_INTEGRATION_REVIEW.md`로 읽는다. 사전 허용 기록 없음(병합은 이미 main에 커밋된 상태).
-- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 버그 수정 브랜치 `work/SERVICE-U4`(main `ae81e98` 기준 폴더 생성 커밋에서 분기).
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/SERVICE-U4`(main `fcc982d`에서 분기). 진단 커밋 `3b0e2ca` = 구현 시작 커밋.
 - 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: PIE 실패 재작업 0회, 아키텍처 자동 복귀 미사용.
-- 복귀 기록: 없음
-- 워커 세션 ID, 사용자 지시 모델 덮어쓰기: 없음
+- 복귀 기록: 없음. 구현 1차가 기존 테스트 unity `FFixture` 충돌로 빌드 차단 → 마스터가 최소 namespace 명시를 구현 범위에 포함해 같은 Codex 세션 재개.
+- 워커 세션 ID, 사용자 지시 모델 덮어쓰기: 진단 리뷰어(Claude, 신규), 구현 Codex `01a0f680-f6ac-7c33-a691-60e809bceae3`. 덮어쓰기 없음
 - 결과물 목록과 사용자 지시 요약:
   - `PIE_CHECKLIST.md`: 2026-10-01 `USER_UNREAL.md` 서비스 4단위 PIE 항목을 옮김.
   - 사용자 결정(버그 리포트): 세신 포커스 중 손에 든 때수건을 숨기고 커서 때수건 하나만 보이며, 이탈하면 다시 보인다(선택지 A).

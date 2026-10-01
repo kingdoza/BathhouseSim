@@ -76,6 +76,7 @@ bool UPlayerScrubFocusComponent::BeginScrubFocus(AScrubTableActor* Table)
 	Controller->SetInputMode(FInputModeGameOnly());
 	Controller->SetViewTargetWithBlend(Table, Table->GetFocusBlendInSeconds());
 	UpdateCursor();
+	HideHeldTowel();
 	Table->GetScrubCursor()->SetHiddenInGame(false);
 	if (Table->GetFocusBlendInSeconds() <= 0)
 	{
@@ -87,6 +88,27 @@ bool UPlayerScrubFocusComponent::BeginScrubFocus(AScrubTableActor* Table)
 											   Table->GetFocusBlendInSeconds(), false);
 	}
 	return true;
+}
+
+void UPlayerScrubFocusComponent::HideHeldTowel()
+{
+	auto* Towel = Carry ? Carry->GetHeldObject() : nullptr;
+	if (!IsValid(Towel) || !HiddenHeldTowel.IsExplicitlyNull())
+	{
+		return;
+	}
+	HiddenHeldTowel = Towel;
+	bHiddenHeldTowelWasHidden = Towel->IsHidden();
+	Towel->SetActorHiddenInGame(true);
+}
+
+void UPlayerScrubFocusComponent::RestoreHeldTowelVisibility()
+{
+	if (auto* Towel = HiddenHeldTowel.Get())
+	{
+		Towel->SetActorHiddenInGame(bHiddenHeldTowelWasHidden);
+	}
+	HiddenHeldTowel.Reset();
 }
 
 void UPlayerScrubFocusComponent::CompleteFocusIn()
@@ -156,6 +178,7 @@ void UPlayerScrubFocusComponent::RequestEndScrubFocus()
 	{
 		Table->GetScrubCursor()->SetHiddenInGame(true);
 	}
+	RestoreHeldTowelVisibility();
 	if (!IsValid(Table) || Table->IsActorBeingDestroyed() || !Character || !Controller ||
 		Controller != SessionController.Get())
 	{
@@ -221,6 +244,10 @@ void UPlayerScrubFocusComponent::ForceCleanup(bool RestoreView)
 	{
 		Table->OnScrubSessionEnded.Remove(SessionEndedHandle);
 		Table->GetScrubCursor()->SetHiddenInGame(true);
+	}
+	RestoreHeldTowelVisibility();
+	if (Table)
+	{
 		Table->EndScrubSession(*this);
 	}
 	const bool HadSnapshot = bSnapshotValid;
