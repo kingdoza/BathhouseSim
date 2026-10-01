@@ -1,8 +1,8 @@
 # CONTEXT — COMPUTER-WHEEL-SCROLL 컴퓨터 화면 스크롤 영역 마우스 휠 스크롤
 - 목표 / 상위·선행·관련 작업: 컴퓨터 포커스 중 커서가 화면의 스크롤 영역 위에 있으면 마우스 휠로 그 영역이 스크롤된다. 상위 작업 없음. 관련: `BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out` 현상 2(포커스아웃이 클릭 뒤에만 동작, 입력 포커스·라우팅 의심) — 같은 컴퓨터 입력 경로를 공유하지만 이 작업 범위가 아니다. 경계는 `PROMPT_ARCHITECTURE.md` "관련 작업과의 경계".
-- 현재 단계와 재개 지점: 기능 명세 확정본 작성 완료, 사용자 최종 승인 대기(`PROMPT_ARCHITECTURE.md` 상태 `진행`). 사용자 답변(Q1~Q4 A, 전제 이의 없음, S1~S3 A)과 Editor 읽기 전용 사전 조사 결과를 반영했다. 재개 지점: 사용자가 계약을 최종 승인하면 승인 일자를 아래에 적고 `PROMPT_ARCHITECTURE.md`·`QNA_FEATURE_SPEC.md` 상태를 `완료`로 바꾼 뒤 아키텍처 단계로 넘긴다. `REPORT_UNREAL_DISCOVERY.md`는 저장 대기이며 계약 6절은 인계 패킷의 조사 사실을 근거로 썼다.
-- 명세 승인 일자와 사전 허용: 계약 최종 승인 대기. 질문 답변 2026-10-01(커밋 `2c24374`에 기록). 사전 허용(답변 확정, 최종 승인 시 효력): S2 A 승인 범위 밖 asset 수정이 필요하면 멈추고 묻는다, S3 A 사용자 PIE 통과 보고 시 자동 `--no-ff` 병합.
-- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 기능 명세 시작 커밋 `fcc982d`(인계 패킷 기준). 워커 worktree HEAD는 `ae81e98`이며 `fcc982d`와의 차이는 `.md/Work/`·`USER_UNREAL.md` 문서뿐이고 Source·Content는 같다. 기능 명세 확정 작업은 메인 트리 `work/SERVICE-U4` `2c24374`에서 수행.
+- 현재 단계와 재개 지점: 기능 명세 완료·사용자 승인. 아키텍처 단계 진행.
+- 명세 승인 일자와 사전 허용: 2026-10-01 사용자 승인("셋다 승인"). 사전 허용: 승인 범위 밖 asset 수정이 필요하면 멈추고 묻는다(S2 A), 사용자 PIE 통과 보고 시 자동 `--no-ff` 병합(S3 A).
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/COMPUTER-WHEEL-SCROLL`(worktree `.claude/worktrees/wheel`). 관련 BUG 작업과 같은 컴퓨터 입력 경로를 다루므로 `work/BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out` 아키텍처 이후 커밋에서 분기하고 main을 병합해 시작한다. BUG 병합 뒤 구현.
 - 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 해당 없음(명세 단계)
 - 복귀 기록: 없음
 - 워커 세션 ID, 사용자 지시 모델 덮어쓰기: 없음

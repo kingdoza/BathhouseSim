@@ -2,7 +2,7 @@
 
 - 작업 ID: `UNBOX-SPAWN-VIEW`
 - 단계: 기능 명세
-- 상태: 진행
+- 상태: 완료
 
 사용자 답변(`QNA_FEATURE_SPEC.md`, 2026-10-01)과 Editor 사전 조사(`REPORT_UNREAL_DISCOVERY.md`)를 반영한 사용자 최종 승인용 계약이다. 최종 승인 전에는 아키텍처 입력이 아니다. 최종 승인 때 사전 조사로 새로 둔 전제 P9·P10과 P2 정정(4절)도 함께 확인받는다.
 

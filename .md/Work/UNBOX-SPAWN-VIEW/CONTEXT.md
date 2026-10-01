@@ -1,8 +1,8 @@
 # CONTEXT — UNBOX-SPAWN-VIEW 플레이어 앞 생성 위치를 카메라 정면 기준으로
 - 목표 / 상위·선행·관련 작업: 개봉 등 플레이어 앞에 새 물체가 생길 때 카메라 정면 기준으로 생기게 함. 상위 없음. 관련: 상점 확장(SHOP-018~020·033·038~041, `Architecture/ShopSystem.md` World Placement), 서비스 3단위 봉투 정면 놓기(`Architecture/CleaningLitterSystem.md` Front Drop Placement).
-- 현재 단계와 재개 지점: 기능 명세 확정본 작성 완료(`PROMPT_ARCHITECTURE.md` 상태 진행), 사용자 최종 승인 대기. 승인 때 사전 조사 반영 전제 P9·P10·P2 정정(`QNA_FEATURE_SPEC.md` 사전 조사 반영 절) 이의를 함께 확인한다. 승인되면 승인 일자를 아래에 적고 `PROMPT_ARCHITECTURE.md`·`QNA_FEATURE_SPEC.md` 상태를 `완료`로 바꾼다.
-- 명세 승인 일자와 사전 허용: 미승인. 사용자 답변(2026-10-01): Q1 B, Q2 A, Q3 B(사전 조사 뒤 A→B), Q4 A, Q5 B, Q6 B, P1~P8 이의 없음, S1 사전 조사 진행, S2 A(범위 밖 asset은 멈추고 묻기), S3 A(PIE 통과 후 자동 `--no-ff` 병합).
-- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 기능 명세 시작 커밋 `fcc982d`(워커 worktree는 `ae81e98`, 차이는 `.md/USER_UNREAL.md`·`.md/Work/SERVICE/`뿐). Editor 사전 조사 시작 `2c24374`. 기능 명세 확정 작업 시작 `806cefb`(브랜치 work/SERVICE-U4, 메인 트리). 작업 브랜치는 마스터가 정함.
+- 현재 단계와 재개 지점: 기능 명세 완료·사용자 승인. 아키텍처 단계 진행.
+- 명세 승인 일자와 사전 허용: 2026-10-01 사용자 승인("셋다 승인") (P9·P10·P2 정정 포함). 사전 허용: 승인 범위 밖 asset 수정이 필요하면 멈추고 묻는다(S2 A), 사용자 PIE 통과 보고 시 자동 `--no-ff` 병합(S3 A).
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/UNBOX-SPAWN-VIEW`(worktree `.claude/worktrees/unbox`, main에서 분기).
 - 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: Editor 사전 조사는 사용자 결정(S1)으로 진행·완료(`REPORT_UNREAL_DISCOVERY.md`). 수직 구현 없음(Q6 B 사용자 결정, 개봉·봉투 한 작업에서 구현·검증).
 - 복귀 기록: 없음
 - 워커 세션 ID, 사용자 지시 모델 덮어쓰기: 없음
