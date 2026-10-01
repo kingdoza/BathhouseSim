@@ -74,7 +74,7 @@ PowerShell 예시다. 동일 프로젝트 프로세스 부재, 실행 권한·�
   -log='C:/UnrealProjects/BathhouseSim/Saved/Codex/Unreal/<TaskId>/verify.log'
 ```
 
-- `<TaskId>`를 실제 ID로 바꾸고 로그 폴더를 준비한다. [공통 headless 정책](AGENT_WORKFLOW.md)을 적용한다.
+- `<TaskId>`를 실제 ID로 바꾸고 로그 폴더를 준비한다. [공통 headless 정책](UE_BUILD_POLICY.md)을 적용한다.
 - 파일·맵·스크립트를 작업에 맞게 바꾼다. 예시를 실제 수행한 검증 결과로 기록하지 않는다.
 - 실제 맵이 필요하면 지원되는 `LevelEditorSubsystem.load_level` 등으로 대상 Level을 명시적으로 로드한다.
 - World Partition의 미로드 cell·actor를 “없음”으로 판정하지 않는다. 실제 world·trace·입력은 live 경로가 필요할 수 있다.
