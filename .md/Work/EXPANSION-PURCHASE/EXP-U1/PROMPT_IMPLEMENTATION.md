@@ -6,6 +6,7 @@
 - 재작업 기록(2026-10-02 사용자 검토 1회차): Q1 A 확정, 사후 결정 D1(홀=쓰레기 조각만, 목욕공간=물 얼룩 조각만, 작업공간=없음) 반영, 바깥 출입구 필수 규칙을 홀 기준으로 명확화, 공간별 넓힘 목록과 Editor 전용 넓힘 미리보기의 형태를 U2 예정 형태로 확정(U1 구현 금지). 공용 값의 Project Settings 위치는 유지
 - 재작업 기록(2026-10-02 사용자 검토 2회차): 통로 위치 개선안 (가) 채택 — 공간 위치 지정 방식(Location 직접 입력)은 그대로 두고, 맞닿음·겹침 관련 검증 오류 문구에 맞닿게 하는 Location 값을 함께 제안한다(9절 위치 제안).
 - 사용자 승인: 2026-10-02, (가) 반영을 조건으로 승인("추가 QNA가 없으면 승인 없이 진행", 마스터 전달). 새 사용자 결정이 필요한 항목이 없어 상태를 `완료`로 바꿨다
+- 복귀 재설계(2026-10-02, 코드 리뷰 1회차 `PROMPT_IMPLEMENTATION_R.md` A1·A2·A3): 15절. 사용자 동작·데이터 관리 형태 변경 없음, 사용자 재승인 불필요
 
 - 상위 계약: [../PROMPT_ARCHITECTURE.md](../PROMPT_ARCHITECTURE.md)(상태 완료). 이번 범위는 EXP-001~015, 대표 시나리오는 EXP-007과 EXP-004다.
 - Editor 사실: [../REPORT_UNREAL_DISCOVERY.md](../REPORT_UNREAL_DISCOVERY.md), [../REPORT_UNREAL_DISCOVERY_2.md](../REPORT_UNREAL_DISCOVERY_2.md)
@@ -186,7 +187,9 @@
 | 파일 | 변경 |
 |---|---|
 | `Public·Private/Placement/FacilityPlacementZoneActor.*` | `static FText GetDefinitionNotAllowedReason()`(문구 `이 공간에는 놓을 수 없는 설비입니다`) 추가. 다른 동작 변경 없음 |
-| `Private/Placement/PlayerFacilityPlacementValidation.cpp` | 허용 거부 문구를 위 getter로. `ValidateWorldPlacement`의 `Params.AddIgnoredActor(&Zone)` → `Params.AddIgnoredComponent(Zone.GetZoneBounds())` |
+| `Private/Placement/PlayerFacilityPlacementValidation.cpp` | 허용 거부 문구를 위 getter로. `ValidateWorldPlacement`의 `Params.AddIgnoredActor(&Zone)` → `Params.AddIgnoredComponent(Zone.GetZoneBounds())`. (복귀 A1) `TracePlacementZone`은 hit가 구역의 바닥 표면 hit일 때만 구역으로 인정한다(15절) |
+| (복귀 A1) `Public·Private/Placement/FacilityPlacementZoneActor.*` | `bool IsZoneSurfaceHit(const FHitResult& Hit) const` 추가(15절). 다른 동작 변경 없음 |
+| (복귀 A2·A3) `Private/Building/BathhouseSpaceLayout.cpp`, `BathhouseSpaceValidation.cpp`(I2 분리 뒤에는 world 검사 파일) | 판 구멍·계단 끝 벽 Z 규칙, 계단 통로 trace 아래 끝(15절) |
 | `Private/Facility/BathhouseFacilityActor.cpp`, `Private/Facility/BathWaterUtilityFacilityActor.cpp`, `Private/Towel/TowelProcessingMachineActor.cpp` | `QueryFacilityPlacement`의 구역 거부 문구를 getter로 |
 | `Public·Private/Cleaning/LitterSpawnZoneActor.*`, `StainSpawnZoneActor.*` | `USceneComponent* GetSpawnFloor() const`, `void SetSpawnAreaHalfSizeXY(const FVector2D&)`(SpawnBounds X·Y extent만, Z와 `SpawnFloor` 상대 위치 유지, BeginPlay 전 deferred spawn 중 호출 계약) |
 | `Config/DefaultGameplayTags.ini` | `Facility.Type.ClothesLocker`, `DrinkFridge`, `MassageChair`, `RestBench`, `Television`, `Vanity`, `Bath`, `Shower`, `ScrubTable`, `Boiler`, `Cooler`, `Circulator`, `Washer`, `Dryer` 등록(DevComment에 공간 허용 판정용임을 적음) |
@@ -278,7 +281,7 @@ BuildingSystem.md Validation 표 전부를 `FBathhouseSpaceValidation`에 구현
 
 - Content·Level 수정 금지(Editor 단계 몫). Recast·지형·Project Settings asset 저장 금지(Config 파일 기본값 작성만 허용).
 - U2·U3 금지: 넓힘 목록(`ExpansionSteps`, 형태는 BuildingSystem.md U2 Expansion Authoring Contract로 확정만)·현재 넓힘 횟수·확장 탭·구입·가격·열쇠/한도 변경·락커 판매·상점 규칙 변경. `UBathhouseExpansionDefinition`·`ABathhouseExpansionAuthority` 변경 금지.
-- Customer StateTree·Spawner·Counter·Cleaning director·Floor Rule·Placement 후보 계산·grid 표시 로직 변경 금지(3절 표의 변경만 허용).
+- Customer StateTree·Spawner·Counter·Cleaning director·Floor Rule·Placement 후보 계산·grid 표시 로직 변경 금지(3절 표의 변경만 허용). 복귀 A1 예외: `TracePlacementZone`의 구역 인정 조건 한 곳과 zone의 `IsZoneSurfaceHit` 추가만 허용한다. `MakeCandidateTransform`, `ContainsFootprint`, `ValidateWorldPlacement`, grid 수집, 거부 문구 흐름은 바꾸지 않는다.
 - Landscape module 의존 추가 금지. 다른 Actor를 OnConstruction에서 수정하지 않는다(편집 동기화 helper의 shell 재생성만 예외).
 - Blueprint로 우회할 Content 계약을 만들지 않는다.
 
@@ -288,11 +291,11 @@ BuildingSystem.md Validation 표 전부를 `FBathhouseSpaceValidation`에 구현
 
 | 시나리오 | 자동화 |
 |---|---|
-| EXP-001 | 단일 공간: 바닥·천장 Z 범위와 바깥 직사각형, 벽 4개의 모서리 비겹침·합집합이 바깥 띠를 덮음. 맞닿은 두 공간: 바닥·천장이 변만 닿고 겹치지 않음 |
+| EXP-001 | 단일 공간: 바닥·천장 Z 범위와 바깥 직사각형, 벽 4개의 모서리 비겹침·합집합이 바깥 띠를 덮음. 맞닿은 두 공간: 바닥·천장이 변만 닿고 겹치지 않음. (복귀 A2) 계단이 있는 홀·작업공간 계획 전체에서 보이는 part(Floor·Wall·Ceiling·StairWall·StairStep) 상자끼리 양의 부피로 겹치지 않음(같은 방향 동일 평면 면 겹침이 없다는 것과 같다). 위 입구 앞 띠의 보이는 윗면은 Floor, 아래 출구 위 띠의 보이는 아랫면은 Ceiling |
 | EXP-002, 003 | 개구부 분할(옆 조각·인방), 통로가 두 공간 벽에서 같은 world 구간, 바깥 출입구 검증 |
-| EXP-004 | 계단: 위층 바닥·아래층 천장 구멍 = 구멍 `R`, 경사로 윗면 양 끝점, 계단 벽 열림 구간(위 입구·아래 출구), 구멍 막이 위치. world: 경사로 BlockAll·Nav 비관련, 계단 판 충돌 없음 |
+| EXP-004 | 계단: 위층 바닥·아래층 천장 구멍 = 구멍 `R`을 폭 방향으로 `t`씩 넓힌 직사각형(복귀 A2), 경사로 윗면 양 끝점, 계단 벽 열림 구간(위 입구·아래 출구), 구멍 막이 위치. world: 경사로 BlockAll·Nav 비관련, 계단 판 충돌 없음 |
 | EXP-005 | world: 벽·천장 ISM이 PhysicsBody·Pawn·Visibility Block |
-| EXP-008, 009 | 공간 Actor를 zone으로 한 실제 배치 검증: 허용 종류 성공, 비허용 종류 실패 문구 = getter, 벽과 겹친 후보 Blocked, 계단 구멍 위 Blocked, 공간 바닥 ISM 위 바닥 지지 성공 |
+| EXP-008, 009 | 공간 Actor를 zone으로 한 실제 배치 검증: 허용 종류 성공, 비허용 종류 실패 문구 = getter, 벽과 겹친 후보 Blocked, 계단 구멍 위 Blocked, 공간 바닥 ISM 위 바닥 지지 성공. (복귀 A1) 실제 `TracePlacementZone`·`ValidateCurrentPlacement` 경로(카메라 위치·방향을 fixture로 둠): 벽·천장·경사로·계단 벽을 조준하면 구역 없음과 `설치 가능한 구역을 바라보세요.`, 위에서 `ZoneBounds`를 조준하면 그 구역, 지하에서 계단 구멍으로 위층 `ZoneBounds`를 아래에서 조준하면 구역 없음, 이웃 공간 벽 너머 조준이 이웃 구역을 잡지 않음. 기존 단일 Zone 배치 automation 통과 |
 | EXP-010 | 조각 분할(축별 개수·균등 크기·전체 덮음), world: `Litter` 공간은 쓰레기 조각만·`Stain` 공간은 물 얼룩 조각만 생기고 수·`SpawnFloor` Z = 바닥 Z·크기가 맞음, `None` 공간 조각 0, 다른 종류 조각 0, EndPlay 파괴 |
 | EXP-013 | zone subclass `ZoneBounds` transform·extent = 안쪽 직사각형(지도 투영 입력) |
 | 0.5 | 검증: 종류 중복·누락, 회전, 겹침/닿음/높이 분리, 개구부 범위·겹침, 통로 비인접, 위치 제안(떨어짐·조금 겹침·바닥 Z 차이에서 제안 값을 적용한 snapshot이 그 오류를 없애고 다른 겹침을 만들지 않음, 기대값은 fixture 크기·벽 두께에서 계산, 제안이 오류를 못 없애는 경우 제안 없음), 출입구 막힘, 홀 바깥 출입구 없음(목욕공간만 바깥 출입구가 없어도 오류 아님), 고른 조각 종류의 Settings class 없음, 작업공간 조각 종류 경고, 계단 범위 밖·출입 자리·경사, Nav 범위(fixture `NavMeshBoundsVolume`), 빈 허용 태그 |
@@ -313,6 +316,39 @@ BuildingSystem.md Validation 표 전부를 `FBathhouseSpaceValidation`에 구현
 - 나머지: EXP-001~003, 005, 006, 008~015.
 - 마스터가 `PIE_CHECKLIST.md`에 옮길 관찰 포인트: 바닥·지형 깜빡임 없음, 계단 구멍 안에 지형이 보이지 않음, 벽 너머로 배치 격자가 조준되지 않음, 쓰레기가 벽에 묻히지 않음, 관리 탭 지도가 목욕공간 기준.
 
-## 15. 복귀 재설계 여부
+## 15. 복귀 재설계 (2026-10-02, 코드 리뷰 1회차 A1·A2·A3)
 
-해당 없음(첫 설계).
+- 출처: [PROMPT_IMPLEMENTATION_R.md](PROMPT_IMPLEMENTATION_R.md) A1·A2·A3. 입력 구현 `b5f4c41`.
+- 영향 시나리오: A1 EXP-008·009, A2 EXP-001·004, A3 0.5 검증(계단 통로 장애물). 사용자 동작·0절 데이터 관리 형태·검증 문구 표현은 바뀌지 않는다.
+- 유지되는 완료 범위: 위 세 항목 밖의 구현 전부(형상 계산, shell 수명, 조각 spawn, Nav 검사, 위치 제안, Placement·Cleaning 문구·API, Config). 구현 재작업 I1~I4는 리뷰 문서대로 함께 처리한다.
+
+### A1 구역 hit 판정
+
+- 결정: 공간 형상의 배치 trace 채널 Block은 유지하고(벽·천장이 시선을 가림), 구역 인정 조건을 "hit component가 그 구역 Actor의 `ZoneBounds`이고 hit 면이 구역 바닥 위쪽을 향함"으로 좁힌다.
+  - `AFacilityPlacementZoneActor::IsZoneSurfaceHit(const FHitResult& Hit) const`: `Hit.GetComponent() == ZoneBounds`이고 `FVector::DotProduct(Hit.ImpactNormal, PlacementFloor 위쪽) > 0`일 때 true. 부호 비교만 쓰며 새 수치가 없다.
+  - `TracePlacementZone`: 기존 단일 trace(같은 채널·거리·무시 대상)를 유지하고 `Cast` 성공과 `IsZoneSurfaceHit` 참일 때만 `OutZone`을 채운다. 아니면 구역 없음이며 기존 `NoZone` 문구(`설치 가능한 구역을 바라보세요.`)가 나온다. 가려진 뒤쪽 구역을 찾으려고 다시 trace하지 않는다.
+- 결과: 벽·천장·경사로·계단 벽 hit는 구역 없음이다. 계단 구멍 아래(지하)에서 위층 `ZoneBounds` 아랫면을 맞혀도 구역 없음이다. 기존 단일 Zone은 `ZoneBounds`만 채널을 Block하고 위에서 조준되므로 결과가 같다.
+- 대안 거부: 형상 component를 별도 Actor로 분리하면 벽 클릭 → 공간 Actor 선택(0절)과 shell 수명 구조가 깨진다. 형상이 채널을 Ignore하면 벽 너머 구역이 조준된다(PlacementSystem.md Space Zones 계약 위반).
+
+### A2 계단 벽과 판의 면 겹침
+
+- 결정: 판 두께 구간에서는 판이 우선한다. 판 구멍은 옆 벽 발자국까지 넓히고, 위·아래 끝 벽은 판 두께 구간을 건너뛴다.
+  - 위층 바닥 구멍과 아래층 천장 구멍 = 계단 frame x `[0, Run]` × y `[−W/2 − t, W/2 + t]`(구멍 `R` + 옆 벽 발자국).
+  - 옆 벽은 그대로(x `[0, Run]`, Z `[Zf(L), Zf(U) + Guard]`). 두 판 두께 구간을 관통하지만 그 자리에 판이 없다.
+  - 위쪽 끝 벽(x `[−t, 0]`, 폭은 옆 벽 바깥까지): Z `[Zf(L), Zc(L)]`와 `[Zc(L) + s, Zf(U) − s]` 두 조각. 위 입구 앞 띠의 윗면은 홀 바닥(Floor 재질)이다.
+  - 아래쪽 끝 벽(x `[Run, Run + t]`): Z `[Zc(L) + s, Zf(U) − s]`와 `[Zf(U), Zf(U) + Guard]` 두 조각. 아래 출구 위 띠의 아랫면은 작업공간 천장(Ceiling 재질)이다.
+  - 높이가 0 이하인 조각은 만들지 않는다(두 공간 부피가 닿기만 할 때 가운데 조각).
+- 결과: 보이는 part 상자끼리 부피가 겹치지 않아 같은 방향 동일 평면 면이 생기지 않는다. 남는 접면은 서로 반대 방향(등을 맞댄 면)뿐이다. 경사로·계단 판·구멍 막이, 위 입구·아래 출구 열림, 충돌·보행 결과는 그대로다.
+- 대안 거부: 판에서 끝 벽 발자국까지 빼면 입구 앞·출구 위에 계단 벽 재질 띠가 보인다.
+
+### A3 계단 통로 장애물 trace 범위
+
+- 결정: Z `[Zc(L), Zf(U)]`(아래층 천장 아랫면 ~ 위층 바닥 윗면, 두 판 두께 구간 포함). 구현의 위쪽 확장을 정본으로 하고 아래 끝을 `Zc(L)`까지 넓힌다. 공간 Actor component hit는 계속 무시한다.
+- 구현: world 검사의 계단 trace 아래 끝을 `Zc(L)`로 맞춘다.
+
+### 구현이 할 일
+
+- A1: 3절 표의 두 Placement 파일. 12절 예외 범위 안에서만.
+- A2: `BathhouseSpaceLayout.cpp` 판 구멍과 끝 벽 조각.
+- A3: 계단 trace 아래 끝.
+- 13절의 복귀 표시 자동화(EXP-001·004·008·009)와 A3 범위 검사(아래층 천장 판 두께 구간 안의 외부 blocking 물체를 오류로 잡음)를 더한다. `BuildingSystem.md` Implementation Notes의 계단 치수·trace 서술을 결과에 맞춘다.

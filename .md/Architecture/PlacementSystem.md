@@ -166,6 +166,7 @@ preview root transform, final deferred spawn transform, footprint world transfor
 - 거부 문구는 `AFacilityPlacementZoneActor::GetDefinitionNotAllowedReason()` 한 곳(`이 공간에는 놓을 수 없는 설비입니다`)이 정본이다. player 검증과 세 `QueryFacilityPlacement` 구현(목욕탕 설비, utility, 수건 처리기)이 같은 getter를 쓴다.
 - 구역 Actor가 바닥·벽 형상도 소유하므로 `ValidateWorldPlacement`의 overlap·바닥 지지 query는 구역 Actor 전체가 아니라 `ZoneBounds` component만 무시한다(`AddIgnoredComponent`). 기존 단일 Zone에서는 결과가 같다.
 - 공간 벽·천장·계단 형상은 배치 trace 채널을 Block한다. 벽 너머 다른 공간의 구역은 조준되지 않고 `설치 가능한 구역을 바라보세요.`가 된다. 계단 구멍 위는 보이지 않는 QueryOnly 막이 상자가 막는다.
+- 구역 인정(2026-10-02 복귀 A1): 형상 component도 구역 Actor 소유이므로 `TracePlacementZone`은 `Cast` 성공만으로 구역을 정하지 않는다. `AFacilityPlacementZoneActor::IsZoneSurfaceHit(Hit)`(hit component = `ZoneBounds`, `ImpactNormal`이 `PlacementFloor` 위쪽과 같은 쪽)일 때만 구역이다. 벽·천장·경사로·계단 벽 hit와 `ZoneBounds` 아랫면 hit는 구역 없음(`설치 가능한 구역을 바라보세요.`)이다. trace는 한 번이고 가려진 뒤쪽 구역을 다시 찾지 않는다. 기존 단일 Zone의 결과는 같다.
 
 ## Compatible Zone Grid Presentation
 

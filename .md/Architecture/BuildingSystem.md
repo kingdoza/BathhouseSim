@@ -71,8 +71,8 @@ Private/Tests/
 
 좌표는 모두 world, 단위 cm. `t` = `WallThicknessCm`, `s` = `SlabThicknessCm`. 안쪽 직사각형 `I`, 바깥 직사각형 `O` = `I`를 사방 `t`만큼 넓힌 것, 바닥 윗면 `Zf`, 천장 아랫면 `Zc = Zf + CeilingHeightCm`.
 
-- 바닥: `O`에서 이 공간을 위층으로 하는 계단 구멍을 뺀 직사각형들, Z `[Zf − s, Zf]`.
-- 천장: `O`에서 이 공간을 아래층으로 하는 계단 구멍을 뺀 직사각형들, Z `[Zc, Zc + s]`.
+- 바닥: `O`에서 이 공간을 위층으로 하는 계단의 판 구멍을 뺀 직사각형들, Z `[Zf − s, Zf]`.
+- 천장: `O`에서 이 공간을 아래층으로 하는 계단의 판 구멍을 뺀 직사각형들, Z `[Zc, Zc + s]`.
 - 벽: 동·서 벽은 Y로 `O` 전체 길이, 남·북 벽은 X로 `I` 길이(모서리 겹침 없음). 두께 `t`는 `I` 밖으로, Z `[Zf, Zc]`.
 - 개구부: 벽 길이 구간 `[c − w/2, c + w/2]` × Z `[Zf, Zf + h]`를 벽에서 뺀다. 나머지는 개구부 사이 전체 높이 조각 + 개구부 위 인방 조각이다. 통로는 `ConnectedSpace` 벽에서도 같은 world 구간을 뺀다.
 - 맞닿은 두 공간은 바깥 직사각형 변이 정확히 닿는다. 그래서 두 벽은 등을 맞대고, 바닥·천장은 변끼리 붙어 겹치지 않는다.
@@ -80,10 +80,11 @@ Private/Tests/
 
 계단(위층 `U`, 아래층 `L`, 높이 `H = Zf(U) − Zf(L)`). 계단 frame 원점 = 위층 Actor 위치 + `TopEdgeCenterOffsetCm`(Z = `Zf(U)`), +x = `DownSide`, y = 폭 방향.
 
-- 구멍 `R` = x `[0, RunCm]` × y `[−W/2, W/2]`. `U` 바닥과 `L` 천장에서 뺀다.
+- 구멍 `R` = x `[0, RunCm]` × y `[−W/2, W/2]`(걷는 통로). 판 구멍 = x `[0, RunCm]` × y `[−W/2 − t, W/2 + t]`(`R` + 옆 벽 발자국)이고 `U` 바닥과 `L` 천장에서 뺀다(2026-10-02 복귀 A2).
 - 경사로(`StairRamp`): 윗면이 (0, `Zf(U)`)와 (`RunCm`, `Zf(L)`)를 잇는 두께 `s` 회전 상자. 보이지 않고 충돌만 한다. 실제 걷는 면이다.
 - 계단 판(`StairStep`): `StepCount`개 시각 상자, 충돌 없음. 각 판 윗면은 경사로와 한 단 높이 이내다.
-- 계단 벽(`StairWall`, 두께 `t`, `R` 바깥): 양옆 Z `[Zf(L), Zf(U) + GuardHeightCm]`, 위쪽 끝(x=0 바깥) Z `[Zf(L), Zf(U)]`(위층 쪽은 입구로 열림), 아래쪽 끝(x=Run 바깥) Z `[Zc(L), Zf(U) + GuardHeightCm]`(아래층 출구로 열림).
+- 계단 벽(`StairWall`, 두께 `t`, `R` 바깥): 양옆 Z `[Zf(L), Zf(U) + GuardHeightCm]`. 위쪽 끝(x=0 바깥, 폭은 옆 벽 바깥까지) Z `[Zf(L), Zc(L)]`와 `[Zc(L) + s, Zf(U) − s]`(위층 쪽은 입구로 열림). 아래쪽 끝(x=Run 바깥) Z `[Zc(L) + s, Zf(U) − s]`와 `[Zf(U), Zf(U) + GuardHeightCm]`(아래층 출구로 열림). 판 두께 구간에서는 판이 우선해 끝 벽이 건너뛰고, 높이 0 이하 조각은 만들지 않는다.
+- 면 겹침 불변식: 보이는 part(Floor·Wall·Ceiling·StairWall·StairStep) 상자끼리 양의 부피로 겹치지 않는다. 그래서 같은 방향 동일 평면 면이 없고 접면은 등을 맞댄 면뿐이다. 위 입구 앞 띠 윗면은 Floor, 아래 출구 위 띠 아랫면은 Ceiling이다.
 - 위층 구멍 막이(`StairKeepClear`): `R` 위 Z `[Zf(U), Zc(U)]`의 보이지 않는 QueryOnly 상자. 경사로 꼭대기가 바닥 지지로 잡혀 구멍 위에 설비가 놓이는 것을 막는다.
 
 조명: `I`를 `SpacingCm` 이하 간격으로 균등 분할한 칸 중심마다 Movable `UPointLightComponent` 하나, Z = `Zc − CeilingOffsetCm`. 축마다 최소 한 개.
@@ -101,7 +102,7 @@ Private/Tests/
 | StairKeepClear | 숨김 | QueryOnly, WorldStatic·WorldDynamic·PhysicsBody만 Block | WorldStatic | 비관련 | Ignore | 없음 |
 
 - part마다 `UInstancedStaticMeshComponent` 하나(상자 mesh = Settings `ShellBoxMesh`, instance scale은 mesh local bounds로 파생)를 쓰고 Mobility는 Static이다. 청소 바닥 규칙(WorldStatic + Static)을 바닥이 만족한다.
-- "배치 trace 채널 Block"은 벽 너머 다른 공간의 배치 구역을 조준하지 못하게 한다.
+- "배치 trace 채널 Block"은 벽 너머 다른 공간의 배치 구역을 조준하지 못하게 한다. 형상 hit는 구역 hit가 아니다. 구역은 `AFacilityPlacementZoneActor::IsZoneSurfaceHit`(hit component = `ZoneBounds`, hit 면이 바닥 위쪽을 향함)일 때만 인정한다([PlacementSystem.md](PlacementSystem.md) Space Zones, 2026-10-02 복귀 A1).
 - 생성 component와 조명은 `RF_Transient`이며 저장하지 않는다. 재생성은 항상 전부 파괴 후 새로 만든다(Static component를 옮기지 않음).
 
 ## Lifecycle
@@ -135,7 +136,7 @@ Private/Tests/
 | 바깥 출입구 구간에 다른 공간이 닿음 | Error |
 | 홀에 바깥 출입구가 하나도 없음(손님은 홀 출입구로만 드나든다. 목욕공간·작업공간에는 요구하지 않음) / Work로 내려가는 계단이 없음 | Error |
 | 계단: `LowerSpace` 유효·다름·더 낮음, 폭·길이·판 수 양수, 계단 벽까지 포함한 발자국이 두 공간 안쪽 안, 위 입구 앞과 아래 출구 앞에 계단 폭만큼의 빈 바닥, 경사 ≤ `UCharacterMovementComponent` 기본 `GetWalkableFloorAngle()` | Error |
-| 계단 통로(구멍 안, `Zc(L)+s`~`Zf(U)−s`)를 공간이 아닌 blocking 물체(지형 등)가 막음 | Error(편집 world trace) |
+| 계단 통로(구멍 `R` 안, Z `Zc(L)`~`Zf(U)`, 두 판 두께 구간 포함)를 공간이 아닌 blocking 물체(지형 등)가 막음 | Error(편집 world trace, 2026-10-02 복귀 A3) |
 | 손님 공간 바닥 직사각형이 어떤 `NavMeshBoundsVolume`에 들지 않음, 바깥 출입구 앞 바깥 지점(개구부 폭만큼 떨어진 곳)이 Nav 범위 밖, Work 바닥이 Nav 범위 안 | Error |
 | Settings 상자 mesh 없음, 공간이 고른 조각 종류의 Settings class 없음 / 공간 재질 없음, Work에 `CleaningChunkKind` ≠ `None`(손님이 없어 생성 없음) | Error / Warning |
 | 배치된 `IPlaceableFacility`가 어느 공간에도 없거나 그 공간이 허용하지 않는 종류 | Warning |
@@ -197,8 +198,8 @@ Private/Tests/
 ## Implementation Notes (2026-10-02 구현)
 
 - 입력 snapshot(`FBathhouseSpaceSnapshot`)·형상 계획·순수 계산은 `Private/Building/BathhouseSpaceLayout.*`, 검사와 위치 제안은 `BathhouseSpaceValidation.*`다. 개구부·계단 위치는 Actor 기준 상대값으로 담고 world 값은 helper가 계산한다. 위치 제안의 이동 후보는 snapshot 복사본에 적용해 같은 검사를 다시 돌려 확인한 것만 문구에 붙는다.
-- 계단 구현 치수: 경사로 상자 두께 = 판 두께. 계단 판 윗면 = 그 판 중앙 위치의 경사로 윗면 높이. 계단 옆 벽은 `R`의 길이 방향 `[0, Run]`, 위·아래 끝 벽은 두께 `t`에 폭 방향으로 옆 벽 두께까지 포함한다. 위 입구 앞과 아래 출구 앞의 출입 자리는 계단 벽 바깥 `t` 지점부터 계단 폭만큼이다.
-- 계단 통로 장애물 trace는 구멍 안 3×3 지점에서 위층 바닥 윗면에서 아래층 천장 윗면까지 아래로 쏜다(공간 Actor가 아닌 WorldStatic·WorldDynamic blocking만 오류). 지형이 판 두께 범위에 걸려도 잡히도록 설계 범위보다 위쪽을 포함한다.
+- 계단 구현 치수: 경사로 상자 두께 = 판 두께. 계단 판 윗면 = 그 판 중앙 위치의 경사로 윗면 높이. 계단 옆 벽은 `R`의 길이 방향 `[0, Run]`, 위·아래 끝 벽은 두께 `t`에 폭 방향으로 옆 벽 두께까지 포함한다. 판 구멍·끝 벽 Z 조각은 Geometry Rules(복귀 A2)를 따른다(재작업 반영 대기). 위 입구 앞과 아래 출구 앞의 출입 자리는 계단 벽 바깥 `t` 지점부터 계단 폭만큼이다.
+- 계단 통로 장애물 trace는 구멍 안 3×3 지점에서 위층 바닥 윗면에서 아래로 쏜다(공간 Actor가 아닌 WorldStatic·WorldDynamic blocking만 오류). 아래 끝은 Validation 표대로 아래층 천장 아랫면 `Zc(L)`이다(복귀 A3, 재작업 반영 대기).
 - 검사는 `ValidateLayout`(순수, 위치 제안 포함), `ValidateNavigation`(순수, Nav bounds 상자를 받음), `ValidateWorld`(world에서 snapshot·`NavMeshBoundsVolume`·계단 trace·배치된 설비를 모아 위 둘을 합침)로 나뉜다. 편집 world의 `IsDataValid`와 BeginPlay 로그가 `ValidateWorld`를 쓴다.
 - 생성 component는 `CreationMethod = UserConstructionScript` + `RF_Transient`다. Engine construction 재실행이 이전 생성물을 파괴해도 shell이 `IsValid`로 걸러 다시 만든다.
 - 자동화는 접근용 friend(`FBathhouseBuildingAutomationAccess`, 공간 Actor)와 배치 검증용 friend(`FBathhouseSpacePlacementAutomationTest`, `UPlayerFacilityPlacementComponent`)를 쓴다.
@@ -211,6 +212,6 @@ Private/Tests/
 
 ## Verification
 
-- 순수 layout: 단일 공간 상자 Z·XY, 모서리 겹침 없음, 개구부 분할, 통로 양쪽 같은 구간, 계단 구멍·경사로 양 끝·계단 벽 열림 구간, 조각 균등 분할·전체 덮음. 기대값은 같은 입력 값에서 계산한다.
+- 순수 layout: 단일 공간 상자 Z·XY, 모서리 겹침 없음, 개구부 분할, 통로 양쪽 같은 구간, 계단 판 구멍·경사로 양 끝·계단 벽 열림 구간, 보이는 part 상자 부피 비겹침(계단 포함), 조각 균등 분할·전체 덮음. 기대값은 같은 입력 값에서 계산한다.
 - 검증: 겹침/닿음, 통로 비인접(위치 제안 값 적용 시 오류 소멸 포함), 출입구 막힘, 계단 범위 밖·경사 초과, 종류 중복·누락, 회전.
-- world: BeginPlay 뒤 part별 component 수와 충돌 설정, 두 번 재생성해도 component 수 불변, `Litter` 공간은 쓰레기 조각만·`Stain` 공간은 물 얼룩 조각만·`None` 공간은 조각 없음, 조각 `SpawnFloor` Z = 바닥, 공간 Actor를 zone으로 쓴 배치 바닥 지지·벽 겹침 거부.
+- world: BeginPlay 뒤 part별 component 수와 충돌 설정, 두 번 재생성해도 component 수 불변, `Litter` 공간은 쓰레기 조각만·`Stain` 공간은 물 얼룩 조각만·`None` 공간은 조각 없음, 조각 `SpawnFloor` Z = 바닥, 공간 Actor를 zone으로 쓴 배치 바닥 지지·벽 겹침 거부, 실제 `TracePlacementZone`에서 형상 hit와 `ZoneBounds` 아랫면 hit는 구역 없음.
