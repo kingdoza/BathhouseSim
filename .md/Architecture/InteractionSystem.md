@@ -113,8 +113,9 @@ Equipment row 합성은 현재 held Actor가 `IHeldEquipmentUsable`이면 해당
 - `FViewFrontBox {Center, YawDegrees, HalfExtent}`: 선 자세(yaw만) box 하나.
 - `GetProjectionRange(Boxes, Origin, Axis)`: support function(`Center·Axis ± Σ e_k|Axis·local_k|`)으로 구한 정확한 투영 [Min, Max].
 - `ComputeViewFrontTranslation(Boxes, CameraOrigin, ViewDirection, DistanceCm)`: 축은 V와 `FRotationMatrix(V.Rotation())`의 Y·Z다. 결과에서 V 투영 최솟값 = DistanceCm("카메라에서 시선 방향으로 잰 가장 가까운 부분"), right·up 투영 범위 중앙 = 카메라. pitch ±90에서도 정의된다.
-- `GetCameraClearancePushCm(Boxes, CameraOrigin, HorizontalForward)`: 윗면 ≤ 카메라 Z − `CameraClearanceCm`(10) 또는 수평 전방 투영 최솟값 ≥ 10이면 0, 아니면 투영 최솟값을 10으로 만드는 추가 거리. 카메라와 무리를 평면 하나로 분리해 감싸지 않게 한다.
-- `BuildPullDistances(Start, Min)`: max(Start, Min)부터 `PullStepCm`(10)씩 줄이고 마지막은 Min 한 번.
+- `GetCameraClearancePushCm(Boxes, CameraOrigin, HorizontalForward, CameraClearanceCm)`: 윗면 ≤ 카메라 Z − 여유 또는 수평 전방 투영 최솟값 ≥ 여유면 0, 아니면 투영 최솟값을 여유로 만드는 추가 거리. 카메라와 무리를 평면 하나로 분리해 감싸지 않게 한다.
+- `BuildPullDistances(Start, Min, Step)`: max(Start, Min)부터 Step씩 줄이고 마지막은 Min 한 번. 비유한·Step ≤ 0이면 빈 결과.
+- 조정값을 소유하지 않는다. 여유·간격·거리는 모두 호출자가 자기 원본(개봉 `UShopSettings`, 봉투 `ALitterTongsActor`)에서 읽어 인자로 넘긴다. helper 안의 수는 부동소수 판정 epsilon과 기하 정의(중앙 = 범위 합의 1/2)뿐이다.
 - 단계 순서, 충돌·시야·손님 검사와 실패 계약은 호출 시스템이 소유한다. 이 helper에 world query를 넣지 않는다.
 
 ## `UPlayerInteractionComponent`
