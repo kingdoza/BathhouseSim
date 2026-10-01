@@ -54,9 +54,15 @@ bool UPlayerFacilityPlacementComponent::TracePlacementZone(
 		End,
 		BathhousePlacementCollision::ZoneTraceChannel,
 		Params)) return false;
-	OutZone = Cast<AFacilityPlacementZoneActor>(Hit.GetActor());
+	AFacilityPlacementZoneActor* HitZone = Cast<AFacilityPlacementZoneActor>(Hit.GetActor());
+	if (!HitZone || !HitZone->IsZoneSurfaceHit(Hit))
+	{
+		// 공간 벽·천장·경사로 등 형상 hit는 시선만 가리고 구역으로 인정하지 않는다.
+		return false;
+	}
+	OutZone = HitZone;
 	OutPoint = Hit.ImpactPoint;
-	return OutZone != nullptr;
+	return true;
 }
 
 AActor* UPlayerFacilityPlacementComponent::TraceRecoveryTarget() const

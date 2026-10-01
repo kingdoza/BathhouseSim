@@ -19,12 +19,10 @@ public:
 
 	virtual FName GetCategoryName() const override { return TEXT("Game"); }
 
-	float GetWallThicknessCm() const { return FMath::Max(1.0f, WallThicknessCm); }
-	float GetSlabThicknessCm() const { return FMath::Max(1.0f, SlabThicknessCm); }
-	FVector2D GetCleaningChunkMaxSizeCm() const
-	{
-		return FVector2D(FMath::Max(1.0f, CleaningChunkMaxSizeCm.X), FMath::Max(1.0f, CleaningChunkMaxSizeCm.Y));
-	}
+	float GetWallThicknessCm() const { return WallThicknessCm; }
+	float GetSlabThicknessCm() const { return SlabThicknessCm; }
+	/** 값이 0 이하이거나 유한하지 않으면 공간 검증이 오류로 알린다(숨은 하한 없음). */
+	FVector2D GetCleaningChunkMaxSizeCm() const { return CleaningChunkMaxSizeCm; }
 	UStaticMesh* LoadShellBoxMesh() const;
 	UClass* LoadLitterChunkZoneClass() const;
 	UClass* LoadStainChunkZoneClass() const;

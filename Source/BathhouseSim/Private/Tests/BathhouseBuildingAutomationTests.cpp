@@ -18,6 +18,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTagContainer.h"
+#include "Camera/CameraComponent.h"
 #include "Placement/FacilityActorConversionTransaction.h"
 #include "Placement/FacilityPlacementComponent.h"
 #include "Placement/FacilityPlacementDefinition.h"
@@ -148,6 +149,8 @@ namespace
 		Stair.RunCm = 600.0;
 		Stair.StepCount = 10;
 		Stair.GuardHeightCm = 100.0;
+		Stair.bHasStepMaterial = true;
+		Stair.bHasStairWallMaterial = true;
 		Hall.Stairs.Add(Stair);
 		Snapshots.Add(Hall);
 		Snapshots.Add(Bath);
@@ -415,13 +418,14 @@ bool FBathhouseBuildingLayoutStairsTest::RunTest(const FString& Parameters)
 	const double S = Values.SlabThicknessCm;
 
 	// EXP-004: 위층 바닥과 아래층 천장의 구멍이 같은 R이다.
+	const FBox2D SlabHole = FBathhouseSpaceLayout::StairSlabHole(Hall, Stair, T);
 	const FVector2D HoleCenter = Hole.GetCenter();
 	TestFalse(TEXT("EXP-004 upper floor has the hole"),
 		PlanContains(Plans[0], EBathhouseShellPart::Floor, FVector(HoleCenter.X, HoleCenter.Y, ZUpper - S * 0.5)));
 	TestFalse(TEXT("EXP-004 lower ceiling has the same hole"),
 		PlanContains(Plans[2], EBathhouseShellPart::Ceiling, FVector(HoleCenter.X, HoleCenter.Y, FBathhouseSpaceLayout::CeilingZ(Work) + S * 0.5)));
-	for (const FVector2D& Outside : { FVector2D(Hole.Min.X - 5.0, HoleCenter.Y), FVector2D(Hole.Max.X + 5.0, HoleCenter.Y),
-		FVector2D(HoleCenter.X, Hole.Min.Y - 5.0), FVector2D(HoleCenter.X, Hole.Max.Y + 5.0) })
+	for (const FVector2D& Outside : { FVector2D(SlabHole.Min.X - 5.0, HoleCenter.Y), FVector2D(SlabHole.Max.X + 5.0, HoleCenter.Y),
+		FVector2D(HoleCenter.X, SlabHole.Min.Y - 5.0), FVector2D(HoleCenter.X, SlabHole.Max.Y + 5.0) })
 	{
 		TestTrue(TEXT("EXP-004 upper floor remains around the hole"),
 			PlanContains(Plans[0], EBathhouseShellPart::Floor, FVector(Outside.X, Outside.Y, ZUpper - S * 0.5)));
@@ -430,6 +434,9 @@ bool FBathhouseBuildingLayoutStairsTest::RunTest(const FString& Parameters)
 	}
 	ExpectNear(*this, TEXT("EXP-004 hole length = run"), Hole.Max.X - Hole.Min.X, Stair.RunCm, TestTolerance);
 	ExpectNear(*this, TEXT("EXP-004 hole width = stair width"), Hole.Max.Y - Hole.Min.Y, Stair.WidthCm, TestTolerance);
+	// 복귀 A2: 판 구멍은 옆 벽 발자국까지 넓다.
+	ExpectNear(*this, TEXT("A2 slab hole length = run"), SlabHole.Max.X - SlabHole.Min.X, Stair.RunCm, TestTolerance);
+	ExpectNear(*this, TEXT("A2 slab hole width = stair width + 2 wall"), SlabHole.Max.Y - SlabHole.Min.Y, Stair.WidthCm + 2.0 * T, TestTolerance);
 
 	// 경사로 윗면 양 끝점.
 	const TArray<FBathhouseBoxPart>& Ramps = Plans[0].Get(EBathhouseShellPart::StairRamp);
@@ -455,11 +462,11 @@ bool FBathhouseBuildingLayoutStairsTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("EXP-004 upper entrance is open above the floor"),
 		PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(UpperEnd.X, UpperEnd.Y, ZUpper + 20.0)));
 	TestTrue(TEXT("EXP-004 upper end is closed below the floor"),
-		PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(UpperEnd.X, UpperEnd.Y, ZUpper - 20.0)));
+		PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(UpperEnd.X, UpperEnd.Y, ZUpper - S - 20.0)));
 	TestFalse(TEXT("EXP-004 lower exit is open below the lower ceiling"),
 		PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(LowerEnd.X, LowerEnd.Y, ZLowerCeiling - 20.0)));
 	TestTrue(TEXT("EXP-004 lower end is closed above the lower ceiling"),
-		PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(LowerEnd.X, LowerEnd.Y, ZLowerCeiling + 20.0)));
+		PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(LowerEnd.X, LowerEnd.Y, ZLowerCeiling + S + 20.0)));
 	for (const double Side : { -1.0, 1.0 })
 	{
 		const FVector2D SideWall = Frame.ToWorld(Stair.RunCm * 0.5, Side * (Stair.WidthCm * 0.5 + T * 0.5));
@@ -467,6 +474,33 @@ bool FBathhouseBuildingLayoutStairsTest::RunTest(const FString& Parameters)
 			PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(SideWall.X, SideWall.Y, ZUpper + Stair.GuardHeightCm - 5.0)));
 		TestFalse(TEXT("EXP-004 side wall stops at the guard height"),
 			PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(SideWall.X, SideWall.Y, ZUpper + Stair.GuardHeightCm + 5.0)));
+	}
+
+	// 복귀 A2: 보이는 part 상자끼리 양의 부피로 겹치지 않는다(같은 방향 동일 평면 면 겹침 없음).
+	{
+		TArray<FBathhouseBoxPart> Visible;
+		for (const int32 PlanIndex : { 0, 2 })
+		{
+			for (const EBathhouseShellPart Part : { EBathhouseShellPart::Floor, EBathhouseShellPart::Wall, EBathhouseShellPart::Ceiling,
+				EBathhouseShellPart::StairWall, EBathhouseShellPart::StairStep })
+			{
+				Visible.Append(Plans[PlanIndex].Get(Part));
+			}
+		}
+		int32 Overlaps = 0;
+		for (int32 A = 0; A < Visible.Num(); ++A)
+		{
+			for (int32 B = A + 1; B < Visible.Num(); ++B)
+			{
+				const FVector Gap = (Visible[A].Center - Visible[B].Center).GetAbs() - (Visible[A].HalfExtent + Visible[B].HalfExtent);
+				Overlaps += (Gap.X < -TestTolerance && Gap.Y < -TestTolerance && Gap.Z < -TestTolerance) ? 1 : 0;
+			}
+		}
+		TestEqual(TEXT("A2 visible stair, slab and wall boxes never overlap in volume"), Overlaps, 0);
+		TestFalse(TEXT("A2 upper end wall skips the floor slab band"),
+			PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(UpperEnd.X, UpperEnd.Y, ZUpper - S * 0.5)));
+		TestFalse(TEXT("A2 lower end wall skips the ceiling slab band"),
+			PlanContains(Plans[0], EBathhouseShellPart::StairWall, FVector(LowerEnd.X, LowerEnd.Y, ZLowerCeiling + S * 0.5)));
 	}
 
 	// 구멍 막이: R 위 [바닥, 천장].
@@ -570,6 +604,11 @@ bool FBathhouseBuildingValidationRulesTest::RunTest(const FString& Parameters)
 		{ TEXT("stair outside the lower interior"), [](FSnapshots& S, FBathhouseValidationInputs&) { S[0].Stairs[0].TopEdgeOffsetCm.X = 400.0; }, EBathhouseProblemCode::StairOutside, Error },
 		{ TEXT("stair without a landing"), [](FSnapshots& S, FBathhouseValidationInputs&)
 			{ S[0].Stairs[0].TopEdgeOffsetCm.X = S[0].Interior.Min.X + S[0].Stairs[0].WidthCm * 0.5; }, EBathhouseProblemCode::StairLanding, Error },
+		{ TEXT("stair step material missing"), [](FSnapshots& S, FBathhouseValidationInputs&) { S[0].Stairs[0].bHasStepMaterial = false; }, EBathhouseProblemCode::MaterialMissing, EBathhouseProblemSeverity::Warning },
+		{ TEXT("stair wall material missing"), [](FSnapshots& S, FBathhouseValidationInputs&) { S[0].Stairs[0].bHasStairWallMaterial = false; }, EBathhouseProblemCode::MaterialMissing, EBathhouseProblemSeverity::Warning },
+		{ TEXT("second stair material ignored"), [](FSnapshots& S, FBathhouseValidationInputs&) { const FBathhouseStairSnapshot Copy = S[0].Stairs[0]; S[0].Stairs.Add(Copy); }, EBathhouseProblemCode::MaterialMissing, EBathhouseProblemSeverity::Warning },
+		{ TEXT("settings wall thickness zero"), [](FSnapshots&, FBathhouseValidationInputs& I) { I.Layout.WallThicknessCm = 0.0; }, EBathhouseProblemCode::ValueInvalid, Error },
+		{ TEXT("settings chunk size zero"), [](FSnapshots&, FBathhouseValidationInputs& I) { I.Layout.ChunkMaxSizeCm.X = 0.0; }, EBathhouseProblemCode::ValueInvalid, Error },
 		{ TEXT("stair too steep"), [](FSnapshots& S, FBathhouseValidationInputs&) { S[0].Stairs[0].RunCm = 300.0; }, EBathhouseProblemCode::StairSteep, Error },
 		{ TEXT("box mesh invalid"), [](FSnapshots&, FBathhouseValidationInputs& I) { I.bBoxMeshValid = false; }, EBathhouseProblemCode::BoxMeshMissing, Error },
 		{ TEXT("litter chunk class missing"), [](FSnapshots&, FBathhouseValidationInputs& I) { I.bLitterClassSet = false; }, EBathhouseProblemCode::ChunkClassMissing, Error },
@@ -1177,6 +1216,93 @@ bool FBathhouseSpacePlacementAutomationTest::RunTest(const FString& Parameters)
 	TestTrue(FString::Printf(TEXT("EXP-008 the bath floor supports a candidate, got %s"), *InBath.FailureReason.ToString()), InBath.bSucceeded);
 	const FFacilityPlacementTransactionResult InWork = Validate(*Work, FVector(Work->GetActorLocation().X - 300.0, Work->GetActorLocation().Y + 300.0, Work->GetFloorZ()));
 	TestTrue(FString::Printf(TEXT("EXP-009 the work floor supports a candidate, got %s"), *InWork.FailureReason.ToString()), InWork.bSucceeded);
+
+	// 복귀 A1: 실제 TracePlacementZone 경로. 형상(벽·천장·계단 벽) hit는 구역이 아니고 ZoneBounds 윗면 hit만 구역이다.
+	UCameraComponent* Camera = NewObject<UCameraComponent>(PlayerActor);
+	PlayerActor->AddInstanceComponent(Camera);
+	PlayerActor->SetRootComponent(Camera);
+	Camera->RegisterComponent();
+	Placement->Camera = Camera;
+	AFacilityPlacementZoneActor* AimedZone = nullptr;
+	auto Aim = [&](const FVector& Location, const FRotator& Rotation)
+	{
+		Camera->SetWorldLocationAndRotation(Location, Rotation);
+		FVector Point;
+		AimedZone = nullptr;
+		return Placement->TracePlacementZone(AimedZone, Point);
+	};
+	auto RawHit = [&](const FVector& Location, const FRotator& Rotation)
+	{
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(BuildingAimProbe), true, PlayerActor);
+		World->LineTraceSingleByChannel(Hit, Location,
+			Location + Rotation.Vector() * GetDefault<UFacilityPlacementSettings>()->GetPlacementTraceDistance(),
+			BathhousePlacementCollision::ZoneTraceChannel, Params);
+		return Hit;
+	};
+	const FBathhouseSpaceSnapshot& HallSnap = Fixture.Snapshots[0];
+	const double HallFloor = Hall->GetFloorZ();
+	TestTrue(TEXT("A1 looking down at the hall floor picks the hall zone"),
+		Aim(FVector(300.0, -400.0, HallFloor + 150.0), FRotator(-90.0, 0.0, 0.0)) && AimedZone == Hall);
+	TestTrue(TEXT("A1 looking down at the bath floor picks the bath zone"),
+		Aim(FVector(Bath->GetActorLocation().X, 300.0, Bath->GetFloorZ() + 150.0), FRotator(-90.0, 0.0, 0.0)) && AimedZone == Bath);
+	{
+		const FVector Eye(300.0, -400.0, HallFloor + 100.0);
+		const FHitResult CeilingHit = RawHit(Eye, FRotator(90.0, 0.0, 0.0));
+		TestTrue(TEXT("A1 the ceiling blocks the placement trace"), CeilingHit.GetActor() == Hall && CeilingHit.GetComponent() != Hall->GetZoneBounds());
+		TestFalse(TEXT("A1 looking at the ceiling is not a zone"), Aim(Eye, FRotator(90.0, 0.0, 0.0)));
+	}
+	{
+		const FVector Eye(HallSnap.Interior.Min.X + 400.0, -400.0, HallFloor + 100.0);
+		const FHitResult WallHit = RawHit(Eye, FRotator(0.0, 180.0, 0.0));
+		TestTrue(TEXT("A1 the wall blocks the placement trace"), WallHit.GetActor() == Hall && WallHit.GetComponent() != Hall->GetZoneBounds());
+		TestFalse(TEXT("A1 looking at a wall is not a zone"), Aim(Eye, FRotator(0.0, 180.0, 0.0)));
+	}
+	{
+		const FVector Eye(HoleCenter.X, Hole.Max.Y + 300.0, HallFloor + 60.0);
+		const FHitResult StairWallHit = RawHit(Eye, FRotator(0.0, -90.0, 0.0));
+		TestTrue(TEXT("A1 the stair wall blocks the placement trace"), StairWallHit.GetActor() == Hall && StairWallHit.GetComponent() != Hall->GetZoneBounds());
+		TestFalse(TEXT("A1 looking at a stair wall is not a zone"), Aim(Eye, FRotator(0.0, -90.0, 0.0)));
+	}
+	{
+		const FBathhouseStairFrame Frame = FBathhouseSpaceLayout::MakeStairFrame(Fixture.Snapshots[0], Stair);
+		const FVector2D EyeXY = Frame.ToWorld(Stair.RunCm * 0.3, 0.0);
+		const double Rise = HallFloor - Work->GetFloorZ();
+		const FVector Eye(EyeXY.X, EyeXY.Y, HallFloor - Rise * 0.3 + 20.0);
+		const FHitResult UpHit = RawHit(Eye, FRotator(90.0, 0.0, 0.0));
+		TestTrue(TEXT("A1 the zone underside is hit from the shaft"), UpHit.GetComponent() == Hall->GetZoneBounds() && UpHit.ImpactNormal.Z < 0.0);
+		TestFalse(TEXT("A1 the zone underside is not a zone"), Aim(Eye, FRotator(90.0, 0.0, 0.0)));
+	}
+
+	// 복귀 A3: 아래층 천장 판 두께 구간의 외부 blocking 물체도 계단 통로 오류다.
+	{
+		auto CountStairBlocked = [&]()
+		{
+			FSnapshots Snaps;
+			FProblems Problems;
+			FBathhouseSpaceValidation::ValidateWorld(*World, Snaps, Problems);
+			int32 Count = 0;
+			for (const FBathhouseLayoutProblem& Problem : Problems)
+			{
+				Count += Problem.Code == EBathhouseProblemCode::StairBlocked ? 1 : 0;
+			}
+			return Count;
+		};
+		TestEqual(TEXT("A3 no stair blocker before the obstacle"), CountStairBlocked(), 0);
+		AActor* Obstacle = World->SpawnActor<AActor>();
+		UBoxComponent* Box = NewObject<UBoxComponent>(Obstacle);
+		Obstacle->AddInstanceComponent(Box);
+		Obstacle->SetRootComponent(Box);
+		Box->SetBoxExtent(FVector(10.0));
+		Box->SetCollisionObjectType(ECC_WorldStatic);
+		Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		Box->SetCollisionResponseToAllChannels(ECR_Block);
+		Box->RegisterComponent();
+		const double CeilingSlabMid = FBathhouseSpaceLayout::CeilingZ(Fixture.Snapshots[2]) + Fixture.Values.SlabThicknessCm * 0.5;
+		Obstacle->SetActorLocation(FVector(HoleCenter.X, HoleCenter.Y, CeilingSlabMid));
+		TestTrue(TEXT("A3 an obstacle inside the lower ceiling slab band is a stair error"), CountStairBlocked() > 0);
+		Obstacle->Destroy();
+	}
 
 	Fixture.Destroy();
 	return true;

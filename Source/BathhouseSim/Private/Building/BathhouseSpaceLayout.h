@@ -107,6 +107,8 @@ public:
 	static FBathhouseStairFrame MakeStairFrame(const FBathhouseSpaceSnapshot& Upper, const FBathhouseStairSnapshot& Stair);
 	/** 구멍 R(world XY). */
 	static FBox2D StairHole(const FBathhouseSpaceSnapshot& Upper, const FBathhouseStairSnapshot& Stair);
+	/** 판에서 빼는 구멍 = R을 폭 방향으로 벽 두께만큼 넓혀 옆 벽 발자국을 포함한 직사각형. */
+	static FBox2D StairSlabHole(const FBathhouseSpaceSnapshot& Upper, const FBathhouseStairSnapshot& Stair, double WallThicknessCm);
 
 	/** guillotine 분할로 Base에서 Holes를 뺀 겹치지 않는 직사각형 목록. */
 	static void SubtractRects(const FBox2D& Base, const TArray<FBox2D>& Holes, TArray<FBox2D>& OutRects);

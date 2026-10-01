@@ -17,7 +17,10 @@ Public/Building/
 Private/Building/
   (위 .cpp)
   BathhouseSpaceLayout.h/.cpp      순수 계산: 공간 snapshot → 공간별 형상 계획, 직사각형 빼기, 조각 분할
-  BathhouseSpaceValidation.h/.cpp  layout 규칙 검사 + world 검사(Nav 범위, 계단 통로 장애물, 설비 소속)
+  BathhouseSpaceValidation.h/.cpp  규칙 검사(`CollectProblems`, `ValidateLayout`)
+  BathhouseSpacePositionSuggestion.cpp  위치 제안(`SuggestTouchingLocation`, `ApplyMove`, 후보 검증, 문구 부착)
+  BathhouseSpaceWorldValidation.cpp  snapshot 수집, Settings 입력, Nav 범위, 계단 통로 장애물, 설비 소속(`ValidateWorld`)
+  BathhouseSpaceValidationInternal.h  세 파일이 공유하는 내부 helper(이름 있는 namespace `BathhouseSpaceValidationDetail`)
   BathhouseSpaceEditorSync.h/.cpp  WITH_EDITOR: 편집 world의 공간 형상 지연 일괄 재생성
   BathhouseCleaningChunkSpawner.h/.cpp  runtime 생성 조각 Actor spawn
 Private/Tests/
@@ -197,10 +200,13 @@ Private/Tests/
 
 ## Implementation Notes (2026-10-02 구현)
 
-- 입력 snapshot(`FBathhouseSpaceSnapshot`)·형상 계획·순수 계산은 `Private/Building/BathhouseSpaceLayout.*`, 검사와 위치 제안은 `BathhouseSpaceValidation.*`다. 개구부·계단 위치는 Actor 기준 상대값으로 담고 world 값은 helper가 계산한다. 위치 제안의 이동 후보는 snapshot 복사본에 적용해 같은 검사를 다시 돌려 확인한 것만 문구에 붙는다.
-- 계단 구현 치수: 경사로 상자 두께 = 판 두께. 계단 판 윗면 = 그 판 중앙 위치의 경사로 윗면 높이. 계단 옆 벽은 `R`의 길이 방향 `[0, Run]`, 위·아래 끝 벽은 두께 `t`에 폭 방향으로 옆 벽 두께까지 포함한다. 판 구멍·끝 벽 Z 조각은 Geometry Rules(복귀 A2)를 따른다(재작업 반영 대기). 위 입구 앞과 아래 출구 앞의 출입 자리는 계단 벽 바깥 `t` 지점부터 계단 폭만큼이다.
-- 계단 통로 장애물 trace는 구멍 안 3×3 지점에서 위층 바닥 윗면에서 아래로 쏜다(공간 Actor가 아닌 WorldStatic·WorldDynamic blocking만 오류). 아래 끝은 Validation 표대로 아래층 천장 아랫면 `Zc(L)`이다(복귀 A3, 재작업 반영 대기).
+- 입력 snapshot(`FBathhouseSpaceSnapshot`)·형상 계획·순수 계산은 `Private/Building/BathhouseSpaceLayout.*`, 규칙 검사는 `BathhouseSpaceValidation.cpp`, 위치 제안은 `BathhouseSpacePositionSuggestion.cpp`, world 수집·Nav·계단 trace는 `BathhouseSpaceWorldValidation.cpp`다(공개 API는 `BathhouseSpaceValidation.h`의 `FBathhouseSpaceValidation` 하나). 개구부·계단 위치는 Actor 기준 상대값으로 담고 world 값은 helper가 계산한다. 위치 제안의 이동 후보는 snapshot 복사본에 적용해 같은 검사를 다시 돌려 확인한 것만 문구에 붙는다.
+- 계단 구현 치수: 경사로 상자 두께 = 판 두께. 계단 판 윗면 = 그 판 중앙 위치의 경사로 윗면 높이. 계단 옆 벽은 `R`의 길이 방향 `[0, Run]`, 위·아래 끝 벽은 두께 `t`에 폭 방향으로 옆 벽 두께까지 포함한다. 판 구멍은 옆 벽 발자국까지 넓고(`StairSlabHole`) 위·아래 끝 벽은 판 두께 구간을 건너뛰는 두 조각이다(Geometry Rules, 복귀 A2). 구멍 막이·trace는 `R`(`StairHole`)을 쓴다. 위 입구 앞과 아래 출구 앞의 출입 자리는 계단 벽 바깥 `t` 지점부터 계단 폭만큼이다.
+- 계단 통로 장애물 trace는 구멍 안 3×3 지점에서 위층 바닥 윗면에서 아래로 쏜다(공간 Actor가 아닌 WorldStatic·WorldDynamic blocking만 오류). 아래 끝은 Validation 표대로 아래층 천장 아랫면 `Zc(L)`이다(복귀 A3).
 - 검사는 `ValidateLayout`(순수, 위치 제안 포함), `ValidateNavigation`(순수, Nav bounds 상자를 받음), `ValidateWorld`(world에서 snapshot·`NavMeshBoundsVolume`·계단 trace·배치된 설비를 모아 위 둘을 합침)로 나뉜다. 편집 world의 `IsDataValid`와 BeginPlay 로그가 `ValidateWorld`를 쓴다.
+- 구역 인정(복귀 A1): `AFacilityPlacementZoneActor::IsZoneSurfaceHit`가 hit component = `ZoneBounds`이고 hit 법선이 구역 바닥 위쪽일 때만 참이다. `TracePlacementZone`은 그때만 구역을 채운다.
+- Project Settings 두께·조각 최대 크기는 숨은 하한 없이 그대로 읽고(getter에 `Max` 대체값 없음) 0 이하·비유한이면 `ValueInvalid` Error로 알린다(재작업 I3).
+- 계단 재질이 비었거나(판·벽) 둘째 이후 계단 항목의 재질이 무시되면 `MaterialMissing` Warning이다(재작업 I1).
 - 생성 component는 `CreationMethod = UserConstructionScript` + `RF_Transient`다. Engine construction 재실행이 이전 생성물을 파괴해도 shell이 `IsValid`로 걸러 다시 만든다.
 - 자동화는 접근용 friend(`FBathhouseBuildingAutomationAccess`, 공간 Actor)와 배치 검증용 friend(`FBathhouseSpacePlacementAutomationTest`, `UPlayerFacilityPlacementComponent`)를 쓴다.
 

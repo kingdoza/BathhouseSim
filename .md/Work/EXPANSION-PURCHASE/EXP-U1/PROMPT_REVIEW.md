@@ -112,3 +112,39 @@
 - 편집 world 전체 흐름: `OnConstruction`·`RequestRebuild`(FTSTicker)·Undo·레벨 로드 순서(Editor 프로세스가 필요).
 - 실제 `NavMeshBoundsVolume`에서의 `ValidateWorld`, 실제 지형(Landscape) 위 계단 통로 trace, Nav 재생성 결과, 조명 표시 밝기, 재질 모습.
 - PIE: EXP-001~015 전부의 실제 플레이 확인. 관찰 항목은 [PROMPT_UNREAL.md](PROMPT_UNREAL.md) 마지막 절.
+
+## 9. 재작업 1회차 (코드 리뷰 1회차 `PROMPT_IMPLEMENTATION_R.md`)
+
+- 기준: 단계 시작 커밋 `2881b9a`. 리뷰는 `git diff 2881b9a`로 재작업분만 본다. 위 1~8절은 최초 구현 기록이며 아래와 다른 부분(Validation 파일 1001줄, 계단 trace 범위, 판 구멍·끝 벽, 시나리오 표의 일부 케이스)은 이 절이 우선한다.
+- 상태: 완료(코드 리뷰 재검증 대기). `Content/` 변경 없음.
+
+항목별 처리:
+
+| 항목 | 처리 | 변경 파일 |
+|---|---|---|
+| A1 구역 hit | `AFacilityPlacementZoneActor::IsZoneSurfaceHit`(hit component = `ZoneBounds` and 법선·바닥 위쪽 내적 > 0) 추가. `TracePlacementZone`은 `Cast` 성공과 이 조건이 참일 때만 구역을 채운다. 다른 Placement 로직은 바꾸지 않았다(12절 예외 범위) | `Public·Private/Placement/FacilityPlacementZoneActor.*`, `Private/Placement/PlayerFacilityPlacementValidation.cpp` |
+| A2 판·계단 벽 | 판 구멍을 `StairSlabHole`(R을 폭 방향으로 `t`씩 넓힘)로, 위·아래 끝 벽을 판 두께 구간을 건너뛴 두 조각씩으로 바꿨다. 옆 벽·경사로·판·구멍 막이·충돌은 그대로 | `Private/Building/BathhouseSpaceLayout.h/.cpp` |
+| A3 trace 범위 | 아래 끝을 `Zc(L)`로(`Bottom = CeilingZ(Lower)`) | `Private/Building/BathhouseSpaceWorldValidation.cpp` |
+| I1 계단 재질 | 계단 판·벽 재질 누락 `MaterialMissing` Warning(계단 번호·재질 이름), 둘째 이후 계단 항목은 "재질 무시" Warning(둘 중 경고 쪽 선택) | `Private/Building/BathhouseSpaceValidation.cpp` |
+| I2 파일 분리 | `BathhouseSpaceValidation.cpp`(규칙 검사 378줄), `BathhouseSpacePositionSuggestion.cpp`(위치 제안), `BathhouseSpaceWorldValidation.cpp`(수집·Nav·trace·설비), `BathhouseSpaceValidationInternal.h`(공유 helper, namespace `BathhouseSpaceValidationDetail`, inline). 공개 헤더 API 변경 없음. 코드 이동만(위 I1·I3 외 동작 변경 없음) | `Private/Building/*` |
+| I3 숨은 하한 | getter의 `FMath::Max(1.0f, …)` 제거. Settings 두께·조각 최대 크기가 0 이하·비유한이면 `ValueInvalid` Error | `Public/Building/BathhouseBuildingSettings.h`, `Private/Building/BathhouseSpaceValidation.cpp` |
+| I4 PROMPT_UNREAL | 5절 계단 재질 경고 서술, 14절 EXP-001·004(보조: 구멍 위 내려놓기 거부)·008 | `PROMPT_UNREAL.md` |
+| 정본 | `BuildingSystem.md` Source Scope·Implementation Notes(파일 분리, A1·A2·A3·I1·I3 결과, 대기 표시 제거) | `.md/Architecture/BuildingSystem.md` |
+
+자동화(기존 파일 `BathhouseBuildingAutomationTests.cpp`에 추가, 새 테스트 이름 변경 없음):
+
+- A1: `World.SpacePlacement`가 실제 `TracePlacementZone`을 호출한다. 홀·목욕공간 바닥 위에서 내려다보면 그 구역, 천장·서쪽 벽·계단 벽은 형상이 trace를 막지만(raw trace로 확인) 구역 없음, 지하 계단 안에서 위층 `ZoneBounds` 아랫면을 올려다보면 raw trace는 `ZoneBounds` 아랫면을 맞히지만(법선 아래) 구역 없음. 거부 문구 `설치 가능한 구역을 바라보세요.`는 `ValidateCurrentPlacement` 안의 `NoZone`이며 그 경로 전체(손에 든 설비 필요)는 호출하지 않았다.
+- A2: `Layout.Stairs`가 판 구멍 크기(길이 = Run, 폭 = W + 2t), 홀·작업공간 계획의 보이는 part(Floor·Wall·Ceiling·StairWall·StairStep) 전부 쌍의 양의 부피 겹침 0, 끝 벽이 판 두께 구간을 건너뜀을 검사한다.
+- A3: `World.SpacePlacement`가 아래층 천장 판 두께 구간 안에 외부 WorldStatic 상자를 놓으면 `StairBlocked`가 나고 치우면 0임을 검사한다.
+- I1·I3: `Validation.Rules`에 계단 판 재질 누락, 계단 벽 재질 누락, 둘째 계단 재질 무시, Settings 두께 0, 조각 크기 0 케이스. 정상 fixture는 계단 재질을 채워 경고 0을 유지한다.
+- 결과: 빌드 성공, `BathhouseSim` 전체 163개 통과 / 0 실패(테스트 개수는 기존 파일에 케이스만 더해 같다).
+- 테스트 작성 중 `S[0].Stairs.Add(S[0].Stairs[0])`의 자기 참조 assert를 만나 복사본으로 고쳤다(테스트 코드 한정).
+
+빌드 시점 Source 식별값(재작업 후 마지막 정규 빌드, 이후 Source·Config 변경 없음):
+
+- HEAD: `a8c6f4839a295b19f7c6a4d0a9b91c0eb4adf2c9`(단계 시작 커밋은 `2881b9a`)
+- `git diff HEAD -- Source Config` SHA-256: `6d9ffbb0c39733e7238481704932542413294a79748e88cd57e1dbd61a432ea2`
+- 미추적 신규 3개 파일(`BathhouseSpacePositionSuggestion.cpp`, `BathhouseSpaceValidationInternal.h`, `BathhouseSpaceWorldValidation.cpp`, 경로순 `sha256sum` 줄을 다시 SHA-256): `392cb5d2bf2527c8eb1c319ff78635afa265fa3254627d1421356612a0d2b714`
+- 빌드 로그 `Saved/Logs/exp_u1r_build_final.log`(성공), 자동화 로그 `Saved/Logs/exp_u1r_test_all.log`
+
+미검증(추가): 파일 분리 뒤 전체 unity 빌드(커밋 뒤 구성)는 다시 돌리지 않았다. 수정·신규 파일은 이번 빌드에서 개별 컴파일(비unity)로 통과했고, 새 helper는 이름 있는 namespace와 `inline`이라 unity 충돌 가능성은 낮다. 그 밖의 미검증은 8절과 같다.

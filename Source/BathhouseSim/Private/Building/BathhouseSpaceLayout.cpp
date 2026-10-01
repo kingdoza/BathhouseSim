@@ -119,6 +119,14 @@ FBox2D FBathhouseSpaceLayout::StairHole(
 		0.0, Stair.RunCm, -Stair.WidthCm * 0.5, Stair.WidthCm * 0.5);
 }
 
+FBox2D FBathhouseSpaceLayout::StairSlabHole(
+	const FBathhouseSpaceSnapshot& Upper, const FBathhouseStairSnapshot& Stair, const double WallThicknessCm)
+{
+	return MakeStairFrame(Upper, Stair).ToWorldRect(
+		0.0, Stair.RunCm,
+		-Stair.WidthCm * 0.5 - WallThicknessCm, Stair.WidthCm * 0.5 + WallThicknessCm);
+}
+
 void FBathhouseSpaceLayout::SubtractRects(
 	const FBox2D& Base, const TArray<FBox2D>& Holes, TArray<FBox2D>& OutRects)
 {
@@ -221,7 +229,7 @@ FBathhouseSpacePlan FBathhouseSpaceLayout::BuildPlan(
 		{
 			if (IsBuildableStair(Snapshots, Index, Stair))
 			{
-				Holes.Add(StairHole(Space, Stair));
+				Holes.Add(StairSlabHole(Space, Stair, T));
 			}
 		}
 		TArray<FBox2D> Rects;
@@ -241,7 +249,7 @@ FBathhouseSpacePlan FBathhouseSpaceLayout::BuildPlan(
 			{
 				if (Stair.LowerIndex == Index && IsBuildableStair(Snapshots, OtherIndex, Stair))
 				{
-					Holes.Add(StairHole(Snapshots[OtherIndex], Stair));
+					Holes.Add(StairSlabHole(Snapshots[OtherIndex], Stair, T));
 				}
 			}
 		}
@@ -363,10 +371,21 @@ FBathhouseSpacePlan FBathhouseSpaceLayout::BuildPlan(
 			MakeBox(Frame.ToWorldRect(0.0, Run, W * 0.5, W * 0.5 + T), ZLower, GuardTop));
 		Plan.Get(EBathhouseShellPart::StairWall).Add(
 			MakeBox(Frame.ToWorldRect(0.0, Run, -W * 0.5 - T, -W * 0.5), ZLower, GuardTop));
-		Plan.Get(EBathhouseShellPart::StairWall).Add(
-			MakeBox(Frame.ToWorldRect(-T, 0.0, -W * 0.5 - T, W * 0.5 + T), ZLower, ZUpper));
-		Plan.Get(EBathhouseShellPart::StairWall).Add(
-			MakeBox(Frame.ToWorldRect(Run, Run + T, -W * 0.5 - T, W * 0.5 + T), ZLowerCeiling, GuardTop));
+		// 끝 벽은 판 두께 구간을 건너뛴다(그 구간은 판이 소유해 같은 방향 동일 평면 면이 생기지 않는다).
+		const double SlabThickness = S;
+		auto AddEndWall = [&](const FBox2D& Rect, const double Z0, const double Z1)
+		{
+			if (Z1 - Z0 > LayoutTolerance)
+			{
+				Plan.Get(EBathhouseShellPart::StairWall).Add(MakeBox(Rect, Z0, Z1));
+			}
+		};
+		const FBox2D UpperEnd = Frame.ToWorldRect(-T, 0.0, -W * 0.5 - T, W * 0.5 + T);
+		const FBox2D LowerEnd = Frame.ToWorldRect(Run, Run + T, -W * 0.5 - T, W * 0.5 + T);
+		AddEndWall(UpperEnd, ZLower, ZLowerCeiling);
+		AddEndWall(UpperEnd, ZLowerCeiling + SlabThickness, ZUpper - SlabThickness);
+		AddEndWall(LowerEnd, ZLowerCeiling + SlabThickness, ZUpper - SlabThickness);
+		AddEndWall(LowerEnd, ZUpper, GuardTop);
 
 		// 위층 구멍 막이.
 		Plan.Get(EBathhouseShellPart::StairKeepClear).Add(
