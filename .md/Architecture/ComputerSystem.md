@@ -202,7 +202,7 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
   - 화면 widget은 `NativeOnMouseWheel`을 override하지 않는다. C++은 ScrollBox를 찾아 직접 스크롤하지 않는다.
 - 한 칸 이동량의 단일 authoring 위치는 각 WBP `UScrollBox`의 `WheelScrollMultiplier`다. 실제 이동은 엔진 cvar `Slate.GlobalScrollAmount` × multiplier × 휠 양이다.
   - `ConsumeMouseWheel != Never`와 `AnimateWheelScrolling=false`가 계약이다.
-  - C++ 설정값은 두지 않는다. 현재 asset 값은 Unreal `InteractionUISystem.md`가 기록한다.
+  - C++ 설정값은 두지 않는다. 이동량 원본 위치는 각 WBP ScrollBox의 `WheelScrollMultiplier`이며 Unreal `InteractionUISystem.md`도 수치 없이 그 위치만 기록한다.
 - 스크롤 위치는 엔진 widget 표시 상태다. focus-out이 widget을 파괴하지 않으므로 재진입·탭 전환 뒤에도 유지되고 저장하지 않는다.
 - 1 frame 한계: Active 전환 직후 첫 hover 갱신 전과 LMB release 직후(엔진이 경로를 비움)의 같은 frame 휠은 무시되거나 직전 경로로 간다. 엔진 protected API를 우회하지 않는다.
 - 자동화: `BathhouseSim.Computer.Input.WheelScrollsHoveredScrollBoxThroughSlate`(실제 Slate routing), `WheelRoutesByComputerPhase`(분기·gate), `ScreenWheelContentContract`(WBP·IA·IMC 전제 load 검증). headless에서는 world 화면 hover를 만들 수 없다(`-nullrhi`면 widget hit-test grid가 비어 있음). 그래서 hover→주입 결합은 사용자 PIE가 확인한다.

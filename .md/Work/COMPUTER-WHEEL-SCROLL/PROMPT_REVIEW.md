@@ -43,3 +43,8 @@ reflected 추가·삭제·rename 없음. test-only UCLASS(Transient, 모듈 내�
 - `PROMPT_IMPLEMENTATION.md` 11절 기준 전부.
 - `BathhouseComputerActor.h` friend 한 줄 허용 여부.
 - 미검증(PIE 전용): 실제 world 화면 hover 경로로의 `ScrollWheel` 주입(headless는 hit-test grid가 비어 `ScrollPointerWheel`이 false를 반환함을 B가 `AddInfo`로 기록), 실제 마우스 휠의 viewport 도달, 이동량 감각, 1 frame 한계.
+
+## 재작업 기록
+- 1회차(문서만): `PROMPT_UNREAL.md` 12행(multiplier 수치 대신 원본 위치 참조), `.md/Architecture/CharacterSystem.md` 63행(상태 문구), `.md/Architecture/ComputerSystem.md` 203행("엔진 기본 32" 제거).
+- 2회차(문서만): `PROMPT_UNREAL.md` 12행("Editor 단계가 읽어 기록" 삭제, 수치 미기록·원본 위치만 기록 명시), `.md/Architecture/ComputerSystem.md` 205행(수치 기록 전제 제거), 이 절 추가.
+- Source·Config·Content는 `863d964` 이후 변경 없음(문서만 변경)이라 재빌드·재Automation이 필요 없다. 위 빌드·Automation 결과와 Source 식별값이 그대로 유효하다.
