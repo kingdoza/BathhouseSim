@@ -200,7 +200,7 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
 - 엔진은 마지막 hover 경로로 wheel 이벤트를 bubble한다. 커서 아래 가장 안쪽 `SScrollBox`가 실제로 움직였을 때만 소비하고, 끝이거나 내용이 작으면 바깥으로 넘긴다.
   - 그래서 중첩 규칙, 영역 밖 무반응, 슬라이더 위 휠(`SSlider`가 휠을 처리하지 않음 → 상세 영역 스크롤)이 영역별 코드 없이 성립한다.
   - 화면 widget은 `NativeOnMouseWheel`을 override하지 않는다. C++은 ScrollBox를 찾아 직접 스크롤하지 않는다.
-- 한 칸 이동량의 단일 authoring 위치는 각 WBP `UScrollBox`의 `WheelScrollMultiplier`다. 실제 이동은 `Slate.GlobalScrollAmount`(엔진 기본 32) × multiplier × 휠 양이다.
+- 한 칸 이동량의 단일 authoring 위치는 각 WBP `UScrollBox`의 `WheelScrollMultiplier`다. 실제 이동은 엔진 cvar `Slate.GlobalScrollAmount` × multiplier × 휠 양이다.
   - `ConsumeMouseWheel != Never`와 `AnimateWheelScrolling=false`가 계약이다.
   - C++ 설정값은 두지 않는다. 현재 asset 값은 Unreal `InteractionUISystem.md`가 기록한다.
 - 스크롤 위치는 엔진 widget 표시 상태다. focus-out이 widget을 파괴하지 않으므로 재진입·탭 전환 뒤에도 유지되고 저장하지 않는다.

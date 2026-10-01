@@ -60,7 +60,7 @@ Source/BathhouseSim/Private/Character/
 - `UPlayerComputerUseComponent`와 mouse-source `UWidgetInteractionComponent`를 조립한다.
 - `UPlayerEquipmentUseComponent`를 조립하고 camera, carry와 interaction query/result context를 주입한다.
 - target `UPlayerFacilityPlacementComponent`를 조립하고 camera, carry와 interaction에 context를 주입한다.
-- computer session이 capture 중이면 E Started는 focus-out으로, LMB는 widget pointer로, 휠(`MouseWheelInput`)은 `UPlayerComputerUseComponent::ScrollPointerWheel`로 보낸다. Move/Look/Jump/Sprint/F/G/Q/LCtrl은 차단한다. 휠은 화면 스크롤에만 쓰이고 Placement 회전에는 닿지 않는다. 화면 주입은 Active일 때만이다(2026-10-01 `COMPUTER-WHEEL-SCROLL` 설계, Source 미반영).
+- computer session이 capture 중이면 E Started는 focus-out으로, LMB는 widget pointer로, 휠(`MouseWheelInput`)은 `UPlayerComputerUseComponent::ScrollPointerWheel`로 보낸다. Move/Look/Jump/Sprint/F/G/Q/LCtrl은 차단한다. 휠은 화면 스크롤에만 쓰이고 Placement 회전에는 닿지 않는다. 화면 주입은 Active일 때만이다(2026-10-01 `COMPUTER-WHEEL-SCROLL` 구현, Source 반영·자동화 통과·사용자 PIE 대기).
 - 일반 상태 LMB는 active placement가 있으면 placement confirm, 장비를 들었으면 equipment-use lifecycle, 장비 아닌 물건을 들었거나 대상이 Apply를 광고하면 held-target-use Apply로 전달한다. 순서는 [HeldTargetUseSystem.md](HeldTargetUseSystem.md) Input Ownership이 정본이다.
 - `SecondaryUseAction`(신규, `IA_SecondaryUse`, RMB)의 Started/Completed/Canceled는 held-target-use Take로 전달한다. Computer capture·Placement active·held-use 진행 중·장비를 든 상태에서는 press만 소비한다.
 - 진입에 사용한 E의 Completed/Canceled가 즉시 focus-out 또는 기존 hold lifecycle로 재전달되지 않도록 press ownership을 보존한다.

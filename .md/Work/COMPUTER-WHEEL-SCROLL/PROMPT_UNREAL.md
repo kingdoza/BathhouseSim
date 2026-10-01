@@ -9,7 +9,7 @@
 
 ## 갱신할 Unreal 정본(문서만, `PROMPT_IMPLEMENTATION.md` 9절)
 1. `.md/Unreal/InteractionUISystem.md` "컴퓨터 연결": `BP_BathhouseComputer` `ScreenWidget.WidgetClass`를 `/Game/Bathhouse/UI/WBP_ComputerScreenRoot.WBP_ComputerScreenRoot_C`로 고친다(근거 `REPORT_UNREAL_DISCOVERY.md`).
-2. 같은 문서에 스크롤 영역 authoring 기록: `WBP_ShopScreen`의 `ProductScroll`·`CartScroll`·`OrderScroll`, `WBP_BathWaterDetail`의 `DetailScroll`. 세로, 중첩 없음, `ConsumeMouseWheel=WhenScrollingPossible`, `AnimateWheelScrolling=false`, `WheelScrollMultiplier` 1.0(자동화 C가 Content에서 확인함). 한 칸 = `Slate.GlobalScrollAmount` × multiplier, ScrollBox local unit. `DetailScroll`은 `ManagementScale` 안이라 화면 px로는 더 작다.
+2. 같은 문서에 스크롤 영역 authoring 기록: `WBP_ShopScreen`의 `ProductScroll`·`CartScroll`·`OrderScroll`, `WBP_BathWaterDetail`의 `DetailScroll`. 세로, 중첩 없음, `ConsumeMouseWheel=WhenScrollingPossible`, `AnimateWheelScrolling=false`, `WheelScrollMultiplier`는 값을 복제하지 않고 각 ScrollBox의 `WheelScrollMultiplier` 프로퍼티(WBP)를 원본으로 참조하며 현재 값은 Editor 단계가 읽어 기록한다(자동화 C는 finite·양수만 확인하고 값은 `AddInfo`로 남긴다). 한 칸 = 엔진 cvar `Slate.GlobalScrollAmount` × 그 ScrollBox의 `WheelScrollMultiplier`, ScrollBox local unit. `DetailScroll`은 `ManagementScale` 안이라 화면 px로는 더 작다.
 3. 같은 문서 입력 절: `IMC_FirstPerson`의 `MouseWheelAxis → IA_PlacementRotate`(Axis1D, modifier·trigger 없음)는 공용 휠 intent다. 컴퓨터 미사용 시 배치 회전, Active 시 화면 스크롤. 아키텍처 설계 없이 modifier·trigger나 두 번째 휠 mapping을 추가하지 않는다(자동화 C가 지킴).
 
 ## 사용자 PIE 관찰 항목
