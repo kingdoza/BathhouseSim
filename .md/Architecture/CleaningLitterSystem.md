@@ -125,7 +125,7 @@ Public/Placement/
 `ALitterTongsActor`(`BP_LitterTongs`). 구현: `IPlayerInteractable`, `IPhysicalCarryable`, `IHeldEquipmentUsable`, `IHeldEquipmentSecondaryUsable`.
 
 - carry: `EPhysicalCarryKind::LitterTongs`(append), 기본 capability `FreeDrop|FixedSlot`. exact fixed slot, held-pose drop, CCD·Pawn Ignore, fixed slot 우선 복구는 `AWetMopActor`와 같은 구조다. 봉투 개수는 모든 carry 전이에서 유지된다(TRSH-013, 023).
-- 값: `BagCapacity`(EditDefaultsOnly, 20, ≥ 1), `TiedBagClass`(`ATrashBagActor` 자식), `TieForwardDistanceCm` 60, `TieMinForwardDistanceCm` 30. 상태는 `BagCount`(Transient)다.
+- 값: `BagCapacity`(EditDefaultsOnly, 20, ≥ 1), `TiedBagClass`(`ATrashBagActor` 자식), 봉투 놓기 값(아래 Front Drop Placement 표). 상태는 `BagCount`(Transient)다.
 - `GetHeldSummaryText()` = `봉투 n/20`(HUD, 조준 무관).
 - E query(월드·거치대 밖): 빈손이면 물걸레와 같은 들기 문구, 표시 이름 `집게`.
 - LMB `QueryEquipmentUse`(`Instant`):
@@ -135,19 +135,31 @@ Public/Placement/
 - RMB `QuerySecondaryEquipmentUse`(조준 무관): visible, action `봉투 묶기`. `BagCount == 0`이면 불가, `봉투가 비어 있음`.
 - `ExecuteSecondaryEquipmentUse`:
   1. 재평가한다.
-  2. `FTrashBagDropPlacement::Find`로 위치를 구하고, 실패하면 `봉투를 놓을 공간이 없음`을 반환하며 아무것도 바꾸지 않는다.
+  2. `BuildTieDropRequest(Context, Request)`로 `FTrashBagDropPlacement::Find`를 호출하고, 실패하면 `봉투를 놓을 공간이 없음`을 반환하며 아무것도 바꾸지 않는다.
   3. `ATrashBagActor::SpawnTiedBag(World, Class, BagCount, Transform)`: deferred → `InitializeCount` → Finish → `ActivateFreeWorld`(추가 속도 없음). 실패하면 만든 Actor를 제거하고 실패한다.
   4. 성공 뒤에만 `BagCount = 0`이다(TRSH-010~012, 021, 022).
 
 ### Front Drop Placement
 
-`FTrashBagDropPlacement::Find(World, UserPawn, IgnoredActors, BagClass, Distances, OutTransform)`:
+2026-10-01 UNBOX-SPAWN-VIEW: 1단계를 카메라 시선 앞으로 바꾸고 기존 정면 규칙을 2단계로 남긴다. 기하는 개봉과 같은 [InteractionSystem.md](InteractionSystem.md) Player View-Front Spawn Geometry다.
 
-- 발바닥(capsule 바닥)과 카메라 수평 전방을 쓴다. 거리 d는 `TieForwardDistanceCm`부터 10cm씩 `TieMinForwardDistanceCm`까지 시도한다.
-- 후보 중심 = 발바닥 + 전방 × d + up × (봉투 half Z + 5), 회전은 플레이어 yaw다.
-- 검사:
-  - capsule 중심 → 후보 중심 Visibility line trace가 막히지 않음(벽 너머 금지).
-  - 봉투 class collision template(`BuildClassCollisionQuery`)로 `FacilityPlacementCollision::HasBlockingOverlap`. 플레이어·집게는 무시한다. template 응답을 쓰므로 Pawn·쓰레기·얼룩은 막지 않는다.
+값의 정본: `ALitterTongsActor` UPROPERTY(EditDefaultsOnly, Category `Litter Tongs`)다. 기본값은 `Public/Cleaning/LitterTongsActor.h` 초기값, 실제 값은 `/Game/Bathhouse/Blueprints/Cleaning/BP_LitterTongs` Class Defaults, 유효 범위는 `ClampMin`과 `IsDataValid`다. 이 문서는 값을 적지 않는다.
+
+| 값 | 의미 |
+|---|---|
+| `TieViewDistanceCm`, `TieViewMinDistanceCm`, `TieViewPullStepCm` | 1단계 시선 앞: 카메라 → 봉투의 가장 가까운 부분(시선 방향) 시작 거리·하한·당김 간격 |
+| `TieForwardDistanceCm`, `TieMinForwardDistanceCm`, `TieForwardPullStepCm`, `TieFloorClearanceCm` | 2단계 바닥 정면: 발바닥 기준 수평 거리·하한·당김 간격, 봉투 밑면의 발바닥 위 높이(앞 두 값 의미 유지) |
+| `TieCameraClearanceCm` | P10 카메라 여유 |
+
+`FTrashBagDropPlacement::Find(World, UserPawn, IgnoredActors, BagClass, Request, OutTransform, OutStage)`. `FTrashBagDropRequest`는 카메라 위치·시선 방향(장비 context)과 위 값 전체이며 `ALitterTongsActor::BuildTieDropRequest(Context, OutRequest)` 한 곳에서 만든다. 자동화도 같은 함수로 기대값을 계산한다. 카메라 component를 직접 찾지 않는다. `ETrashBagDropStage`(ViewFront/FloorFront)는 자동화용 결과다.
+
+- 회전은 플레이어 yaw, shape는 봉투 class collision template(`BuildClassCollisionQuery`)이다. root → bounds 중심 offset을 역산해 Actor 위치를 만든다.
+- 단계(거리열 `BuildPullDistances(시작, 하한, 간격)`, 마지막 하한). 단계 값이 무효(비유한, 간격 ≤ 0, 하한 ≤ 0, 거리 < 하한)면 그 단계만 건너뛴다.
+  1. 시선 앞: d = `TieViewDistanceCm` → `TieViewMinDistanceCm`. 봉투 중심 = `ComputeViewFrontTranslation`(봉투 하나, 가장 가까운 부분 = d). 시야 기준점은 카메라 위치다.
+  2. 바닥 정면: d = `TieForwardDistanceCm` → `TieMinForwardDistanceCm`. 중심 = 발바닥 + 수평 전방 × d + up × (봉투 half Z + `TieFloorClearanceCm`), 시야 기준점은 capsule 중심이다. 수평 성분이 0이면 건너뛴다. `GetCameraClearancePushCm(…, TieCameraClearanceCm)`을 적용한다(봉투 윗면이 카메라보다 충분히 낮아 기본값에서는 push가 생기지 않는다).
+- 검사(두 단계 공통):
+  - 단계 기준점 → 후보 중심 Visibility line trace가 막히지 않음(벽 너머 금지).
+  - template으로 `FacilityPlacementCollision::HasBlockingOverlap`. 플레이어·집게와 후보와 겹친 쓰레기·물 얼룩은 무시한다. template 응답이라 Pawn(손님·플레이어 몸)은 막지 않는다(USV P2 정정, P9).
 - 모두 실패하면 공간 없음이다.
 
 ## Trash Bag
@@ -243,6 +255,7 @@ Public/Placement/
   - `UFacilityPlacementEventSubsystem`
 - 삭제(Q1 A): `AStainSpawnZoneActor::SelectionWeight`, `ZoneKind`, `EStainSpawnZoneKind`. 2026-10-01 추가 삭제: `AStainSpawnZoneActor::PawnClearanceOverride`, `ACleaningDirectorActor::DefaultPawnClearance`. property 삭제라 Core Redirect를 쓰지 않는다. Editor에서 `BP_StainSpawnZone`과 레벨 구역 instance를 load·compile·resave한다.
 - 기존 이름 변경은 없다. `SpawnIntervalSeconds`는 이름을 유지하고 의미·tooltip만 바뀐다.
+- 2026-10-01 UNBOX-SPAWN-VIEW: Front Drop Placement 표의 `TieView*`, `TieForwardPullStepCm`, `TieFloorClearanceCm`, `TieCameraClearanceCm` 추가만 한다. C++ 기본값이 기존 코드 상수와 같다. C++ 기본값을 상속하므로 `BP_LitterTongs` resave와 Core Redirect가 필요 없다.
 - copy-first load gate: `BP_CleaningDirector`, `BP_StainSpawnZone`, `BP_WaterStain`(native property·subobject 추가), `BP_ItemBox`, `BP_ShopDeliveryBox`, `BP_PlaceableFacilityItem`(interface 추가).
 
 ## Verification
@@ -255,6 +268,7 @@ Public/Placement/
 | TRSH-005 | 같은 seed 같은 외형·yaw |
 | TRSH-006, 020, 028 | 쓰레기 E 무변화, Pawn·물건 비충돌, 빈손·박스·바구니·삽 LMB 이유, 렌치·걸레·배송 상자 장비 행 유지 |
 | TRSH-007~012, 021, 022, 024 | 집게 줍기 1개, 가득 참, 묶기 조준 무관, 빈 봉투, 막힌 정면 무변화, press당 1회, 비대상 LMB 무반응 |
+| USV-017~019 | 고정 카메라, 기대값은 `BuildTieDropRequest`로 계산: 시선 앞 가장 가까운 면 = `TieViewDistanceCm`·눈높이, −70°·−90° 시선 앞 성공, 쓰레기·얼룩·손님 비차단, 시선 단계를 막으면 바닥 정면 현재 값, 전 높이 벽은 공간 없음·개수 불변 |
 | TRSH-013, 014, 023 | 거치대·drop·낙하 복구 개수 유지, 봉투 E·G·요약 |
 | TRSH-016, 017, 026, 027 | 실제 conversion transaction 배치: 겹침(가장자리 포함) 제거·수 감소·청소 중 얼룩 제거, preview·취소 무변화, 쓰레기가 얼룩 조준을 가림 |
 | COLL-001~004, 007, 008 | `CollectNow`: 종류별 제거·잔존, held 제외, 중심 판정, 내용물 동반 소멸, 지갑 불변 |

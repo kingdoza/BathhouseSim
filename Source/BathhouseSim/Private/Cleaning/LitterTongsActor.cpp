@@ -362,6 +362,21 @@ FHeldEquipmentUseQuery ALitterTongsActor::QuerySecondaryEquipmentUse(const FHeld
 	return Query;
 }
 
+void ALitterTongsActor::BuildTieDropRequest(const FHeldEquipmentUseContext& Context,
+											FTrashBagDropRequest& OutRequest) const
+{
+	OutRequest.CameraOrigin = Context.CameraOrigin;
+	OutRequest.CameraDirection = Context.CameraDirection;
+	OutRequest.ViewDistanceCm = TieViewDistanceCm;
+	OutRequest.ViewMinDistanceCm = TieViewMinDistanceCm;
+	OutRequest.ViewPullStepCm = TieViewPullStepCm;
+	OutRequest.FloorForwardDistanceCm = TieForwardDistanceCm;
+	OutRequest.FloorMinForwardDistanceCm = TieMinForwardDistanceCm;
+	OutRequest.FloorPullStepCm = TieForwardPullStepCm;
+	OutRequest.FloorClearanceCm = TieFloorClearanceCm;
+	OutRequest.CameraClearanceCm = TieCameraClearanceCm;
+}
+
 FHeldEquipmentUseResult ALitterTongsActor::ExecuteSecondaryEquipmentUse(const FHeldEquipmentUseContext& Context)
 {
 	const auto Query = QuerySecondaryEquipmentUse(Context);
@@ -371,9 +386,11 @@ FHeldEquipmentUseResult ALitterTongsActor::ExecuteSecondaryEquipmentUse(const FH
 	}
 	FTransform Transform;
 	const TArray<AActor*> Ignored = {Context.User.Get(), this};
+	FTrashBagDropRequest Request;
+	BuildTieDropRequest(Context, Request);
 	if (!GetWorld() ||
-		!FTrashBagDropPlacement::Find(*GetWorld(), Cast<APawn>(Context.User), Ignored, TiedBagClass,
-									  TieForwardDistanceCm, TieMinForwardDistanceCm, Transform) ||
+		!FTrashBagDropPlacement::Find(*GetWorld(), Cast<APawn>(Context.User), Ignored, TiedBagClass, Request,
+									  Transform) ||
 		!ATrashBagActor::SpawnTiedBag(*GetWorld(), TiedBagClass, BagCount, Transform))
 	{
 		return FHeldEquipmentUseResult::Failed(LOCTEXT("NoBagSpace", "봉투를 놓을 공간이 없음"));
@@ -390,6 +407,29 @@ EDataValidationResult ALitterTongsActor::IsDataValid(FDataValidationContext& Con
 		Context.AddWarning(
 			LOCTEXT("HeldTransformScaleIgnored",
 					"HeldTransform scale is ignored at runtime. Author a unit scale and use location/rotation only."));
+	}
+	const auto ReportInvalid = [&Context, &Result](const FText& Message)
+	{
+		Context.AddError(Message);
+		Result = EDataValidationResult::Invalid;
+	};
+	if (!FMath::IsFinite(TieViewMinDistanceCm) || TieViewMinDistanceCm <= 0.0f || !FMath::IsFinite(TieViewDistanceCm)
+		|| TieViewDistanceCm < TieViewMinDistanceCm || !FMath::IsFinite(TieViewPullStepCm) || TieViewPullStepCm <= 0.0f)
+	{
+		ReportInvalid(LOCTEXT("InvalidTieView",
+							  "Tie view-front values need Min > 0, Distance >= Min and Pull Step > 0; the stage is skipped otherwise."));
+	}
+	if (!FMath::IsFinite(TieMinForwardDistanceCm) || TieMinForwardDistanceCm <= 0.0f
+		|| !FMath::IsFinite(TieForwardDistanceCm) || TieForwardDistanceCm < TieMinForwardDistanceCm
+		|| !FMath::IsFinite(TieForwardPullStepCm) || TieForwardPullStepCm <= 0.0f)
+	{
+		ReportInvalid(LOCTEXT("InvalidTieFloor",
+							  "Tie floor-front values need Min > 0, Distance >= Min and Pull Step > 0; the stage is skipped otherwise."));
+	}
+	if (!FMath::IsFinite(TieFloorClearanceCm) || TieFloorClearanceCm < 0.0f || !FMath::IsFinite(TieCameraClearanceCm)
+		|| TieCameraClearanceCm < 0.0f)
+	{
+		ReportInvalid(LOCTEXT("InvalidTieClearance", "Tie floor and camera clearances must be finite and >= 0."));
 	}
 	return Result == EDataValidationResult::NotValidated ? EDataValidationResult::Valid : Result;
 }
