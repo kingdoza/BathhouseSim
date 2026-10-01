@@ -231,5 +231,5 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 서비스 2단위(ServiceFacilityDisplaySystem·Towel 2단위 절): 2026-09-30 완료(`c9a1150`).
 - 서비스 3단위(CleaningLitterSystem): 2026-10-01 완료(`2c14d8f`). 같은 날 버그(집게를 들면 빼기 강조 표시) 수정 설계로 장비 보조 사용을 별도 query 필드로 분리했다. 버그 수정은 `4111e20`로 완료됐다.
 - 서비스 4단위(ServiceAmenitySystem): 2026-10-01 설계, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
-- 빈 박스 빼기 대상 선택 통일(ServiceFacilityDisplaySystem, `EMPTY-BOX-TAKE-TARGET`): 2026-10-01 설계, Source 반영(작업 브랜치, 코드 리뷰 승인, 사용자 PIE 대기). 입력은 `.md/Work/EMPTY-BOX-TAKE-TARGET/PROMPT_IMPLEMENTATION.md`다.
+- 빈 박스 빼기 대상 선택 통일(ServiceFacilityDisplaySystem, `EMPTY-BOX-TAKE-TARGET`): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.
 - 플레이어 앞 생성 위치 카메라 시선 기준(UNBOX-SPAWN-VIEW, Shop·CleaningLitter·Interaction): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.
