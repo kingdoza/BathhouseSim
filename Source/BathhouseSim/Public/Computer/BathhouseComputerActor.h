@@ -74,6 +74,7 @@ protected:
 private:
 	friend class FBathhouseComputerSessionTest;
 	friend class FComputerKeyboardFocusTest;
+	friend class FBathhouseComputerWheelRoutingTest;
 
 	UPlayerComputerUseComponent* ResolvePlayerComputerUse(const FPlayerInteractionContext& Context) const;
 

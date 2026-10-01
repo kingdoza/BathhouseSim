@@ -251,6 +251,7 @@ worst case query 수는 (단계별 거리·단 수 × 시도 수의 합) × 물�
   - 주문 버튼 활성·부족액·상한 안내는 매번 `EvaluatePlaceOrder`·`EvaluateAdd`로 계산한다(SHOP-006~008).
   - 주문 성공 시 `주문 완료`를 표시한다.
   - 상품이 넘치면 `ProductScroll`만 세로로 스크롤한다. cart·주문 panel은 `ProductScroll` 밖 형제로 둬 항상 보인다(SHOP-032, WBP layout).
+  - `ProductScroll`·`CartScroll`·`OrderScroll`의 마우스 휠 스크롤은 Shop 코드 없이 Computer 휠 주입이 처리한다([ComputerSystem.md](ComputerSystem.md) Screen Wheel Scroll).
 - 행 widget: `UShopProductCardWidget`(Name/Price/Icon/AddButton), `UShopCartLineWidget`(Name/Quantity/LineTotal/Plus/Minus/Remove), `UShopOrderLineWidget`(Summary/Status). 버튼은 해당 domain API만 호출한다.
 - HUD: `ABathhouseHUD`가 `UMoneyHudWidget`(MoneyText, DeltaText, `DeltaDisplaySeconds=2`)과 `UShopNoticeWidget`(NoticeText)을 추가로 생성한다.
   - money widget은 PlayerController의 PlayerState wallet에 bind한다. PlayerState가 아직 없으면 possession 변경과 짧은 재시도로 bind한다. bind 시 현재 금액을 바로 표시하고, `OnMoneyChanged(Previous, Current)`의 차이를 `+10,000`/`−30,000` 형식으로 2초 표시한다. 새 변화가 오면 새 값으로 바꾸고 2초를 다시 시작한다.

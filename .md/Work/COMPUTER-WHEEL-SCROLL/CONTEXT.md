@@ -1,11 +1,11 @@
 # CONTEXT — COMPUTER-WHEEL-SCROLL 컴퓨터 화면 스크롤 영역 마우스 휠 스크롤
 - 목표 / 상위·선행·관련 작업: 컴퓨터 포커스 중 커서가 화면의 스크롤 영역 위에 있으면 마우스 휠로 그 영역이 스크롤된다. 상위 작업 없음. 관련: `BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out` 현상 2(포커스아웃이 클릭 뒤에만 동작, 입력 포커스·라우팅 의심) — 같은 컴퓨터 입력 경로를 공유하지만 이 작업 범위가 아니다. 경계는 `PROMPT_ARCHITECTURE.md` "관련 작업과의 경계".
-- 현재 단계와 재개 지점: 기능 명세 완료·사용자 승인. 아키텍처 단계 진행.
+- 현재 단계와 재개 지점: 사용자 PIE 대기(`PIE_CHECKLIST.md`). Editor 작업 완료(Unreal 정본 `InteractionUISystem.md`만, asset 저장 없음, 보고서는 워커 전문을 마스터가 저장).
 - 명세 승인 일자와 사전 허용: 2026-10-01 사용자 승인("셋다 승인"). 사전 허용: 승인 범위 밖 asset 수정이 필요하면 멈추고 묻는다(S2 A), 사용자 PIE 통과 보고 시 자동 `--no-ff` 병합(S3 A).
-- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/COMPUTER-WHEEL-SCROLL`(worktree `.claude/worktrees/wheel`). 관련 BUG 작업과 같은 컴퓨터 입력 경로를 다루므로 `work/BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out` 아키텍처 이후 커밋에서 분기하고 main을 병합해 시작한다. BUG 병합 뒤 구현.
-- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 해당 없음(명세 단계)
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/COMPUTER-WHEEL-SCROLL`(worktree `.claude/worktrees/wheel`). 관련 BUG 작업과 같은 컴퓨터 입력 경로를 다루므로 `work/BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out` 아키텍처 이후 커밋에서 분기하고 main을 병합해 시작한다. BUG 병합 뒤 구현. 아키텍처 시작 `4be64f6`. 구현 시작 `5dae4d4`, 구현 `863d964`, 재작업 1 `263fef4`. 재작업 2 `2a52b8b` = 리뷰 승인 커밋.
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 리뷰 3회(1회차 F1·F2, 2회차 F1 미해결, 3회차 승인), 자동 재작업 2회 사용, 아키텍처 자동 복귀 미사용. F3(테스트 B 596·597행 라벨 CWS-018 오기)은 Source 재빌드 회피로 마스터가 생략 결정 — 판정 무관, 후속 Source 변경 때 함께 정정.
 - 복귀 기록: 없음
-- 워커 세션 ID, 사용자 지시 모델 덮어쓰기: 없음
+- 사용자 지시 모델 덮어쓰기: 없음
 - 결과물 목록과 사용자 지시 요약:
   - 사용자 요청 원문: "인게임컴퓨터에서 스크롤영역위에 마우스있을때는 플레이어 마우스스크롤로도 스크롤 되게하기"
   - `PROMPT_ARCHITECTURE.md`(진행, 최종 승인 대기), `QNA_FEATURE_SPEC.md`(진행, 답변 기록됨), `REPORT_UNREAL_DISCOVERY.md`(저장 대기)

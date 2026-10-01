@@ -101,6 +101,7 @@ UBathWaterManagementScreenWidget
 - `USlider::SetValue`는 `OnValueChanged`를 다시 broadcast한다. 보정 쓰기는 재진입 guard 안에서 하고, guard 중 callback은 요청을 보내지 않는다. 재요청이 제한 피드백을 지우지 않게 하기 위해서다.
 - `ApplyBathSnapshot`의 slider 동기화는 presentation cache 조기 반환보다 앞에서 매번 수행하되, 값이 다를 때만 쓴다. text·step 쓰기와 presentation counter는 기존 cache gate를 유지한다.
 - 제한 피드백은 기존 revision 규칙을 유지한다. 한계에서 반복된 no-op 요청도 `bWasLimited`라 문구가 남고, 제한 없는 요청이나 선택 변경이 문구를 지운다.
+- 마우스 휠은 slider 값을 바꾸지 않는다. `SSlider`는 휠을 처리하지 않아 `DetailScroll`이 스크롤된다. detail widget에 휠 처리를 추가하지 않는다([ComputerSystem.md](ComputerSystem.md) Screen Wheel Scroll, `COMPUTER-WHEEL-SCROLL` Q3 A).
 
 ### Required BindWidget Contract
 

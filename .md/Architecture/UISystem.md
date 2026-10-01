@@ -182,6 +182,7 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 2026-09-27 설계, Source 미반영. 계약은 [ShopSystem.md](ShopSystem.md) UI 절이 정본이다.
 
 - `UComputerScreenRootWidget`: 관리·상점 탭과 `UWidgetSwitcher`, 컴퓨터 context·사용자 전달. 탭 index는 표시 상태다.
+- 화면 스크롤 영역의 마우스 휠은 virtual pointer 주입과 엔진 `SScrollBox`가 처리한다. 화면 widget은 휠 코드(`NativeOnMouseWheel`, C++ 스크롤 조작)를 갖지 않는다. 영역별 이동량은 WBP `UScrollBox` 설정이 소유한다([ComputerSystem.md](ComputerSystem.md) Screen Wheel Scroll).
 - `UShopScreenWidget`과 행 widget 3종: domain API 호출과 표시만 한다. cart·주문·돈을 보관하지 않는다.
 - `ABathhouseHUD`는 `UMoneyHudWidget`(잔액·2초 변화량)과 `UShopNoticeWidget`(배송 도착)을 추가로 생성한다. 두 widget은 PlayerState wallet과 order subsystem delegate를 구독하고 EndPlay에 대칭 해제한다.
 

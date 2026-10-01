@@ -89,7 +89,7 @@ protected:
 	void RecoverFacilityCanceledInput();
 	void PlacementSnapStartInput();
 	void PlacementSnapEndInput();
-	void PlacementRotateInput(const FInputActionValue& Value);
+	void MouseWheelInput(const FInputActionValue& Value);
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoMove(float Right, float Forward);
@@ -200,6 +200,7 @@ private:
 	friend class FServiceAmenityInputTest;
 	friend class FBathhouseComputerSessionTest;
 	friend class FComputerKeyboardFocusTest;
+	friend class FBathhouseComputerWheelRoutingTest;
 	friend class FBathhouseEquipmentUseRoutingTest;
 	friend class FBathhouseHeldTargetUseOwnerRoutingTest;
 	friend class FCleaningLitterInputRoutingTest;

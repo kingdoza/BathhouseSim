@@ -50,6 +50,7 @@ private:
 	friend class FBathhouseFacilityPlacementMathTest;
 	friend class FBathhouseFacilityPlacementRuntimeTest;
 	friend class FBathhouseHeldTargetUseOwnerRoutingTest;
+	friend class FBathhouseComputerWheelRoutingTest;
 
 	UFUNCTION()
 	void HandleHeldObjectChanged(AActor* NewHeldObject);

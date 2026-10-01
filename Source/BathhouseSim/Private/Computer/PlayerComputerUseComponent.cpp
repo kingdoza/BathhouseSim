@@ -267,6 +267,36 @@ void UPlayerComputerUseComponent::ReleasePointer()
 	ReleasePointerIfNeeded();
 }
 
+bool UPlayerComputerUseComponent::ScrollPointerWheel(float WheelDelta)
+{
+	const UWidgetComponent* HoveredComponent = WidgetInteraction ? WidgetInteraction->GetHoveredWidgetComponent() : nullptr;
+	if (!CanInjectPointerWheel(WheelDelta, HoveredComponent))
+	{
+		return false;
+	}
+
+	WidgetInteraction->ScrollWheel(WheelDelta);
+	return true;
+}
+
+bool UPlayerComputerUseComponent::CanInjectPointerWheel(float WheelDelta, const UWidgetComponent* HoveredComponent) const
+{
+	if (Phase != EPlayerComputerUsePhase::Active || !IsValid(WidgetInteraction) || !WidgetInteraction->bEnableHitTesting)
+	{
+		return false;
+	}
+	if (!FMath::IsFinite(WheelDelta) || FMath::IsNearlyZero(WheelDelta))
+	{
+		return false;
+	}
+	const ABathhouseComputerActor* Computer = ActiveComputer.Get();
+	if (!IsValid(Computer) || !IsValid(Computer->GetScreenWidget()))
+	{
+		return false;
+	}
+	return HoveredComponent != nullptr && HoveredComponent == Computer->GetScreenWidget();
+}
+
 APlayerController* UPlayerComputerUseComponent::ResolvePlayerController() const
 {
 	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
