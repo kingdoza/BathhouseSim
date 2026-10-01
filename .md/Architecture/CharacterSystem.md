@@ -22,7 +22,7 @@ Character System은 범용 1인칭 조작 템플릿의 플레이어 조작을 �
 - computer focus 중 1인칭 입력 gate와 click action 라우팅
 - player equipment-use component 조립과 LMB Started/Triggered/Completed/Canceled routing
 - player held-target-use component 조립과 LMB·RMB(`SecondaryUseAction`) held-use owner routing([HeldTargetUseSystem.md](HeldTargetUseSystem.md))
-- player facility-placement component 조립과 Q/LCtrl/MouseWheel intent routing
+- player facility-placement component 조립과 Q/LCtrl/MouseWheel intent routing. 휠은 공용 intent로 computer capture 중에는 computer 화면 스크롤로 보낸다([ComputerSystem.md](ComputerSystem.md) Input Routing)
 
 현재 문서화된 Character 책임 밖의 도메인 gameplay logic은 Character System 책임이 아니다.
 
@@ -60,7 +60,7 @@ Source/BathhouseSim/Private/Character/
 - `UPlayerComputerUseComponent`와 mouse-source `UWidgetInteractionComponent`를 조립한다.
 - `UPlayerEquipmentUseComponent`를 조립하고 camera, carry와 interaction query/result context를 주입한다.
 - target `UPlayerFacilityPlacementComponent`를 조립하고 camera, carry와 interaction에 context를 주입한다.
-- computer session이 capture 중이면 E Started는 focus-out으로, LMB는 widget pointer로 보내고 Move/Look/Jump/Sprint/F/G/Q/LCtrl/휠을 차단한다.
+- computer session이 capture 중이면 E Started는 focus-out으로, LMB는 widget pointer로, 휠(`MouseWheelInput`)은 `UPlayerComputerUseComponent::ScrollPointerWheel`로 보낸다. Move/Look/Jump/Sprint/F/G/Q/LCtrl은 차단한다. 휠은 화면 스크롤에만 쓰이고 Placement 회전에는 닿지 않는다. 화면 주입은 Active일 때만이다(2026-10-01 `COMPUTER-WHEEL-SCROLL` 구현, Source 반영·자동화 통과·사용자 PIE 대기).
 - 일반 상태 LMB는 active placement가 있으면 placement confirm, 장비를 들었으면 equipment-use lifecycle, 장비 아닌 물건을 들었거나 대상이 Apply를 광고하면 held-target-use Apply로 전달한다. 순서는 [HeldTargetUseSystem.md](HeldTargetUseSystem.md) Input Ownership이 정본이다.
 - `SecondaryUseAction`(신규, `IA_SecondaryUse`, RMB)의 Started/Completed/Canceled는 held-target-use Take로 전달한다. Computer capture·Placement active·held-use 진행 중·장비를 든 상태에서는 press만 소비한다.
 - 진입에 사용한 E의 Completed/Canceled가 즉시 focus-out 또는 기존 hold lifecycle로 재전달되지 않도록 press ownership을 보존한다.
@@ -236,10 +236,10 @@ Blueprint/Editor에서 설정해야 하는 주요 property:
 - InteractAction이 Started 한 번마다 한 번만 실행되는지 확인한다.
 - E hold target이 Completed/Canceled를 받으며 기존 instant interaction이 release 때 재실행되지 않는지 확인한다.
 - F와 G가 각각 한 번만 routing되고 G가 concrete kind 판단 없이 key를 포함한 held carryable에 도달하는지 확인한다.
-- computer 사용 중 Move/Look/Jump/Sprint/F/G/Q/LCtrl/휠이 기존 component나 domain에 도달하지 않는지 확인한다.
+- computer 사용 중 Move/Look/Jump/Sprint/F/G/Q/LCtrl이 기존 component나 domain에 도달하지 않고, 휠은 computer component에만 도달하는지 확인한다.
 - `PrimaryUseAction`과 deprecated fallback이 동시에 LMB를 중복 binding하지 않는지 확인한다.
 - Computer/Placement/Equipment press owner가 섞이지 않고 Completed/Canceled가 시작 owner에 한 번만 도달하는지 확인한다.
-- Q Hold와 LCtrl/휠이 placement component에만 도달하고 Character가 설비 상태를 판정하지 않는지 확인한다.
+- computer·세신 포커스가 아닐 때 Q Hold와 LCtrl/휠이 placement component에만 도달하고 Character가 설비 상태를 판정하지 않는지 확인한다.
 - 진입 E release와 종료 E press/release가 각각 한 번만 소비되며 world interaction을 오발하지 않는지 확인한다.
 - pawn 종료/교체 시 interaction focus와 held key attachment가 정리되는지 확인한다.
 - Blueprint native parent rename이 필요한 경우 Core Redirect 필요 여부를 먼저 검토한다.

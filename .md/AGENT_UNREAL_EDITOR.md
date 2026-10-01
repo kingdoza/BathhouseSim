@@ -21,7 +21,7 @@ PIE 시작·입력·플레이 시나리오 검증은 사람이 한다. 이 역�
 
 ## 필수 문서
 
-- [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md): 단계·승인·결과물·빌드와 headless 실행 정책
+- [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md): 단계·승인·결과물 정책, [UE_BUILD_POLICY.md](UE_BUILD_POLICY.md): 빌드와 headless 실행 정책
 - [UNREAL_MCP_CONNECTION.md](UNREAL_MCP_CONNECTION.md): 모든 경로의 공통 Editor 세션 운영 및 MCP 연결
 - Python을 사용할 때 [UNREAL_PYTHON_API.md](UNREAL_PYTHON_API.md)
 - 해당 모드의 조사 요청 또는 승인된 기능 계약과 현재 Editor 작업 프롬프트
@@ -111,5 +111,6 @@ PIE 시작·입력·플레이 시나리오 검증은 사람이 한다. 이 역�
 - 기존 큐는 실제 완료·저장·필요한 재로드를 확인한 뒤에만 제거한다. 지침 교체만으로 완료 처리하지 않는다.
 - 조사 보고에는 범위·방법·실제값·근거·미확정·기준선을, 작업 보고에는 완료/부분 완료/중단과 exact 변경 대상을 적는다.
 - 작업 보고에는 실행 경로·스크립트·로그·백업, Compile/Validation/Save/reload별 결과, 시나리오 ID별 PIE 관찰 항목과 dirty·큐·정본 변경을 포함한다.
-- 마스터에게 돌려주는 완료 보고는 결론과 파일 경로 중심 20줄 이내로 쓰고 상세는 `REPORT_UNREAL_EDITOR.md`에 둔다.
+- 마스터에게 돌려주는 완료 보고는 결론과 파일 경로 중심 20줄 이내로 쓰고 상세는 `REPORT_UNREAL_*.md`에 둔다. 마스터 워커로 실행되면 이 보고서를 직접 쓰지 않고 첫머리를 갖춘 전문을 저장 경로와 함께 보고 뒤에 붙인다([AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) 소유권 절).
+- Unreal 정본에는 조정값 수치를 복제하지 않고 원본 asset·프로퍼티 위치를 적는다(조정값 원본 원칙).
 - 실행 성공·Compile 성공·같은 세션 readback은 전체 수용 완료와 다르다. 필수 검증이 남으면 완료로 기록하지 않는다. PIE 수용은 사용자 몫이다.

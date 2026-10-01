@@ -26,7 +26,7 @@ public class BathhouseSim : ModuleRules
 			"Niagara"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 
 		if (Target.bBuildEditor)
 		{

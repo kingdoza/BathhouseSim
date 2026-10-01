@@ -2,10 +2,6 @@
 
 namespace
 {
-constexpr int32 MaxPlacementAttempts = 12;
-constexpr float MinimumElevationDegrees = 15.0f;
-constexpr float MaximumElevationDegrees = 45.0f;
-constexpr float PairDepthToleranceCm = 0.5f;
 constexpr float AxisEpsilon = 1.0e-4f;
 
 FVector GetLocalXAxis(const float YawDegrees)
@@ -39,9 +35,10 @@ void AddBoxAxes(const float YawDegrees, TArray<FVector, TInlineAllocator<5>>& Ax
 float GetPairTargetDepth(
 	const FVector& HalfExtentA,
 	const FVector& HalfExtentB,
-	const float RequestedDepthCm)
+	const float RequestedDepthCm,
+	const float ExtentRatio)
 {
-	return FMath::Min(RequestedDepthCm, 0.5f * FMath::Min(HalfExtentA.GetMin(), HalfExtentB.GetMin()));
+	return FMath::Min(RequestedDepthCm, ExtentRatio * FMath::Min(HalfExtentA.GetMin(), HalfExtentB.GetMin()));
 }
 
 bool IsValidHalfExtent(const FVector& HalfExtent)
@@ -112,6 +109,7 @@ float FShopUnboxingCluster::ComputePenetrationDepth(
 bool FShopUnboxingCluster::BuildLayout(
 	const TArray<FVector>& HalfExtents,
 	const float DepthCm,
+	const FShopUnboxClusterTuning& Tuning,
 	FRandomStream& RandomStream,
 	TArray<FShopUnboxClusterItem>& OutItems)
 {
@@ -128,7 +126,7 @@ bool FShopUnboxingCluster::BuildLayout(
 		}
 	}
 
-	const float RequestedDepthCm = FMath::Clamp(DepthCm, 0.0f, 50.0f);
+	const float RequestedDepthCm = DepthCm;
 	TArray<int32> ShuffledIndices;
 	ShuffledIndices.Reserve(HalfExtents.Num());
 	for (int32 Index = 0; Index < HalfExtents.Num(); ++Index)
@@ -157,13 +155,13 @@ bool FShopUnboxingCluster::BuildLayout(
 		const FVector& CandidateExtent = HalfExtents[CandidateIndex];
 		bool bPlaced = false;
 
-		for (int32 Attempt = 0; Attempt < MaxPlacementAttempts; ++Attempt)
+		for (int32 Attempt = 0; Attempt < Tuning.PlacementAttempts; ++Attempt)
 		{
 			const int32 AnchorIndex = RandomStream.RandHelper(PlacedItems.Num());
 			const float AzimuthRadians = FMath::DegreesToRadians(RandomStream.FRand() * 360.0f);
 			const float ElevationDegrees = RandomStream.FRandRange(
-				MinimumElevationDegrees,
-				MaximumElevationDegrees);
+				Tuning.MinElevationDegrees,
+				Tuning.MaxElevationDegrees);
 			const float ElevationSign = RandomStream.FRand() < 0.5f ? -1.0f : 1.0f;
 			const float ElevationRadians = FMath::DegreesToRadians(ElevationDegrees * ElevationSign);
 			const float HorizontalMagnitude = FMath::Cos(ElevationRadians);
@@ -181,7 +179,8 @@ bool FShopUnboxingCluster::BuildLayout(
 				GetPairTargetDepth(
 					HalfExtents[PlacedIndices[AnchorIndex]],
 					CandidateExtent,
-					RequestedDepthCm));
+					RequestedDepthCm,
+					Tuning.PairDepthExtentRatio));
 			if (Candidate.Center.ContainsNaN())
 			{
 				continue;
@@ -193,7 +192,8 @@ bool FShopUnboxingCluster::BuildLayout(
 				const float PairLimit = GetPairTargetDepth(
 					HalfExtents[CandidateIndex],
 					HalfExtents[PlacedIndices[ExistingIndex]],
-					RequestedDepthCm) + PairDepthToleranceCm;
+					RequestedDepthCm,
+					Tuning.PairDepthExtentRatio) + Tuning.DepthToleranceCm;
 				const float PenetrationDepth = ComputePenetrationDepth(
 					Candidate.Center,
 					Candidate.YawDegrees,

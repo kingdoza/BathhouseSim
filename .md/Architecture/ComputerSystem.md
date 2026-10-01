@@ -4,7 +4,11 @@
 
 이 문서는 월드 모니터 기반 컴퓨터 상호작용의 현재 native 구현을 정의한다. Computer Actor, player session component, interaction suppression, sample widget과 욕탕 관리 native Widget은 Source에 구현되었고 Blueprint/Editor 연결은 후속 단계다. 욕탕 관리 화면의 상세 계약은 [BathWaterManagementUISystem.md](BathWaterManagementUISystem.md)를 따른다.
 
-2026-09-26 설계(Source 미반영): 포커스인 뒤 클릭 없이 E로 이탈, ESC 이탈, 진입마다 커서 화면 중앙, 컴퓨터별 고정 위치·방향 이탈과 막힘 시 근처 빈자리 탐색을 추가한다. 입력은 `.md/PROMPT_ARCHITECTURE.md`(컴퓨터 포커스 진입·이탈 수정, CMP-001~020)와 `.md/QNA_FEATURE_SPEC.md` Q62~Q68이다.
+2026-09-26 설계(Source 반영 `61f72c1`, 사용자 PIE 수용 대기): 포커스인 뒤 클릭 없이 E로 이탈, ESC 이탈, 진입마다 커서 화면 중앙, 컴퓨터별 고정 위치·방향 이탈과 막힘 시 근처 빈자리 탐색을 추가한다. 입력은 `.md/PROMPT_ARCHITECTURE.md`(컴퓨터 포커스 진입·이탈 수정, CMP-001~020)와 `.md/QNA_FEATURE_SPEC.md` Q62~Q68이다.
+
+2026-10-01 버그 `BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`: 클릭 없는 E 이탈 실패의 원인은 2026-09-25 당시 `SetWidgetToFocus(화면)`였으며 위 설계로 이미 수정됐다. 이번에는 production 변경 없이 아래 Keyboard Focus Invariant를 지키는 자동화만 추가한다.
+
+2026-10-01 `COMPUTER-WHEEL-SCROLL` 구현(Source 반영, 자동화 통과, 사용자 PIE 대기): Active 동안 실제 휠 양을 virtual pointer로 화면에 주입한다. 그러면 커서 아래 가장 안쪽 스크롤 영역이 엔진 규칙대로 스크롤된다. 아래 Input Routing과 `Screen Wheel Scroll`이 정본이고, 입력 계약은 `.md/Work/COMPUTER-WHEEL-SCROLL/`(CWS-001~020)이다.
 
 2026-10-01 서비스 4단위 설계: 세신 포커스(`UPlayerScrubFocusComponent`)가 이탈 위치 helper `FComputerFocusExitPlacement::Resolve`를 재사용한다. 컴퓨터 component는 수정하지 않는다. Character의 컴퓨터 전용 입력 차단 검사는 `IsFocusCapturingInput()`(컴퓨터 || 세신)로 바뀌며, 컴퓨터 쪽 결과는 같다([ServiceAmenitySystem.md](ServiceAmenitySystem.md)).
 
@@ -149,7 +153,16 @@ private 비-UObject helper `FComputerFocusExitPlacement`(`Private/Computer/Compu
 - `CancelAction` Started(신규, 기본 ESC): computer phase가 `FocusingIn`·`Active`면 focus-out을 요청하고, `FocusingOut`이면 무시한다. computer를 쓰지 않으면 아무것도 하지 않으며 placement·레버·회수 등 다른 동작에 전달하지 않는다. Started 한 번만 쓰므로 누르고 있어도 전환은 한 번이다.
 - `PrimaryUseAction` Started/Triggered/Completed/Canceled: input owner priority `Computer > Placement > Equipment`를 유지한다. Computer가 `Active`일 때 left pointer press/release를 소유한다.
 - deprecated `ComputerClickAction`은 `PrimaryUseAction`이 비어 있는 기존 Blueprint를 위한 fallback으로만 유지한다.
+- 휠(`PlacementRotateAction` = `IA_PlacementRotate`, 공용 휠 intent, Triggered): Character `MouseWheelInput`이 분기한다. computer phase가 `Inactive`가 아니면 `UPlayerComputerUseComponent::ScrollPointerWheel(Delta)`로 보내고 끝낸다. 실제 주입은 Active일 때만이다. 세신 포커스 capture면 소비한다. 그 밖에는 기존 Placement 회전이다. computer capture 중 휠은 Placement에 닿지 않는다. 새 Input Action을 만들지 않는 근거는 작업 폴더 `PROMPT_IMPLEMENTATION.md` 4.2다.
 - Move/Look/Jump/Sprint/F/G: computer session이 input을 capture하는 동안 Character의 input-facing handler와 공개 `DoMove`/`DoLook`/`DoJumpStart` 경로에서 domain 호출 전에 차단한다.
+
+### Keyboard Focus Invariant
+
+- 실제 사용자(local player Slate user)의 키보드·휠 focus는 컴퓨터 사용 중에도 game viewport에 있다. 그래서 E·ESC·휠은 `FSceneViewport` → PlayerInput → Enhanced Input → Character 분기로 들어온다.
+- world-space 화면은 `UWidgetComponent` virtual window 안에 있다. 여기에 실제 사용자 focus를 주면(`FInputModeGameAndUI::SetWidgetToFocus`, `UWidget::SetFocus`·`SetKeyboardFocus`·`SetUserFocus`) local player `SlateOperations`가 frame 끝에 그 user의 focus를 virtual window로 옮긴다. 그러면 key 이벤트가 viewport에 오지 않는다. 화면을 실제로 클릭해야 viewport가 focus를 되찾는다. 이것이 2026-09-25 보고 현상이었다.
+- 화면 입력은 `UWidgetInteractionComponent` virtual user로만 주입한다. 버튼·슬라이더 클릭이 바꾸는 focus는 virtual user 것이며 실제 사용자 focus와 무관하다.
+- 새 화면 입력은 같은 경로를 확장한다. Enhanced Input action → Character의 computer phase 분기 → `UPlayerComputerUseComponent` → widget interaction virtual user 주입 순서다. 휠(`Screen Wheel Scroll`)이 첫 사례다. 실제 사용자 focus·`bReceiveHardwareInput`을 화면에 주는 방식은 쓰지 않는다. Slate는 휠을 키보드 focus가 아니라 실제 커서 아래 widget(game viewport)으로 라우팅하므로 휠의 viewport 도달은 focus 상태와 무관하다.
+- 자동화 `BathhouseSim.Computer.Input.ActiveFocusKeepsKeyboardOnGameViewport`가 harness game viewport(`UGameViewportClient` + `FSceneViewport`)로 이를 검증한다. 진입 뒤 local player `SlateOperations`에 viewport 외 focus 요청이 없어야 하고, 이탈 뒤에는 viewport focus가 복구돼야 한다. 실제 키보드 이벤트 도달은 사용자 PIE CMP-001이 확인한다.
 
 전체 `DisableInput()`은 종료 E와 pointer 입력까지 막으므로 사용하지 않는다. 기존 mapping context는 교체하지 않는다. ESC는 computer 전용이 아닌 범용 `취소/뒤로` intent `IA_Cancel`로 추가하고, E를 매핑한 기존 IMC에 Escape를 매핑한다. 이후 게임 메뉴·범용 포커스아웃이 같은 action을 재사용하며 이번에는 computer 이탈만 연결한다.
 
@@ -177,6 +190,23 @@ native C++은 construct/destruct의 대칭 delegate 연결, 클릭 여부와 tex
 
 focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다. 따라서 마지막 클릭 상태는 같은 computer Actor lifetime 동안 유지되고 재진입 시 그대로 보인다. Actor 파괴 또는 level reload 뒤의 영속 저장은 현재 범위 밖이다.
 
+### Screen Wheel Scroll
+
+2026-10-01 설계, Source 미반영.
+
+- `UPlayerComputerUseComponent::ScrollPointerWheel(float WheelDelta)`(C++ 전용)는 private gate `CanInjectPointerWheel`이 통과할 때만 `UWidgetInteractionComponent::ScrollWheel(WheelDelta)`를 호출한다. 값의 부호·배율은 바꾸지 않는다.
+- gate 조건: phase `Active`, widget interaction 유효·hit testing 켜짐, 휠 양 finite·non-zero, 현재 컴퓨터 `ScreenWidget` 유효, hovered widget component == 그 `ScreenWidget`. 엔진은 hit testing이 꺼져 있으면 hover 경로를 갱신하지 않으므로, 이전 세션·다른 화면의 낡은 경로로 주입하지 않기 위한 조건이다.
+- 신규 상태·Tick·delegate·UPROPERTY는 없다. 주입은 press/release와 같은 virtual user·pointer index를 쓴다.
+- 엔진은 마지막 hover 경로로 wheel 이벤트를 bubble한다. 커서 아래 가장 안쪽 `SScrollBox`가 실제로 움직였을 때만 소비하고, 끝이거나 내용이 작으면 바깥으로 넘긴다.
+  - 그래서 중첩 규칙, 영역 밖 무반응, 슬라이더 위 휠(`SSlider`가 휠을 처리하지 않음 → 상세 영역 스크롤)이 영역별 코드 없이 성립한다.
+  - 화면 widget은 `NativeOnMouseWheel`을 override하지 않는다. C++은 ScrollBox를 찾아 직접 스크롤하지 않는다.
+- 한 칸 이동량의 단일 authoring 위치는 각 WBP `UScrollBox`의 `WheelScrollMultiplier`다. 실제 이동은 엔진 cvar `Slate.GlobalScrollAmount` × multiplier × 휠 양이다.
+  - `ConsumeMouseWheel != Never`와 `AnimateWheelScrolling=false`가 계약이다.
+  - C++ 설정값은 두지 않는다. 이동량 원본 위치는 각 WBP ScrollBox의 `WheelScrollMultiplier`이며 Unreal `InteractionUISystem.md`도 수치 없이 그 위치만 기록한다.
+- 스크롤 위치는 엔진 widget 표시 상태다. focus-out이 widget을 파괴하지 않으므로 재진입·탭 전환 뒤에도 유지되고 저장하지 않는다.
+- 1 frame 한계: Active 전환 직후 첫 hover 갱신 전과 LMB release 직후(엔진이 경로를 비움)의 같은 frame 휠은 무시되거나 직전 경로로 간다. 엔진 protected API를 우회하지 않는다.
+- 자동화: `BathhouseSim.Computer.Input.WheelScrollsHoveredScrollBoxThroughSlate`(실제 Slate routing), `WheelRoutesByComputerPhase`(분기·gate), `ScreenWheelContentContract`(WBP·IA·IMC 전제 load 검증). headless에서는 world 화면 hover를 만들 수 없다(`-nullrhi`면 widget hit-test grid가 비어 있음). 그래서 hover→주입 결합은 사용자 PIE가 확인한다.
+
 욕탕 관리 화면의 native hierarchy, 지도 투영, slider request와 refresh 정책은 [BathWaterManagementUISystem.md](BathWaterManagementUISystem.md)가 정본이다. 기존 sample widget은 삭제하지 않고 회귀와 asset 호환을 위해 보존한다.
 
 ## Dependencies
@@ -191,7 +221,7 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
 - Computer/UI management screen -> Bath Water Operations snapshot/request API
 - Interaction은 Computer concrete type에 의존하지 않는다.
 
-현재 `UMG`, `InputCore`와 `EnhancedInput` module dependency로 구현한다. direct Slate API 사용처가 없으므로 `Slate`, `SlateCore`를 추가하지 않는다.
+현재 `UMG`, `InputCore`와 `EnhancedInput` module dependency로 구현한다. production Computer 코드는 direct Slate API를 쓰지 않는다. `Slate`, `SlateCore` private dependency는 자동화 테스트 harness(`SViewport`, `SVirtualWindow`, `FSlateApplication`) use site 때문에만 있다([CoreSystem.md](CoreSystem.md)).
 
 ## Blueprint/API Contracts
 
@@ -211,7 +241,7 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
 ## Out Of Scope
 
 - fullscreen viewport UI와 game pause
-- 범용 desktop, app window, keyboard text input와 scroll
+- 범용 desktop, app window, keyboard text input, 키보드·드래그 관성 스크롤과 가로 스크롤(화면 스크롤 영역의 마우스 휠 스크롤은 범위 안, `Screen Wheel Scroll`)
 - 계정, 결제, 경제 또는 저장 데이터
 - 여러 player의 network replication
 - level reload를 넘는 monitor 상태 저장
@@ -220,13 +250,14 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
 ## Manual Review Points
 
 - 빈손일 때만 진입하며 실패 query와 execute가 동일한 이유를 반환하는지 확인한다.
-- Active 전환이 screen widget에 keyboard focus를 주지 않고 viewport focus·커서 중앙·hit testing 순서를 지키는지 확인한다.
+- Active 전환이 screen widget에 keyboard focus를 주지 않고 viewport focus·커서 중앙·hit testing 순서를 지키는지 확인한다. 화면 Widget·WBP graph에 실제 사용자 focus 호출(`SetFocus`·`SetKeyboardFocus`·`SetUserFocus`·`SetWidgetToFocus`)이 없는지 확인한다.
 - 정상 이탈이 진입 위치와 무관하게 고정 위치·방향으로 teleport한 뒤 blend하고, 비정상 복구는 teleport하지 않는지 확인한다.
 - 막힘 탐색이 다른 actor를 옮기지 않고 벽 너머 후보를 고르지 않는지 확인한다.
 - 진입에 사용한 E release는 유지되고 새로운 E Started만 focus-out을 시작하는지 확인한다.
 - focus-in/out과 반복 E에서도 reservation, timer와 input lock이 정확히 한 번 정리되는지 확인한다.
 - 사용 중 Move/Look/Jump/Sprint/F/G와 world trace가 mutation을 만들지 않는지 확인한다.
 - mouse press/release와 focus-out 강제 release가 button stuck 또는 double click을 만들지 않는지 확인한다.
+- 휠이 Active·hover gate를 거쳐 값 그대로 virtual pointer에 주입되는지 확인한다. computer capture 중에는 Placement에 닿지 않고, 화면 widget에 휠 코드·focus 호출이 없는지 확인한다.
 - monitor가 정면으로 보이면서 주변 목욕탕이 viewport에 남는지 플레이 테스트한다.
 - focus-out/re-entry 뒤 `클릭 확인` 상태가 유지되고 widget construct가 반복되지 않는지 확인한다.
 - active focus에서는 FXAA가 적용되고 정상 종료와 강제 cleanup 뒤에는 진입 전 AA method가 복구되는지 확인한다.

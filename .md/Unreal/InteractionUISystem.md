@@ -20,7 +20,8 @@ Summary의 접두사별 이름은 표기된 접두사에 `CapacityText`, `Capaci
 
 ## 컴퓨터 연결
 
-- `/Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer`의 inherited `ScreenWidget.WidgetClass`는 `/Game/Bathhouse/UI/WBP_BathWaterManagementScreen.WBP_BathWaterManagementScreen_C`다.
+- `/Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer`의 inherited `ScreenWidget.WidgetClass`는 탭 root `/Game/Bathhouse/UI/WBP_ComputerScreenRoot.WBP_ComputerScreenRoot_C`다. CDO와 DefaultMap instance가 같고 instance override는 없다(2026-10-01 읽기 전용 조사, `COMPUTER-WHEEL-SCROLL`).
+- `WBP_ComputerScreenRoot`는 `RootOverlay > RootSize (SizeBox 1024×576) > RootFrame > RootColumn` 아래에 `TabBar`(`ManagementTabButton`, `ShopTabButton`)와 `ScreenSwitcher`를 둔다. Switcher index 0은 `ManagementScale`(ScaleBox) > `ManagementScreen`(`WBP_BathWaterManagementScreen_C`), index 1은 `ShopScreen`(`WBP_ShopScreen_C`, ScaleBox 없음)이다. 조상 widget은 모두 Visible 또는 SelfHitTestInvisible이라 스크롤 영역 hit test를 막지 않는다.
 - ScreenWidget은 World Space, Draw Size (1024,576), Receive Hardware Input false를 유지한다. Focus camera 기본값은 변경하지 않았다.
 - 새 Editor 프로세스 재로드에서 BP_BathhouseComputer CDO의 FocusExitPoint 위치는 (1500,0,-228.5714285714), 회전은 (0,180,0), SearchRadius는 100cm였다. FocusExitArrow는 이 컴포넌트 자식이며 local 원점/회전 0, editor-only, 길이 80cm다. DefaultMap 컴퓨터 인스턴스도 동일한 상대 transform을 재로드했다. Actor transform은 위치 (-470,0,160), yaw 0, scale (0.12,1.2,0.7)이며 계산된 world 발 위치는 (-290,0,0), 방향은 컴퓨터를 향하는 -X다. 이전 MCP 인계의 X=1000은 stale한 값이며 새 프로세스 재로드 결과를 현재 저장 상태로 본다.
 - Level computer instance의 ManagedBathPlacementZone은 BP_FacilityPlacementZone_C_UAID_F02F7433CA36D1FF02_1155169559를 참조한다. CDO 속성은 None이므로 class default와 Level instance 참조를 구분한다.
@@ -31,6 +32,28 @@ Summary의 접두사별 이름은 표기된 접두사에 `CapacityText`, `Capaci
 - Level reference는 World Partition external actor `/Game/__ExternalActors__/Maps/DefaultMap/7/EH/E4FLO971KSWUJ40H7W7PHK`에 저장됐다. `DefaultMap.umap` 자체는 이 연결 때문에 변경하지 않았다.
 
 UE 5.8 DLL 빌드 후 새 Editor에서 다섯 WBP와 컴퓨터 BP의 Data Validation 6/6 `VALID`를 확인했다. PIE의 1024×576 RenderTarget에는 Zone 격자·경계, Bath 타일 2개, utility summary와 detail이 표시됐다. 타일 Button의 `OnClicked` 이벤트를 호출하면 선택·detail·slider 활성화가 갱신된다. 실제 플레이어 LMB 조준/클릭과 물 제어·회수 전체 시나리오는 아직 직접 플레이 검증이 필요하며 [USER_UNREAL.md](../USER_UNREAL.md)에 남겼다. 이번 FocusExitPoint/취소 입력 변경은 fresh-process reload와 PIE 시작·종료까지만 확인했고, Data Validation과 E/ESC/마우스 입력 수용은 미완료다.
+
+### 컴퓨터 화면 스크롤 영역
+
+컴퓨터 화면의 휠 스크롤 대상은 아래 `ScrollBox` 4개뿐이다. 모두 세로(Orientation Vertical)이고 서로 중첩되지 않는다. `/Game/Bathhouse/UI`의 다른 WBP(상품 카드·장바구니 행·주문 행·지도·타일·용량 요약·관리 화면·root 포함)에는 ScrollBox가 없다.
+
+| ScrollBox | WBP와 경로 | 내용 |
+|---|---|---|
+| `ProductScroll` | `WBP_ShopScreen` `/RootOverlay/ShopFrame/ShopBody/ProductColumn/ProductScroll` | `ProductGrid`(WrapBox) |
+| `CartScroll` | `WBP_ShopScreen` `…/ShopBody/CartPanel/CartColumn/CartScroll` | `CartList`(VerticalBox), `OrderScroll`과 형제 |
+| `OrderScroll` | `WBP_ShopScreen` `…/ShopBody/CartPanel/CartColumn/OrderScroll` | `OrderList`(VerticalBox) |
+| `DetailScroll` | `WBP_BathWaterDetail` `/RootOverlay/DetailFrame/DetailScroll` | `DetailColumn`(상세 문구, `CirculationSlider`·`TargetTemperatureSlider`와 라벨) |
+
+- 휠 계약 설정(네 영역 공통, [ComputerSystem.md](../Architecture/ComputerSystem.md) `Screen Wheel Scroll`): `ConsumeMouseWheel=WhenScrollingPossible`, `AnimateWheelScrolling=false`. 휠 경로는 엔진이 overscroll을 막아 끝에서 멈추고, 내용이 영역보다 작거나 끝이면 휠을 처리하지 않고 바깥으로 넘긴다.
+- 한 칸 이동량의 원본은 각 ScrollBox의 `WheelScrollMultiplier` 프로퍼티(영역별 authoring 위치)와 엔진 cvar `Slate.GlobalScrollAmount`다. 한 칸 = `Slate.GlobalScrollAmount` × 그 ScrollBox의 `WheelScrollMultiplier`이며 단위는 ScrollBox local unit이다. 이 문서는 수치를 기록하지 않는다. `WheelScrollMultiplier` 현재 값은 Editor에서 해당 ScrollBox를 읽거나 자동화 `BathhouseSim.Computer.Input.ScreenWheelContentContract`의 Info 로그로 확인하고, cvar 값은 Editor 콘솔에서 읽는다.
+- `DetailScroll`은 root의 `ManagementScale`(ScaleBox) 안이라 같은 local 이동량이 컴퓨터 화면 px로는 더 작게 보인다. 상점의 세 영역은 ScaleBox 밖이다.
+- 이동량 감각 조정은 해당 ScrollBox의 `WheelScrollMultiplier`만 바꾼다. 휠 분기·주입·hover gate는 C++(`AFirstPersonCharacter`, `UPlayerComputerUseComponent`)가 소유하므로 WBP에 휠 이벤트 graph, `OnMouseWheel` override, ScrollBox 직접 조작을 만들지 않는다.
+- 두 Slider에는 휠 설정이 없고 엔진 Slider는 휠을 처리하지 않으므로, 슬라이더 위 휠은 `DetailScroll`로 올라간다.
+
+### 공용 휠 입력
+
+- `/Game/Input/IMC_FirstPerson`의 `MouseWheelAxis → /Game/Input/Actions/IA_PlacementRotate`(Axis1D, modifier·trigger 없음)는 프로젝트의 유일한 마우스 휠 mapping이며 공용 휠 intent다. 컴퓨터를 쓰지 않을 때는 배치 회전, 컴퓨터 사용 중에는 화면 스크롤로 쓰인다(분기는 C++). `BP_FirstPersonCharacter.PlacementRotateAction=IA_PlacementRotate`이고 `IMC_Default`·`IMC_MouseLook`에는 mapping이 없다.
+- 아키텍처 설계 없이 이 mapping이나 `IA_PlacementRotate`에 modifier·trigger를 추가하거나 두 번째 휠 mapping을 만들지 않는다. 자동화 `ScreenWheelContentContract`가 이 전제를 load 검증한다.
 
 
 ## 서비스 단계 연결

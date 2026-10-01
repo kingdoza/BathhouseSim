@@ -7,6 +7,7 @@
 #include "Cleaning/LitterSpawnZoneActor.h"
 #include "Cleaning/LitterTongsActor.h"
 #include "Cleaning/StainSpawnZoneActor.h"
+#include "Cleaning/TrashBagDropPlacement.h"
 #include "Cleaning/TrashBagActor.h"
 #include "Cleaning/TrashCollectionZoneActor.h"
 #include "Cleaning/WaterStainActor.h"
@@ -80,6 +81,8 @@ namespace CleaningLitterTest
 		Result.CarryComponent = Player.Carry;
 		Result.InteractionComponent = Player.Interaction;
 		Result.Camera = Player.Camera;
+		Result.CameraOrigin = Player.Camera->GetComponentLocation();
+		Result.CameraDirection = Player.Camera->GetForwardVector().GetSafeNormal();
 		if (Focus)
 		{
 			Result.FocusHit = FHitResult(Focus, Focus->FindComponentByClass<UPrimitiveComponent>(),
@@ -138,5 +141,23 @@ namespace CleaningLitterTest
 		Set<FClassProperty>(Result, TEXT("TiedBagClass"), ATrashBagActor::StaticClass());
 		BeginActorPlayIfNeeded(Result);
 		return Result;
+	}
+
+	/** Tie drop request exactly as the tongs build it: camera from the use context, tuning from the CDO values. */
+	inline FTrashBagDropRequest TieRequest(UWorld* World, FPlayer& Player)
+	{
+		auto* Equipment = Tongs(World);
+		FTrashBagDropRequest Request;
+		Equipment->BuildTieDropRequest(Context(Player, Equipment), Request);
+		Equipment->Destroy();
+		return Request;
+	}
+
+	/** Tie request with the view-front stage skipped (invalid pull step) so only the floor-front stage runs. */
+	inline FTrashBagDropRequest TieFloorOnlyRequest(UWorld* World, FPlayer& Player)
+	{
+		FTrashBagDropRequest Request = TieRequest(World, Player);
+		Request.ViewPullStepCm = 0.0f;
+		return Request;
 	}
 } // namespace CleaningLitterTest

@@ -11,6 +11,7 @@ class UCameraComponent;
 class UFirstPersonMovementComponent;
 class UPlayerCarryComponent;
 class UPlayerInteractionComponent;
+class UWidgetComponent;
 class UWidgetInteractionComponent;
 
 enum class EPlayerComputerUsePhase : uint8
@@ -45,6 +46,8 @@ public:
 
 	bool PressPointer();
 	void ReleasePointer();
+	// Active 동안 커서 아래 화면 경로로 휠 양을 virtual pointer에 주입한다. 주입했으면 true.
+	bool ScrollPointerWheel(float WheelDelta);
 
 	bool IsCapturingInput() const { return Phase != EPlayerComputerUsePhase::Inactive; }
 	bool IsActive() const { return Phase == EPlayerComputerUsePhase::Active; }
@@ -54,6 +57,7 @@ public:
 private:
 	friend class FBathhouseComputerSessionTest;
 	friend class FBathhouseHeldTargetUseOwnerRoutingTest;
+	friend class FBathhouseComputerWheelRoutingTest;
 
 	APlayerController* ResolvePlayerController() const;
 	AActor* ResolveReturnViewTarget(APlayerController* PlayerController) const;
@@ -67,6 +71,7 @@ private:
 	void RestoreFocusedAntiAliasingOverride();
 	void ClearBlendTimer();
 	bool HasValidConfiguredContext() const;
+	bool CanInjectPointerWheel(float WheelDelta, const UWidgetComponent* HoveredComponent) const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UCameraComponent> Camera = nullptr;

@@ -11,6 +11,7 @@ tools: Read, Grep, Glob, Bash, PowerShell, Edit, Write
 작업 규칙:
 
 - 인계 패킷의 작업 ID, 작업 폴더(`.md/Work/<작업 ID>/`), 단계, 시나리오 범위, 읽을 문서 목록과 단계 시작 커밋을 따른다. 목록 밖 문서는 필요할 때만 읽고 이유를 보고한다.
+- 질문지는 질문별 답변 칸·전제 이의 칸·S2~S4를 둔다. 답변을 받으면 확정본을 쓰고 `AGENT_FEATURE_SPEC.md`의 자동 승인 조건을 점검해, 만족하면 상태를 `완료`로 바꾸고 아니면 추가 확인 항목만 보고한다.
 - 결과물은 작업 폴더에 쓰고 `.md/AGENT_WORKFLOW.md`의 결과물 첫머리 형식을 따른다.
 - `.md/FEEDBACK_BACKLOG.md` 색인에서 자기 역할 태그와 현재 시스템의 `Active` 항목만 적용한다.
 - 커밋하지 않는다. `AGENT_*.md`와 `FEEDBACK_BACKLOG.md` 일반화 항목을 수정하지 않는다.

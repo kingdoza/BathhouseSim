@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 
+#include "Shop/ShopUnboxingTuning.h"
+
 struct FShopUnboxClusterItem
 {
 	FVector Center = FVector::ZeroVector;
@@ -14,6 +16,7 @@ public:
 	static bool BuildLayout(
 		const TArray<FVector>& HalfExtents,
 		float DepthCm,
+		const FShopUnboxClusterTuning& Tuning,
 		FRandomStream& RandomStream,
 		TArray<FShopUnboxClusterItem>& OutItems);
 

@@ -6,7 +6,7 @@
 
 사용자 동작, 구조, Public API, Blueprint 계약과 Content를 임의로 변경하지 않는다.
 
-기본 실행은 Codex 워커이며 GPT 사용 한도에 도달하면 Claude 구현 대체 워커가 같은 규칙으로 이어서 구현한다. 대체 워커는 현재 작업 트리와 인계 패킷에서 시작한다.
+마스터 세션에서는 Claude 구현 워커(`.claude/agents/bathhouse-implementation.md`)로 실행된다. 재작업이면 현재 작업 트리와 인계 패킷에서 이어서 구현한다.
 
 ## 진입 조건과 필수 문서
 
@@ -43,7 +43,7 @@
 6. 각 시나리오 ID를 구현 경로와 가능한 자동화 테스트에 연결한다.
 7. success/cancel/failure/rollback, BeginPlay 순서와 중복 호출을 검증한다.
 8. 변경 후 클래스 성장과 C++/Blueprint 책임 경계를 다시 확인한다.
-9. diff 검사, focused search와 가능한 UBT 빌드를 수행한다.
+9. diff 검사, focused search와 가능한 UBT 빌드를 수행한다. 빌드·Automation 명령은 [UE_BUILD_POLICY.md](UE_BUILD_POLICY.md)를 따른다.
 10. 실제 구조가 바뀌었다면 Architecture 정본을 현재 상태로 갱신한다.
 11. 코드 리뷰와 Unreal 작업 프롬프트를 작성한다.
 
@@ -69,6 +69,7 @@
 
 - runtime 상태, delegate lifecycle, 입력 판단, validation, 데이터 변환과 domain API 호출은 C++에 둔다.
 - Widget Blueprint는 hierarchy, layout, style, animation, asset 연결만 담당한다.
+- 설계가 원본을 지정한 조정값을 코드 상수로 복제하지 않는다. 자동화 테스트도 기대값을 원본에서 읽거나 계산한다([AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) 조정값 원본 원칙).
 - reflected rename·삭제는 승인된 migration, Core Redirect, Editor 재시작과 compile/save 계획 없이는 진행하지 않는다.
 - Content 작업이 필요하면 구현을 숨기지 않고 `PROMPT_UNREAL.md`에 exact asset과 계약을 인계한다.
 - 실제 Editor 구조가 Unreal 정본과 다를 가능성을 구현 가정으로 해결하지 않는다.
@@ -97,7 +98,6 @@
 - 클래스 크기·책임 변화
 - Blueprint/API/Core Redirect 영향
 - 빌드와 정적 검증 결과, 빌드 시점 Source 식별값과 빌드 로그 경로
-- 구현 대체 중이면 그 사실
 - 리뷰 중점, 전역 영향과 미검증
 
 ## `PROMPT_UNREAL.md`

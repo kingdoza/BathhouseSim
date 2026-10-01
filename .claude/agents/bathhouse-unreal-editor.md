@@ -14,4 +14,4 @@ effort: high
 - `.md/FEEDBACK_BACKLOG.md` 색인에서 자기 역할 태그와 현재 시스템의 `Active` 항목만 적용한다.
 - 빌드·Automation·commandlet이 10분을 넘길 수 있으면 백그라운드로 실행하고 완료를 확인한 뒤 결과를 읽는다.
 - 커밋하지 않는다. `AGENT_*.md`와 `FEEDBACK_BACKLOG.md` 일반화 항목을 수정하지 않는다.
-- 완료 보고는 결론과 파일 경로 중심 20줄 이내로 쓴다.
+- 완료 보고는 결론과 파일 경로 중심 20줄 이내로 쓴다. `REPORT_UNREAL_*.md`는 직접 쓰지 않고 첫머리를 갖춘 전문을 저장 경로와 함께 보고 뒤에 붙인다(마스터가 저장). Unreal 정본·`USER_UNREAL.md`는 직접 갱신한다.

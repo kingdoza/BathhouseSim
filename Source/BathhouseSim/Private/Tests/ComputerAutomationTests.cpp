@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Tests/BathhouseCleaningTowelTestProbe.h"
+#include "ComputerAutomationTestSupport.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
@@ -34,51 +35,8 @@
 
 namespace
 {
-class FScopedComputerAutomationWorld
-{
-public:
-	explicit FScopedComputerAutomationWorld(const TCHAR* BaseName)
-	{
-		if (!GEngine)
-		{
-			return;
-		}
-		const FName WorldName = MakeUniqueObjectName(nullptr, UWorld::StaticClass(), BaseName);
-		FWorldContext& WorldContext = GEngine->CreateNewWorldContext(EWorldType::Game);
-		World = UWorld::CreateWorld(EWorldType::Game, false, WorldName, GetTransientPackage());
-		if (!World)
-		{
-			GEngine->DestroyWorldContext(World);
-			return;
-		}
-		World->AddToRoot();
-		WorldContext.SetCurrentWorld(World);
-		World->InitializeActorsForPlay(FURL());
-	}
-
-	~FScopedComputerAutomationWorld()
-	{
-		if (World && GEngine)
-		{
-			World->DestroyWorld(false);
-			GEngine->DestroyWorldContext(World);
-			World->RemoveFromRoot();
-		}
-	}
-
-	UWorld* Get() const { return World; }
-
-private:
-	UWorld* World = nullptr;
-};
-
-void BeginActorForComputerTest(AActor* Actor)
-{
-	if (Actor && !Actor->HasActorBegunPlay())
-	{
-		Actor->DispatchBeginPlay();
-	}
-}
+using ComputerAutomationTestSupport::FScopedComputerAutomationWorld;
+using ComputerAutomationTestSupport::BeginActorForComputerTest;
 
 void ConfigureCarryMesh(AActor* Actor, UStaticMesh* Mesh)
 {

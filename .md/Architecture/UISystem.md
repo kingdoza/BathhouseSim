@@ -164,7 +164,7 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - map tile은 C++이 class와 bath snapshot을 사용해 동적으로 생성·제거한다. Blueprint Event Graph가 actor를 검색하거나 tile 수명을 소유하지 않는다.
 - world `+X`를 화면 위, world `+Y`를 화면 오른쪽으로 투영하며 bath footprint 크기와 yaw를 함께 표시한다.
 - tile은 이름·실제 수온·오염도·상태색, detail은 수위·실제/목표 수온·오염도·순환도·요구량·임계치와 용량 부족 상태를 표시한다.
-- slider callback은 subsystem request API에 intent를 전달하고 committed/limited result만 presentation에 반영한다.
+- slider callback은 subsystem request API에 intent를 전달하고 committed/limited result만 presentation에 반영한다. 손잡이는 같은 callback 안에서 확정값으로 되돌린다([BathWaterManagementUISystem.md](BathWaterManagementUISystem.md) Slider Synchronization).
 - UI는 `10%`를 상수로 저장하지 않고 condition snapshot의 파생 임계치를 표시한다.
 - 구조 revision이 바뀔 때만 map을 rebuild하고, 연속 값은 presentation cache가 달라질 때만 갱신한다.
 - 지도는 Zone world 종횡비를 보존한 중앙 letterbox content rect와 네 world corner의 단일 투영 결과로 위치·크기·yaw를 계산한다.
@@ -182,6 +182,7 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 2026-09-27 설계, Source 미반영. 계약은 [ShopSystem.md](ShopSystem.md) UI 절이 정본이다.
 
 - `UComputerScreenRootWidget`: 관리·상점 탭과 `UWidgetSwitcher`, 컴퓨터 context·사용자 전달. 탭 index는 표시 상태다.
+- 화면 스크롤 영역의 마우스 휠은 virtual pointer 주입과 엔진 `SScrollBox`가 처리한다. 화면 widget은 휠 코드(`NativeOnMouseWheel`, C++ 스크롤 조작)를 갖지 않는다. 영역별 이동량은 WBP `UScrollBox` 설정이 소유한다([ComputerSystem.md](ComputerSystem.md) Screen Wheel Scroll).
 - `UShopScreenWidget`과 행 widget 3종: domain API 호출과 표시만 한다. cart·주문·돈을 보관하지 않는다.
 - `ABathhouseHUD`는 `UMoneyHudWidget`(잔액·2초 변화량)과 `UShopNoticeWidget`(배송 도착)을 추가로 생성한다. 두 widget은 PlayerState wallet과 order subsystem delegate를 구독하고 EndPlay에 대칭 해제한다.
 
