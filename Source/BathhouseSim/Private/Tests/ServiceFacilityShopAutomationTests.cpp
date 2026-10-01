@@ -14,7 +14,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBathhouseServiceUnitTwoShopTest,
 bool FBathhouseServiceUnitTwoShopTest::RunTest(const FString& Parameters)
 {
 	FScopedUtilityLaborWorld Scope(TEXT("UnitTwoShopWorld"));
-	FFixture Fixture(Scope.Get());
+	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!Fixture.Install(*this))
 	{
 		return false;

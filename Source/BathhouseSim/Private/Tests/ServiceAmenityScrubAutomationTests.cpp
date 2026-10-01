@@ -30,9 +30,17 @@ bool FServiceAmenityScrubFocusTest::RunTest(const FString&)
 			  FString(TEXT("때수건이 필요합니다")));
 	TestFalse(TEXT("No towel begin rejected"), Focus->BeginScrubFocus(Table));
 	auto* Towel = HoldTowel(*F.World, *C.CarryComponent);
-	TestNotNull(TEXT("Towel held"), Towel);
+	if (!TestNotNull(TEXT("Towel held"), Towel))
+	{
+		return false;
+	}
+	TestFalse(TEXT("Towel visible before entry"), Towel->IsHidden());
+	const auto* HeldParent = Towel->GetRootComponent()->GetAttachParent();
 	TestEqual(TEXT("SCRB-004 no user reason"), Table->QueryInteraction(C).FailureReason.ToString(),
 			  FString(TEXT("세신할 손님 없음")));
+	TestFalse(TEXT("Held towel with no user begin rejected"), Focus->BeginScrubFocus(Table));
+	TestFalse(TEXT("Rejected entry keeps towel visible"), Towel->IsHidden());
+	TestTrue(TEXT("Rejected entry keeps cursor hidden"), Table->GetScrubCursor()->bHiddenInGame);
 	auto* User = F.Occupy();
 	if (!TestNotNull(TEXT("User occupied"), User))
 	{
@@ -43,6 +51,13 @@ bool FServiceAmenityScrubFocusTest::RunTest(const FString&)
 	TestFalse(TEXT("SCRB-012 occupied cannot recover"), Table->QueryFacilityRecovery().bSucceeded);
 	TestTrue(TEXT("SCRB-002 E execution enters focus"), Table->ExecuteInteraction(C).bSucceeded);
 	TestEqual(TEXT("Active"), Focus->GetPhase(), EPlayerScrubFocusPhase::Active);
+	TestTrue(TEXT("Active hides held towel"), Towel->IsHidden());
+	TestFalse(TEXT("Active shows scrub cursor"), Table->GetScrubCursor()->bHiddenInGame);
+	TestEqual(TEXT("Active keeps held object"), C.CarryComponent->GetHeldObject(), static_cast<AActor*>(Towel));
+	TestEqual(TEXT("Active keeps carry kind"), C.CarryComponent->GetHeldKind(), EPhysicalCarryKind::ScrubTowel);
+	TestTrue(TEXT("Active preserves held attachment"), Towel->GetRootComponent()->GetAttachParent() == HeldParent);
+	TestFalse(TEXT("Duplicate entry rejected"), Focus->BeginScrubFocus(Table));
+	TestTrue(TEXT("Duplicate entry keeps towel hidden"), Towel->IsHidden());
 	TestTrue(TEXT("Suppressed"), Pawn->GetPlayerInteraction()->IsInteractionSuppressed());
 	TestEqual(TEXT("MOVE_None"), Pawn->GetFirstPersonMovement()->MovementMode.GetValue(), MOVE_None);
 	TestFalse(TEXT("Second scrubber denied"),
@@ -69,17 +84,23 @@ bool FServiceAmenityScrubFocusTest::RunTest(const FString&)
 	Focus->RequestEndScrubFocus();
 	Focus->RequestEndScrubFocus();
 	TestEqual(TEXT("SCRB-007 manual exit inactive"), Focus->GetPhase(), EPlayerScrubFocusPhase::Inactive);
+	TestFalse(TEXT("Manual exit restores towel visibility"), Towel->IsHidden());
+	TestTrue(TEXT("Manual exit hides scrub cursor"), Table->GetScrubCursor()->bHiddenInGame);
 	TestEqual(TEXT("Manual exit preserves gauge"), Table->GetScrubProgress(), AtEdge);
 	TestEqual(TEXT("Towel remains held"), C.CarryComponent->GetHeldObject(), static_cast<AActor*>(Towel));
 	Hud->PollForTest();
 	TestEqual(TEXT("HUD transparent outside focus"), Hud->GetRenderOpacity(), 0.f);
 	TestTrue(TEXT("Reentry succeeds"), Focus->BeginScrubFocus(Table));
+	TestTrue(TEXT("Reentry hides held towel again"), Towel->IsHidden());
 	TestEqual(TEXT("Reentry progress retained"), Table->GetScrubProgress(), AtEdge);
 	Focus->SetRubbing(true);
 	Focus->AddRubInput(FVector2D(100, 100));
 	Focus->AddRubInput(FVector2D(-100, -100));
 	Focus->AddRubInput(FVector2D(100, 100));
 	TestEqual(TEXT("SCRB-008 completion auto exit"), Focus->GetPhase(), EPlayerScrubFocusPhase::Inactive);
+	TestFalse(TEXT("Completion restores towel visibility"), Towel->IsHidden());
+	TestTrue(TEXT("Completion hides scrub cursor"), Table->GetScrubCursor()->bHiddenInGame);
+	TestEqual(TEXT("Completion keeps towel held"), C.CarryComponent->GetHeldObject(), static_cast<AActor*>(Towel));
 	TestTrue(TEXT("SCRB-014 slot immediately empty"), Table->GetFacilitySlots()[0]->IsAvailable());
 	TestTrue(TEXT("User remains to offer cash"), IsValid(User));
 	TestTrue(TEXT("User at stand point"),
@@ -128,7 +149,11 @@ bool FServiceAmenityScrubExpiryTest::RunTest(const FString&)
 	auto* Table = CastChecked<AServiceAmenityTableProbe>(F.Facility);
 	auto* Pawn = F.Character();
 	auto* Focus = Pawn->GetPlayerScrubFocus();
-	HoldTowel(*F.World, *Pawn->GetPlayerCarry());
+	auto* Towel = HoldTowel(*F.World, *Pawn->GetPlayerCarry());
+	if (!TestNotNull(TEXT("Towel held"), Towel))
+	{
+		return false;
+	}
 	auto* User = F.Occupy();
 	auto* Slot = Table->GetFacilitySlots()[0].Get();
 	Focus->BeginScrubFocus(Table);
@@ -140,6 +165,7 @@ bool FServiceAmenityScrubExpiryTest::RunTest(const FString&)
 	TestEqual(TEXT("SCRB-020 knockdown reserves"), Slot->GetSlotState(), EBathhouseFacilitySlotState::Reserved);
 	TestEqual(TEXT("Knockdown clears gauge"), Table->GetScrubProgress(), 0.f);
 	TestEqual(TEXT("Knockdown exits focus"), Focus->GetPhase(), EPlayerScrubFocusPhase::Inactive);
+	TestFalse(TEXT("Knockdown exits focus restores towel visibility"), Towel->IsHidden());
 	TickWorldForDuration(F.World, 91);
 	TestTrue(TEXT("Interrupted wait cannot expire user"), IsValid(User));
 	Slot->BeginUse(User);
@@ -151,6 +177,7 @@ bool FServiceAmenityScrubExpiryTest::RunTest(const FString&)
 	TestTrue(TEXT("SCRB-009/018 expired dummy removed"), !IsValid(User));
 	TestTrue(TEXT("Expiry clears slot"), Slot->IsAvailable());
 	TestEqual(TEXT("Expiry exits focus"), Focus->GetPhase(), EPlayerScrubFocusPhase::Inactive);
+	TestFalse(TEXT("Expiry exits focus restores towel visibility"), Towel->IsHidden());
 	int32 CashCount = 0;
 	for (TActorIterator<ABathhouseCashPaymentActor> It(F.World); It; ++It)
 	{
@@ -162,6 +189,7 @@ bool FServiceAmenityScrubExpiryTest::RunTest(const FString&)
 	User->Destroy();
 	TestTrue(TEXT("Destroy user frees slot"), Slot->IsAvailable());
 	TestEqual(TEXT("Destroy user exits"), Focus->GetPhase(), EPlayerScrubFocusPhase::Inactive);
+	TestFalse(TEXT("Destroy user exits restores towel visibility"), Towel->IsHidden());
 	User = F.Occupy();
 	Slot->EndUse(User);
 	User->Destroy();
@@ -183,7 +211,11 @@ bool FServiceAmenityScrubFailureTest::RunTest(const FString&)
 	auto* Table = CastChecked<AServiceAmenityTableProbe>(F.Facility);
 	auto* Pawn = F.Character();
 	auto* Focus = Pawn->GetPlayerScrubFocus();
-	HoldTowel(*F.World, *Pawn->GetPlayerCarry());
+	auto* Towel = HoldTowel(*F.World, *Pawn->GetPlayerCarry());
+	if (!TestNotNull(TEXT("Towel held"), Towel))
+	{
+		return false;
+	}
 	auto* User = F.Occupy();
 	Table->ConfigureScrub(1, 90);
 	Table->ClearCashClass();
@@ -194,9 +226,12 @@ bool FServiceAmenityScrubFailureTest::RunTest(const FString&)
 	TestTrue(TEXT("Failed spawn keeps session and user"), Table->HasOccupiedUser() && IsValid(User));
 	TestTrue(TEXT("Failed spawn ratio below one"), Table->GetScrubProgress() < 1 && Table->GetScrubProgress() > 0);
 	TestEqual(TEXT("Failed spawn does not complete focus"), Focus->GetPhase(), EPlayerScrubFocusPhase::Active);
+	TestTrue(TEXT("Cash failure keeps towel hidden"), Towel->IsHidden());
+	TestFalse(TEXT("Cash failure keeps cursor visible"), Table->GetScrubCursor()->bHiddenInGame);
 	const FVector Before = Pawn->GetActorLocation();
 	Table->Destroy();
 	TestEqual(TEXT("Destroy table immediate cleanup"), Focus->GetPhase(), EPlayerScrubFocusPhase::Inactive);
+	TestFalse(TEXT("Destroy table immediate cleanup restores towel visibility"), Towel->IsHidden());
 	TestFalse(TEXT("Suppression cleared"), Pawn->GetPlayerInteraction()->IsInteractionSuppressed());
 	TestTrue(TEXT("Destroy does not teleport pawn"), Pawn->GetActorLocation().Equals(Before));
 	TestEqual(TEXT("View restored"), F.Player.Controller->GetViewTarget(), static_cast<AActor*>(Pawn));
@@ -222,6 +257,10 @@ bool FServiceAmenityInputTest::RunTest(const FString&)
 	auto* Pawn = F.Character();
 	auto* Focus = Pawn->GetPlayerScrubFocus();
 	auto* Towel = HoldTowel(*F.World, *Pawn->GetPlayerCarry());
+	if (!TestNotNull(TEXT("Towel held"), Towel))
+	{
+		return false;
+	}
 	F.Occupy();
 	AddAimShape(*Table);
 	Pawn->GetFirstPersonCamera()->SetWorldLocationAndRotation(Table->GetActorLocation() - FVector(180, 0, 0),
@@ -229,6 +268,8 @@ bool FServiceAmenityInputTest::RunTest(const FString&)
 	Pawn->GetPlayerInteraction()->RefreshInteractionQuery();
 	Pawn->InteractStartInput();
 	TestEqual(TEXT("Entry E starts blend"), Focus->GetPhase(), EPlayerScrubFocusPhase::FocusingIn);
+	TestTrue(TEXT("Focus-in already hides held towel"), Towel->IsHidden());
+	TestFalse(TEXT("Focus-in shows scrub cursor"), Table->GetScrubCursor()->bHiddenInGame);
 	Pawn->InteractEndInput();
 	TestEqual(TEXT("SCRB-011 entry E release cannot exit"), Focus->GetPhase(), EPlayerScrubFocusPhase::FocusingIn);
 	Focus->AddRubInput(FVector2D(10, 10));
@@ -248,6 +289,7 @@ bool FServiceAmenityInputTest::RunTest(const FString&)
 	TestTrue(TEXT("SCRB-016 movement input blocked"), Pawn->GetPendingMovementInputVector().IsZero());
 	TestFalse(TEXT("Jump blocked"), Pawn->bPressedJump);
 	TestEqual(TEXT("G keeps towel"), Pawn->GetPlayerCarry()->GetHeldObject(), static_cast<AActor*>(Towel));
+	TestTrue(TEXT("G keeps held towel hidden"), Towel->IsHidden());
 	TestFalse(TEXT("Q placement remains inactive"), Pawn->GetPlayerFacilityPlacement()->IsPlacementActive());
 	TestFalse(TEXT("RMB held-use remains inactive"), Pawn->GetPlayerHeldTargetUse()->IsUseActive());
 	Pawn->LookInput(FInputActionValue(FVector2D(1, 2)));
@@ -265,6 +307,8 @@ bool FServiceAmenityInputTest::RunTest(const FString&)
 		CleaningLitterTest::Box(F.World, Foot.GetLocation() + FVector(0, 0, HalfHeight), FVector(5, 5, 80));
 	Pawn->CancelInput();
 	TestEqual(TEXT("ESC starts focus-out"), Focus->GetPhase(), EPlayerScrubFocusPhase::FocusingOut);
+	TestFalse(TEXT("ESC immediately restores towel visibility"), Towel->IsHidden());
+	TestTrue(TEXT("ESC immediately hides scrub cursor"), Table->GetScrubCursor()->bHiddenInGame);
 	Pawn->InteractStartInput();
 	Pawn->InteractEndInput();
 	TestEqual(TEXT("Duplicate E does not disturb focus-out"), Focus->GetPhase(), EPlayerScrubFocusPhase::FocusingOut);
@@ -276,8 +320,78 @@ bool FServiceAmenityInputTest::RunTest(const FString&)
 	Obstacle->GetOwner()->Destroy();
 	TickWorldForDuration(F.World, .75);
 	TestEqual(TEXT("Exit completes"), Focus->GetPhase(), EPlayerScrubFocusPhase::Inactive);
+	TestFalse(TEXT("Blend completion keeps towel visible"), Towel->IsHidden());
 	TestFalse(TEXT("Input restored after blend"), Pawn->GetPlayerInteraction()->IsInteractionSuppressed());
 	TestTrue(TEXT("Gauge retained after ESC"), Table->GetScrubProgress() > 0);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FServiceAmenityScrubVisibilityCleanupTest,
+	"BathhouseSim.Service.Amenity.Scrub.VisibilitySnapshotCarryLossAndEndPlay",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FServiceAmenityScrubVisibilityCleanupTest::RunTest(const FString&)
+{
+	FScopedUtilityLaborWorld Scope(TEXT("ScrubVisibilityCleanupWorld"));
+	FFixture F(Scope.Get());
+	if (!F.Install(*this, AServiceAmenityTableProbe::StaticClass()))
+	{
+		return false;
+	}
+	auto* Table = CastChecked<AServiceAmenityTableProbe>(F.Facility);
+	auto* Pawn = F.Character();
+	auto* Carry = Pawn->GetPlayerCarry();
+	auto* Focus = Pawn->GetPlayerScrubFocus();
+	auto* Towel = HoldTowel(*F.World, *Carry);
+	if (!TestNotNull(TEXT("Towel held"), Towel) || !TestNotNull(TEXT("User occupied"), F.Occupy()))
+	{
+		return false;
+	}
+	Towel->SetActorHiddenInGame(true);
+	TestTrue(TEXT("Prehidden towel enters focus"), Focus->BeginScrubFocus(Table));
+	Focus->RequestEndScrubFocus();
+	Focus->RequestEndScrubFocus();
+	TestTrue(TEXT("Exit restores prehidden snapshot"), Towel->IsHidden());
+	Towel->SetActorHiddenInGame(false);
+	TestTrue(TEXT("Visible towel reenters focus"), Focus->BeginScrubFocus(Table));
+	TestTrue(TEXT("Reentry takes fresh visibility snapshot"), Towel->IsHidden());
+	// Simulate an abnormal carry change through the domain API, bypassing the blocked G input.
+	if (!TestTrue(TEXT("Abnormal carry release succeeds"),
+				  Carry->TryFreeDropHeldObject(FVector::ForwardVector).bSucceeded))
+	{
+		return false;
+	}
+	TestNull(TEXT("Original towel no longer held"), Carry->GetHeldObject());
+	TickWorldForDuration(F.World, .1);
+	TestEqual(TEXT("Carry loss cleans up on Tick"), Focus->GetPhase(), EPlayerScrubFocusPhase::Inactive);
+	TestFalse(TEXT("Carry loss restores original actor"), Towel->IsHidden());
+	TestTrue(TEXT("Carry loss hides cursor"), Table->GetScrubCursor()->bHiddenInGame);
+	TestFalse(TEXT("Carry loss clears suppression"), Pawn->GetPlayerInteraction()->IsInteractionSuppressed());
+	FText Failure;
+	if (!TestTrue(TEXT("Retake original towel"), Carry->TryTakePhysicalObject(Towel, Failure)))
+	{
+		return false;
+	}
+	TestTrue(TEXT("Focus before towel destruction"), Focus->BeginScrubFocus(Table));
+	Towel->Destroy();
+	TickWorldForDuration(F.World, .1);
+	TestEqual(TEXT("Destroyed towel cleans up on Tick"), Focus->GetPhase(), EPlayerScrubFocusPhase::Inactive);
+	TestTrue(TEXT("Destroyed towel hides cursor"), Table->GetScrubCursor()->bHiddenInGame);
+	TestFalse(TEXT("Destroyed towel clears suppression"), Pawn->GetPlayerInteraction()->IsInteractionSuppressed());
+	Towel = HoldTowel(*F.World, *Carry);
+	if (!TestNotNull(TEXT("Replacement towel held"), Towel))
+	{
+		return false;
+	}
+	TestTrue(TEXT("Focus before character destruction"), Focus->BeginScrubFocus(Table));
+	TestTrue(TEXT("Character destruction starts with hidden towel"), Towel->IsHidden());
+	Pawn->Destroy();
+	if (!TestTrue(TEXT("Towel survives character EndPlay"), IsValid(Towel)))
+	{
+		return false;
+	}
+	TestFalse(TEXT("Character EndPlay restores towel visibility"), Towel->IsHidden());
+	TestTrue(TEXT("Character EndPlay hides cursor"), Table->GetScrubCursor()->bHiddenInGame);
 	return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FServiceAmenityTowelTest,

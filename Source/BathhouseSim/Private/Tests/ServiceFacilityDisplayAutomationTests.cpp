@@ -11,7 +11,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBathhouseServiceFacilityGroupsTest,
 bool FBathhouseServiceFacilityGroupsTest::RunTest(const FString& Parameters)
 {
 	FScopedUtilityLaborWorld Scope(TEXT("FacilityGroupsWorld"));
-	FFixture Fixture(Scope.Get());
+	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!TestTrue(TEXT("Vanity installs through conversion"), Fixture.Install(*this)))
 	{
 		return false;
@@ -134,7 +134,7 @@ bool FBathhouseServiceRouterRepeatTest::RunTest(const FString& Parameters)
 		UDisplayFacilityTargetComponent::SelectClosestSpace(Centers, Indices, FVector(0, 40, 0), FVector(200, 40, 0)),
 		0);
 	FScopedUtilityLaborWorld Scope(TEXT("RouterRepeatWorld"));
-	FFixture Fixture(Scope.Get());
+	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!Fixture.Install(*this))
 	{
 		return false;
@@ -223,7 +223,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBathhouseServiceShowerUseTest,
 bool FBathhouseServiceShowerUseTest::RunTest(const FString& Parameters)
 {
 	FScopedUtilityLaborWorld Scope(TEXT("ShowerConsumptionWorld"));
-	FFixture Fixture(Scope.Get());
+	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!Fixture.Install(*this, true))
 	{
 		return false;

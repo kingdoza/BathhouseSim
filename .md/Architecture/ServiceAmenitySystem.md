@@ -219,13 +219,14 @@ Public/UI/ Private/UI/
   - 이탈 위치 탐색은 기존 private helper `FComputerFocusExitPlacement::Resolve`를 그대로 호출한다. 이름은 유지하며 범용 인자 helper다.
   - 시점 blend·이동 정지·suppression 절차는 컴퓨터와 같은 순서로 이 component에 둔다. 두 포커스의 공통화는 이후 세 번째 포커스가 생길 때 검토한다.
 - phase: `Inactive → FocusingIn → Active → FocusingOut`. 컴퓨터와 같은 snapshot·`ForceCleanup` 대칭이다.
+- 표시 owner는 이 component다. 커서 표시 기간 = 손 때수건 숨김 기간이며, 숨긴 Actor의 weak 참조(`HiddenHeldTowel`)와 직전 `IsHidden()` 값(`bHiddenHeldTowelWasHidden`)을 snapshot한다. 중복 숨김은 snapshot을 덮어쓰지 않고 복원은 현재 carry 조회 대신 저장한 Actor를 사용한다.
 - `BeginScrubFocus(Table)`:
   - 조건: 로컬 제어, 때수건 소지, 컴퓨터 포커스 아님, `TryBeginScrubSession` 성공.
   - 순서:
     1. 이동 정지·snapshot
     2. `SetInteractionSuppressed(true)`
     3. `SetViewTargetWithBlend(Table, BlendIn)`
-    4. 커서를 `ScrubArea` 중심에 두고 `ScrubCursor`를 표시
+    4. 커서를 `ScrubArea` 중심에 두고 `ScrubCursor`를 표시하며 손에 든 때수건 Actor를 숨긴다(carry 상태 불변)
 - Active 입력(Character가 전달):
   - `AddRubInput(FVector2D LookAxis)`: 커서 local XY에 `LookAxis × RubCmPerInputUnit`(X→local +Y, Y→local +X)을 더하고 area extent로 clamp한다.
   - LMB가 눌려 있으면 clamp 뒤 실제 이동 거리를 `Table->AddRubDistance`로 보낸다(SCRB-005, 006). 커서 world transform을 갱신한다.
@@ -233,8 +234,9 @@ Public/UI/ Private/UI/
 - 종료:
   - `RequestEndScrubFocus()`(E·ESC, 진입 E의 release·중복 입력 무시, SCRB-011)
   - 세신대 통지(완료·만료·사용자 상실, SCRB-008, 009)
-  - 절차: 커서를 숨기고 `ScrubExitPoint`·`ExitSearchRadiusCm`로 `FComputerFocusExitPlacement::Resolve`(SCRB-010) → 캐릭터 이동·회전 → `SetViewTargetWithBlend(Pawn, BlendOut)` → 완료 시 suppression 해제, 이동 복원, `EndScrubSession`.
+  - 절차: 커서를 숨기고 손에 든 때수건 표시를 snapshot 값으로 복원한 뒤 `ScrubExitPoint`·`ExitSearchRadiusCm`로 `FComputerFocusExitPlacement::Resolve`(SCRB-010) → 캐릭터 이동·회전 → `SetViewTargetWithBlend(Pawn, BlendOut)` → 완료 시 suppression 해제, 이동 복원, `EndScrubSession`.
   - 세신대 파괴: 이탈 위치 없이 view·이동·suppression을 즉시 복원한다.
+  - `ForceCleanup`: 커서를 숨기고 때수건 표시를 snapshot으로 복원한다. Table 유무·이동 snapshot 유무와 무관하게 표시 복원을 실행하고 weak 참조를 Reset한다. 정상 blend 완료, 세신대 파괴, 사용자 상실, Tick 문맥 검증 실패, 캐릭터·레벨 `EndPlay` 모두 같은 대칭 정리를 쓰며 반복 정리도 안전하다.
 - 게이지는 세신대에 있으므로 중간 이탈 뒤 유지되고, 재진입하면 이어진다(SCRB-007). 때수건은 손에 남는다.
 - 포커스 HUD: `UScrubFocusHudWidget`.
   - `ABathhouseHUD`가 money widget처럼 생성하고 possessed pawn의 component를 주입한다.

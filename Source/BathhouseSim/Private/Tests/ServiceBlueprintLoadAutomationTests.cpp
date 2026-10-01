@@ -141,7 +141,15 @@ bool FBathhouseServiceBlueprintLoadTest::RunTest(const FString& Parameters)
 			{
 				return false;
 			}
-			TestEqual(TEXT("Catalog includes the authored unit-two products"), Catalog->Products.Num(), 16);
+			TestEqual(TEXT("Catalog includes the authored unit-four products"), Catalog->Products.Num(), 20);
+			for (const TCHAR* ProductId : {TEXT("MassageChair"), TEXT("RestBench"), TEXT("Television"), TEXT("ScrubTable")})
+			{
+				TestTrue(FString::Printf(TEXT("SVC4-001 catalog includes %s"), ProductId),
+					Catalog->Products.ContainsByPredicate([ProductId](const FShopProductEntry& Product)
+					{
+						return Product.ProductId == FName(ProductId);
+					}));
+			}
 			for (const FShopProductEntry& Product : Catalog->Products)
 			{
 				TestFalse(FString::Printf(TEXT("%s keeps a product id"), *Product.ProductId.ToString()), Product.ProductId.IsNone());
