@@ -6,7 +6,7 @@
 - domain 정본: [BathWaterOperationsSystem.md](BathWaterOperationsSystem.md)
 - computer session 정본: [ComputerSystem.md](ComputerSystem.md)
 - 공통 native Widget 정책: [UISystem.md](UISystem.md)
-- 2026-10-01 버그 수정 설계(`BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`, Source 미반영): slider 손잡이를 요청 callback 안에서 확정값으로 되돌리고 polling 동기화를 cache gate 앞으로 옮긴다. 아래 `Slider Synchronization`이 정본이다.
+- 2026-10-01 버그 수정(`BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`, Source 반영, 사용자 PIE 대기): slider 손잡이를 요청 callback 안에서 확정값으로 되돌리고 polling 동기화를 cache gate 앞으로 옮긴다. 아래 `Slider Synchronization`이 정본이다.
 - 2026-09-24 Source 확장: [UtilityLaborSystem.md](UtilityLaborSystem.md)의 예약/가동/설치 값, 이중 부족 상태와 snapshot cache를 native summary에 반영했다. 기존 WBP의 줄바꿈/높이 확인은 Editor 단계에서 필요하며, 빌드와 automation은 미실행이다.
 
 ## Target Source Scope

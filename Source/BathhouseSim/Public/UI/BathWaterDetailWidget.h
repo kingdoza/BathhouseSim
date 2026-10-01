@@ -43,6 +43,9 @@ private:
 	UFUNCTION() void HandleCirculationChanged(float Value);
 	UFUNCTION() void HandleTargetTemperatureChanged(float Value);
 	void ApplyRequestFeedback(const FBathWaterSettingRequestResult& Result);
+	void WriteSliderValueSilently(USlider* Slider, float NormalizedValue);
+	void SyncSlidersToSnapshot(const FBathWaterBathSnapshot& Snapshot);
+	void ResyncSliderAfterRequest(bool bCirculation, const FBathWaterSettingRequestResult& Result);
 
 	TWeakObjectPtr<UBathWaterOperationsSubsystem> Operations;
 	TWeakObjectPtr<ABathhouseBathFacilityActor> SelectedBath;
@@ -53,8 +56,10 @@ private:
 	bool bHasTransientFeedback = false;
 	bool bShowingEmptyState = false;
 	bool bApplyingSnapshot = false;
+	bool bWritingSliderValue = false;
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FBathWaterOperationsUIWidgetTest;
+	friend class FBathWaterSliderTestAccess;
 	int32 PresentationWriteCount = 0;
 	int32 SliderWriteCount = 0;
 #endif

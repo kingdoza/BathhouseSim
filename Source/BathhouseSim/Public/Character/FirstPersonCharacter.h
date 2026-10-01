@@ -199,6 +199,7 @@ private:
 	bool IsFocusCapturingInput() const;
 	friend class FServiceAmenityInputTest;
 	friend class FBathhouseComputerSessionTest;
+	friend class FComputerKeyboardFocusTest;
 	friend class FBathhouseEquipmentUseRoutingTest;
 	friend class FBathhouseHeldTargetUseOwnerRoutingTest;
 	friend class FCleaningLitterInputRoutingTest;
