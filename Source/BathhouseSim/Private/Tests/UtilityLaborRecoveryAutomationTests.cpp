@@ -566,4 +566,44 @@ bool FUtilityLaborRecoveryPayloadTest::RunTest(const FString& Parameters)
 }
 
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FUtilityShovelReleaseVelocityTest,
+	"BathhouseSim.Utility.Labor.ShovelReleaseVelocityUsesProperty",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUtilityShovelReleaseVelocityTest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	FScopedUtilityLaborWorld Scope(TEXT("UtilityShovelReleaseVelocityWorld"));
+	UWorld* World = Scope.Get();
+	if (!TestNotNull(TEXT("Automation world exists"), World))
+	{
+		return false;
+	}
+	AUtilityShovelActor* Shovel = World->SpawnActor<AUtilityShovelActor>();
+	if (!TestNotNull(TEXT("Shovel spawns"), Shovel))
+	{
+		return false;
+	}
+	FFloatProperty* ForwardProperty = FindFProperty<FFloatProperty>(Shovel->GetClass(), TEXT("ThrowImpulseStrength"));
+	FFloatProperty* UpwardProperty =
+		FindFProperty<FFloatProperty>(Shovel->GetClass(), TEXT("UpwardThrowImpulseStrength"));
+	if (!TestNotNull(TEXT("Forward release property exists"), ForwardProperty) ||
+		!TestNotNull(TEXT("Upward release property exists"), UpwardProperty))
+	{
+		return false;
+	}
+	// Fixture values differ from the class defaults, so a getter that ignores the property fails.
+	const float ForwardFixture = Shovel->GetThrowImpulseStrength() + 37.0f;
+	const float UpwardFixture = Shovel->GetUpwardThrowImpulseStrength() + 11.0f;
+	ForwardProperty->SetPropertyValue_InContainer(Shovel, ForwardFixture);
+	UpwardProperty->SetPropertyValue_InContainer(Shovel, UpwardFixture);
+	const IPhysicalCarryable* Carryable = Shovel;
+	TestEqual(TEXT("Shovel forward release speed follows its property"),
+		Carryable->GetThrowImpulseStrength(), ForwardFixture);
+	TestEqual(TEXT("Shovel upward release speed follows its property"),
+		Carryable->GetUpwardThrowImpulseStrength(), UpwardFixture);
+	return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

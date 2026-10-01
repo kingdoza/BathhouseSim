@@ -47,9 +47,10 @@ void UShopScreenWidget::NativeTick(const FGeometry& MyGeometry, const float InDe
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	CountdownRefreshElapsed += InDeltaTime;
-	if (CountdownRefreshElapsed >= 1.0f)
+	const float Interval = FMath::Max(0.1f, CountdownRefreshIntervalSeconds);
+	if (CountdownRefreshElapsed >= Interval)
 	{
-		CountdownRefreshElapsed = FMath::Fmod(CountdownRefreshElapsed, 1.0f);
+		CountdownRefreshElapsed = FMath::Fmod(CountdownRefreshElapsed, Interval);
 		RefreshOrderCountdowns();
 	}
 }

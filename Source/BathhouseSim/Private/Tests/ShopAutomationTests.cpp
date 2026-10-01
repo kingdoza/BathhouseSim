@@ -1,5 +1,7 @@
 #include "Misc/AutomationTest.h"
 
+#include <limits>
+
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Components/BoxComponent.h"
@@ -67,6 +69,7 @@ struct FScopedShopSettingsOverride
 	int32 CartTotalQuantityLimit = Settings->CartTotalQuantityLimit;
 	int32 PerProductQuantityLimit = Settings->PerProductQuantityLimit;
 	float DeliveryDelaySeconds = Settings->DeliveryDelaySeconds;
+	float DeliveryAttemptIntervalSeconds = Settings->DeliveryAttemptIntervalSeconds;
 	float UnboxOverlapDepthCm = Settings->UnboxOverlapDepthCm;
 
 	~FScopedShopSettingsOverride()
@@ -76,6 +79,7 @@ struct FScopedShopSettingsOverride
 		Settings->CartTotalQuantityLimit = CartTotalQuantityLimit;
 		Settings->PerProductQuantityLimit = PerProductQuantityLimit;
 		Settings->DeliveryDelaySeconds = DeliveryDelaySeconds;
+		Settings->DeliveryAttemptIntervalSeconds = DeliveryAttemptIntervalSeconds;
 		Settings->UnboxOverlapDepthCm = UnboxOverlapDepthCm;
 	}
 };
@@ -260,6 +264,32 @@ const FShopBlueprintLoadSpec ShopBlueprintSpecs[] =
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FShopSettingsDefaultsAutomationTest,
+	"BathhouseSim.Shop.SettingsDefaults",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShopSettingsDefaultsAutomationTest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	FScopedShopSettingsOverride SavedSettings;
+	UShopSettings& Settings = *SavedSettings.Settings;
+	const float NaN = std::numeric_limits<float>::quiet_NaN();
+	Settings.DeliveryDelaySeconds = NaN;
+	Settings.DeliveryNoticeSeconds = NaN;
+	Settings.DeliveryAttemptIntervalSeconds = NaN;
+	TestEqual(TEXT("Non-finite delivery delay falls back to the shared default"),
+		Settings.GetDeliveryDelaySeconds(), UShopSettings::DefaultDeliveryDelaySeconds);
+	TestEqual(TEXT("Non-finite notice duration falls back to the shared default"),
+		Settings.GetDeliveryNoticeSeconds(), UShopSettings::DefaultDeliveryNoticeSeconds);
+	TestEqual(TEXT("Non-finite attempt interval falls back to the shared default"),
+		Settings.GetDeliveryAttemptIntervalSeconds(), UShopSettings::DefaultDeliveryAttemptIntervalSeconds);
+	Settings.DeliveryAttemptIntervalSeconds = -1.0f;
+	TestEqual(TEXT("Negative attempt interval clamps to every-tick attempts"),
+		Settings.GetDeliveryAttemptIntervalSeconds(), 0.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FShopWalletAndCartAutomationTest,
 	"BathhouseSim.Shop.WalletAndCart",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -435,7 +465,11 @@ bool FShopOrderDelayWaitingAndFifoAutomationTest::RunTest(const FString& Paramet
 	FScopedShopFacilityPlacementGridOverride PlacementGridOverride;
 	UShopSettings& Settings = *SavedSettings.Settings;
 	Settings.DeliveryBoxClass = TSoftClassPtr<AShopDeliveryBoxActor>(AShopDeliveryBoxActor::StaticClass());
-	Settings.DeliveryDelaySeconds = 10.0f;
+	// Fixture values; the test sets and restores them, so it does not depend on shipped defaults.
+	const float DelayFixtureSeconds = 10.0f;
+	const float AttemptIntervalFixtureSeconds = 0.25f;
+	Settings.DeliveryDelaySeconds = DelayFixtureSeconds;
+	Settings.DeliveryAttemptIntervalSeconds = AttemptIntervalFixtureSeconds;
 	Settings.CartTotalQuantityLimit = 10;
 	Settings.PerProductQuantityLimit = 99;
 	UFacilityPlacementDefinition* Definition = MakeShopTestDefinition();
@@ -494,7 +528,7 @@ bool FShopOrderDelayWaitingAndFifoAutomationTest::RunTest(const FString& Paramet
 		return false;
 	}
 	TestTrue(TEXT("Ten-second order snapshot starts at ten seconds"),
-		FMath::IsNearlyEqual(FirstOrderSnapshots[0].SecondsRemaining, 10.0f, 0.05f));
+		FMath::IsNearlyEqual(FirstOrderSnapshots[0].SecondsRemaining, DelayFixtureSeconds, 0.05f));
 	TestTrue(TEXT("Successful order clears the cart"), Cart->GetLines().IsEmpty());
 	TestEqual(TEXT("First order charges once"), PlayerState->GetWallet()->GetCurrentMoney(), 99000);
 	EShopFailureCode RepeatFailure = EShopFailureCode::None;
@@ -522,9 +556,10 @@ bool FShopOrderDelayWaitingAndFifoAutomationTest::RunTest(const FString& Paramet
 	LowCeiling->RegisterComponent();
 	LowCeiling->UpdateComponentToWorld();
 
-	for (int32 TickIndex = 0; TickIndex < 41; ++TickIndex)
+	const int32 WaitTickCount = FMath::CeilToInt(DelayFixtureSeconds / AttemptIntervalFixtureSeconds) + 1;
+	for (int32 TickIndex = 0; TickIndex < WaitTickCount; ++TickIndex)
 	{
-		World->Tick(LEVELTICK_All, 0.25f);
+		World->Tick(LEVELTICK_All, AttemptIntervalFixtureSeconds);
 	}
 	const TArray<FShopOrderSnapshot> WaitingSnapshots = Orders->GetOrderSnapshots();
 	TestEqual(TEXT("Both ready orders remain queued while the delivery point is blocked"), WaitingSnapshots.Num(), 2);
@@ -536,7 +571,7 @@ bool FShopOrderDelayWaitingAndFifoAutomationTest::RunTest(const FString& Paramet
 	TestEqual(TEXT("No box is delivered under a ceiling too low for the crate"), Probe->OrderDeliveredCount, 0);
 
 	LowCeilingActor->Destroy();
-	World->Tick(LEVELTICK_All, 0.25f);
+	World->Tick(LEVELTICK_All, AttemptIntervalFixtureSeconds);
 	TestEqual(TEXT("Removing the blocker releases both ready orders"), Orders->GetOrderSnapshots().Num(), 0);
 	TestEqual(TEXT("Both orders deliver in the original FIFO order"), Probe->OrderDeliveredCount, 2);
 	if (Probe->DeliveredOrderIds.Num() == 2)

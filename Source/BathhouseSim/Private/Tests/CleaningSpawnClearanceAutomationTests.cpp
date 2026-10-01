@@ -15,6 +15,10 @@ using namespace CleaningLitterTest;
 
 namespace
 {
+	// Fixture footprints for the zone queries. Height and floor offset come from the director's data.
+	constexpr float StainRadiusFixtureCm = 30.0f;
+	constexpr float LitterRadiusFixtureCm = 15.0f;
+
 	struct FSpawnZones
 	{
 		AStainSpawnZoneActor* Stain;
@@ -35,10 +39,14 @@ namespace
 		{
 			FRandomStream StainRandom(77), LitterRandom(77);
 			FTransform Pose;
-			Test.TestEqual(FString(Label) + TEXT(" (stain zone)"), Stain->FindSpawnTransform(StainRandom, 0, Pose, 30),
-						   Expected);
+			const ACleaningDirectorActor* Director = GetDefault<ACleaningDirectorActor>();
+			const float Height = Director->GetSpawnClearanceHeightCm();
+			const float Offset = Director->GetSpawnClearanceFloorOffsetCm();
+			Test.TestEqual(FString(Label) + TEXT(" (stain zone)"),
+						   Stain->FindSpawnTransform(StainRandom, 0, Pose, StainRadiusFixtureCm, Height, Offset), Expected);
 			Test.TestEqual(FString(Label) + TEXT(" (litter zone)"),
-						   Litter->FindSpawnTransform(LitterRandom, 0, Pose), Expected);
+						   Litter->FindSpawnTransform(LitterRandom, 0, Pose, LitterRadiusFixtureCm, Height, Offset),
+						   Expected);
 		}
 	};
 
@@ -131,7 +139,8 @@ bool FCleaningSpawnTerrainTest::RunTest(const FString&)
 	Set<FFloatProperty>(Zones.Litter, TEXT("MaximumFloorSlopeDegrees"), 25.f);
 	Floor->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	// Two adjacent slabs share one mesh and one collision component. The ray hits the lower slab;
-	// the raised slab starts 10 cm away and overlaps the clearance box from 1 cm upward.
+	// the raised slab starts 10 cm away and its top reaches the clearance floor offset.
+	const float FloorOffset = GetDefault<ACleaningDirectorActor>()->GetSpawnClearanceFloorOffsetCm();
 	auto* SteppedMesh = DuplicateObject<UStaticMesh>(Floor->GetStaticMesh(), GetTransientPackage());
 	auto* Setup = NewObject<UBodySetup>(SteppedMesh);
 	Setup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
@@ -141,7 +150,7 @@ bool FCleaningSpawnTerrainTest::RunTest(const FString&)
 	Lower.Y = 1000;
 	Lower.Z = 20;
 	FKBoxElem Raised;
-	Raised.Center = FVector(255, 0, -9);
+	Raised.Center = FVector(255, 0, FloorOffset - 10);
 	Raised.X = 490;
 	Raised.Y = 1000;
 	Raised.Z = 20;
@@ -150,12 +159,13 @@ bool FCleaningSpawnTerrainTest::RunTest(const FString&)
 	auto* Step = StaticFloor(World, FTransform::Identity);
 	Step->SetStaticMesh(SteppedMesh);
 	Step->RecreatePhysicsState();
-	Zones.Expect(*this, TEXT("F2: one-centimetre step on same mesh component is ignored"), true);
+	Zones.Expect(*this, TEXT("F2: floor-offset-high step on same mesh component is ignored"), true);
 	Step->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Box(World, FVector(0, 0, -10), FVector(500, 500, 10))->SetMobility(EComponentMobility::Static);
-	auto* OtherStep = StaticFloor(World, FTransform(FVector(12, 0, -8.5)));
+	// The lip is 20 cm tall (0.2 scale of the 100 cm cube): its top is half a centimetre above the offset.
+	auto* OtherStep = StaticFloor(World, FTransform(FVector(12, 0, FloorOffset + 0.5f - 10)));
 	OtherStep->SetWorldScale3D(FVector(.1, .4, .2));
-	Zones.Expect(*this, TEXT("Separate mesh lip above one centimetre remains blocking"), false);
+	Zones.Expect(*this, TEXT("Separate mesh lip above the floor offset remains blocking"), false);
 	OtherStep->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	return true;
 }

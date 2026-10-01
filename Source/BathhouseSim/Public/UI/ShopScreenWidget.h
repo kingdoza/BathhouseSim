@@ -71,6 +71,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Shop|Widgets")
 	TSubclassOf<UShopOrderLineWidget> OrderLineWidgetClass;
 
+	/** 주문 목록 남은 시간 표시 갱신 간격 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop|Display", meta = (ClampMin = "0.1", UIMin = "0.1"))
+	float CountdownRefreshIntervalSeconds = 1.0f;
+
 private:
 	UFUNCTION()
 	void HandleMoneyChanged(int32 PreviousMoney, int32 CurrentMoney);

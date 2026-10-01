@@ -577,8 +577,8 @@ bool ABathWaterUtilityFacilityActor::CanFreeDrop(FText& OutFailureReason) const
 	OutFailureReason = LOCTEXT("PlacedUtilityNoDrop", "배치된 설비는 내려놓을 수 없습니다."); return false;
 }
 UPrimitiveComponent* ABathWaterUtilityFacilityActor::GetPhysicalCarryPrimitive() const { return nullptr; }
-float ABathWaterUtilityFacilityActor::GetThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetThrowImpulseStrength() : 120.0f; }
-float ABathWaterUtilityFacilityActor::GetUpwardThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetUpwardThrowImpulseStrength() : 15.0f; }
+float ABathWaterUtilityFacilityActor::GetThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetThrowImpulseStrength() : GetDefault<UFacilityPlacementComponent>()->GetThrowImpulseStrength(); }
+float ABathWaterUtilityFacilityActor::GetUpwardThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetUpwardThrowImpulseStrength() : GetDefault<UFacilityPlacementComponent>()->GetUpwardThrowImpulseStrength(); }
 AActor* ABathWaterUtilityFacilityActor::GetAssignedPhysicalCarryFixedSlot() const { return nullptr; }
 bool ABathWaterUtilityFacilityActor::TryBindPhysicalCarryFixedSlot(AActor& SlotActor, FText& OutFailureReason) { (void)SlotActor; OutFailureReason = LOCTEXT("UtilityNoFixedSlot", "설비는 고정 슬롯을 지원하지 않습니다."); return false; }
 void ABathWaterUtilityFacilityActor::ClearPhysicalCarryFixedSlotBinding(AActor& ExpectedSlot) { (void)ExpectedSlot; }

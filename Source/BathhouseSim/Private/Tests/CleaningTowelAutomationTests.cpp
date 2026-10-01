@@ -833,10 +833,19 @@ bool FBathhouseCleaningInteractionTest::RunTest(const FString& Parameters)
 	BeginActorForTest(Zone);
 	UCleaningWorldSubsystem* Cleaning = World->GetSubsystem<UCleaningWorldSubsystem>();
 	TestEqual(TEXT("Authored zone registers once"), Cleaning->GetActiveZones().Num(), 1);
+	// Fixture footprint; clearance height and floor offset come from the director's data.
+	const float StainRadiusFixtureCm = 30.0f;
+	const ACleaningDirectorActor* DirectorDefaults = GetDefault<ACleaningDirectorActor>();
+	const auto FindCandidate = [&](FRandomStream& Stream, FTransform& Out)
+	{
+		return Zone->FindSpawnTransform(Stream, 80.0f, Out, StainRadiusFixtureCm,
+										DirectorDefaults->GetSpawnClearanceHeightCm(),
+										DirectorDefaults->GetSpawnClearanceFloorOffsetCm());
+	};
 	FRandomStream CandidateStream(77);
 	FTransform Candidate;
 	TestTrue(TEXT("A tagged level floor inside the authored zone is accepted"),
-			 Zone->FindSpawnTransform(CandidateStream, 80.0f, Candidate));
+			 FindCandidate(CandidateStream, Candidate));
 
 	AWaterStainActor* SpacingStain = World->SpawnActor<AWaterStainActor>();
 	BeginActorForTest(SpacingStain);
@@ -849,7 +858,7 @@ bool FBathhouseCleaningInteractionTest::RunTest(const FString& Parameters)
 	FRandomStream RepeatedCandidateStream(77);
 	FTransform RepeatedCandidate;
 	TestFalse(TEXT("Existing stain spacing rejects the same random candidate"),
-			  Zone->FindSpawnTransform(RepeatedCandidateStream, 80.0f, RepeatedCandidate));
+			  FindCandidate(RepeatedCandidateStream, RepeatedCandidate));
 	SpacingStain->Destroy();
 
 	APawn* Pawn = World->SpawnActor<APawn>();
@@ -864,13 +873,13 @@ bool FBathhouseCleaningInteractionTest::RunTest(const FString& Parameters)
 	Pawn->SetActorLocation(Candidate.GetLocation());
 	FRandomStream PawnCandidateStream(77);
 	TestTrue(TEXT("TRSH-029: Pawn does not reject an otherwise valid candidate"),
-			 Zone->FindSpawnTransform(PawnCandidateStream, 80.0f, RepeatedCandidate));
+			 FindCandidate(PawnCandidateStream, RepeatedCandidate));
 	Pawn->Destroy();
 
 	Zone->RequiredFloorComponentTag = TEXT("WrongFloorTag");
 	FRandomStream TagCandidateStream(77);
 	TestFalse(TEXT("A floor without the required authored tag is rejected"),
-			  Zone->FindSpawnTransform(TagCandidateStream, 80.0f, RepeatedCandidate));
+			  FindCandidate(TagCandidateStream, RepeatedCandidate));
 	Zone->RequiredFloorComponentTag = TEXT("CleaningFloor");
 	Floor->SetMobility(EComponentMobility::Movable);
 	Floor->SetWorldRotation(FRotator(30.0f, 0.0f, 0.0f));
@@ -878,7 +887,7 @@ bool FBathhouseCleaningInteractionTest::RunTest(const FString& Parameters)
 	Zone->MaximumFloorSlopeDegrees = 10.0f;
 	FRandomStream SlopeCandidateStream(77);
 	TestFalse(TEXT("A floor steeper than the authored slope limit is rejected"),
-			  Zone->FindSpawnTransform(SlopeCandidateStream, 80.0f, RepeatedCandidate));
+			  FindCandidate(SlopeCandidateStream, RepeatedCandidate));
 	Floor->SetMobility(EComponentMobility::Movable);
 	Floor->SetWorldRotation(FRotator::ZeroRotator);
 	Floor->SetMobility(EComponentMobility::Static);

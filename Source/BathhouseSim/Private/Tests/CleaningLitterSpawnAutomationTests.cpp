@@ -163,6 +163,14 @@ bool FCleaningLitterFloorTest::RunTest(const FString&)
 	S.Extent = FVector(.1, .1, 100);
 	S.FloorZ = 0;
 	S.RequiredFloorTag = TEXT("CleaningFloor");
+	// Fixture values for the query; clearance height and floor offset come from the director's data.
+	S.TraceDistance = 300;
+	S.MaximumSlopeDegrees = 25;
+	S.FloorTolerance = 5;
+	S.Radius = 15;
+	S.Spacing = 40;
+	S.ClearanceHeight = GetDefault<ACleaningDirectorActor>()->GetSpawnClearanceHeightCm();
+	S.ClearanceFloorOffset = GetDefault<ACleaningDirectorActor>()->GetSpawnClearanceFloorOffsetCm();
 	FTransform Result;
 	auto Find = [&](bool Spacing = true)
 	{
@@ -253,14 +261,21 @@ bool FCleaningLitterPlacementTest::RunTest(const FString&)
 		return false;
 	}
 	FTransform Footprint(FRotator(0, 45, 0), FVector(0, 0, 50), FVector(2, 1, 1));
+	const float HeightToleranceFixtureCm = 5.0f;
+	const float FootprintHalfHeight = 50.0f;
 	TestTrue(TEXT("Footprint includes overlapping circle with center outside"),
 			 FCleaningFootprintOverlap::Intersects(Footprint.TransformPosition(FVector(55, 0, 0)), 12, Footprint,
-												   FVector(50, 20, 50)));
+												   FVector(50, 20, 50), HeightToleranceFixtureCm));
 	TestFalse(TEXT("Far circle remains"),
 			  FCleaningFootprintOverlap::Intersects(Footprint.TransformPosition(FVector(80, 0, 0)), 12, Footprint,
-													FVector(50, 20, 50)));
+													FVector(50, 20, 50), HeightToleranceFixtureCm));
+	const float FootprintTopZ = Footprint.GetLocation().Z + FootprintHalfHeight;
+	TestTrue(TEXT("Z inside tolerance is cleared"),
+			 FCleaningFootprintOverlap::Intersects(FVector(0, 0, FootprintTopZ + HeightToleranceFixtureCm - 1), 12,
+												   Footprint, FVector(50, 20, 50), HeightToleranceFixtureCm));
 	TestFalse(TEXT("Z outside tolerance remains"),
-			  FCleaningFootprintOverlap::Intersects(FVector(0, 0, 106), 12, Footprint, FVector(50, 20, 50)));
+			  FCleaningFootprintOverlap::Intersects(FVector(0, 0, FootprintTopZ + HeightToleranceFixtureCm + 1), 12,
+													Footprint, FVector(50, 20, 50), HeightToleranceFixtureCm));
 	auto* Events = World->GetSubsystem<UFacilityPlacementEventSubsystem>();
 	int32 Publications = 0;
 	const auto Handle = Events->OnFacilityPlaced.AddLambda(

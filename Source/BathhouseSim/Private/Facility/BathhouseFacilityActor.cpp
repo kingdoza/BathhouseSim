@@ -330,8 +330,8 @@ bool ABathhouseFacilityActor::HandleTakenBy(UPlayerCarryComponent& Carry, UScene
 }
 bool ABathhouseFacilityActor::CanFreeDrop(FText& OutFailureReason) const { OutFailureReason = LOCTEXT("PlacedFacilityNoDrop", "배치 설비 Actor는 내려놓을 수 없습니다."); return false; }
 UPrimitiveComponent* ABathhouseFacilityActor::GetPhysicalCarryPrimitive() const { return nullptr; }
-float ABathhouseFacilityActor::GetThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetThrowImpulseStrength() : 120.0f; }
-float ABathhouseFacilityActor::GetUpwardThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetUpwardThrowImpulseStrength() : 15.0f; }
+float ABathhouseFacilityActor::GetThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetThrowImpulseStrength() : GetDefault<UFacilityPlacementComponent>()->GetThrowImpulseStrength(); }
+float ABathhouseFacilityActor::GetUpwardThrowImpulseStrength() const { return FacilityPlacement ? FacilityPlacement->GetUpwardThrowImpulseStrength() : GetDefault<UFacilityPlacementComponent>()->GetUpwardThrowImpulseStrength(); }
 AActor* ABathhouseFacilityActor::GetAssignedPhysicalCarryFixedSlot() const { return nullptr; }
 bool ABathhouseFacilityActor::TryBindPhysicalCarryFixedSlot(AActor& SlotActor, FText& OutFailureReason) { OutFailureReason = LOCTEXT("PlacedFacilityNoFixedSlot", "배치 설비 Actor는 고정 슬롯을 지원하지 않습니다."); return false; }
 void ABathhouseFacilityActor::ClearPhysicalCarryFixedSlotBinding(AActor& ExpectedSlot) {}

@@ -19,6 +19,10 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	// C++ 전용: 구역 후보 질의가 같은 값을 쓰도록 하는 테스트·호출자용 getter
+	float GetSpawnClearanceHeightCm() const { return SpawnClearanceHeightCm; }
+	float GetSpawnClearanceFloorOffsetCm() const { return SpawnClearanceFloorOffsetCm; }
+
 #if WITH_DEV_AUTOMATION_TESTS
 	void AdvanceSpawnScheduleForTesting(float DeltaSeconds, const TArray<FVector>& CustomerLocations);
 	void SetSpawnRandomSeedForTesting(int32 Seed);
@@ -37,6 +41,9 @@ protected:
 	float DefaultLitterSpacing = 40.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "0.1"))
 	float SpawnClearanceHeightCm = 30.0f;
+	/** clearance box를 바닥 접점에서 띄우는 높이 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cleaning Spawn", meta = (ClampMin = "0.0"))
+	float SpawnClearanceFloorOffsetCm = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cleaning Spawn",
 			  meta = (ClampMin = "0.1", ToolTip = "Mean interval per customer (seconds)."))

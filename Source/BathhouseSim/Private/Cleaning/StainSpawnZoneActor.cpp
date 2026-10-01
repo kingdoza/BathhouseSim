@@ -41,7 +41,8 @@ void AStainSpawnZoneActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 }
 
 bool AStainSpawnZoneActor::FindSpawnTransform(FRandomStream& Stream, float DefaultStainSpacing,
-											  FTransform& OutTransform, float FloorRadius, float ClearanceHeight) const
+											  FTransform& OutTransform, float FloorRadius, float ClearanceHeight,
+											  float ClearanceFloorOffset) const
 {
 	UWorld* World = GetWorld();
 	auto* Subsystem = World ? World->GetSubsystem<UCleaningWorldSubsystem>() : nullptr;
@@ -60,6 +61,7 @@ bool AStainSpawnZoneActor::FindSpawnTransform(FRandomStream& Stream, float Defau
 	Settings.FloorTolerance = FloorHeightToleranceCm;
 	Settings.Radius = FloorRadius;
 	Settings.ClearanceHeight = ClearanceHeight;
+	Settings.ClearanceFloorOffset = ClearanceFloorOffset;
 	Settings.Spacing = StainSpacingOverride > 0 ? StainSpacingOverride : DefaultStainSpacing;
 	return FCleaningFloorSpawnQuery::Find(
 		*World, this, Settings, Stream,

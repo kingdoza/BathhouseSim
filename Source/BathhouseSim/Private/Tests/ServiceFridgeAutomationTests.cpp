@@ -30,6 +30,7 @@ struct FScopedServiceShopSettings
 	TSoftClassPtr<AItemBoxActor> ItemBoxClass = Settings->ItemBoxClass;
 	int32 CartLimit = Settings->CartTotalQuantityLimit;
 	float DeliveryDelay = Settings->DeliveryDelaySeconds;
+	float DeliveryAttemptInterval = Settings->DeliveryAttemptIntervalSeconds;
 
 	~FScopedServiceShopSettings()
 	{
@@ -38,6 +39,7 @@ struct FScopedServiceShopSettings
 		Settings->ItemBoxClass = ItemBoxClass;
 		Settings->CartTotalQuantityLimit = CartLimit;
 		Settings->DeliveryDelaySeconds = DeliveryDelay;
+		Settings->DeliveryAttemptIntervalSeconds = DeliveryAttemptInterval;
 	}
 };
 
