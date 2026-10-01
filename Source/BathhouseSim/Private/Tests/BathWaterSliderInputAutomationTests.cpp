@@ -321,11 +321,17 @@ bool FBathWaterSliderCommittedSyncTest::RunTest(const FString& Parameters)
 
 		const float CirculationInstalled = MaxDemand * 0.6f;
 		const float CirculationLimitPercent = CirculationInstalled / MaxDemand * 100.0f;
-		// A quarter of a degree of headroom keeps the step quantization from rounding the fixture down.
-		const float HeatingHeadroomC = 10.0f;
-		const float CoolingHeadroomC = 5.0f;
-		const float HeatingInstalled = HeatPerC * (HeatingHeadroomC + 0.25f);
-		const float CoolingInstalled = CoolPerC * (CoolingHeadroomC + 0.25f);
+		// Headroom is a whole number of TargetTemperatureStepC units that fits both sides of the target range;
+		// the installed capacity adds less than one step so quantization keeps the headroom as the limit.
+		const float StepC = Settings->GetTargetTemperatureStepC();
+		const float SideRangeC = FMath::Min(MaxTemperature - Ambient, Ambient - MinTemperature);
+		const int32 HeadroomSteps = StepC > KINDA_SMALL_NUMBER ? FMath::FloorToInt(SideRangeC / StepC * 0.5f) : 0;
+		if (!TestTrue(TEXT("The target range leaves at least one step of headroom on both sides"), HeadroomSteps >= 1)) return false;
+		const float HeadroomC = StepC * HeadroomSteps;
+		const float HeatingHeadroomC = HeadroomC;
+		const float CoolingHeadroomC = HeadroomC;
+		const float HeatingInstalled = HeatPerC * (HeatingHeadroomC + StepC * 0.5f);
+		const float CoolingInstalled = CoolPerC * (CoolingHeadroomC + StepC * 0.5f);
 		if (!TestTrue(TEXT("Heating and cooling fixtures stay inside the target range"),
 			Ambient + HeatingHeadroomC < MaxTemperature && Ambient - CoolingHeadroomC > MinTemperature)) return false;
 		TestTrue(TEXT("Circulation provider registers"), Fixture.Operations->RegisterProvider(AddProvider(
@@ -378,7 +384,7 @@ bool FBathWaterSliderCommittedSyncTest::RunTest(const FString& Parameters)
 		const float CoolingLimitC = Ambient - CoolingHeadroomC;
 		TestTrue(TEXT("SLD-003: cooling overrun clamps the handle to the committed temperature"),
 			FMath::IsNearlyEqual(TargetSlider->GetValue(), NormalizeTemperature(CoolingLimitC), ValueTolerance));
-		TestTrue(TEXT("SLD-003: cooling overrun commits the limit in 0.5 degree steps"),
+		TestTrue(TEXT("SLD-003: cooling overrun commits the limit in TargetTemperatureStepC units"),
 			FMath::IsNearlyEqual(Condition->GetTargetTemperatureC(), CoolingLimitC, 0.01f));
 		TestTrue(TEXT("SLD-003: cooling feedback names the kind"),
 			FBathWaterSliderTestAccess::Feedback(Detail).Contains(TEXT("냉각")));

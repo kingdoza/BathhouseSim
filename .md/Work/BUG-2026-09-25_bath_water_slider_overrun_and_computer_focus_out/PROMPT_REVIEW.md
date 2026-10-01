@@ -34,7 +34,7 @@
 ## 클래스 크기·책임
 
 - `UBathWaterDetailWidget`: cpp 269 → 약 335줄, 책임 추가 없음(손잡이를 domain 확정값과 일치시키는 표시 동기화). 경고선 아래, 새 타입 없음. reflected 변경 없음.
-- 조정값: 새 수치 상수 없음. 온도 범위는 `UBathWaterSettings`(Min/Max/Step)에서 읽는다. 테스트도 용량·온도 기대값을 condition getter(`GetMaxCirculationDemandPoints`, `GetHeatingDemandPointsPerC`, `GetCoolingDemandPointsPerC`)와 settings(`GetAmbientTemperatureC` 등)에서 계산한다. 테스트 리터럴은 fixture 비율(설치 60%, 여유 10/5°C, 슬라이더 위치 비율)과 허용오차뿐이며 튜닝값이 아니다.
+- 조정값: 새 수치 상수 없음. 온도 범위는 `UBathWaterSettings`(Min/Max/Step)에서 읽는다. 테스트도 용량·온도 기대값을 condition getter(`GetMaxCirculationDemandPoints`, `GetHeatingDemandPointsPerC`, `GetCoolingDemandPointsPerC`)와 settings(`GetAmbientTemperatureC` 등)에서 계산한다. 테스트 리터럴은 fixture 비율(설치 60%, 여유는 `TargetTemperatureStepC`의 정수배(settings에서 계산), 슬라이더 위치 비율)과 허용오차뿐이며 튜닝값이 아니다.
 
 ## Blueprint/API/Core Redirect 영향
 
@@ -42,8 +42,8 @@
 
 ## 빌드와 검증
 
-- 빌드: `BathhouseSimEditor Win64 Development`, 성공(exit 0). 마지막 빌드 로그 `C:/Users/kdowo/AppData/Local/Temp/claude/C--UnrealProjects-BathhouseSim/fe09b558-f6ab-4905-a7e9-d23d125f4a9f/scratchpad/build8.log`.
-- Source 식별값: HEAD `cd47d47b84d7aab67e36997cf9989d1640fc781f`, `git diff HEAD -- Source Config`와 untracked `Source`/`Config` 파일 내용을 이어 붙인 SHA-256 `97090aa8296dc0e5cd180dc0bed31705e24b120a6d6509664d73241157130ef2`(마지막 빌드·Automation 직후 계산, 이후 Source 변경 없음).
+- 빌드: `BathhouseSimEditor Win64 Development`, 성공(exit 0). 마지막 빌드 로그 `C:/Users/kdowo/AppData/Local/Temp/claude/C--UnrealProjects-BathhouseSim/fe09b558-f6ab-4905-a7e9-d23d125f4a9f/scratchpad/build9.log`.
+- Source 식별값: HEAD `8615935bca78b5bce086c8e258442bf38b02c0ba`(리뷰 1회차 R1 재작업 후), `git diff HEAD -- Source Config`와 untracked `Source`/`Config` 파일 내용을 이어 붙인 SHA-256 `3d384056fecfb73d63784a9dc1f3376c5e82ad1e50b3b6e90837f8a2f7dda143`(마지막 빌드·Automation 직후 계산, 이후 Source 변경 없음).
 - Automation(필터 `BathhouseSim.BathWater+BathhouseSim.Computer+BathhouseSim.Interaction.HeldTargetUse.InputOwners`, headless): 새 3개 포함 16개 전부 Success, Fail 0. 로그 `Saved/Logs/BathhouseSim.log`(마지막 실행), 리포트 경로 `Saved/Automation/Reports/2026-10-01/bug-0925`.
 - 변경 전 실패 확인: `ResyncSliderAfterRequest`를 임시로 무력화(수정 전 동작과 동일)하고 `BathhouseSim.BathWater.ManagementUI`를 실행했다. `SliderPointerDragHoldsCommittedValue`는 "계속 끌기 시 손잡이가 한계 유지"와 "놓은 뒤 확정값 위치"에서, `SliderCommittedSyncAndFeedback`는 두 번째 한계 초과·반복 가열/냉각·실패 경로에서 실패했다. 이후 원복해 위 최종 결과를 얻었다.
 - `git diff --check`는 LF 경고(저장소 autocrlf) 외 없음. Content 변경 0건.

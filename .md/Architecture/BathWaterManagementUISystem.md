@@ -95,7 +95,7 @@ UBathWaterManagementScreenWidget
 
 ### Slider Synchronization
 
-- 불변식: 요청 callback 밖에서 두 slider 손잡이는 항상 선택 욕탕의 domain 확정값(순환도 %, 0.5°C 단위 목표 수온)을 정규화한 위치다. 제한은 slider 속성(Min/Max/step/lock)이 아니라 subsystem 결과로만 표현한다.
+- 불변식: 요청 callback 밖에서 두 slider 손잡이는 항상 선택 욕탕의 domain 확정값(순환도 %, `UBathWaterSettings.TargetTemperatureStepC` 단위 목표 수온)을 정규화한 위치다. 제한은 slider 속성(Min/Max/step/lock)이 아니라 subsystem 결과로만 표현한다.
 - `SSlider`는 drag 중 손잡이를 커서 값으로 먼저 바꾼 뒤 `OnValueChanged`를 실행한다. 그래서 detail은 같은 callback 안에서 요청 결과(`CommittedValue`, 실패면 domain 또는 마지막 snapshot 값)로 해당 slider를 즉시 다시 쓴다. 이렇게 해야 한계 밖 손잡이가 한 frame도 그려지지 않는다.
 - subsystem은 확정값이 기존 값과 같으면 mutation·broadcast를 하지 않는다. 이 경우를 UI가 결과로 직접 보정하며, subsystem에 no-op 알림을 추가하지 않는다.
 - `USlider::SetValue`는 `OnValueChanged`를 다시 broadcast한다. 보정 쓰기는 재진입 guard 안에서 하고, guard 중 callback은 요청을 보내지 않는다. 재요청이 제한 피드백을 지우지 않게 하기 위해서다.
