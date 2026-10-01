@@ -231,3 +231,4 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 서비스 2단위(ServiceFacilityDisplaySystem·Towel 2단위 절): 2026-09-30 완료(`c9a1150`).
 - 서비스 3단위(CleaningLitterSystem): 2026-10-01 완료(`2c14d8f`). 같은 날 버그(집게를 들면 빼기 강조 표시) 수정 설계로 장비 보조 사용을 별도 query 필드로 분리했다. 버그 수정은 `4111e20`로 완료됐다.
 - 서비스 4단위(ServiceAmenitySystem): 2026-10-01 설계, Source 미반영. 다음 Source 입력은 `.md/PROMPT_IMPLEMENTATION.md`다.
+- 버그 `BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`: 2026-10-01 설계, Source 미반영. 관리 화면 slider 확정값 동기화([BathWaterManagementUISystem.md](Architecture/BathWaterManagementUISystem.md))와 컴퓨터 키보드 focus 불변식 회귀 자동화([ComputerSystem.md](Architecture/ComputerSystem.md))다. 입력은 `.md/Work/BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out/PROMPT_IMPLEMENTATION.md`이다.

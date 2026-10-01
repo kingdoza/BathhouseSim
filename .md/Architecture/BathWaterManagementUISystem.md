@@ -6,6 +6,7 @@
 - domain 정본: [BathWaterOperationsSystem.md](BathWaterOperationsSystem.md)
 - computer session 정본: [ComputerSystem.md](ComputerSystem.md)
 - 공통 native Widget 정책: [UISystem.md](UISystem.md)
+- 2026-10-01 버그 수정 설계(`BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`, Source 미반영): slider 손잡이를 요청 callback 안에서 확정값으로 되돌리고 polling 동기화를 cache gate 앞으로 옮긴다. 아래 `Slider Synchronization`이 정본이다.
 - 2026-09-24 Source 확장: [UtilityLaborSystem.md](UtilityLaborSystem.md)의 예약/가동/설치 값, 이중 부족 상태와 snapshot cache를 native summary에 반영했다. 기존 WBP의 줄바꿈/높이 확인은 Editor 단계에서 필요하며, 빌드와 automation은 미실행이다.
 
 ## Target Source Scope
@@ -84,13 +85,22 @@ UBathWaterManagementScreenWidget
 - root는 constructed 상태에서 lightweight snapshot을 polling할 수 있다.
 - Bath topology/Zone geometry가 변할 때만 map 구조를 rebuild하고 capacity summary는 종류별 presentation cache로 갱신한다.
 - 연속 수위·수온·오염 값은 presentation cache와 달라질 때만 bound Widget과 Blueprint hook에 적용한다.
-- slider callback은 operations subsystem request API를 호출하고 committed 값과 failure result를 다시 표시한다.
+- slider callback은 operations subsystem request API를 호출하고 committed 값과 failure result를 다시 표시한다. 손잡이 동기화는 아래 `Slider Synchronization`을 따른다.
 - slider가 condition property를 직접 set하지 않는다.
 - 선택된 Bath가 회수/소멸하면 selection을 지우고 detail을 unavailable로 전환한다.
 - focus-out은 Widget을 파괴하지 않으므로 마지막 선택과 화면 상태가 Actor lifetime 동안 유지된다.
 - thermal threshold는 snapshot의 authoring 기반 파생값을 표시하고 `10%`를 UI 상수로 저장하지 않는다.
 - bath snapshot은 circulation/heating/cooling deficit을 독립 flag로 제공하며 tile/detail은 이를 동시에 표시한다.
 - 온도 문자열은 소수점 한 자리와 `°C`를 사용한다. selection/context 변경과 후속 revision에서는 transient request feedback을 정리한다.
+
+### Slider Synchronization
+
+- 불변식: 요청 callback 밖에서 두 slider 손잡이는 항상 선택 욕탕의 domain 확정값(순환도 %, 0.5°C 단위 목표 수온)을 정규화한 위치다. 제한은 slider 속성(Min/Max/step/lock)이 아니라 subsystem 결과로만 표현한다.
+- `SSlider`는 drag 중 손잡이를 커서 값으로 먼저 바꾼 뒤 `OnValueChanged`를 실행한다. 그래서 detail은 같은 callback 안에서 요청 결과(`CommittedValue`, 실패면 domain 또는 마지막 snapshot 값)로 해당 slider를 즉시 다시 쓴다. 이렇게 해야 한계 밖 손잡이가 한 frame도 그려지지 않는다.
+- subsystem은 확정값이 기존 값과 같으면 mutation·broadcast를 하지 않는다. 이 경우를 UI가 결과로 직접 보정하며, subsystem에 no-op 알림을 추가하지 않는다.
+- `USlider::SetValue`는 `OnValueChanged`를 다시 broadcast한다. 보정 쓰기는 재진입 guard 안에서 하고, guard 중 callback은 요청을 보내지 않는다. 재요청이 제한 피드백을 지우지 않게 하기 위해서다.
+- `ApplyBathSnapshot`의 slider 동기화는 presentation cache 조기 반환보다 앞에서 매번 수행하되, 값이 다를 때만 쓴다. text·step 쓰기와 presentation counter는 기존 cache gate를 유지한다.
+- 제한 피드백은 기존 revision 규칙을 유지한다. 한계에서 반복된 no-op 요청도 `bWasLimited`라 문구가 남고, 제한 없는 요청이나 선택 변경이 문구를 지운다.
 
 ### Required BindWidget Contract
 
@@ -147,6 +157,7 @@ WidgetTree의 현재 hierarchy, 필수 `BindWidget` 이름·타입과 컴퓨터/
 - Zone 밖 Bath와 non-Bath utility가 지도에서 제외되는지 확인한다.
 - topology revision에서만 tile set을 rebuild하는지 확인한다.
 - slider가 subsystem transaction을 거쳐 committed/limited result를 표시하고 다른 Bath 설정을 바꾸지 않는지 확인한다.
+- 한계에서 반복 drag(no-op 요청)와 release 뒤에도 손잡이가 확정값에 있는지 Slate pointer 경로(`FSlateApplication::RoutePointer*` + virtual user)로 확인한다.
 - selected Bath 회수/EndPlay에서 stale reference가 남지 않는지 확인한다.
 - focus-out/re-entry에서 Widget instance와 선택이 유지되는지 확인한다.
 - sample Widget compatibility와 existing computer automation을 회귀 검증한다.
