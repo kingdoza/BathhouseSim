@@ -1,0 +1,11 @@
+# CONTEXT — UNBOX-SPAWN-VIEW 플레이어 앞 생성 위치를 카메라 정면 기준으로
+- 목표 / 상위·선행·관련 작업: 개봉 등 플레이어 앞에 새 물체가 생길 때 카메라 정면 기준으로 생기게 함. 상위 없음. 관련: 상점 확장(SHOP-018~020·033·038~041, `Architecture/ShopSystem.md` World Placement), 서비스 3단위 봉투 정면 놓기(`Architecture/CleaningLitterSystem.md` Front Drop Placement).
+- 현재 단계와 재개 지점: 기능 명세 초안 작성 완료, 사용자 답변 대기(`QNA_FEATURE_SPEC.md` Q1~Q6, P1~P8). 답변을 `PROMPT_ARCHITECTURE.md` 4절에 반영하고 연쇄 메모대로 시나리오를 고친 뒤 승인 요청.
+- 명세 승인 일자와 사전 허용: 미승인
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 기능 명세 시작 커밋 `fcc982d`(워커 worktree는 `ae81e98`, 차이는 `.md/USER_UNREAL.md`·`.md/Work/SERVICE/`뿐). 작업 브랜치는 마스터가 정함.
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: Editor 사전 조사 생략(새 계약은 런타임 카메라 기준이라 Blueprint 값에 의존하지 않음, `PROMPT_ARCHITECTURE.md` 10절).
+- 복귀 기록: 없음
+- 워커 세션 ID, 사용자 지시 모델 덮어쓰기: 없음
+- 결과물 목록과 사용자 지시 요약:
+  - `PROMPT_ARCHITECTURE.md`(진행), `QNA_FEATURE_SPEC.md`(진행)
+  - 사용자 요청 원문: "언박싱등의 플레이어앞에 물체가 생길때 너무 아래에서 생기는데 생성위치가 플레이어 카메라 정면 기준이 맞는지 확인."

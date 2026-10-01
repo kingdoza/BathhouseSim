@@ -1,0 +1,11 @@
+# CONTEXT — COMPUTER-WHEEL-SCROLL 컴퓨터 화면 스크롤 영역 마우스 휠 스크롤
+- 목표 / 상위·선행·관련 작업: 컴퓨터 포커스 중 커서가 화면의 스크롤 영역 위에 있으면 마우스 휠로 그 영역이 스크롤된다. 상위 작업 없음. 관련: `BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out` 현상 2(포커스아웃이 클릭 뒤에만 동작, 입력 포커스·라우팅 의심) — 같은 컴퓨터 입력 경로를 공유하지만 이 작업 범위가 아니다. 경계는 `PROMPT_ARCHITECTURE.md` "관련 작업과의 경계".
+- 현재 단계와 재개 지점: 기능 명세 초안 작성(`PROMPT_ARCHITECTURE.md` 진행). 사용자 답변(`QNA_FEATURE_SPEC.md`) 대기. Editor 읽기 전용 사전 조사 범위를 `PROMPT_ARCHITECTURE.md`에 적었으며 승인 전에 수행을 권한다.
+- 명세 승인 일자와 사전 허용: 미승인
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 기능 명세 시작 커밋 `fcc982d`(인계 패킷 기준). 워커 worktree HEAD는 `ae81e98`이며 `fcc982d`와의 차이는 `.md/Work/`·`USER_UNREAL.md` 문서뿐이고 Source·Content는 같다.
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 해당 없음(명세 단계)
+- 복귀 기록: 없음
+- 워커 세션 ID, 사용자 지시 모델 덮어쓰기: 없음
+- 결과물 목록과 사용자 지시 요약:
+  - 사용자 요청 원문: "인게임컴퓨터에서 스크롤영역위에 마우스있을때는 플레이어 마우스스크롤로도 스크롤 되게하기"
+  - `PROMPT_ARCHITECTURE.md`(진행), `QNA_FEATURE_SPEC.md`(진행)
