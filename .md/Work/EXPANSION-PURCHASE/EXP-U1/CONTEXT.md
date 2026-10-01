@@ -11,3 +11,4 @@
   - `PROMPT_IMPLEMENTATION.md`(보류, 0절 사용자용 개요), `QNA_ARCHITECTURE.md`(보류, Q1), Architecture 정본: 신규 `BuildingSystem.md`, 수정 `0_ARCHITECTURE.md`·`PlacementSystem.md`·`CleaningLitterSystem.md`·`CoreSystem.md`·`ComputerSystem.md`
   - 사용자 응답(2026-10-02): 미승인. Q1 A 결정(QNA 기록은 아키텍처 워커 재개 때 반영). 추가 질문: 출입구·통로 배치 방법 상세, 벽·바닥 두께·조각 설정을 개별 원본 Blueprint가 아니라 Project Settings에 두는 이유. 마스터 확인 사항: Validation 표의 '손님 공간(Hall·Bath)에 바깥 출입구가 없음'이 목욕공간에도 바깥 출입구를 요구하는 것으로 읽힘 → 계약(홀만 출입구)에 맞게 '손님 공간 전체에 하나도 없음'으로 고칠 것.
   - 사용자 응답 2(2026-10-02): 통로 위치 지정 현행 유지, 공용 값 Project Settings 유지. 추가 결정: 홀=쓰레기 조각만, 목욕공간=물 얼룩 조각만, 작업공간=없음 → 계약 변경이라 기능 명세 워커가 상위 `PROMPT_ARCHITECTURE.md` 수정 중, 뒤이어 아키텍처 워커 재개(이 결정, Q1 A, 출입구 검증 문구 정정). 질문: 단계별 확장 크기 조절 방식(U2 예정 형태 설명).
+  - 사용자 응답 3(2026-10-02): 넓힘 목록 Editor 형태를 지금 확정(U1 설계에 'U2 예정 형태'로, 구현은 U2), Editor 전용 넓힘 미리보기 횟수 추가. 기능 명세 D1 커밋 `a0d66e3`. 아키텍처 워커 재개 중.

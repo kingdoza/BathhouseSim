@@ -2,7 +2,8 @@
 
 - 작업 ID: `EXP-U1`
 - 단계: 아키텍처
-- 상태: 보류 — 사용자 특별 지시(구현 전 승인)에 따라 0절 Editor 데이터 관리 개요 승인과 `QNA_ARCHITECTURE.md` Q1 답변 대기, 책임 단계: 아키텍처(사용자 확인), 재개 조건: 사용자 승인과 Q1 답변. 승인·Q1 A면 내용 변경 없이 상태만 `완료`로 바꾼다
+- 상태: 보류 — 사용자 특별 지시(구현 전 승인)에 따라 0절 Editor 데이터 관리 개요 승인 대기, 책임 단계: 아키텍처(사용자 확인), 재개 조건: 사용자 승인. 승인되면 내용 변경 없이 상태만 `완료`로 바꾼다
+- 재작업 기록(2026-10-02 사용자 검토 1회차): Q1 A 확정, 사후 결정 D1(홀=쓰레기 조각만, 목욕공간=물 얼룩 조각만, 작업공간=없음) 반영, 바깥 출입구 필수 규칙을 홀 기준으로 명확화, 공간별 넓힘 목록과 Editor 전용 넓힘 미리보기의 형태를 U2 예정 형태로 확정(U1 구현 금지). 통로 위치 지정 방식과 공용 값의 Project Settings 위치는 유지
 
 - 상위 계약: [../PROMPT_ARCHITECTURE.md](../PROMPT_ARCHITECTURE.md)(상태 완료). 이번 범위는 EXP-001~015, 대표 시나리오는 EXP-007과 EXP-004다.
 - Editor 사실: [../REPORT_UNREAL_DISCOVERY.md](../REPORT_UNREAL_DISCOVERY.md), [../REPORT_UNREAL_DISCOVERY_2.md](../REPORT_UNREAL_DISCOVERY_2.md)
@@ -22,7 +23,7 @@
    - 공간 하나에 관한 값은 전부 그 Actor의 Details 패널 `Bathhouse Space` 묶음에 있다. 크기·위치·천장 높이·재질·조명·출입구/통로·계단·놓을 수 있는 설비가 여기 있다.
    - 뷰포트에서 홀 벽을 클릭하면 홀 Actor가 선택된다. 공간을 옮기려면 Actor를 끌면 된다.
 2. **Project Settings > Game > Bathhouse Building** (파일 `Config/DefaultGame.ini`)
-   - 모든 공간이 함께 쓰는 값이다. 벽 두께, 바닥·천장 판 두께, 벽·바닥을 만드는 상자 모양, 쓰레기·물 얼룩 생성 조각의 최대 크기와 조각 종류가 여기 있다.
+   - 모든 공간이 함께 쓰는 값이다. 벽 두께, 바닥·천장 판 두께, 벽·바닥을 만드는 상자 모양, 생성 조각의 최대 크기, 그리고 "쓰레기 조각"·"물 얼룩 조각"으로 쓸 구역 Blueprint가 여기 있다. 어느 공간에 어떤 조각을 깔지는 공간 Actor 값이다(0.2 `Cleaning Chunk Kind`).
 3. **기존 asset** (대부분 U2·U3에서 씀)
    - 확장 정의 `DA_BathhouseExpansion_Default`: 가격·전체 구입 상한·홀 넓힘 효과 표(U2·U3 예정)
    - 상점 목록 `DA_ShopCatalog`: 락커 상품 가격(U2·U3 예정)
@@ -45,14 +46,17 @@
 | 놓을 수 있는 설비 | 공간 Actor `Allowed Facility Tags`(설비 종류 태그 목록) | 태그 추가·삭제 | 태그 `Facility.Type.<종류>` | U1 |
 | 설비 종류 표시 | 설비 정의 `DA_FacilityPlacement_*`의 `Facility Tags`에 종류 태그 하나 | 정의 asset 열기 | 한 번 정하면 바꿀 일 없음. 1·4·8칸 락커는 같은 태그 | U1 |
 | 벽 두께, 바닥·천장 판 두께, 형상 상자 mesh | Project Settings > Bathhouse Building | 설정 창 | cm | U1 |
+| 생성 조각 종류(공간별) | 공간 Actor `Cleaning Chunk Kind`(없음/쓰레기/물 얼룩 중 하나) | Details 선택 | 기능 계약 D1: 홀=쓰레기, 목욕공간=물 얼룩, 작업공간=없음. 넓힐 때 추가되는 조각도 같은 종류 | U1 |
 | 쓰레기·물 얼룩 생성 조각 최대 크기 | Project Settings > Bathhouse Building `Cleaning Chunk Max Size Cm` | 설정 창 | cm(X, Y). 바닥을 이 크기 이하의 같은 칸으로 나눔 | U1 |
-| 조각으로 쓸 구역 종류 | Project Settings > Bathhouse Building(쓰레기·물 얼룩 조각 class) | 설정 창 | 기본 `BP_LitterSpawnZone`, `BP_StainSpawnZone` | U1 |
+| 조각 종류별 구역 Blueprint | Project Settings > Bathhouse Building(쓰레기 조각 class, 물 얼룩 조각 class) | 설정 창 | 기본 `BP_LitterSpawnZone`, `BP_StainSpawnZone`. 공간 Actor가 고른 종류에 맞는 class를 여기서 찾는다 | U1 |
 | 조각마다 동시 최대 개수 | `BP_LitterSpawnZone`·`BP_StainSpawnZone` Class Defaults | Blueprint 열기 | 개, 기존 값 | 기존 |
 | 맵 전체 쓰레기·물 얼룩 상한 | `BP_CleaningDirector` | 기존과 같음 | 개 | 기존 |
 | 손님 길 범위 | Level의 `NavMeshBoundsVolume` 1개 | 상자 크기·위치 조정 | 홀·목욕공간(앞으로 넓어질 자리 포함)과 출입구 밖 마당을 넓게, 높이는 지상만 | U1 |
 | 열쇠걸이 자리 수 | `BP_BathhouseKeyRack` `Pair Transforms` | 기존과 같음 | 자리 | 기존 |
-| 공간별 넓힘 양·방향·넓힘 상한 | 공간 Actor에 넓힘 목록 추가 예정(몇 번째 넓힘마다 방향·양) | — | cm. 상한을 목록 길이로 둘지 따로 둘지 U2 설계에서 확정 | U2·U3 예정 |
-| 확장 구입 가격, 전체 구입 상한, 홀 넓힘 횟수별 열쇠 수·락커 칸 한도 | `DA_BathhouseExpansion_Default`(기존 확장 정의). 지금의 단계 표를 "홀 넓힘 횟수별 효과 표"로 쓰고 가격 목록·상한을 더할 예정 | DataAsset 열기 | 원, 회, 개·칸 | U2·U3 예정 |
+| 공간별 넓힘 방향·양 | 공간 Actor `Expansion Steps` 목록. 1번째 줄 = 그 공간의 1번째 넓힘, 2번째 줄 = 2번째 넓힘. 줄마다 `Side`(동·서·남·북)와 `Amount Cm` | 줄 추가·수정·삭제 | cm. 그 방향 벽 한 면만 바깥으로 그만큼 물러난다. 형태 확정, 구현은 U2 | U2·U3 예정 |
+| 공간별 넓힘 횟수 상한 | 같은 `Expansion Steps`의 줄 수(따로 적는 값 없음) | 줄을 지우거나 더함 | 회. 줄이 2개면 그 공간은 2번까지 넓힐 수 있다 | U2·U3 예정 |
+| 넓힘 미리보기 횟수 | 공간 Actor `Editor Preview Expansion Count`(편집 화면 전용, 저장 안 됨) | Details 숫자 입력 | 회, 0~줄 수. 편집 뷰포트에서만 그만큼 넓힌 모습을 보여 준다. 게임은 항상 실제 넓힘 횟수(시작 0)로 짓는다 | U2 예정 |
+| 확장 구입 가격, 전체 구입 상한, 홀 넓힘 횟수별 열쇠 수·락커 칸 한도 | `DA_BathhouseExpansion_Default`(기존 확장 정의). 지금의 단계 표를 "홀 넓힘 횟수별 효과 표"로 쓰고 가격 목록·전체 상한을 더할 예정(세부 필드는 U2 설계) | DataAsset 열기 | 원, 회, 개·칸. 전체 상한은 공간별 줄 수와 별개다. 어느 쪽이든 먼저 닿으면 막힌다 | U2·U3 예정 |
 | 락커 상품 가격 | `DA_ShopCatalog`에 락커 상품 3개 추가 예정 | DataAsset 열기 | 원, 상품별 | U2(1칸)·U3(4·8칸) 예정 |
 
 ### 0.3 작업 흐름 예
@@ -60,10 +64,14 @@
 - **홀을 더 크게 시작하고 싶다:** `Space_Hall` 선택 → `Floor Size Cm` 수정 → 벽·바닥·천장·조명·배치 격자 범위·조각 미리보기가 그 자리에서 다시 생긴다. 목욕공간과 겹치면 저장할 때 오류가 뜬다. 목욕공간도 옮겨야 하면 `Space_Bath`를 끈다. 통로는 두 공간이 맞닿아 있어야 뚫린다.
 - **출입구를 옮기고 싶다:** `Space_Hall` → `Openings`의 서쪽 항목 `Center Offset Cm` 수정 → 서쪽 벽 구멍이 옮겨진다. 손님 생성기·퇴장 지점·쓰레기 수거 구역은 따라가지 않으므로 출입구 밖으로 직접 옮긴다.
 - **통로 폭을 바꾸고 싶다:** 통로는 한쪽 공간(홀)의 `Openings`에만 있다. 그 항목의 `Width Cm`을 바꾸면 홀 동쪽 벽과 목욕공간 서쪽 벽이 같이 다시 뚫린다.
-- **계단을 옮기고 싶다:** `Space_Hall` → `Stairs` 항목의 위치·방향 수정 → 홀 바닥 구멍, 지하 천장 구멍, 계단, 계단 벽이 같이 옮겨진다. 계단이 지하 공간 밖으로 나가거나 너무 가파르면 오류가 뜬다. 지형 구멍 범위는 `QNA_ARCHITECTURE.md` Q1을 따른다.
+- **계단을 옮기고 싶다:** `Space_Hall` → `Stairs` 항목의 위치·방향 수정 → 홀 바닥 구멍, 지하 천장 구멍, 계단, 계단 벽이 같이 옮겨진다. 계단이 지하 공간 밖으로 나가거나 너무 가파르면 오류가 뜬다. 0회 홀 안쪽에서 옮기면 지형 구멍은 다시 칠할 필요가 없다(Q1 A). 0회 홀 밖으로 옮기면 구멍을 넓혀야 하고, 빠뜨리면 검사가 알린다.
 - **지하를 더 깊게:** `Space_Work`의 Location Z를 낮춘다 → 계단 길이는 그대로이므로 경사가 가팔라진다. 너무 가파르면 오류가 뜨므로 계단 `Run Cm`을 늘린다.
 - **목욕공간에 놓을 수 있는 설비를 바꾸고 싶다:** `Space_Bath` → `Allowed Facility Tags`에 태그를 더하거나 뺀다. 새 설비 종류라면 그 설비 정의 asset에 종류 태그를 먼저 붙인다(태그 목록은 Project Settings > GameplayTags).
 - **재질·조명:** 공간 Actor의 `Surfaces`, `Lighting`을 바꾸면 즉시 반영된다.
+- **어느 공간에 어떤 조각을 깔지 바꾸고 싶다:** 그 공간 Actor의 `Cleaning Chunk Kind`를 바꾼다. 미리보기 선이 바로 바뀐다. 한 공간에는 한 종류만 깔린다.
+- **(U2부터) 홀 2번째 넓힘을 북쪽 4m로 바꾸고 싶다:** `Space_Hall` → `Expansion Steps`의 2번째 줄 → `Side`를 `북(+Y)`, `Amount Cm`을 400으로. 홀을 2번 넓히면 북쪽 벽이 그만큼 물러난다. 넓힌 끝 모습이 목욕공간이나 다른 공간의 넓힌 끝 모습과 겹치면 저장할 때 오류가 뜬다.
+- **(U2부터) 2번 넓힌 홀이 어떻게 보이는지 미리 보고 싶다:** `Space_Hall` → `Editor Preview Expansion Count`를 2로. 편집 뷰포트에서 홀이 목록 1·2번째 줄대로 넓어지고 벽·바닥·천장·조명·통로·배치 격자 범위·조각 미리보기 선이 따라간다. 공간 위에 `넓힘 미리보기 2회` 표시가 뜬다. 0으로 돌리거나 레벨을 다시 열면 0회 모습으로 돌아온다. PIE를 눌러도 게임은 0회에서 시작한다.
+- **(U2부터) 홀을 1번만 넓힐 수 있게:** `Space_Hall` → `Expansion Steps`에서 2번째 줄을 지운다. 전체 구입 횟수 상한은 `DA_BathhouseExpansion_Default`에서 따로 바꾼다.
 - **조각을 더 잘게:** Project Settings의 조각 최대 크기를 바꾼다. 편집 화면의 조각 미리보기 선이 바로 바뀐다(공간 Actor를 한 번 건드리거나 레벨을 다시 열면 갱신). 게임 시작 때 그 크기로 조각이 생긴다.
 
 ### 0.4 값을 바꾸면 자동으로 따라오는 것
@@ -72,7 +80,10 @@
 |---|---|---|
 | 공간 위치·크기·천장 높이 | 그 공간의 벽·바닥·천장·조명, 설비 배치 구역과 격자, 생성 조각(미리보기 선, 게임 시작 때 실제 조각), 맞닿은 공간의 통로 구멍, 계단 구멍, 컴퓨터 관리 탭 욕탕 지도(목욕공간) | 이미 놓인 설비·고정 물건, 손님 생성기·퇴장 지점, 계산대 대기 배회 구역, 쓰레기 수거 구역, 플레이어 시작 위치, 손님 길 범위 상자(벗어나면 오류로 알림), 지형 구멍 |
 | 출입구·통로 | 해당 벽 구멍(통로는 양쪽 벽) | 출입구 밖 물건 |
-| 계단 | 홀 바닥 구멍, 지하 천장 구멍, 계단 판·경사로·계단 벽·구멍 막이 | 지형 구멍(Q1) |
+| 계단 | 홀 바닥 구멍, 지하 천장 구멍, 계단 판·경사로·계단 벽·구멍 막이 | 지형 구멍(0회 홀 밖으로 옮길 때만, Q1 A) |
+| 조각 종류 | 그 공간의 미리보기 선과 게임 시작 때 생기는 조각 종류 | — |
+| (U2) 넓힘 목록 | 넓힐 때 물러나는 벽과 그 뒤 형상·구역·조각(넓힌 띠만 새 조각 추가) | 출입구 밖 물건(출입구가 있는 벽을 넓히면 출입구만 벽과 함께 바깥으로 이동) |
+| (U2) 넓힘 미리보기 횟수 | 편집 뷰포트의 그 공간 형상·조명·통로·배치 구역·조각 미리보기 선, 이웃 공간의 통로 구멍 | 게임 시작 상태(항상 실제 넓힘 횟수), 저장 내용, 이미 놓인 설비 |
 | 재질·조명 | 즉시 반영 | — |
 | 허용 설비 태그 | 다음 배치 미리보기부터 반영(격자도 허용 공간에만 보임) | 이미 놓인 설비(놓인 채 유지, 검사가 경고) |
 | Project Settings 값 | 공간 Actor가 다시 지어질 때(편집·레벨 열기·게임 시작) 반영 | — |
@@ -87,12 +98,12 @@
 - 오류로 알리는 설정(전체 목록은 BuildingSystem.md Validation):
   - 공간 종류가 빠졌거나 두 번 있음, 공간 Actor를 돌리거나 늘림
   - 두 공간이 겹침(지하는 위층과 높이로 떨어져 있으면 괜찮음), 지하가 너무 얕아 홀 바닥과 지하 천장이 겹침
-  - 출입구·통로가 벽 밖으로 나감, 같은 벽에서 겹침, 통로인데 두 공간이 맞닿지 않음, 바깥 출입구 너머에 다른 공간이 붙어 있음, 손님 공간에 바깥 출입구가 없음
+  - 출입구·통로가 벽 밖으로 나감, 같은 벽에서 겹침, 통로인데 두 공간이 맞닿지 않음, 바깥 출입구 너머에 다른 공간이 붙어 있음, 홀에 바깥 출입구가 하나도 없음(손님은 홀 출입구로만 드나든다. 목욕공간에는 요구하지 않음)
   - 계단이 지하 공간 밖으로 나감, 계단 위·아래 출입 자리가 없음, 너무 가파름, 지하로 가는 계단이 없음, 계단 통로를 지형 등이 막음
   - 손님 길 범위가 홀·목욕공간·출입구 밖을 덮지 않거나 지하를 덮음
-  - 놓을 수 있는 설비 목록이 빔, Project Settings의 상자 mesh·조각 종류가 빔
-- 경고: 재질이 비었음(엔진 기본 격자 재질로 보임), 이미 놓인 설비가 어느 공간에도 없거나 그 공간에 맞지 않는 종류
-- U2·U3 예정: 넓혀졌을 때 겹침, 열쇠 수가 열쇠걸이 자리 수를 넘음, 가격·효과 표가 상한보다 짧음
+  - 놓을 수 있는 설비 목록이 빔, Project Settings의 상자 mesh가 빔, 공간이 고른 조각 종류의 구역 Blueprint가 Project Settings에 없음
+- 경고: 재질이 비었음(엔진 기본 격자 재질로 보임), 이미 놓인 설비가 어느 공간에도 없거나 그 공간에 맞지 않는 종류, 작업공간에 조각 종류를 고름(손님이 없어 아무것도 생기지 않음)
+- U2·U3 예정: 모든 공간을 목록 끝까지 넓힌 모습끼리 겹침, 다른 공간과 맞닿은 벽(통로 벽 포함)을 넓히는 줄, 넓힘 양이 0 이하, 넓힌 손님 공간이 손님 길 범위 밖, 열쇠 수가 열쇠걸이 자리 수를 넘음, 가격·효과 표가 전체 상한보다 짧음. 경고: 바깥 출입구가 있는 벽을 넓히는 줄
 
 ### 0.6 Level Actor와 asset 목록
 
@@ -101,7 +112,7 @@
 | 새 Blueprint | `/Game/Bathhouse/Blueprints/Building/BP_BathhouseSpace`(parent `ABathhouseSpaceActor`) | 만든다. 배치 격자 Plane과 격자 재질만 지정 |
 | 새 Level Actor | `Space_Hall`, `Space_Bath`, `Space_Work`(위 Blueprint 3개) | 놓고 값 설정 |
 | 새 재질 | 공간별 벽·바닥·천장 재질과 계단 재질 | 기존 자원 중 가까운 것으로 만든다. 상자를 늘려 쓰므로 무늬가 늘어나지 않는 world 기준 재질을 권장 |
-| 새 재질(Q1 A·B) | 구멍을 지원하는 프로젝트 지형 재질 | 만들어 지형에 지정, 홀 아래 지형 구멍 칠하기 |
+| 새 재질(Q1 A) | 지금 격자 재질과 똑같이 보이면서 구멍을 지원하는 프로젝트 지형 재질 | 만들어 지형에 지정, 0회 홀 안쪽 바닥 아래 지형에 구멍 칠하기 |
 | Project Settings | Bathhouse Building 묶음 | 구현 단계가 기본값을 넣고 Editor에서 확인 |
 | GameplayTags | `Facility.Type.*` 14개 | 구현 단계가 등록 |
 | 설비 정의 16개 | `DA_FacilityPlacement_*`(배치 활성 16개) | 종류 태그 하나씩 추가 |
@@ -121,6 +132,10 @@
 | 모두 같이 쓰는 값 | Project Settings 한 곳 | 공간마다 벽 두께 등을 둠: 같은 뜻의 값이 세 군데 생겨 어긋날 수 있다 |
 | 손님 길 | 넓게 깐 고정 Nav 범위(지하 높이 제외) + 실시간 Nav 재생성 | 공간이 Nav 범위를 직접 움직임: 다른 Actor를 생성 스크립트에서 고치게 되어 불안정하다. 범위가 모자라면 검사가 알린다 |
 | 생성 조각 | 게임 시작 때 공간이 자동 생성, 편집 화면은 선으로 미리보기 | Level에 조각을 직접 배치: 크기를 바꿀 때마다 다시 깔아야 하고 U2 넓힘 때 조각을 추가할 수 없다 |
+| 공간별 조각 종류(D1) | 공간 Actor 값 `Cleaning Chunk Kind`(없음/쓰레기/물 얼룩) + 종류별 구역 Blueprint는 Project Settings | 공간 종류로 코드에 고정: Editor에서 보이지 않고 바꿀 수 없다. 공간 Actor에 Blueprint를 직접 지정: 같은 Blueprint를 공간마다 다시 고르게 되어 공용 값 원칙과 어긋난다 |
+| 지형 구멍(Q1) | A: 구멍 지원 프로젝트 지형 재질로 바꾸고 0회 홀 안쪽 아래에 구멍 | B: 계단 자리만 작게 칠함. 계단을 옮길 때마다 다시 칠해야 한다 |
+| 넓힘 미리보기 소속 | U2(넓힘 목록과 함께) | U1: 미리볼 넓힘 목록이 U2 데이터라 U1에 넣으려면 목록까지 앞당겨야 한다(수직 단위 선행 일반화). 비용은 편집 전용 숫자 하나와 형상 계산 입력 하나라 U2에 얹어도 작다 |
+| 넓힘 데이터 형태(U2 예정) | 공간 Actor `Expansion Steps` 목록, 줄 = 몇 번째 넓힘(방향·양), 공간별 상한 = 줄 수 | 상한을 별도 숫자로 둠: 줄 수와 숫자가 어긋날 수 있다(숫자 > 줄 수면 넓힐 양이 없음). DataAsset에 공간별 표: 공간 값이 공간 Actor와 DataAsset 두 곳으로 갈린다. 방향 하나 + 횟수별 양만: "2번째는 북쪽" 같은 횟수별 방향을 못 정한다 |
 | 공간별 허용 설비 | 공간의 허용 태그 목록 + 설비 정의마다 종류 태그 | 공간마다 설비 정의 목록: 태그를 쓰는 기존 배치 구역 규칙을 그대로 쓰지 못한다. 정의마다 공간 태그: 표를 바꾸려면 정의 16개를 고쳐야 한다 |
 | 벽·바닥 모양 | 상자 하나를 늘려 쓰는 생성 형상 | 집 mesh(StylizedKitchen): 방 배치가 구워진 통짜라 크기를 바꿀 수 없다(사전 조사) |
 
@@ -130,7 +145,7 @@
 
 - 시나리오: EXP-001~015(상위 계약 5절 "공간 건물 [U1]"). 대표: EXP-007(손님 한 명이 출입구로 들어와 전 루틴을 마치고 출입구로 나감), EXP-004(물건을 들고 계단 왕복).
 - 현재 단계: 수직 구현 첫 단위. 확장 구입 없음. 공간 크기가 Editor 값대로 바뀌면 건물·구역이 따라간다(계약 4.7, 10절).
-- 승인 결정: 상위 계약 3절(Q1~Q15, P1~P37, S2 A, S3 A). 설계에 맡김(12절) 중 U1 해당 항목의 결정은 3절과 BuildingSystem.md다.
+- 승인 결정: 상위 계약 3절(Q1~Q15, P1~P37, D1, S2 A, S3 A). 아키텍처 질문은 `QNA_ARCHITECTURE.md` Q1 A(지형 구멍). 설계에 맡김(12절) 중 U1 해당 항목의 결정은 3절과 BuildingSystem.md다.
 
 ## 2. 목적·수용 기준·비목표
 
@@ -171,7 +186,7 @@
 | `Private/Facility/BathhouseFacilityActor.cpp`, `Private/Facility/BathWaterUtilityFacilityActor.cpp`, `Private/Towel/TowelProcessingMachineActor.cpp` | `QueryFacilityPlacement`의 구역 거부 문구를 getter로 |
 | `Public·Private/Cleaning/LitterSpawnZoneActor.*`, `StainSpawnZoneActor.*` | `USceneComponent* GetSpawnFloor() const`, `void SetSpawnAreaHalfSizeXY(const FVector2D&)`(SpawnBounds X·Y extent만, Z와 `SpawnFloor` 상대 위치 유지, BeginPlay 전 deferred spawn 중 호출 계약) |
 | `Config/DefaultGameplayTags.ini` | `Facility.Type.ClothesLocker`, `DrinkFridge`, `MassageChair`, `RestBench`, `Television`, `Vanity`, `Bath`, `Shower`, `ScrubTable`, `Boiler`, `Cooler`, `Circulator`, `Washer`, `Dryer` 등록(DevComment에 공간 허용 판정용임을 적음) |
-| `Config/DefaultGame.ini` | `[/Script/BathhouseSim.BathhouseBuildingSettings]` 섹션: 상자 mesh `/Engine/BasicShapes/Cube`, 조각 class 두 개(`BP_LitterSpawnZone_C`, `BP_StainSpawnZone_C`), 조각 최대 크기(상위 계약 4.7 제안), 벽·판 두께(구현이 정한 기본값). C++ 초기값은 설정이 없을 때의 예비값 |
+| `Config/DefaultGame.ini` | `[/Script/BathhouseSim.BathhouseBuildingSettings]` 섹션: 상자 mesh `/Engine/BasicShapes/Cube`, 종류별 조각 class 두 개(쓰레기 `BP_LitterSpawnZone_C`, 물 얼룩 `BP_StainSpawnZone_C`), 조각 최대 크기(상위 계약 4.7 제안), 벽·판 두께(구현이 정한 기본값). C++ 초기값은 설정이 없을 때의 예비값 |
 | `BathhouseSim.Build.cs` | 변경 없음(NavigationSystem, DeveloperSettings, GameplayTags 기존 의존) |
 
 ## 4. 공간 Actor 구현
@@ -205,8 +220,9 @@ BuildingSystem.md Space Actor 절의 class·component·property 계약을 그대
 BuildingSystem.md Cleaning Chunks 절대로 `FBathhouseCleaningChunkSpawner`가 공간 BeginPlay에서 실행한다.
 
 - Owner = 공간 Actor, spawn은 `SpawnActorDeferred` → `SetSpawnAreaHalfSizeXY` → `GetSpawnFloor()` 상대 Z로 Actor Z 보정 → `FinishSpawning`. class가 없거나 load 실패면 그 종류만 건너뛰고 오류를 한 번 기록한다.
+- 공간 Actor `CleaningChunkKind`가 정한 한 종류만 spawn한다. `Litter`면 Settings 쓰레기 조각 class, `Stain`이면 물 얼룩 조각 class, `None`이면 아무것도 만들지 않는다. 기능 계약 D1의 값(홀 `Litter`, 목욕공간 `Stain`, 작업공간 `None`)은 Editor 단계가 Level instance에 설정한다. C++ 기본값은 `None`이다.
 - 생성된 조각은 공간 Actor의 Transient weak 배열에 두고 EndPlay에서 파괴한다.
-- Work 공간은 조각을 만들지 않는다(종류 규칙 `Hall`·`Bath`만 손님 공간).
+- 공간 종류로 조각 종류를 추론하지 않는다(작업공간에 `None` 외의 값은 검증 경고만).
 - 조각은 BeginPlay에서 등록되므로 `ACleaningDirectorActor`의 기존 구역 등록 경로가 그대로 clock을 만든다. director·Floor Rule은 바꾸지 않는다.
 
 ## 7. 배치 변경
@@ -237,12 +253,12 @@ BuildingSystem.md Validation 표 전부를 `FBathhouseSpaceValidation`에 구현
 - 구현 단계가 `PROMPT_UNREAL.md`에 넣을 Editor 범위(0.6 표를 exact하게):
   1. `BP_BathhouseSpace` 생성(GridVisual Plane·`MI_FacilityPlacementGrid`, ZoneBounds Z extent는 기존 `BP_FacilityPlacementZone`과 같게).
   2. Recast `RuntimeGeneration = Dynamic`(기존 `USER_UNREAL.md` 항목 해소. 자동화 실패 시 그 항목 유지).
-  3. 공간 3개 배치와 값 설정. 기본 제안은 상위 계약 4.7(홀·목욕공간 맞닿음, 지하는 홀 아래). 지상 공간 바닥 Z는 지형 면보다 위로 둔다(같은 높이면 바닥과 지형이 겹쳐 깜빡임). 개구부: 홀 서쪽 출입구, 홀→목욕공간 통로. 계단: 홀→작업공간. 허용 태그는 계약 4.2 표.
+  3. 공간 3개 배치와 값 설정(`CleaningChunkKind`: 홀 쓰레기, 목욕공간 물 얼룩, 작업공간 없음). 기본 제안은 상위 계약 4.7(홀·목욕공간 맞닿음, 지하는 홀 아래). 지상 공간 바닥 Z는 지형 면보다 위로 둔다(같은 높이면 바닥과 지형이 겹쳐 깜빡임). 개구부: 홀 서쪽 출입구, 홀→목욕공간 통로. 계단: 홀→작업공간. 허용 태그는 계약 4.2 표.
   4. 공간 재질(world 기준 재질 권장)과 조명 값.
   5. 설비 정의 16개에 종류 태그.
   6. 기존 Level instance 정리: 0.6 표의 삭제·이동·연결. 설비는 공간 바닥 Z로 내리고 footprint가 공간 안쪽에 들어가야 한다. Approach point가 Nav 위에 남는지, 고정 거치대·운반 물건이 같이 옮겨지는지 확인한다. `boiler` 장식 mesh(목욕공간 안)는 계약 목록에 없어 그대로 두고, 공간 형상과 겹치면 멈추고 묻는다(S2).
   7. 손님 생성기·퇴장 지점·쓰레기 수거 구역을 출입구 밖 마당으로, 손님 길 범위 상자를 0.2 기준으로 조정.
-  8. 지형 재질·구멍(Q1 답변). 칠하기 자동화가 안 되면 `USER_UNREAL.md`.
+  8. 지형 재질·구멍(Q1 A): 지금 `/Engine/OpenWorldTemplate/LandscapeMaterial/M_ProcGrid`와 같게 보이면서 Landscape Visibility Mask를 지원하는 프로젝트 지형 재질을 만들어 지형에 지정하고, 0회 홀 안쪽 바닥 아래(홀 바닥에 가려지는 범위)에 지형 구멍을 칠한다. 바깥 지형 모습이 바뀌지 않았는지 확인한다. 칠하기 자동화가 안 되면 `USER_UNREAL.md`.
   9. 공간 Actor Data Validation 오류 0, 경고는 사유 기록.
   10. Unreal 정본: 새 `.md/Unreal/BuildingSystem.md`와 `0_UNREAL.md` 링크, `WorldSystem.md`(PlacementZone 단일 기록 대체, Recast), `PlacementSystem.md`(Placement Zone 절), `CleaningSystem.md`(DefaultMap 구역 instance 제거, 바닥이 `Studio_floor`라는 낡은 기록 정정), `FacilitySystem.md`(정의 종류 태그), `InteractionUISystem.md`의 컴퓨터 WidgetClass 낡은 기록(상위 계약 6절).
 - Editor 단계는 Blueprint graph로 형상·조명·조각을 만들지 않는다. C++ 계약이 Level·asset과 맞지 않으면 아키텍처로 복귀한다.
@@ -256,7 +272,7 @@ BuildingSystem.md Validation 표 전부를 `FBathhouseSpaceValidation`에 구현
 ## 12. 구현 금지 범위
 
 - Content·Level 수정 금지(Editor 단계 몫). Recast·지형·Project Settings asset 저장 금지(Config 파일 기본값 작성만 허용).
-- U2·U3 금지: 넓힘 목록·현재 넓힘 횟수·확장 탭·구입·가격·열쇠/한도 변경·락커 판매·상점 규칙 변경. `UBathhouseExpansionDefinition`·`ABathhouseExpansionAuthority` 변경 금지.
+- U2·U3 금지: 넓힘 목록(`ExpansionSteps`, 형태는 BuildingSystem.md U2 Expansion Authoring Contract로 확정만)·현재 넓힘 횟수·확장 탭·구입·가격·열쇠/한도 변경·락커 판매·상점 규칙 변경. `UBathhouseExpansionDefinition`·`ABathhouseExpansionAuthority` 변경 금지.
 - Customer StateTree·Spawner·Counter·Cleaning director·Floor Rule·Placement 후보 계산·grid 표시 로직 변경 금지(3절 표의 변경만 허용).
 - Landscape module 의존 추가 금지. 다른 Actor를 OnConstruction에서 수정하지 않는다(편집 동기화 helper의 shell 재생성만 예외).
 - Blueprint로 우회할 Content 계약을 만들지 않는다.
@@ -272,9 +288,9 @@ BuildingSystem.md Validation 표 전부를 `FBathhouseSpaceValidation`에 구현
 | EXP-004 | 계단: 위층 바닥·아래층 천장 구멍 = 구멍 `R`, 경사로 윗면 양 끝점, 계단 벽 열림 구간(위 입구·아래 출구), 구멍 막이 위치. world: 경사로 BlockAll·Nav 비관련, 계단 판 충돌 없음 |
 | EXP-005 | world: 벽·천장 ISM이 PhysicsBody·Pawn·Visibility Block |
 | EXP-008, 009 | 공간 Actor를 zone으로 한 실제 배치 검증: 허용 종류 성공, 비허용 종류 실패 문구 = getter, 벽과 겹친 후보 Blocked, 계단 구멍 위 Blocked, 공간 바닥 ISM 위 바닥 지지 성공 |
-| EXP-010 | 조각 분할(축별 개수·균등 크기·전체 덮음), world: Hall·Bath BeginPlay 뒤 조각 Actor 수·`SpawnFloor` Z = 바닥 Z·크기, Work 조각 0, EndPlay 파괴 |
+| EXP-010 | 조각 분할(축별 개수·균등 크기·전체 덮음), world: `Litter` 공간은 쓰레기 조각만·`Stain` 공간은 물 얼룩 조각만 생기고 수·`SpawnFloor` Z = 바닥 Z·크기가 맞음, `None` 공간 조각 0, 다른 종류 조각 0, EndPlay 파괴 |
 | EXP-013 | zone subclass `ZoneBounds` transform·extent = 안쪽 직사각형(지도 투영 입력) |
-| 0.5 | 검증: 종류 중복·누락, 회전, 겹침/닿음/높이 분리, 개구부 범위·겹침, 통로 비인접, 출입구 막힘, 계단 범위 밖·출입 자리·경사, Nav 범위(fixture `NavMeshBoundsVolume`), 빈 허용 태그 |
+| 0.5 | 검증: 종류 중복·누락, 회전, 겹침/닿음/높이 분리, 개구부 범위·겹침, 통로 비인접, 출입구 막힘, 홀 바깥 출입구 없음(목욕공간만 바깥 출입구가 없어도 오류 아님), 고른 조각 종류의 Settings class 없음, 작업공간 조각 종류 경고, 계단 범위 밖·출입 자리·경사, Nav 범위(fixture `NavMeshBoundsVolume`), 빈 허용 태그 |
 | lifecycle | 두 번 재생성 뒤 component 수 불변, 공간 하나의 값 변경 뒤 이웃 공간 통로 구멍 갱신(동기화 helper 직접 호출) |
 | 회귀 | Placement·Cleaning(Litter 포함)·Facility·Customer·Computer·BathWater 관리 UI 기존 automation 전체 |
 
