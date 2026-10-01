@@ -1,8 +1,13 @@
 # 사용자 Unreal 후속 작업
 
+허용된 자동화와 승인된 화면 작업으로 끝낼 수 없는 실제 Editor 수정 작업의 큐다. 형식과 처리 규칙은 [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md)의 `USER_UNREAL.md` 절을 따른다.
+
+- 아래 기존 항목의 `PROMPT_UNREAL.md`, `PROMPT_INTEGRATION_REVIEW.md` 참조는 2026-10-01 삭제된 루트 결과물이며 Git 이력에서 읽는다.
+- 기존 항목에 섞인 PIE·플레이 검증은 해당 작업을 이어갈 때 마스터가 작업 폴더의 `PIE_CHECKLIST.md`로 옮긴다.
+
 ## 서비스 4단위 (안마의자·평상·TV·세신) — PIE 수용 대기
 
-MCP·Python으로 authoring·Compile·Data Validation·개별 Save·재로드 대조는 끝났다(`.md/Unreal/ServiceSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). 입력·조준·마우스를 넣을 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 통합 리뷰를 승인하지 않는다.
+MCP·Python으로 authoring·Compile·Data Validation·개별 Save·재로드 대조는 끝났다(`.md/Unreal/ServiceSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). 입력·조준·마우스를 넣을 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 이 작업을 완료 처리하지 않는다.
 
 1. **대표 PIE 전체** (`.md/PROMPT_UNREAL.md`의 "대표 PIE 절차와 관찰"): SVC4-001/002(상점 4상품 구매→개봉→설치·회수·수거 구역 제거), TV REST-001~003/006, 평상 REST-004/005, 안마의자 MASS-001~015, 세신 SCRB-001~020, SVC4-003. 콘솔: `bathhouse.Debug.Service.SpawnTestUser/KnockdownTestUser/StandUpTestUser/RemoveTestUser`. 고장 관찰은 테스트 세션에서만 `BreakChancePercent=100`으로 바꾸고 **저장 상태에 남기지 않는다**(저장 값은 10).
 2. **화면 판정(제안값 확인)**: ⓪ 세신 영역은 사용자가 회전 `(0,180,90)`(Roll,Pitch,Yaw)·extent `(35,90,1)`로 저장했다(디스크 확인됨). 포커스 중 커서 때수건이 마우스 좌우·상하와 같은 방향으로 움직이고 세신대 밖으로 나가지 않는지 확인한다. ① 세신 포커스 camera `(0,-170,240)`·pitch -45에서 area 네 모서리와 커서가 모두 보이고 몸체에 가려지지 않는지, ② 이탈점 `(0,-120,0)`과 인형 위치 `(0,-200,0)`, 현금 `(0,-160,110)`이 겹치지 않고 E로 조준되는지, ③ 안마의자 "고장" 라벨과 TV 켜진 화면(초록 반투명 plane)이 꺼진 상태와 구별되는지, ④ 설비 body·footprint 크기, ⑤ `WBP_ScrubFocusHud` 게이지·"대기 N초"가 하단 중앙에서 기존 HUD와 겹치지 않는지(아래 여백 90 제안값). 어긋나면 값을 알려 주면 재작업한다.
@@ -15,7 +20,7 @@ MCP·Python으로 authoring·Compile·Data Validation·개별 Save·재로드 �
 
 ## 서비스 3단위 (쓰레기·수거) — PIE 수용 대기
 
-MCP·Python으로 authoring·Compile·Data Validation·개별 Save·재로드 대조는 끝났다(`.md/Unreal/CleaningSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). MCP로 입력·console을 실행할 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 통합 리뷰를 승인하지 않는다.
+MCP·Python으로 authoring·Compile·Data Validation·개별 Save·재로드 대조는 끝났다(`.md/Unreal/CleaningSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). MCP로 입력·console을 실행할 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 이 작업을 완료 처리하지 않는다.
 
 1. **대표 PIE 전체** (`.md/PROMPT_UNREAL.md`의 "대표 PIE 검증"): TRSH-001~030, COLL-001~009. 특히 ① 빈손 쓰레기 조준 HUD·Visibility trace, ② 거치대 집게 E→쓰레기 LMB 3회 `봉투 3/20`, ③ RMB 봉투 묶기·실패 문구, ④ 집게 거치/G/낙하 복구, ⑤ 봉투 들기·수거(`bathhouse.Debug.TrashCollection.CollectNow`)·제외 대상, ⑥ 손님 체류 시 쓰레기·얼룩 발생(탈의 구역), ⑦ 새 RMB 행(`WBP_InteractionPrompt`) 표시. 실패하면 조준 위치와 Output Log를 남긴다.
 2. **배치·임시 도형 화면 확인**: 제안 위치가 맞는지(쓰레기 구역 `(1050,-280)` 탈의 구역 하나만 덮음, 집게 거치대 `(650,750,43)`, 수거 구역 `(-800,450)` 출입구 밖, 겹침 없음), 집게(긴 Cube)·봉투(Cube)·쓰레기(병/면봉/휴지 대용)가 보이는 크기, 수거 구역 바닥 표시(초록 plane)가 경계를 설명하는지, RMB 행이 다른 행과 겹치지 않는지(위쪽 여백 640/680 제안값). 욕탕 바닥·다른 체류 영역이 필요하면 구역 추가를 요청한다. 어긋나면 값을 알려 주면 재작업한다.
@@ -25,7 +30,7 @@ MCP·Python으로 authoring·Compile·Data Validation·개별 Save·재로드 �
 
 ## 서비스 2단위 (화장대·비품 여섯 종) — PIE 수용 대기
 
-MCP로 authoring·Compile·개별 Save·재로드 대조는 끝났다(`.md/Unreal/ServiceSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). MCP는 입력·console 명령을 실행할 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 통합 리뷰를 승인하지 않는다.
+MCP로 authoring·Compile·개별 Save·재로드 대조는 끝났다(`.md/Unreal/ServiceSystem.md`, `PROMPT_INTEGRATION_REVIEW.md`). MCP는 입력·console 명령을 실행할 수 없어 아래는 사용자 Editor에서 확인해야 한다. 완료 전에는 이 작업을 완료 처리하지 않는다.
 
 1. **PIE 대표 시나리오와 표 전체** (`.md/PROMPT_UNREAL.md`의 "검증 순서와 대표 PIE" 이하): SHWR→TOWL, DISP-015~017·023·024, VANI-001~017, SHWR-001~011, TOWL-001~018, SHOP-S03·S04, F1(knockdown 재개 후 소모 불변), F2(보류 취소 뒤 대기 손님 자동 재시도, 실제 StateTree 전이). 실패하면 조준 위치와 Output Log를 남긴다. 콘솔: `bathhouse.Debug.Facility.BeginUse` / `.EndUse`.
 2. **임시 도형 화면 확인**: 박스 안 품목 배치(각 품목 정원 개수)와 트레이 안 수용, 화장대 네 그룹 자리·조준 범위(몸체 앞면 조준이 router보다 먼저 막히는지), 샤워기 샴푸/바디워시 자리, Washer/Dryer 뚜껑 열림 축·끼임과 pile 가시성(pile 범위는 컴포넌트 scale을 고려해 월드 약 ±10cm로 환산해 두었다). 어긋나면 값을 알려 주면 재작업한다.
@@ -36,7 +41,7 @@ MCP로 authoring·Compile·개별 Save·재로드 대조는 끝났다(`.md/Unrea
 
 ## 서비스 1단위 수직 (품목 박스·진열·음료 냉장고·수거함) — MCP 불가 항목
 
-MCP로 신규 asset 7개와 `DA_ShopCatalog`, `BP_FirstPersonCharacter` 카메라 blendable은 저장·재로드했다(`.md/Unreal/ServiceSystem.md`). Config(`ItemBoxClass`, `InsertPreviewMaterial`, `r.CustomDepth=3`)는 사용자 승인으로 직접 반영했고 새 Editor에서 값을 확인했다. 아래는 남은 항목이다. 완료 확인 전에는 통합 리뷰를 승인하지 않는다.
+MCP로 신규 asset 7개와 `DA_ShopCatalog`, `BP_FirstPersonCharacter` 카메라 blendable은 저장·재로드했다(`.md/Unreal/ServiceSystem.md`). Config(`ItemBoxClass`, `InsertPreviewMaterial`, `r.CustomDepth=3`)는 사용자 승인으로 직접 반영했고 새 Editor에서 값을 확인했다. 아래는 남은 항목이다. 완료 확인 전에는 이 작업을 완료 처리하지 않는다.
 
 1. **DefaultMap에 `BP_DrinkCollectionBox` 배치·저장 (사용자 직접).** `SceneTools.save_actor`가 external actor 경로 오류(`Asset does not exist: /Game/__ExternalActors__/Maps/DefaultMap/1/P1/UWXIDD9LM1ZURKQSERVEKZ`)로 실패해 MCP로는 저장할 수 없다.
    - 배치할 액터: `/Game/Bathhouse/Blueprints/Service/BP_DrinkCollectionBox`(1개, 레벨 액터 이름 `DrinkCollectionBox`). 카운터(`BP_BathhouseCounter`, 원점) 상판 위 world `(-50,-20,90)`에 두면 된다(카운터 bounds x∈[-80,80], y∈[-50,50], 상판 z=75; 손님 서비스 지점 x=220 반대편, `ReturnedKeyDropPoint (20,20,90)`과 겹치지 않음). 회전·scale 기본값.
@@ -62,7 +67,7 @@ MCP로 신규 asset 7개와 `DA_ShopCatalog`, `BP_FirstPersonCharacter` 카메�
 3. BP 컴포넌트 미리보기에서 `FuelDoorPresentation` preview-open/restore-closed와 `GaugePresentation` construction preview/restore를 실행해 피벗 축, 문 닫힘 자세, 바늘 기준 회전이 유지되는지 확인한다. 현재 MCP는 이 native 호출과 시각 판정을 제공하지 않는다.
 4. PIE에서 `.md/PROMPT_UNREAL.md`의 E 퍼담기·반환·투입, LMB/F 비변경, 투입 Volume 단독 판정, 문 자동 열림·닫힘/중간 반전·두 보일러 독립, 가열·소진·재투입·회수 rollback을 실제 입력과 화면으로 확인한다. 실패하면 조준 위치와 Output Log를 기록한다.
 
-위 항목과 Data Validation이 통과해야 통합 리뷰에서 Editor 단계를 승인할 수 있다. `Save All`은 사용하지 않는다.
+위 항목과 Data Validation이 통과해야 Editor 단계를 완료 처리할 수 있다. `Save All`은 사용하지 않는다.
 
 # 보일러 노동 가동 수직 구현 — MCP 미지원 작업
 
@@ -237,7 +242,7 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 - 4번 직접 플레이 검증 결과를 기록한다.
 - 5번 native grid 입력·시각 검증 결과를 기록한다.
 
-완료 후 `.md/PROMPT_INTEGRATION_REVIEW.md`의 미완료 항목을 최종 통합 리뷰에서 다시 판정한다.
+완료 후 당시 Editor 보고(`PROMPT_INTEGRATION_REVIEW.md`, Git 이력)의 미완료 항목을 다시 판정한다.
 
 # 쿨러 전체 확장과 순환기 레버 — 2026-09-26 Unreal MCP 인계
 

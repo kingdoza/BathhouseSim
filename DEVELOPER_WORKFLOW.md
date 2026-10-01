@@ -1,82 +1,64 @@
 # BathhouseSim 사람 개발자 작업 순서
 
-이 문서는 사람이 각 전문 에이전트를 어떤 순서로 실행하고 어디서 직접 승인해야 하는지 요약한다. 세부 규칙은 [AGENTS.md](AGENTS.md)와 [.md/AGENT_WORKFLOW.md](.md/AGENT_WORKFLOW.md)를 따른다.
+이 문서는 사람이 마스터 세션과 일반 세션을 어떻게 열고 어디서 직접 승인·검증하는지 요약한다. 세부 규칙은 [AGENTS.md](AGENTS.md), [.md/AGENT_WORKFLOW.md](.md/AGENT_WORKFLOW.md)와 [.md/AGENT_ORCHESTRATOR.md](.md/AGENT_ORCHESTRATOR.md)를 따른다.
+
+## 세션 종류
+
+| 세션 | 여는 방법 | 하는 일 |
+|---|---|---|
+| 마스터 세션 | 새 세션에서 `/orchestrate <요청>` 또는 `/orchestrate <작업 ID> 이어서` | 설계부터 Editor 작업까지 워커를 호출하며 자동 진행, PIE 체크리스트 인계 |
+| 기능 명세 세션 | 새 세션에서 `/feature-spec <새 기능 설명>` 또는 `/feature-spec <작업 ID> 이어서` | 기능 명세와 QNA만 진행 |
+| 일반 세션 | Skill 없이 열기 | 모델링, 단일 질문, 문서 정리 등 사용자가 지정한 일만 |
+
+- 세션은 자동으로 마스터가 되지 않는다. 작업 하나가 끝나면 다음 작업은 새 세션에서 시작한다.
+- 마스터 세션과 기능 명세 세션은 Opus 5.5 high를 권장한다.
 
 ## 기본 작업 순서
 
-1. **기능 요청 작성**
-   - 구현 방법보다 플레이어가 무엇을 하고 무엇을 봐야 하는지 적는다.
-   - 유지할 기존 동작, 실패·취소 결과와 범위 밖 항목을 함께 적는다.
+1. **기능 명세** — `/feature-spec`으로 시작하거나 마스터에게 신규 기능을 요청한다.
+   - 질문은 `QNA_FEATURE_SPEC.md`에 한 번에 온다. 맨 위 답변 줄에 `답변: 전부 추천안` 또는 `답변: 전부 추천안, 단 Q3 B`처럼 한 줄로 답한다. 전제에 이의가 있으면 `P3 반대: ...`를 붙인다.
+   - 수치는 기본값 표로 오며 플레이 후 Editor에서 조정한다.
+2. **명세 승인** — 입력, 화면 피드백, 완료 순간, 성공 결과, 실패·취소·복구, Editor 조정 위치를 확인하고 승인한다.
+   - 이때 사전 허용도 답한다: 승인 범위 밖 asset 처리, PIE 통과 후 자동 커밋·병합 여부.
+   - 기능 명세 세션이었다면 안내대로 새 세션에서 `/orchestrate <작업 ID> 이어서`를 실행한다.
+3. **자동 구간** — 마스터가 아키텍처 → 구현(Codex) → 코드 리뷰 → Unreal Editor 작업을 이어서 진행한다. 질문이나 승인이 필요할 때만 멈춘다.
+   - 코드 리뷰 실패는 2회까지 자동으로 재작업한다.
+   - 구현(빌드) 전에 Unreal Editor가 열려 있으면 저장 후 닫아 달라는 요청이 온다. 열린 Editor가 있으면 빌드가 실패하기 때문이다.
+4. **화면 작업 승인(있을 때만)** — 자동화로 처리할 수 없는 Editor 항목이 남으면 마스터가 대상·조작·이유를 보여 주고 Computer Use 사용 승인을 묻는다. 승인하지 않은 항목은 `USER_UNREAL.md`로 넘어온다.
+5. **수동 Editor 작업** — `USER_UNREAL.md`의 해당 작업 항목을 Editor에서 처리하고 마스터에게 알린다. 항목마다 먼저 끝내야 할 PIE 시나리오가 표시돼 있다.
+6. **PIE 검증** — 작업 폴더의 `PIE_CHECKLIST.md`를 동선 순서대로 플레이하며 확인한다. PIE는 항상 사람이 한다.
+   - 체크리스트를 끝까지 본 뒤 마스터 세션에 `전부 통과` 또는 `3, 7번 통과. 5번 실패: 냉장고 빼기 강조가 남음`처럼 짧게 보고한다. 버그 리포트는 마스터가 쓴다.
+   - 크래시처럼 뒤 항목을 볼 수 없는 실패만 바로 보고한다. 워커 세션에는 보고하지 않는다.
+7. **완료** — PIE를 통과하면 마스터가 커밋·병합(사전 허용 시)하고 작업 폴더를 정리한다. 다음 작업은 새 세션에서 시작한다.
 
-2. **기능 명세 에이전트 실행**
-   - `.md/AGENT_FEATURE_SPEC.md`에 따라 `PROMPT_ARCHITECTURE.md`를 작성시킨다.
-   - Blueprint, Level, StateTree, UI 또는 실제 PIE 상태가 명세에 영향을 주면 사전 MCP 조사를 요청한다.
+## 수직 구현
 
-3. **필요할 때 Unreal MCP 사전 조사**
-   - 읽기 전용으로 현재 CDO, component, binding, override, collision, transform과 설정을 확인한다.
-   - 결과를 `REPORT_UNREAL_DISCOVERY.md`에 작성한 뒤 기능 명세 에이전트로 돌아간다.
-   - MCP가 지원하지 않는 조작은 Computer Use로 자동 전환하지 않는다.
+입력·UI·Content·물리·collision·Navigation이 함께 바뀌거나 여러 대상에 공통 적용하는 작업은 대표 대상 하나를 먼저 끝까지 만든다. PIE에서 대표 흐름이 예상과 같을 때 승인하면, 나머지 대상으로의 전체 확장을 새 작업으로 진행한다.
 
-4. **사람이 기능 명세 승인**
-   - 입력, 프롬프트, 완료 순간, 성공 결과, 실패·취소·복구와 Editor 설정 위치를 확인한다.
-   - 예상과 다르면 이 단계에서 수정하고, 승인 전에는 설계·구현을 시작하지 않는다.
+## 완료된 작업에서 버그를 발견했을 때
 
-5. **설계 에이전트 실행**
-   - 승인된 `PROMPT_ARCHITECTURE.md`를 기술 구조로 변환한다.
-   - 고위험·다중 시스템 작업은 대표 대상 하나의 수직 구현만 먼저 설계한다.
+마스터 세션에서 `/orchestrate`로 현상을 짧게 알리면 된다. 마스터가 버그 리포트를 쓰고 새 `BUG-` 작업으로 진단·수정한 뒤 다시 PIE 체크리스트를 넘긴다.
 
-6. **구현 에이전트 실행**
-   - 현재 `PROMPT_IMPLEMENTATION.md` 범위의 C++·승인된 Config만 구현한다.
-   - `PROMPT_REVIEW.md`와 `PROMPT_UNREAL.md`가 생성됐는지 확인한다.
+## Git
 
-7. **코드 리뷰 에이전트 실행**
-   - 코드 안전성뿐 아니라 기능 명세, 수직 구현 범위와 Editor 계약 일치를 검토한다.
-   - 재작업이면 구현으로, 구조 문제면 설계로, 동작 문제면 기능 명세로 돌아간다.
+- 작업마다 `work/<작업 ID>` 브랜치를 쓰고 마스터가 단계마다 커밋한다.
+- Editor가 열린 상태에서는 브랜치를 바꾸지 않는다. 작업 브랜치가 진행 중일 때 main에서 Content를 바꿨다면 마스터에게 알린다.
+- 진행 중인 작업을 다른 작업으로 바꾸려면 마스터에게 지시한다. 마스터가 스스로 작업을 끼워 넣지 않는다.
 
-8. **Unreal MCP Editor 작업 실행**
-   - MCP로 가능한 allowlist asset만 수정·Compile·Save·재로드·PIE 검증한다.
-   - 저장된 현재 구조를 `.md/Unreal/*System.md`에 갱신한다.
-   - MCP 미지원 작업은 한국어 `.md/USER_UNREAL.md`에 남긴다.
+## 회고와 지침 변경
 
-9. **남은 Editor 작업 처리**
-   - `USER_UNREAL.md`가 있으면 사람이 직접 수행하거나 Computer Use 작업을 별도로 명시한다.
-   - 완료 후 저장 상태와 Unreal 문서를 확인하고 해결된 항목을 제거한다.
+- 피드백 일반화와 지침 승격은 사용자가 요청할 때만 한다. 예: 마스터 세션에서 "회고 진행".
+- 회고 결과 후보를 보고받고 승인한 항목만 `FEEDBACK_BACKLOG.md`나 `AGENT_*.md`에 반영된다.
 
-10. **통합 리뷰 에이전트 실행**
-    - 기능 명세, C++, Blueprint/Level, Unreal 문서와 PIE 결과를 함께 검토한다.
-    - 필수 수동 작업이나 미검증 시나리오가 남으면 승인하지 않는다.
+## 에이전트별 실행 도구와 모델
 
-11. **수직 구현이면 사람이 플레이 승인**
-    - 대표 흐름이 예상과 같을 때만 설계 단계부터 전체 대상으로 확장한다.
-    - 전체 확장은 `설계 → 구현 → 코드 리뷰 → MCP → 통합 리뷰`를 다시 수행한다.
+모델과 추론 수준은 도구 설정 파일이 정하며 작업마다 바꾸지 않는다. 바꾸려면 아래 설정 파일을 고친다.
 
-12. **최종 diff·플레이 확인 후 Git commit**
-    - 예상 밖 Source/Content/Level 변경, dirty package와 미완료 `USER_UNREAL.md`가 없는지 확인한다.
+| 역할 | 실행 | 모델 / 추론 | 설정 위치 |
+|---|---|---|---|
+| 마스터 | Claude 세션 | Opus 5.5 / high (권장) | 앱에서 세션 모델 선택 |
+| 기능 명세, 아키텍처, 코드 리뷰, Unreal Editor, 회고 | Claude 워커 | Opus / high | `.claude/agents/bathhouse-*.md` |
+| C++ 구현 | Codex 워커 | `~/.codex/config.toml` 값 | `~/.codex/config.toml` |
+| C++ 구현 대체(GPT 사용 한도) | Claude 워커 | Sonnet 5.5 / medium | `.claude/agents/bathhouse-implementation-fallback.md` |
 
-## 에이전트별 모델·추론 수준
-
-아래는 이 프로젝트의 권장값이다. OpenAI는 Astra를 가장 어려운 end-to-end 작업용 모델, Sol을 복잡한 전문 작업용 flagship, Terra를 지능과 비용의 균형 모델, Luna를 비용 민감형 모델로 설명한다. 모델을 바꿔도 MCP에 없는 Editor 기능이 생기지는 않는다.
-
-| 단계 | 기본 모델 / 추론 | 상향 조건 |
-|---|---|---|
-| 기능 명세 | `gpt-6-astra` / `high` | 복잡한 상태·실패 시나리오면 `xhigh` |
-| MCP 사전 조사 | `gpt-5.6-terra` / `medium` | StateTree·다수 asset 상관분석이면 `high` |
-| 아키텍처 설계 | `gpt-6-astra` / `high` | lifecycle·serialization·Navigation·전역 설정이 얽히면 `xhigh` |
-| C++ 구현 | `gpt-5.6-sol` / `high` | 단순하고 경계가 확정된 수정은 Terra `high` |
-| 코드 리뷰 | `gpt-6-astra` / `high` | 대형 transaction·비동기·GC·rollback 검토는 `xhigh` |
-| Unreal MCP 작업 | `gpt-5.6-terra` / `medium` | 여러 asset과 PIE 로그를 함께 판단하면 `high` |
-| Computer Use | `gpt-6-astra` / `high` | 사용자가 명시적으로 요청한 경우에만 실행 |
-| 통합 리뷰 | `gpt-6-astra` / `high` | 다중 시스템 회귀와 원인 분리가 어려우면 `xhigh` |
-| 단순 문서 정리 | `gpt-5.6-luna` / `medium` | 계약 판단이 포함되면 Terra `medium` 이상 |
-
-`max/ultra`는 기본값으로 쓰지 않는다. `high`에서 판단이 불안정하거나 대안 비교가 반복해서 실패한 고난도 작업에만 제한적으로 올린다.
-
-모델 특성 근거: [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol), [GPT-5.6 Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [GPT-5.6 Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna).
-
-## 빠른 선택
-
-- 결과가 틀리면 재작업 비용이 큼: **Astra High**
-- 범위가 확정된 장시간 C++ 구현: **Sol High**
-- 반복적인 MCP 조회·에셋 설정: **Terra Medium**
-- 단순 문서·목록 정리: **Luna Medium**
-- 잘 모르겠으면 **Astra High**로 시작하고, 반복 작업만 Terra/Sol로 낮춘다.
+이전 지침과 모델 표는 `AgentGuidelinesBackup_2026-10-01/`에 보관돼 있다.

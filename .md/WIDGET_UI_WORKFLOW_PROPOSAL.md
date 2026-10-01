@@ -93,7 +93,7 @@
 
 ## Unreal Python API 작업 규칙(안)
 
-현재 [AGENT_UNREAL_MCP.md](AGENT_UNREAL_MCP.md)는 MCP에 없는 Widget 편집 기능을 "Python reflection이나 asset serialization 우회로 만들어내지 않는다"고 정한다. 도입하려면 이 규칙과 구분되는 **공식 Editor Python API 사용 범위**를 명시해야 한다.
+작성 당시 MCP 전용 역할은 Python 우회를 금지했다. 2026-10-01부터는 [AGENT_UNREAL_EDITOR.md](AGENT_UNREAL_EDITOR.md)와 [UNREAL_PYTHON_API.md](UNREAL_PYTHON_API.md)가 공식 Editor Python API 사용을 허용하므로, 아래는 그 위에 UI 작업용으로 더할 규칙 후보다.
 
 - 대상: 프롬프트 allowlist에 있는 WBP와 UI asset만.
 - 방법: Unreal Editor 공식 Python API로 WidgetTree hierarchy, slot 속성, style을 설정한다. asset 파일 직접 편집이나 비공개 serialization 조작은 하지 않는다.
@@ -113,8 +113,7 @@
 - `AGENT_WORKFLOW.md`: 정기 결과물 표, UI 작업 경로, 문서 크기 정책의 UI 결과물 항목
 - `AGENT_FEATURE_SPEC.md`: UI 변경 시 프로토타입·수치표·UI 시나리오 필수 항목
 - `AGENT_ARCHITECTURE.md`: 요소 ID → `BindWidget` 대응 책임
-- `AGENT_UNREAL_MCP.md` 또는 신규 `AGENT_UNREAL_PYTHON.md`: Editor Python API 허용 범위와 절차
-- `AGENT_INTEGRATION_REVIEW.md`: 수치 대조 검증
+- `AGENT_UNREAL_EDITOR.md`, `UNREAL_PYTHON_API.md`: UI asset의 Python 구성 절차와 `layout.json` 수치 대조 검증(통합 리뷰 단계는 2026-10-01 폐지)
 - `Architecture/UISystem.md`, `Unreal/0_UNREAL.md`: UI 결과물 라우팅
 
 ## 도입 시 결정할 사항

@@ -1,4 +1,4 @@
-# Agent — Implementation Mode
+# Codex Agent — Implementation Mode
 
 ## 역할
 
@@ -6,19 +6,16 @@
 
 사용자 동작, 구조, Public API, Blueprint 계약과 Content를 임의로 변경하지 않는다.
 
-기본 실행은 Codex 워커이며 GPT 사용 한도에 도달하면 Claude 구현 대체 워커가 같은 규칙으로 이어서 구현한다. 대체 워커는 현재 작업 트리와 인계 패킷에서 시작한다.
-
 ## 진입 조건과 필수 문서
 
-- 작업 폴더(`.md/Work/<작업 ID>/`)의 승인된 `PROMPT_ARCHITECTURE.md`
-- 현재 단계와 일치하고 첫머리 상태가 `완료`인 `PROMPT_IMPLEMENTATION.md`
-- 재작업이면 같은 폴더의 `PROMPT_IMPLEMENTATION_R.md`(출처 줄 확인)
-- 인계 패킷이 지정한 시스템 문서와 단계 시작 커밋
+- 승인된 `.md/PROMPT_ARCHITECTURE.md`
+- 현재 단계와 일치하는 `.md/PROMPT_IMPLEMENTATION.md`
+- 재작업이면 `.md/PROMPT_IMPLEMENTATION_R.md`
 - `.md/AGENT_WORKFLOW.md`, `.md/AGENT_ARCHITECTURE.md`
 - `.md/0_ARCHITECTURE.md`, 관련 `.md/Architecture/*System.md`, `CoreSystem.md`
 - `.md/Unreal/0_UNREAL.md`, 관련 `.md/Unreal/*System.md`
 - UI 작업이면 `Architecture/UISystem.md`
-- 필요하면 작업 폴더의 `QNA_IMPLEMENTATION.md`
+- `.md/QNA_IMPLEMENTATION.md`
 
 기능 계약 승인, 사전 조사 또는 아키텍처가 누락되면 구현하지 않는다.
 
@@ -27,9 +24,7 @@
 - 승인된 `Source/BathhouseSim/Public`, `Source/BathhouseSim/Private`
 - 명시적으로 승인된 `Config/`
 - 구현으로 구조가 바뀐 경우 관련 Architecture 정본
-- 작업 폴더의 `PROMPT_REVIEW.md`, `PROMPT_UNREAL.md`
-
-커밋은 마스터가 한다. 구현 워커는 커밋하지 않는다.
+- `.md/PROMPT_REVIEW.md`, `.md/PROMPT_UNREAL.md`
 
 `Content/`와 `.md/Unreal/*`은 읽기 전용이다.
 
@@ -76,10 +71,9 @@
 ## 검증
 
 - 변경 범위에 `git diff --check`와 focused `rg` 검사를 수행한다.
-- 빌드 전에 같은 프로젝트의 Unreal Editor가 실행 중이면 빌드하지 않고 중단 보고한다(Live Coding·DLL 잠금). 빌드·Automation이 10분을 넘길 수 있으면 백그라운드로 실행하고 완료를 확인한다.
-- 가능한 경우 UE 5.8 `BathhouseSimEditor Win64 Development` 빌드를 수행하고, 빌드 시점의 Source 식별값(HEAD 커밋과 `git diff HEAD -- Source Config` 출력의 SHA-256)과 빌드 로그 경로를 기록한다.
+- 가능한 경우 UE 5.8 `BathhouseSimEditor Win64 Development` 빌드를 수행한다.
 - Automation은 시나리오 ID, 기대값과 실패 경로를 식별 가능하게 작성한다.
-- Blueprint Compile/Save와 저장 확인은 `PROMPT_UNREAL.md`에, 사용자가 PIE에서 볼 transform/collision/Navigation/UI 결과는 시나리오 ID별 PIE 관찰 항목으로 명시한다.
+- Blueprint Compile/Save, PIE, transform/collision/Navigation/UI 검증은 `PROMPT_UNREAL.md`에 명시한다.
 - 실행하지 못한 검증을 통과로 기록하지 않는다.
 
 ## 아키텍처 문서
@@ -89,39 +83,36 @@
 - Editor asset 현재 상태는 구현 단계에서 갱신하지 않는다.
 - 날짜별 Update와 작업 일지를 정본에 추가하지 않는다.
 
-## `PROMPT_REVIEW.md`
+## `.md/PROMPT_REVIEW.md`
 
 - 기능 계약과 현재 단계
 - 시나리오 ID별 코드·테스트 연결
 - 변경 파일과 구현 요약
 - 클래스 크기·책임 변화
 - Blueprint/API/Core Redirect 영향
-- 빌드와 정적 검증 결과, 빌드 시점 Source 식별값과 빌드 로그 경로
-- 구현 대체 중이면 그 사실
+- 빌드와 정적 검증 결과
 - 리뷰 중점, 전역 영향과 미검증
 
-## `PROMPT_UNREAL.md`
+## `.md/PROMPT_UNREAL.md`
 
-- 작업 필요/Content 변경 없음 상태와 현재 단계. 변경 없음이면 마스터가 Editor 단계를 생략할 수 있게 명시한다.
-- 작업 모드와 기존 사용자 변경, 생성·수정·저장 allowlist
-- exact asset/actor/package, Parent Class, property/component/BindWidget/event/asset 연결, 값·단위·좌표와 유지 계약
-- 항목별 실행 경로 힌트: 이미 확인된 MCP·Python 가능 여부나 알려진 기능 부족
-- 필요한 helper의 설치·버전 조건, Compile, 개별 Save, 재로드 수준과 멈춰야 하는 조건
-- 시나리오 ID별 사용자 PIE 관찰 항목과 기대 결과 한 줄
+- 작업 필요/변경 불필요 상태와 현재 단계
+- exact asset path, Parent Class와 저장 allowlist
+- property/component/BindWidget/event/asset 연결 계약
+- Compile, 개별 Save, 재로드와 시나리오별 PIE 절차
 - 갱신할 `.md/Unreal/*System.md`
 - Blueprint에서 구현하면 안 되는 C++/domain 로직
 
-`PROMPT_REVIEW.md`와 `PROMPT_UNREAL.md`에는 줄 수 상한이 없다. exact asset·값·검증 기준과 시나리오를 압축하거나 생략하지 않는다. 자동화로 어려울 수 있는 작업도 숨기지 않고 정확히 적는다. "MCP 불가면 수동"을 미리 정하지 않는다. 실행 경로 선택과 `USER_UNREAL.md` 인계는 Unreal Editor 단계가 실제 capability로 판정한다. 신규 C++ helper·Config는 구현 결과와 코드 리뷰 대상에 포함하며 Editor 단계가 임의로 만들게 넘기지 않는다.
+MCP가 지원하지 않을 가능성이 있는 작업도 숨기지 않고 정확히 적는다. 실제 지원 여부와 `USER_UNREAL.md` 인계는 Unreal MCP 단계가 판정한다.
 
 ## 완료 보고
 
-결론과 파일 경로 중심 20줄 이내로 쓴다. 상세는 `PROMPT_REVIEW.md`와 `PROMPT_UNREAL.md`에 둔다.
-
 ```text
-[현재 단계와 결론]
+[수행 내용과 현재 단계]
 [영향 파일]
-[검증과 미검증, 빌드 시점 Source 식별값]
-[Architecture 정본 변경]
-[PROMPT_REVIEW.md / PROMPT_UNREAL.md 경로]
-[버그 수정이면 원인·유입 단계·검출 실패 단계]
+[시나리오 추적]
+[클래스 성장]
+[검증과 미검증]
+[Architecture 정본]
+[PROMPT_REVIEW.md]
+[PROMPT_UNREAL.md]
 ```

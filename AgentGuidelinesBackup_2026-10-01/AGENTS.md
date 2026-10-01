@@ -10,17 +10,14 @@ Do not treat this file as the architecture source of truth. It only points agent
 
 Read the relevant `.md/` documents before making architecture, implementation, or review decisions.
 
-- `.md/AGENT_WORKFLOW.md`: common workflow, work folders, artifact ownership, return rules, and document-size rules
-- `.md/AGENT_ORCHESTRATOR.md`: master session rules (only for sessions started with the orchestration Skill)
+- `.md/AGENT_WORKFLOW.md`: common sequential workflow, artifact ownership, and document-size rules
 - `.md/AGENT_FEATURE_SPEC.md`: user-visible behavior contract and pre-architecture discovery rules
 - `.md/AGENT_ARCHITECTURE.md`: architecture/documentation agent rules
 - `.md/AGENT_IMPLEMENTATION.md`: implementation agent rules
-- `.md/AGENT_REVIEW.md`: code review and user-PIE failure diagnosis rules
-- `.md/AGENT_UNREAL_EDITOR.md`: Unreal Editor investigation and authoring rules (MCP, Editor Python, helpers)
-- `.md/AGENT_COMPUTERUSE.md`: screen-operation mode of the Unreal Editor role (last resort, user approval right before use)
-- `.md/UNREAL_MCP_CONNECTION.md`: shared Editor session operation and MCP connection
-- `.md/UNREAL_PYTHON_API.md`: Editor Python technical procedure
-- `.md/FEEDBACK_POLICY.md`: bug reports, return records, feedback, and retrospectives
+- `.md/AGENT_REVIEW.md`: pre-Editor code review rules
+- `.md/AGENT_UNREAL_MCP.md`: Unreal MCP Editor work rules
+- `.md/AGENT_COMPUTERUSE.md`: separately invoked Unreal Computer Use rules
+- `.md/AGENT_INTEGRATION_REVIEW.md`: final code-and-Editor integration review rules
 - `.md/0_ARCHITECTURE.md`: current architecture map
 - `.md/Architecture/*.md`: system-specific architecture documents
 - `.md/Unreal/0_UNREAL.md`: current Editor authoring/asset-contract map
@@ -42,17 +39,12 @@ Generated or local-runtime directories are not architecture sources of truth:
 - `Saved/`
 - `Binaries/`
 
-Archived guideline versions in `AgentGuidelinesBackup_*/` are history, not active rules.
-
 ## Working Rules
 
 - Read `.md/AGENT_WORKFLOW.md` before the role-specific agent document.
-- A session becomes the master only when the user starts it with the orchestration Skill. Other sessions perform only the role the user assigns and do not chain later stages automatically.
-- Follow the task-specific `.md/AGENT_*.md` file for the current role and write stage artifacts in the task's `.md/Work/<task ID>/` folder.
+- Follow the task-specific `.md/AGENT_*.md` file for the current role.
 - Use `.md/0_ARCHITECTURE.md` as the system map and open the relevant `.md/Architecture/*System.md` files for details.
 - Use `.md/Unreal/0_UNREAL.md` as the Editor map and open the relevant `.md/Unreal/*System.md` files before making Content or Level assumptions.
-- Editor work follows `.md/AGENT_UNREAL_EDITOR.md`: use MCP, the official Editor Python API, and reviewed helpers within the approved scope. Computer Use is the last resort and needs user approval right before use. Only real Editor work that cannot be completed this way goes to `.md/USER_UNREAL.md`.
-- PIE verification is always done by the user. Agents do not start PIE or play scenarios.
-- Worker agents do not edit `AGENT_*.md` or generalized feedback. Those change only in a session the user asked for, after user approval.
+- Unreal MCP agents must not invoke Computer Use. Unsupported Editor work is recorded in `.md/USER_UNREAL.md` for an explicit user or separately invoked Computer Use pass.
 - Keep `AGENTS.md` short. Do not duplicate system inventories, class lists, or workflow details here.
 - If this file conflicts with `.md/` canonical documents, prefer the `.md/` documents and update this file only as a routing entry point.

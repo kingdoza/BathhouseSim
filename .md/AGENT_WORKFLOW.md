@@ -1,64 +1,91 @@
-# Codex Agent — Common Workflow
+# Agent — Common Workflow
 
 ## 목적
 
-이 문서는 BathhouseSim 기술 작업의 공통 순서, 사용자 승인 관문, 단계별 결과물, 문서 소유권과 크기 제한을 정의한다.
-
+BathhouseSim 기술 작업의 공통 순서, 사용자 승인 관문, 작업 폴더와 결과물, 문서 소유권과 크기 제한을 정의한다.
 워크플로는 기술적으로 일관된 구현뿐 아니라 사용자가 승인한 실제 게임 동작과 Editor 결과까지 일치시키는 것을 목표로 한다.
+
+## 실행 구성
+
+- 마스터 세션: 사용자가 오케스트레이션 Skill(`/orchestrate`)로 시작한 세션만 마스터가 된다. 단계 전환과 워커 호출은 [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md)를 따른다.
+- 일반 세션: Skill 없이 열거나 `/feature-spec`처럼 역할 Skill로 연 세션이다. 지정된 역할 하나만 하고 다음 단계를 자동으로 호출하지 않는다.
+- 워커: 마스터가 호출하는 역할 에이전트다. 해당 `AGENT_*.md`와 이 문서를 따르며 모델·추론 설정은 도구 설정(`.claude/agents/*.md`, `~/.codex/config.toml`)이 정한다.
+- 기록·피드백 정책은 [FEEDBACK_POLICY.md](FEEDBACK_POLICY.md)를 따른다.
 
 ## 기본 순서
 
-다음 단계를 순서대로 수행한다.
-
 1. 기능 명세 초안
-2. 필요한 경우 Unreal MCP 읽기 전용 사전 조사
+2. 필요한 경우 Unreal Editor 읽기 전용 사전 조사
 3. 기능 명세 확정과 사용자 승인
 4. 아키텍처 설계
 5. C++ 구현
 6. 코드 리뷰
-7. Unreal MCP Editor 작업
-8. 코드·Editor 통합 리뷰
+7. Unreal Editor 작업
+8. 사용자 PIE 검증
 
-- 기능 명세 승인 전에는 아키텍처와 구현을 시작하지 않는다.
-- 앞 단계가 승인 또는 완료되기 전에는 다음 단계로 진행하지 않는다.
-- 코드 리뷰 실패는 구현으로, 설계 문제는 아키텍처 또는 기능 명세로 돌아간다.
-- Unreal 작업 이후에는 반드시 통합 리뷰를 거친다.
-- MCP가 수행할 수 없는 Editor 작업이 남으면 통합 승인하지 않고 `.md/USER_UNREAL.md`로 인계한다.
+- 기능 명세 승인 전에는 아키텍처와 구현을 시작하지 않는다. 승인 뒤 4~7단계는 마스터가 자동으로 잇는다.
+- 앞 단계의 결과물이 `완료`가 되기 전에는 다음 단계로 진행하지 않는다.
+- PIE 검증은 항상 사람이 한다. 에이전트는 PIE를 시작하거나 PIE에서 입력·시나리오를 검증하지 않는다. 별도의 통합 리뷰 단계는 없다.
+- `PROMPT_UNREAL.md`가 Content 변경 없음을 선언하고 `git status`로 Content가 그대로임을 확인하면 마스터가 Editor 작업 단계를 생략할 수 있다. Content와 무관한 작은 버그는 버그 리포트를 기능 계약으로 보고 기능 명세를 생략할 수 있다. 생략 근거는 `CONTEXT.md`에 남긴다.
 
 ## 수직 구현 경로
 
 입력·UI·Content·Actor lifecycle·물리·collision·Navigation 또는 여러 대상의 공통화가 함께 바뀌는 작업은 대표 시나리오 하나를 먼저 완성한다.
 
 ```text
-기능 명세 승인
-→ 수직 구현 아키텍처
-→ 구현
-→ 코드 리뷰
-→ Unreal MCP 작업
-→ 통합 리뷰
-→ 사용자 수직 구현 승인
-→ 전체 확장 아키텍처부터 동일 순서 반복
+기능 명세 승인 → 수직 구현 아키텍처 → 구현 → 코드 리뷰 → Unreal Editor 작업
+→ 사용자 PIE 검증·수직 구현 승인 → 전체 확장 아키텍처부터 동일 순서 반복
 ```
 
-- 수직 구현은 일부 계층만 만드는 것이 아니라 대표 대상 하나의 사용자 흐름 전체를 완성한다.
+- 수직 구현은 일부 계층만이 아니라 대표 대상 하나의 사용자 흐름 전체를 완성한다.
 - 사용자 승인 전에는 나머지 설비·아이템·상태로 일반화하지 않는다.
-- 단순 내부 버그, 계산, 로그와 Content 비의존 변경은 기능 명세에서 근거를 남기고 직접 전체 구현 경로를 사용할 수 있다.
-- 사용자 수직 구현 승인도 구현·Editor를 직접 수정하는 권한이 아니며, 전체 확장 단계의 새 아키텍처 입력으로 사용한다.
+- 대표 시나리오와 전체 확장은 서로 다른 작업 ID와 작업 폴더를 쓴다.
+- 사용자 수직 구현 승인은 구현·Editor를 직접 수정하는 권한이 아니며 전체 확장 단계의 새 아키텍처 입력이다.
 
-## Unreal MCP 사용 경계
+## 작업 ID와 작업 폴더
 
-Unreal MCP 에이전트에는 두 가지 진입 모드가 있다.
+- 작업은 기능 명세부터 사용자 PIE 검증까지 한 벌의 단계 결과물을 가지는 단위다. 수직 구현 단위, 전체 확장 단계, 단순 버그 수정이 각각 하나의 작업이다.
+- 여러 단위로 나뉘는 기능은 상위 작업 ID 아래 단위 작업 ID를 둔다. 예: `.md/Work/SERVICE/SERVICE-U4/`.
+- 버그 수정 작업 ID는 버그 리포트 파일명에서 만든다. 예: `BUG-2026-10-01_litter_tongs_false_take_highlight`. 새 `BUG-` 작업은 완료된 작업에서 나중에 발견한 버그에만 만든다.
+- 한 번 정한 작업 ID는 바꾸지 않는다. 시나리오 ID(`TRSH-001` 등)와 별개다.
+- 단계 결과물은 `.md/Work/<작업 ID>/`에 둔다. 여러 작업이 동시에 진행·보류 상태일 수 있다.
+- 공유 정본(`Architecture/*`, `Unreal/*`, `USER_UNREAL.md`, `BugReports/`, `FEEDBACK_BACKLOG.md`)은 작업 폴더에 두지 않는다.
+- `CONTEXT.md`는 진행 상태 요약이며 결정의 정본은 QNA와 단계 결과물이다. 첫머리 형식을 적용하지 않고 다음 틀을 쓴다.
 
-- 사전 조사 모드: 기능 명세 중 필요한 Blueprint/Level/StateTree/UI/설정 사실을 읽기 전용으로 조사한다.
-- Editor 작업 모드: 코드 리뷰가 승인한 `PROMPT_UNREAL.md` 범위만 수정·검증·저장한다.
+```markdown
+# CONTEXT — <작업 ID> <작업 이름>
+- 목표 / 상위·선행·관련 작업:
+- 현재 단계와 재개 지점:
+- 명세 승인 일자와 사전 허용:
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋:
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거:
+- 복귀 기록: 복귀 대상, 변경 범위, 유지되는 완료 범위
+- 워커 세션 ID, 사용자 지시 모델 덮어쓰기:
+- 결과물 목록과 사용자 지시 요약:
+```
+- `CONTEXT.md`는 마스터가 갱신한다. 일반 세션은 재개 지점과 자기 단계의 기록만 갱신한다.
+- 사용자 PIE 통과, 정본 반영과 병합을 확인한 뒤 작업 폴더를 제거하고 이력은 Git에 맡긴다. 상위 작업 폴더는 모든 단위가 끝난 뒤 제거한다.
 
-MCP 에이전트는 기본적으로 Computer Use를 실행하지 않는다. Unreal MCP toolset으로 수행할 수 있는 작업만 처리하고, 지원되지 않는 클릭·시각 조작·asset 편집은 우회하지 않고 `.md/USER_UNREAL.md`에 남긴다. Computer Use는 사용자가 별도로 명시적으로 요청한 작업에서만 `.md/AGENT_COMPUTERUSE.md`에 따라 실행한다.
+## 결과물 첫머리 형식
+
+작업 폴더의 모든 단계 결과물은 제목 바로 아래에 다음 세 줄을 같은 순서로 둔다.
+
+```markdown
+- 작업 ID: `SERVICE-U3`
+- 단계: Editor 작업
+- 상태: 보류 — <사유>, <책임 단계>, <재개 조건>
+```
+
+- 상태는 `진행`(작성 중, 다음 단계 입력 아님), `완료`(결론 확정, 다음 단계 입력 가능), `보류`(사유·책임 단계·재개 조건 필수)다.
+- 단계 값은 기능 명세, Editor 사전 조사, Editor 진단, 아키텍처, 구현, 코드 리뷰, Editor 작업, 사용자 PIE 검증 중 하나다. 마스터가 쓰는 `PIE_CHECKLIST.md`는 사용자 PIE 검증, `PROMPT_UNREAL_R.md`는 Editor 작업이다. `CONTEXT.md`와 Codex 작업용 보고(`codex_*_report.md`)는 첫머리 형식 대상이 아니다.
+- 재작업 프롬프트(`PROMPT_IMPLEMENTATION_R.md`, `PROMPT_UNREAL_R.md`)는 네 번째 줄에 출처를 둔다. 예: `- 출처: 코드 리뷰 2회차`, `- 출처: 사용자 PIE (BugReports/<파일>)`.
+- 소유 단계만 자기 결과물의 첫머리를 바꾼다. 에이전트는 시작할 때 입력 결과물의 작업 ID가 지시받은 작업 폴더와 같고 상태가 `완료`인지 확인한다.
 
 ## 정본 정책
 
 | 정책 | 정본 |
 |---|---|
-| 승인된 사용자 동작과 수용 시나리오 | `.md/PROMPT_ARCHITECTURE.md` |
+| 승인된 사용자 동작과 수용 시나리오 | 작업 폴더의 `PROMPT_ARCHITECTURE.md` |
 | 전체 시스템 지도와 의존 방향 | `.md/0_ARCHITECTURE.md` |
 | 클래스 성장과 책임 분리 | `.md/Architecture/CoreSystem.md` |
 | 시스템별 책임과 API | 관련 `.md/Architecture/*System.md` |
@@ -68,60 +95,53 @@ MCP 에이전트는 기본적으로 Computer Use를 실행하지 않는다. Unre
 
 Unreal 문서는 asset 전체를 복제하지 않고 C++ 계약과 기능 결과에 영향을 주는 현재 구조만 기록한다. 날짜별 진행 기록은 Git에 맡긴다.
 
-## 정기 결과물
+## 정기 결과물과 소유권
 
-| 생산 단계 | 결과물 |
+| 작성자 | 결과물(작업 폴더 안) |
 |---|---|
-| 기능 명세 | `.md/PROMPT_ARCHITECTURE.md` |
-| MCP 사전 조사 | `.md/REPORT_UNREAL_DISCOVERY.md` |
-| 아키텍처 설계 | `.md/PROMPT_IMPLEMENTATION.md` |
-| C++ 구현 | `.md/PROMPT_REVIEW.md`, `.md/PROMPT_UNREAL.md` |
-| 코드 리뷰 실패 | `.md/PROMPT_IMPLEMENTATION_R.md` |
-| Unreal MCP/Computer Use 작업 | `.md/PROMPT_INTEGRATION_REVIEW.md`, 관련 `.md/Unreal/*System.md` |
-| 통합 리뷰 코드 재작업 | `.md/PROMPT_IMPLEMENTATION_R.md` |
-| 통합 리뷰 Unreal 재작업 | `.md/PROMPT_UNREAL_R.md` |
+| 기능 명세 | `PROMPT_ARCHITECTURE.md`, `QNA_FEATURE_SPEC.md` |
+| Editor 사전 조사 / 진단 | `REPORT_UNREAL_DISCOVERY.md` / `REPORT_UNREAL_DIAGNOSIS.md` |
+| 아키텍처 | `PROMPT_IMPLEMENTATION.md`, `QNA_ARCHITECTURE.md`, Architecture 정본 |
+| 구현 | Source·승인된 Config, `PROMPT_REVIEW.md`, `PROMPT_UNREAL.md`, `QNA_IMPLEMENTATION.md` |
+| 코드 리뷰 | 리뷰 실패와 사용자 PIE의 구현 문제: `PROMPT_IMPLEMENTATION_R.md`, `QNA_REVIEW.md` |
+| Unreal Editor 작업 | `REPORT_UNREAL_EDITOR.md`, 관련 Unreal 정본, `USER_UNREAL.md` 항목 |
+| 마스터 | `CONTEXT.md`, `PIE_CHECKLIST.md`, 사용자 PIE의 Editor 설정 문제: `PROMPT_UNREAL_R.md` |
 
 - 사전 조사가 불필요하면 `REPORT_UNREAL_DISCOVERY.md`를 만들지 않고 생략 근거를 기능 명세에 남긴다.
-- 코드 리뷰 승인과 최종 통합 승인은 정기 결과물을 만들지 않고 보고로 종료한다.
-- 하나의 결과물은 현재 작업 또는 현재 수직 구현 단계 하나만 기록한다.
-
-## 결과물 소유권
-
-- 기능 명세 단계만 `PROMPT_ARCHITECTURE.md`를 작성한다.
-- 아키텍처 단계만 `PROMPT_IMPLEMENTATION.md`와 Architecture 정본을 작성한다.
-- 구현 단계만 Source/승인된 Config, `PROMPT_REVIEW.md`, `PROMPT_UNREAL.md`를 작성한다.
-- Unreal MCP 사전 조사만 `REPORT_UNREAL_DISCOVERY.md`를 작성한다.
-- 실제 Editor 작업을 수행한 Unreal MCP 또는 명시적 Computer Use 단계만 관련 Unreal 정본과 `PROMPT_INTEGRATION_REVIEW.md`를 작성한다.
+- 코드 리뷰 승인은 정기 결과물을 만들지 않고 보고로 종료한다.
 - 리뷰 단계는 입력을 직접 고치지 않고 해당 소유 단계로 돌려보낸다.
+- 커밋과 병합은 마스터가 한다. 워커는 커밋하지 않는다. 마스터가 아닌 일반 세션은 자기 단계 결과물만 기본 브랜치에 커밋할 수 있다.
+- 워커 에이전트는 `AGENT_*.md`와 `FEEDBACK_BACKLOG.md`의 일반화 항목을 수정하지 않는다.
 - `AGENT_*.md`에는 작업별 클래스·에셋·수행 기록을 누적하지 않는다.
+
+## 복귀 원칙
+
+- 코드 리뷰나 Editor 작업에서 상위 단계 결함이 드러나면 이미 쓴 비용과 관계없이 책임 단계로 복귀한다.
+- 상위 단계 결함을 Blueprint graph, asset 값이나 Level 배치로 우회하지 않는다.
+- 책임이 있는 가장 낮은 단계로 복귀한다: asset만 틀리면 Editor 단계 안에서, 구현이 틀리면 구현, 계약이 실제 asset·Level·엔진 동작과 맞지 않으면 아키텍처, 사용자 동작을 다시 정해야 하면 기능 명세.
+- 복귀한 단계는 영향받는 시나리오 ID와 asset만 다시 정하고 결과물에 변경 범위를 적는다. 이후 단계는 그 범위만 재작업·재리뷰한다.
+- Editor 작업 중 상위 결함이 드러나면 영향받는 asset만 저장하지 않고 멈춘다. 영향이 없는 allowlist 항목은 저장·재로드까지 마친다.
 
 ## `USER_UNREAL.md` 미완료 작업 큐
 
-Unreal MCP toolset으로 완료할 수 없는 실제 Editor 작업만 `.md/USER_UNREAL.md`에 기록한다.
+허용된 자동화(MCP·Python·기존 helper·commandlet)와 사용자가 승인한 화면 작업으로 완료할 수 없는 실제 Editor 수정 작업만 기록한다. PIE·플레이 검증은 기록하지 않고 작업 폴더의 `PIE_CHECKLIST.md`에 둔다.
 
-- 한국어로 작성한다.
-- exact asset path, 현재 상태, 필요한 조작, 예상 결과와 검증·재개 조건을 포함한다.
-- 각 항목은 미완료 상태만 유지하고 완료 이력은 누적하지 않는다.
-- 일반적인 MCP 가능 작업이나 단순 검증을 사용자에게 넘기지 않는다.
-- MCP 에이전트는 Computer Use로 우회하지 않는다.
-- 사용자가 직접 완료하거나 Computer Use를 명시적으로 요청할 수 있다.
-- 완료 후 실제 asset 상태를 검증하고 관련 항목을 제거하기 전에는 의존하는 통합 리뷰를 승인하지 않는다.
+- 한국어로 작성한다. 항목마다 작업 ID, exact asset/actor/package, 현재·목표 상태, 시도한 자동화 경로와 오류, 남은 조작, 먼저 끝내야 하는 PIE 시나리오와 재개 조건을 적는다.
+- 분류: 수동 작업 필요 / 실행 환경 차단 / 화면 작업 미승인·미지원 / 승인 밖.
+- 미완료 상태만 유지한다. 사용자가 완료를 알리면 Editor 역할이 저장·재로드를 확인한 뒤 항목을 제거한다.
 
 ## 질문과 복귀
 
-- 사용자 동작 선택은 기능 명세 단계에서 `.md/QNA_FEATURE_SPEC.md`로 질문한다.
-- 기술 설계 선택은 `QNA_ARCHITECTURE.md`를 사용한다.
-- 구현 선택은 `QNA_IMPLEMENTATION.md`를 사용한다.
-- 리뷰 정보 부족은 `QNA_REVIEW.md`를 사용한다.
+- 사용자 동작 선택은 기능 명세 단계의 `QNA_FEATURE_SPEC.md`, 기술 설계 선택은 `QNA_ARCHITECTURE.md`, 구현 선택은 `QNA_IMPLEMENTATION.md`, 리뷰 정보 부족은 `QNA_REVIEW.md`를 쓴다.
 - 구현 중 사용자 동작을 새로 결정하지 않고 기능 명세로 복귀한다.
 - Editor 단계에서 코드·설계 문제가 발견되면 Blueprint 우회를 만들지 않고 소유 단계로 복귀한다.
 
 ## 문서 크기 정책
 
-- `AGENT_*.md`: 목표 80~120줄, 최대 150줄
+- `AGENT_*.md`: 목표 80~120줄, 최대 150줄. 단 `AGENT_WORKFLOW.md`는 공통 정책 문서로 본다.
 - 공통 정책 문서: 최대 200줄
-- 기능·구현 프롬프트와 질문 문서(`.md/PROMPT_ARCHITECTURE.md`, `.md/PROMPT_IMPLEMENTATION*.md`, `.md/QNA_*.md`): 줄 수 상한 없음. 기능 프롬프트와 질문 문서는 설계에 관여하지 않는 동작 계약·사용자 선택의 완결성을, 구현 프롬프트는 구현자가 추가 설계 판단 없이 작업할 수 있는 완결성을 우선한다.
-- 그 밖의 작업 프롬프트와 결과물: 작업 하나당 최대 200줄
+- 작업 폴더의 모든 프롬프트·질문 문서(`PROMPT_*.md`, `QNA_*.md`)와 `PIE_CHECKLIST.md`: 줄 수 상한 없음. 줄 수 때문에 동작 계약, 사용자 선택, 설계·구현 지시, exact asset·값·검증 기준, 시나리오 같은 디테일을 줄이거나 빼지 않는다. 중복만 피한다.
+- 보고와 요약(`REPORT_UNREAL_DISCOVERY.md`, `REPORT_UNREAL_DIAGNOSIS.md`, `REPORT_UNREAL_EDITOR.md`, `CONTEXT.md`): 작업 하나당 최대 200줄. 상세 근거는 로그·스크립트·결과물에 두고 경로로 가리킨다.
 - 시스템 문서: 300줄부터 분리 검토, 400줄 이상 성장 동결
 
 상한을 넘으면 현재 상태만 남기고 안정적인 책임 경계로 분리한다. 같은 목록·규칙·asset 값을 여러 문서에 복제하지 않는다.
@@ -130,10 +150,15 @@ Unreal MCP toolset으로 완료할 수 없는 실제 Editor 작업만 `.md/USER_
 
 - 승인된 기능 시나리오와 현재 단계 범위를 벗어나지 않았다.
 - 사용자 소유 변경과 무관한 파일·asset을 수정하지 않았다.
-- 빌드, Compile, Save, 재로드, PIE 중 수행한 검증과 미검증을 구분했다.
+- 빌드, Compile, Save, 재로드 중 수행한 검증과 미검증을 구분했다.
 - Editor 변경은 관련 `.md/Unreal/*System.md`의 현재 상태와 일치한다.
-- 예상 밖 dirty package와 `USER_UNREAL.md` 미완료 항목이 통합 승인 전에 해소됐다.
 - 문서 변경 후 diff, 링크, 소유권과 줄 수를 확인했다.
+
+## 전환 규칙 (2026-10-01 채택)
+
+- 모든 작업은 `.md/Work/<작업 ID>/`와 결과물 첫머리 형식을 쓴다. 채택 전의 루트 결과물(`PROMPT_*.md`, `QNA_*.md`, `REPORT_UNREAL_DISCOVERY.md`, `PROMPT_INTEGRATION_REVIEW.md`)과 `.md/NextWork/`는 서비스 4단위 완료 후 삭제했으며 내용은 Git 이력에 있다.
+- 정본 문서나 `USER_UNREAL.md`가 삭제된 루트 결과물을 가리키면 해당 시점 커밋의 파일로 읽는다.
+- 작업 폴더가 없는 기존 작업을 이어갈 때는 마스터가 폴더와 `CONTEXT.md`를 만들고, `USER_UNREAL.md`의 PIE·플레이 검증 항목을 `PIE_CHECKLIST.md`로 옮긴다.
 
 ## UE 5.8 Build Policy
 
@@ -147,7 +172,7 @@ BathhouseSim의 C++ build는 항상 다음 진입점을 사용한다.
   -NoHotReloadFromIDE
 ```
 
-Codex shell에서는 UBT 자식 프로세스와 Engine/Uba 접근을 위해 첫 시도부터 필요한 권한으로 실행한다. 승인 실행이 불가능하면 시도하지 않고 차단 사유를 보고한다. system `dotnet`, MSBuild 직접 실행, `UnrealBuildTool.exe` 또는 `.dll` 직접 실행은 사용하지 않는다.
+에이전트 shell(특히 Codex)에서는 UBT 자식 프로세스와 Engine/Uba 접근을 위해 첫 시도부터 필요한 권한으로 실행한다. 승인 실행이 불가능하면 시도하지 않고 차단 사유를 보고한다. system `dotnet`, MSBuild 직접 실행, `UnrealBuildTool.exe` 또는 `.dll` 직접 실행은 사용하지 않는다.
 
 ## UE 5.8 Headless Automation Policy
 

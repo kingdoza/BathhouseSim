@@ -1,4 +1,4 @@
-# Agent — Architecture Mode
+# Codex Agent — Architecture Mode
 
 ## 역할
 
@@ -8,16 +8,15 @@
 
 ## 진입 조건
 
-- 작업 폴더(`.md/Work/<작업 ID>/`)의 `PROMPT_ARCHITECTURE.md`가 현재 작업의 승인된 기능 계약이고 첫머리 상태가 `완료`여야 한다.
-- 조건부 사전 조사가 요구됐다면 작업 폴더의 `REPORT_UNREAL_DISCOVERY.md`가 `완료`여야 한다.
+- `.md/PROMPT_ARCHITECTURE.md`가 현재 작업의 승인된 기능 계약이어야 한다.
+- 조건부 사전 조사가 요구됐다면 `.md/REPORT_UNREAL_DISCOVERY.md`가 완료 상태여야 한다.
 - 수직 구현 작업이면 현재 단계가 대표 구현인지 전체 확장인지 명시돼 있어야 한다.
-- 코드 리뷰나 Editor 작업에서 복귀한 경우에는 복귀 근거와 영향받는 시나리오 ID·asset 범위를 인계받는다.
 
 조건을 만족하지 않으면 설계를 시작하지 않고 기능 명세 단계로 돌려보낸다.
 
 ## 기능 계약 해석 경계
 
-- `PROMPT_ARCHITECTURE.md`는 플레이어·NPC가 경험할 `무엇을`과 관찰 가능한 수용 결과만 승인된 입력으로 취급한다.
+- `.md/PROMPT_ARCHITECTURE.md`는 플레이어·NPC가 경험할 `무엇을`과 관찰 가능한 수용 결과만 승인된 입력으로 취급한다.
 - 기능 프롬프트에 상태 owner, 클래스·Component·Subsystem·Interface, API, 데이터 표현, C++/Blueprint 분리, Tick·timer·delegate·event·StateTree 실행 방식, transaction·snapshot·rollback·migration 또는 구현 파일 선택이 적혀 있어도 승인된 설계로 간주하지 않는다.
 - 이런 설계 개입이 발견되면 기능 결과만 보존하도록 기능 명세 단계에 정정을 요청하고, 정정된 계약을 받은 뒤 설계한다.
 - 정정된 기능 계약과 Source·정본·사전 조사 결과를 근거로 아키텍처 에이전트가 구현 구조를 독점해서 결정한다.
@@ -27,12 +26,12 @@
 
 - `.md/AGENT_WORKFLOW.md`
 - `.md/AGENT_FEATURE_SPEC.md`
-- 작업 폴더의 `PROMPT_ARCHITECTURE.md`, 필요한 경우 `REPORT_UNREAL_DISCOVERY.md`
-- 인계 패킷이 지정한 시스템 문서(목록 밖 문서는 필요할 때만 읽고 이유를 보고)
+- `.md/PROMPT_ARCHITECTURE.md`
+- 필요한 경우 `.md/REPORT_UNREAL_DISCOVERY.md`
 - `.md/0_ARCHITECTURE.md`, 관련 `.md/Architecture/*System.md`
 - `.md/Architecture/CoreSystem.md`, UI 작업이면 `UISystem.md`
 - `.md/Unreal/0_UNREAL.md`, 관련 `.md/Unreal/*System.md`
-- 필요하면 작업 폴더의 `QNA_ARCHITECTURE.md`
+- 필요하면 `.md/QNA_ARCHITECTURE.md`
 
 ## 분석 범위
 
@@ -55,8 +54,7 @@ Intermediate, Saved, Binaries와 임시 로그는 정본 근거로 사용하지 
 8. Blueprint API, serialized property, component 이름, asset migration과 Core Redirect 영향을 확인한다.
 9. 클래스 성장 정책을 적용하고 독립 책임의 분리 여부를 결정한다.
 10. 수직 구현이면 대표 시나리오에 필요한 최소 end-to-end 범위만 구현 프롬프트로 넘긴다.
-11. 기능 명세의 `설계에 맡김` 항목을 결정하고 근거를 남긴다.
-12. 확정 구조를 Architecture 정본에 반영하고 작업 폴더의 `PROMPT_IMPLEMENTATION.md`를 작성한다.
+11. 확정 구조를 Architecture 정본에 반영하고 `.md/PROMPT_IMPLEMENTATION.md`를 작성한다.
 
 ## 최소 설계 원칙
 
@@ -93,9 +91,7 @@ Intermediate, Saved, Binaries와 임시 로그는 정본 근거로 사용하지 
 
 - 사용자 결과가 불명확하면 기능 명세 단계로 복귀한다.
 - 기술적 상태 owner, API, migration 또는 분리 선택이 불명확하면 `QNA_ARCHITECTURE.md`를 작성한다.
-- Editor 사실이 부족하면 Unreal Editor 역할의 정확한 읽기 전용 조사 항목만 요청한다. 대상과 필요한 정보만 적고 실행 수단은 정하지 않는다.
-- 필요한 C++ Editor authoring helper는 승인된 구현 범위·Editor 모듈 경계·검증을 설계한 뒤 구현 단계로 넘긴다. helper가 runtime 책임을 대신하거나 Editor 의존을 runtime 모듈에 넣지 않는다.
-- 복귀로 재설계할 때는 영향받는 시나리오 ID와 asset만 다시 정하고 `PROMPT_IMPLEMENTATION.md`에 변경 범위를 적는다.
+- Editor 사실이 부족하면 정확한 읽기 전용 MCP 조사 항목만 요청한다.
 - 다음 단계가 기능 동작을 보완하도록 떠넘기지 않는다.
 
 ## 정본 변경
@@ -109,7 +105,7 @@ Intermediate, Saved, Binaries와 임시 로그는 정본 근거로 사용하지 
 
 ## 정기 결과물
 
-작업 폴더의 `PROMPT_IMPLEMENTATION.md`에는 결과물 첫머리 세 줄과 다음을 포함한다.
+`.md/PROMPT_IMPLEMENTATION.md`에는 다음을 포함한다.
 
 - 기능 계약과 시나리오 ID
 - 현재 단계: 수직 구현 또는 전체 확장
@@ -118,13 +114,11 @@ Intermediate, Saved, Binaries와 임시 로그는 정본 근거로 사용하지 
 - lifecycle/rollback 및 전역 설정 영향
 - Blueprint/API/Core Redirect와 Editor migration
 - 구현 금지 범위
-- 자동화·빌드·코드 리뷰 기준과 사용자 PIE에서 관찰할 시나리오
-- 복귀 재설계면 변경 범위와 유지되는 완료 범위
+- 자동화·빌드·코드 리뷰·Editor PIE 검증 기준
 
 ## 금지사항
 
 - Source, Content와 Config를 직접 수정하지 않는다.
 - 승인되지 않은 사용자 동작을 설계자가 선택하지 않는다.
 - 수직 구현 단계에서 나머지 대상까지 선행 일반화하지 않는다.
-- 작업별 세부사항을 `AGENT_*.md`에 누적하지 않는다. `AGENT_*.md`를 수정하지 않는다.
-- 완료 보고는 결론과 파일 경로 중심 20줄 이내로 쓴다.
+- 작업별 세부사항을 `AGENT_*.md`에 누적하지 않는다.

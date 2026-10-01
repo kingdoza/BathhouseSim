@@ -1,47 +1,25 @@
 # 에이전트 피드백 백로그
 
-형식·작성 시점·적용 범위는 [FEEDBACK_POLICY.md](FEEDBACK_POLICY.md)를 따른다.
+이 문서는 작업 중 발견된 결함과 애로사항을 원문에 가깝게 쌓아 두는 임시 기록이다. 여러 항목이 쌓이면 공통 패턴으로 일반화해 각 `AGENT_*.md`에 반영하고, 반영한 항목은 이 문서에서 제거한다.
 
-- 워커는 아래 색인에서 자기 역할 태그와 현재 시스템에 맞는 `Active` 항목만 찾아 적용한다.
-- 상위 단계 복귀 기록과 이전 형식 기록은 작업 지침이 아니며 사용자가 요청한 회고의 입력으로만 쓴다.
-- 일반화 항목의 등록·상태 변경은 사용자가 요청한 회고에서만 한다.
-
-## 마지막 회고 기준점
-
-- 없음 (2026-10-01 정책 채택 시점까지 회고 미실시)
-
-## 일반화 항목 색인
-
-| Feedback ID | 역할 태그 | 시스템 태그 | 상태 |
-|---|---|---|---|
-
-## 일반화 항목
-
-없음.
-
-## 상위 단계 복귀 기록
-
-없음.
-
-## 이전 형식 기록
-
-정책 채택 전에 쌓인 원문 기록이다. 회고에서 검토해 일반화 항목의 근거로 연결한 뒤 제거한다.
+- 에이전트 규칙 문서가 아니므로 작업 중 이 문서를 지시로 따르지 않는다.
+- 항목마다 사실(증상·원인·근거)과 판단(책임·일반화 후보)을 구분한다.
 
 ---
 
-### FB-001 회전된 부모 아래에서 피벗 회전 update가 위치를 바꿔 BP 뷰포트 갱신이 멈춤
+## FB-001 회전된 부모 아래에서 피벗 회전 update가 위치를 바꿔 BP 뷰포트 갱신이 멈춤
 
 - 기록일: 2026-09-29
 - 상태: 코드 수정 완료, 빌드·자동화·Editor 검증 미실행
 - 관련 커밋: `61f72c1` (쿨러,순환기 동작) — `FUtilityPivotRotation` 도입
 
-#### 증상
+### 증상
 
 - `SceneRoot`에 회전이 조금이라도 있으면 BP 뷰포트에서 `GaugeNeedlePivot` 위치를 바꿔도 기즈모와 바늘이 움직이지 않는다. 디테일 값과 저장값은 바뀐다.
 - Compile로는 갱신되지 않고, BP 탭을 닫았다 다시 열어야 반영된다.
 - `BP_Boiler`, `BP_Cooler`, `BP_Circulator` 공통이다. `PackagePhysicalRoot` 스케일은 무관하다(0.5는 부동소수점에서 정확하므로 오차가 생기지 않는다).
 
-#### 원인
+### 원인
 
 1. `FUtilityPivotRotation::Apply/Reset`이 `USceneComponent::SetRelativeRotation(FQuat)`을 호출한다. 게이지·연료 문·레버가 Editor 프리뷰의 `OnConstruction`에서 이를 실행한다.
 2. 엔진 `SetRelativeRotation`은 상대 트랜스폼을 월드로 합성한 뒤 `MoveComponent → InternalSetWorldLocationAndRotation`에서 부모 기준으로 역변환해 `RelativeLocation`을 다시 쓴다(`SceneComponent.cpp:1723`, 역변환 3303행). FQuat 오버로드에는 동일값 조기 종료가 없다.
@@ -51,12 +29,12 @@
 
 엔진 동작 자체는 인스턴스별 override 보호를 위한 의도된 설계다. 결함은 우리 코드가 계약과 달리 위치를 바꾼 데 있다.
 
-#### 조치
+### 조치
 
 - `Source/BathhouseSim/Private/Utility/UtilityPivotRotation.cpp`: 회전 적용 뒤 `RelativeLocation`이 바뀌면 원래 값으로 복원하는 `SetPivotRelativeRotationPreservingLocation` 추가, `Apply`·`Reset`에 적용.
 - `Source/BathhouseSim/Private/Tests/UtilityLaborAutomationTests.cpp`: `BathhouseSim.Utility.Labor.PivotRotationKeepsExactLocationUnderRotatedParent` 추가. 회전된 부모에서 Apply·반복 Apply·Reset 후 위치 bit-exact를 검사하고, 엔진 원 호출의 drift 여부를 Info로 남긴다.
 
-#### 단계별 판단
+### 단계별 판단
 
 | 단계 | 판단 | 근거 |
 |---|---|---|
@@ -65,13 +43,13 @@
 | 아키텍처 | 보완점 | 계약 문장은 정확했으나 "부모 transform 무관 bit-exact"와 회전된 부모 검증 조건을 명시하지 않았다. |
 | Unreal MCP·통합 리뷰 | 해당 없음 | 검증 시점 BP에는 `SceneRoot` 회전이 없어 재현 조건이 존재하지 않았다. |
 
-#### 조사 과정의 애로사항
+### 조사 과정의 애로사항
 
 - 초기 조사에서 원인을 에셋(메시 형상), 루트 스케일, 엔진 버그 순으로 잘못 짚었다. 우리 코드의 Editor 훅(`OnConstruction` 안의 transform 변경)을 먼저 전수 점검했으면 더 빨리 좁힐 수 있었다.
 - "위치를 쓰는 코드"만 grep해서 "위치를 부수적으로 다시 쓰는 엔진 API"(`SetRelativeRotation`)를 놓쳤다.
 - 사용자의 A/B 관찰(루트 스케일 무관, `SceneRoot` 회전만 트리거, 세 설비 공통)이 원인 확정에 결정적이었다.
 
-#### 일반화 후보
+### 일반화 후보
 
 - 구현: Editor 프리뷰(`OnConstruction`, construction preview)에서 native component의 serialized transform을 변경하는 코드는 해당 필드 외 값이 bit 단위로 불변인지 확인한다. 회전만 바꿀 때 `SetRelativeRotation`의 위치 재계산을 고려한다.
 - 구현·리뷰: "값을 바꾸지 않는다" 계약의 테스트는 허용오차 비교가 아니라 정확 비교로, 항등이 아닌 부모 transform 조건을 포함한다.
@@ -80,13 +58,13 @@
 
 ---
 
-### FB-002 게이지 프리뷰 자세가 작성값으로 재캡처되어 컴파일·레벨 저장마다 바늘 회전이 누적됨
+## FB-002 게이지 프리뷰 자세가 작성값으로 재캡처되어 컴파일·레벨 저장마다 바늘 회전이 누적됨
 
 - 기록일: 2026-09-29
 - 상태: 코드 수정 완료(사용자 선택: BP 템플릿 값을 baseline으로 사용), 빌드·자동화·Editor 검증 미실행, 오염된 레벨 인스턴스 3개 정리 미실행
 - 관련 커밋: `61f72c1` (`FUtilityPivotRotation`, `UUtilityGaugeComponent::ApplyConstructionPreview`)
 
-#### 증상
+### 증상
 
 - BP 에디터에서 Compile할 때마다 게이지 바늘이 `ZeroAngleDegrees`만큼 더 돌아간다. 탭을 다시 열면 원래대로 보인다.
 - 레벨에 배치된 인스턴스에 프리뷰 자세가 저장돼 있다(`Content/__ExternalActors__/Maps/DefaultMap`).
@@ -95,7 +73,7 @@
   - BP_Cooler `0/EB/P4KMP0NJE6NZLCAA8FG8AB`: (30, 180, -180). 누적 흔적이다.
   - BP 템플릿 자체에는 회전이 저장돼 있지 않다.
 
-#### 원인
+### 원인
 
 1. 설계(`Architecture/UtilityLaborSystem.md:111`)는 "이미 적용한 표시 자세를 baseline으로 다시 저장하지 않는다"고 정한다. 구현은 이 판단 상태를 raw 포인터 `FUtilityPivotRotation*`(UPROPERTY 아님)에 둔다.
 2. Compile 재인스턴싱: 새 컴포넌트 객체가 생기고, 피벗 `RelativeRotation`은 이전 프리뷰 값(표시 자세)이 복사된다. baseline 상태는 복사되지 않아, `CaptureBaseline`이 표시 자세를 작성값으로 캡처하고 다시 0 각도를 곱한다.
@@ -103,7 +81,7 @@
 3. 레벨 저장: 게이지에는 문·레버와 달리 `PreSave` 복원이 없다. 표시 자세가 인스턴스 override로 저장되고, 다음 로드 때 그 값이 baseline으로 캡처돼 누적된다.
 4. PIE: 복제기는 영속 모드라(`DuplicateDataWriter.cpp:41`) Transient가 복사되지 않는다. 에디터 인스턴스의 현재 표시 자세가 BeginPlay에서 baseline으로 캡처될 수 있다(추론, 미검증).
 
-#### 조치
+### 조치
 
 - `Source/BathhouseSim/Private/Utility/UtilityPivotRotation.cpp`: `CaptureBaseline`이 pivot의 component template(archetype) 회전을 작성값으로 쓴다. template이 없는 컴포넌트(NewObject 생성)만 현재 값을 쓴다. 게이지·문·레버 공통이다.
 - `Source/BathhouseSim/Private/Tests/UtilityLaborAutomationTests.cpp`: `BathhouseSim.Utility.Labor.GaugePreviewBaselineUsesComponentTemplate`를 추가했다. baseline 상태 유실(재인스턴싱 모사) 3회와 오염된 저장 자세에서도 zero pose가 유지되는지 검사한다.
@@ -111,7 +89,7 @@
 - `.md/Architecture/UtilityLaborSystem.md`: baseline 원천과 위치 bit 불변 계약을 추가했다.
 - 미처리: DefaultMap 레벨 인스턴스 3개의 오염된 `GaugeNeedlePivot` 회전 override. 수정 후 baseline으로는 쓰이지 않지만 저장값으로는 남아 있다. 필요하면 Editor에서 Reset to Default 뒤 저장한다.
 
-#### 단계별 판단
+### 단계별 판단
 
 | 단계 | 판단 | 근거 |
 |---|---|---|
@@ -120,7 +98,7 @@
 | 코드 리뷰 | 부분 책임 | UObject 컴포넌트가 raw 포인터로 lifecycle 상태를 소유하는 구조는 GC·복제·재인스턴싱 관점에서 점검 대상이었다. |
 | Unreal MCP·통합 리뷰 | 부분 책임 | 레벨 배치 인스턴스의 pivot 회전 override(저장값)가 이미 비정상이었으나 검증에서 발견되지 않았다. |
 
-#### 일반화 후보
+### 일반화 후보
 
 - 아키텍처: "재구성 불변" 계약에는 객체가 교체되는 경로(Compile 재인스턴싱, 레벨 저장·로드, PIE 복제, Undo)를 명시적으로 나열한다.
 - 구현: 컴포넌트의 lifecycle 판단 상태를 raw 포인터·비반영 멤버에 두지 않는다. 재인스턴싱·복제에서 유지되어야 하는지 먼저 판단한다.
@@ -129,32 +107,32 @@
 
 ---
 
-### FB-003 DISP-024 계약 모순이 설계 단계를 통과해 구현 중 충돌로 발견됨
+## FB-003 DISP-024 계약 모순이 설계 단계를 통과해 구현 중 충돌로 발견됨
 
 - 기록일: 2026-09-30
 - 상태: 기능 명세 정정(2026-09-30) 후 설계 정본·구현 프롬프트 갱신 완료, 구현 재개 대기
 - 관련 문서: `QNA_IMPLEMENTATION.md`(구현 충돌 보고와 아키텍처 답변), `PROMPT_ARCHITECTURE.md` DISP-024, `Architecture/ServiceFacilityDisplaySystem.md` Facility Target Router
 
-#### 증상
+### 증상
 
 - 서비스 2단위 구현 중 구현 에이전트가 DISP-024를 만족할 수 없다고 보고하고 작업을 멈췄다.
 - 최초 DISP-024: 빈 박스로 화장대 드라이기 쪽에서 RMB 연속 빼기 중 빗 쪽으로 조준을 옮기면 멈춘다. 빗은 빠지지 않으며 버튼을 떼고 다시 누르면 빗부터 뺀다.
 - 설계 정본은 "빈 박스 연속 빼기 중 가장 가까운 묶음이 바뀌면 멈춘다(DISP-024)"라고 적고, 검증 표에 "key 변경 시 반복 멈춤", 구현 프롬프트에 해당 테스트를 넣었다.
 
-#### 원인
+### 원인
 
 1. 첫 1개가 빠지는 순간 박스는 빈 박스가 아니라 드라이기 박스가 된다(박스 종류는 내용물이 정함, Q16).
 2. 명세의 공통 규칙상 물품이 든 박스는 박스 종류 묶음으로 넣고 뺀다. 이후 선택은 조준과 무관하게 드라이기로 고정된다(Q51 B·Q61 A와 결합).
 3. 따라서 "조준 이동 시 멈춤"과 "다시 누르면 빗부터"는 명세 자신의 규칙과 양립할 수 없었다.
 4. 설계는 key를 "선택된 묶음의 SpaceIndex"로 정했으므로 key가 절대 바뀌지 않는다. 정본의 멈춤 문장은 선택 함수를 따라가면 성립하지 않는 주장이었다.
 
-#### 조치
+### 조치
 
 - 기능 명세가 DISP-024를 정정했다: 첫 빼기 뒤 박스 종류 묶음에 고정, 설비를 벗어나지 않는 한 같은 묶음에서 계속 빼고, 묶음이 비거나 박스가 차면 멈춘다. 빗은 빠지지 않는다.
 - 설계는 선택 함수·key 변경 없이 정정 계약을 만족한다. 정본의 DISP-024 문장·검증 표, 구현 프롬프트의 테스트와 재개 조건을 갱신했다. key guard는 방어 규칙으로 유지한다.
 - 부수: 같은 보고에서 설계 정본의 세탁기·건조기 BP 경로 오류(`Blueprints/Facility/` → 실제 `Blueprints/Towel/`)도 지적돼 수정했다.
 
-#### 단계별 판단
+### 단계별 판단
 
 | 단계 | 판단 | 근거 |
 |---|---|---|
@@ -163,12 +141,12 @@
 | 구현 | 해당 없음(정상 동작) | 실행 순서를 추적해 충돌을 증명하고, 임의 변경 없이 멈춰 보고했다. |
 | 코드 리뷰·Unreal·통합 리뷰 | 해당 없음 | 도달 전 발견. |
 
-#### 대응 과정의 애로사항
+### 대응 과정의 애로사항
 
 - 아키텍처가 충돌 보고를 받은 뒤 처음 낸 해결안은 "방향별 key(빼기 key = 조준선 최근접 묶음)"였다. 물품이 든 박스로 뺄 때도 옆 묶음 조준 시 멈추게 되어 "박스 종류 묶음으로 넣고 뺀다(설비 전체 조준)" 계약을 깨고, 멈춰도 재입력하면 같은 묶음에서 빠져 의미 없는 멈춤만 만드는 안이었다. 채택되지 않았다.
 - 같은 답변에서 "예시 문구대로면 기능 명세 수정 단계를 거치지 않고 바로 반영하겠다"고 제안했다. 사용자가 보는 결과 변경을 설계 단계가 대신하겠다는 역할 밖 제안이었다.
 
-#### 일반화 후보
+### 일반화 후보
 
 - 기능 명세: 연속 조작 시나리오는 첫 조작 뒤 바뀌는 상태(박스 종류·수량·대상 상태)를 반영해 이후 입력의 결과를 적는다. 새 시나리오를 기존 공통 규칙과 결합해 모순이 없는지 확인한다.
 - 아키텍처: 시나리오 충족을 주장하는 설계 문장은 선택·판정 함수를 시나리오 입력 순서대로 따라가 확인한다. 특히 조작 도중 입력 조건이 바뀌는 반복 시나리오(held-use Repeat 등)를 우선 점검한다.
@@ -177,14 +155,14 @@
 
 ---
 
-### FB-004 수건 프리뷰·강조가 넣기·빼기 뒤 이전 자리에 남음(수량 변화가 focus 알림을 다시 부르지 않음)
+## FB-004 수건 프리뷰·강조가 넣기·빼기 뒤 이전 자리에 남음(수량 변화가 focus 알림을 다시 부르지 않음)
 
 - 기록일: 2026-09-30
 - 상태: 설계 확정(`TowelSystem.md` Service Unit 2 Display Changes `cue 재계산 경로`, `InteractionSystem.md` `PresentationRevision`), 구현 재작업 대기
 - 관련 문서: `PROMPT_IMPLEMENTATION_R.md`(수건 cue 결함), `PROMPT_IMPLEMENTATION.md` 맨 앞 재작업 절
 - 대상 시나리오: TOWL-001, 004, 005, 006, 010, 013, 016, 017, 018
 
-#### 증상
+### 증상
 
 - 서비스 2단위 구현 사이클(코드 리뷰 승인) 완료 뒤 사용자가 발견했다.
 - 선반·사용 수건통(Stack), 세탁기·건조기(Pile)에서 첫 조준의 넣기 프리뷰·꺼내기 외곽선은 맞는 자리에 뜬다. 넣거나 빼면 이전 자리에 남는다.
@@ -194,7 +172,7 @@
 - 조준을 뗐다 다시 하거나, 가득 참·비어 있음·기계 상태처럼 가능 여부가 바뀔 때만 우연히 맞는 자리로 돌아온다.
 - 진열 공간·화장대·샤워기는 해당하지 않는다.
 
-#### 원인
+### 원인
 
 1. 수건 cue는 `NotifyInteractionFocusChanged`에서만 다시 계산된다.
 2. `UPlayerInteractionComponent`는 query가 이전과 `Equals`이면 focus 알림을 생략한다.
@@ -204,12 +182,12 @@
 6. 위치 계산(`GetIndexPresentation`, 결정적 배치, 좌표계)은 맞았다. 다음 계산이 호출되지 않는 것만 결함이었다.
 7. 자동화(`TowelDisplayCueAutomationTests.cpp`)는 옮길 때마다 `NotifyInteractionFocusChanged`를 직접 호출해 실제 경로의 `Equals` 생략 조건을 거치지 않았다.
 
-#### 조치
+### 조치
 
 - 설계: `FPlayerInteractionQuery::PresentationRevision`(int64, `Equals` 포함, Blueprint 비노출)을 추가한다. 수건 대상 query가 대상 inventory revision + 든 바구니 revision으로 채운다. 수량이 바뀌면 다음 query commit에서 기존 focus 알림 경로로 cue가 다시 계산된다. HUD 문구·이동 조건·`UPlayerInteractionComponent`는 바꾸지 않는다(리뷰 선택지 C).
 - 구현 재작업: 실제 경로(`RefreshInteractionQuery`, held-use `BeginUse` + Tick 반복) 기반 자동화와 손님 쪽 수량 변화 검증, PIE 연속 넣기·빼기 관찰 항목을 추가한다.
 
-#### 단계별 판단
+### 단계별 판단
 
 | 단계 | 판단 | 근거 |
 |---|---|---|
@@ -218,7 +196,7 @@
 | 코드 리뷰 | 부분 책임 | 승인 시점에 테스트가 실제 알림 경로를 거치지 않는 점과 1단위 전제(TargetName 수량)의 부재를 지적하지 않았다. |
 | Unreal·통합 확인 | 보완점 | 대표 PIE 절차에 "옮긴 뒤 프리뷰·외곽선이 따라가는지"가 관찰 항목으로 없어 사용자 발견까지 남았다. |
 
-#### 일반화 후보
+### 일반화 후보
 
 - 아키텍처: 알림·이벤트로 갱신되는 표현을 설계할 때 "상태가 바뀐 뒤 알림이 다시 오는 조건"을 명시한다. 알림이 값 비교(`Equals`)로 생략되는 경로라면, 표현이 의존하는 상태가 비교 대상에 들어가는지 확인한다.
 - 아키텍처: 기존 시스템의 동작이 암묵 전제(예: TargetName에 수량 포함)에 기대고 있으면, 같은 도구를 재사용하는 새 대상에 그 전제가 성립하는지 확인한다.
@@ -227,14 +205,14 @@
 
 ---
 
-### FB-005 쓰레기·물 얼룩 생성 자리 판정이 배치 구역 박스에 막혀 배치 구역 안 바닥 전체에서 생성되지 않음
+## FB-005 쓰레기·물 얼룩 생성 자리 판정이 배치 구역 박스에 막혀 배치 구역 안 바닥 전체에서 생성되지 않음
 
 - 기록일: 2026-10-01
 - 상태: 코드 리뷰(pre-Editor)에서 발견 → 아키텍처가 Floor Rule 5단계를 충돌 응답 기반으로 재확정 → 구현 재작업 후 코드 리뷰 승인(2026-10-01). PIE 확인 대기(DefaultMap 바닥 mesh `WorldStatic`·`Static` 확인이 선행 조건).
 - 관련 문서: `PROMPT_IMPLEMENTATION_R.md`(서비스 3단위 F1·F2), `Architecture/CleaningLitterSystem.md` Floor Rule 5단계, `Unreal/WorldSystem.md` DefaultMap Placement Zone
 - 대상 시나리오: 대표 시나리오(탈의실 구역 쓰레기), TRSH-002, 004, 019. 기존 물 얼룩 생성 회귀 가능.
 
-#### 증상(예상)
+### 증상(예상)
 
 - DefaultMap 배치 구역 범위 안에서는 쓰레기·물 얼룩 생성 후보가 모두 clearance 검사에서 기각된다.
   - 배치 구역 범위: 원점 `(600,-100,0)`, `ZoneBounds` Extent `(1400,900,10)`, 2800×1800cm
@@ -242,7 +220,7 @@
 - 이번 변경 전에는 생기던 물 얼룩도 기존 생성 구역이 배치 구역 안이면 멈춘다.
 - 헤드리스 자동화 112/112는 통과했다. fixture에 배치 구역이 없기 때문이다.
 
-#### 원인
+### 원인
 
 1. 설계 Floor Rule 5단계가 clearance를 "WorldStatic·WorldDynamic·PhysicsBody **object overlap**, 물 얼룩·쓰레기 Actor만 무시"로 지정했다. 구현(`FCleaningFloorSpawnQuery::Find`)은 그대로 따랐다. 검사 박스는 바닥 위 1cm ~ 31cm다.
 2. UE의 오브젝트 타입 query는 상대 컴포넌트의 충돌 응답을 보지 않는다. query가 켜져 있고 오브젝트 타입이 목록에 있으면 결과에 포함된다. 모든 채널을 Ignore하는 QueryOnly 트리거 박스도 "겹침"으로 잡힌다.
@@ -250,7 +228,7 @@
 4. 부수: 검사 박스가 hit 지점 위 1cm부터 수평 사각형으로 시작한다. 경사 약 2~4° 이상이나 1cm 이상 단차가 있는 바닥에서는 바닥 자체와 겹쳐 기각된다. 경사 허용값 `MaximumSlopeDegrees`(25°)와 모순이다.
 5. 설계가 막을 대상(설비·놓인 물건·벽)은 적었지만, 막지 말아야 할 영역 표시용 query 박스(배치 구역·진열/router·수건 투입구 등)는 고려하지 않았다. 레벨의 실제 배치 구역 수치(Unreal 정본에 기록됨)와도 대조하지 않았다.
 
-#### 조치(예정)
+### 조치(예정)
 
 - 아키텍처: Floor Rule 5단계의 "무엇이 자리를 막는가" 판정 기준을 확정한다.
   - 후보: 응답 기반 판정(`FacilityPlacementCollision::HasBlockingOverlap`류), 오브젝트 query에 응답·class 제외 조건 추가 등
@@ -258,7 +236,7 @@
 - 구현: 배치 구역 안 생성 성공, 겹친 물 얼룩·쓰레기 구역 상호 비차단, 경사 바닥 fixture 자동화를 추가한다. director 통합 경로로도 확인한다.
 - Unreal: PIE 관찰에 "배치 구역 안 탈의실·욕실 바닥에서 손님이 있을 때 실제 생성"을 넣는다.
 
-#### 단계별 판단
+### 단계별 판단
 
 | 단계 | 판단 | 근거 |
 |---|---|---|
@@ -267,7 +245,7 @@
 | 코드 리뷰 | 발견 | pre-Editor 리뷰에서 코드·엔진 query 동작·Unreal 정본 수치를 대조해 발견했다. |
 | Unreal·통합 리뷰 | 해당 없음 | 도달 전 발견. |
 
-#### 일반화 후보
+### 일반화 후보
 
 - 아키텍처: 월드 query 방식(오브젝트 타입 / 채널 / 응답 기반)을 정본에 구체 지정할 때, 그 방식이 잡는 대상과 무시하는 대상을 함께 적는다. 특히 QueryOnly 트리거·영역 박스가 결과에 섞이는지 확인한다.
 - 아키텍처: 바닥·공간 판정 규칙은 대상 레벨에 이미 있는 영역 Actor(배치 구역, 생성·수거 구역, 설비 query 박스)를 Unreal 정본에서 확인하고, 그 박스들과의 관계를 명시한다.
