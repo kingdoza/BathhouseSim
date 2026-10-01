@@ -38,6 +38,19 @@ FText CapacityDeficitText(const FBathWaterBathSnapshot& Snapshot)
 		: FText::FromString(FString::Printf(TEXT("%s 용량 부족"), *FString::Join(Kinds, TEXT("/"))));
 }
 
+float NormalizeCirculation(const float Percent)
+{
+	return Percent * 0.01f;
+}
+
+float NormalizeTargetTemperature(const float TemperatureC)
+{
+	const UBathWaterSettings* Settings = GetDefault<UBathWaterSettings>();
+	const float Min = Settings->GetMinTargetTemperatureC();
+	const float Range = FMath::Max(Settings->GetMaxTargetTemperatureC() - Min, 0.001f);
+	return FMath::Clamp((TemperatureC - Min) / Range, 0.0f, 1.0f);
+}
+
 const TCHAR* CapacityKindName(const EBathWaterCapacityKind Kind)
 {
 	switch (Kind)
@@ -151,6 +164,7 @@ void UBathWaterDetailWidget::ApplyBathSnapshot(const FBathWaterBathSnapshot* Sna
 		FeedbackBath.Reset();
 		if (FeedbackText) FeedbackText->SetText(FText::GetEmpty());
 	}
+	SyncSlidersToSnapshot(*Snapshot);
 	if (bHasCachedSnapshot && CachedSnapshot.BathActor == Snapshot->BathActor
 		&& FMath::IsNearlyEqual(CachedSnapshot.WaterPercent, Snapshot->WaterPercent)
 		&& FMath::IsNearlyEqual(CachedSnapshot.CirculationPercent, Snapshot->CirculationPercent)
@@ -183,26 +197,11 @@ void UBathWaterDetailWidget::ApplyBathSnapshot(const FBathWaterBathSnapshot* Sna
 		FString::Printf(TEXT("수온 상태: %s"), *DetailStatusText(Snapshot->ThermalStatus).ToString())));
 	if (CapacityStatusText) CapacityStatusText->SetText(FText::FromString(
 		FString::Printf(TEXT("용량: %s"), *CapacityDeficitText(*Snapshot).ToString())));
-	if (CirculationSlider && !FMath::IsNearlyEqual(CirculationSlider->GetValue(), Snapshot->CirculationPercent * 0.01f))
-	{
-		CirculationSlider->SetValue(Snapshot->CirculationPercent * 0.01f);
-#if WITH_DEV_AUTOMATION_TESTS
-		++SliderWriteCount;
-#endif
-	}
 	if (TargetTemperatureSlider)
 	{
 		const UBathWaterSettings* Settings = GetDefault<UBathWaterSettings>();
 		const float Range = FMath::Max(Settings->GetMaxTargetTemperatureC() - Settings->GetMinTargetTemperatureC(), 0.001f);
-		const float Value = (Snapshot->TargetTemperatureC - Settings->GetMinTargetTemperatureC()) / Range;
 		const float Step = Settings->GetTargetTemperatureStepC() / Range;
-		if (!FMath::IsNearlyEqual(TargetTemperatureSlider->GetValue(), Value))
-		{
-			TargetTemperatureSlider->SetValue(Value);
-#if WITH_DEV_AUTOMATION_TESTS
-			++SliderWriteCount;
-#endif
-		}
 		if (!FMath::IsNearlyEqual(TargetTemperatureSlider->GetStepSize(), Step))
 		{
 			TargetTemperatureSlider->SetStepSize(Step);
@@ -218,24 +217,71 @@ void UBathWaterDetailWidget::ApplyBathSnapshot(const FBathWaterBathSnapshot* Sna
 #endif
 }
 
+void UBathWaterDetailWidget::WriteSliderValueSilently(USlider* Slider, const float NormalizedValue)
+{
+	if (!Slider || FMath::IsNearlyEqual(Slider->GetValue(), NormalizedValue))
+	{
+		return;
+	}
+	// USlider::SetValue re-broadcasts OnValueChanged; the guard keeps this write from becoming a new request.
+	TGuardValue<bool> Guard(bWritingSliderValue, true);
+	Slider->SetValue(NormalizedValue);
+#if WITH_DEV_AUTOMATION_TESTS
+	++SliderWriteCount;
+#endif
+}
+
+void UBathWaterDetailWidget::SyncSlidersToSnapshot(const FBathWaterBathSnapshot& Snapshot)
+{
+	WriteSliderValueSilently(CirculationSlider, NormalizeCirculation(Snapshot.CirculationPercent));
+	WriteSliderValueSilently(TargetTemperatureSlider, NormalizeTargetTemperature(Snapshot.TargetTemperatureC));
+}
+
+void UBathWaterDetailWidget::ResyncSliderAfterRequest(const bool bCirculation, const FBathWaterSettingRequestResult& Result)
+{
+	USlider* Slider = bCirculation ? CirculationSlider.Get() : TargetTemperatureSlider.Get();
+	const auto Normalize = [bCirculation](const float Value)
+	{
+		return bCirculation ? NormalizeCirculation(Value) : NormalizeTargetTemperature(Value);
+	};
+	if (Result.bSucceeded)
+	{
+		WriteSliderValueSilently(Slider, Normalize(Result.CommittedValue));
+		return;
+	}
+	FBathWaterBathSnapshot Current;
+	if (Operations.IsValid() && SelectedBath.IsValid() && Operations->GetBathSnapshot(SelectedBath.Get(), Current))
+	{
+		WriteSliderValueSilently(Slider, Normalize(bCirculation ? Current.CirculationPercent : Current.TargetTemperatureC));
+	}
+	else if (bHasCachedSnapshot && CachedSnapshot.BathActor == SelectedBath)
+	{
+		WriteSliderValueSilently(Slider, Normalize(bCirculation ? CachedSnapshot.CirculationPercent : CachedSnapshot.TargetTemperatureC));
+	}
+}
+
 void UBathWaterDetailWidget::HandleCirculationChanged(const float Value)
 {
-	if (!bApplyingSnapshot && Operations.IsValid() && SelectedBath.IsValid())
+	if (!bApplyingSnapshot && !bWritingSliderValue && Operations.IsValid() && SelectedBath.IsValid())
 	{
-		ApplyRequestFeedback(Operations->RequestCirculationPercent(SelectedBath.Get(), Value * 100.0f));
+		const FBathWaterSettingRequestResult Result = Operations->RequestCirculationPercent(SelectedBath.Get(), Value * 100.0f);
+		ApplyRequestFeedback(Result);
+		ResyncSliderAfterRequest(true, Result);
 	}
 }
 
 void UBathWaterDetailWidget::HandleTargetTemperatureChanged(const float Value)
 {
-	if (!bApplyingSnapshot && Operations.IsValid() && SelectedBath.IsValid())
+	if (!bApplyingSnapshot && !bWritingSliderValue && Operations.IsValid() && SelectedBath.IsValid())
 	{
 		const UBathWaterSettings* Settings = GetDefault<UBathWaterSettings>();
 		const float Requested = FMath::Lerp(
 			Settings->GetMinTargetTemperatureC(),
 			Settings->GetMaxTargetTemperatureC(),
 			FMath::Clamp(Value, 0.0f, 1.0f));
-		ApplyRequestFeedback(Operations->RequestTargetTemperature(SelectedBath.Get(), Requested));
+		const FBathWaterSettingRequestResult Result = Operations->RequestTargetTemperature(SelectedBath.Get(), Requested);
+		ApplyRequestFeedback(Result);
+		ResyncSliderAfterRequest(false, Result);
 	}
 }
 
