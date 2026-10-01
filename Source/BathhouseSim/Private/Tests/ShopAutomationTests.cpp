@@ -690,7 +690,8 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	TArray<UFacilityPlacementDefinition*> Definitions = { Definition };
 	TArray<FTransform> SpawnTransforms;
 	FRandomStream RandomStream(1001);
-	const FShopUnboxingTuning FloorStageTuning = ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f);
+	const FShopUnboxingTuning FloorStageTuning = ShopUnboxTest::MakeFloorStageTuning(
+		ShopUnboxTest::MakeTuning().ForwardDistanceCm, ShopUnboxTest::MakeTuning().OverlapDepthCm);
 	{
 		// Open floor with the default view stage: the cluster is placed in front of the camera.
 		TArray<FTransform> ViewTransforms;
@@ -711,7 +712,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 		*BoxForQuery,
 		ShopUnboxTest::MakeShapes(Definitions),
 		ShopUnboxTest::MakeRequest(*Player),
-		ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f),
+		FloorStageTuning,
 		RandomStream,
 		SpawnTransforms,
 		FailureReason));
@@ -749,7 +750,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 				TestTrue(TEXT("Spawned actor preserves the definition item scale"),
 					SpawnedOpenFloorItem->GetActorScale3D().Equals(SpawnTransforms[0].GetScale3D(), 1.0e-3f));
 				TestTrue(TEXT("Spawned actor collision bottom stays 20 cm above the feet"),
-					FMath::IsNearlyEqual(ActualCollisionBottom, FootLocation.Z + 20.0f, 0.5f));
+					FMath::IsNearlyEqual(ActualCollisionBottom, FootLocation.Z + FloorStageTuning.ForwardFloorClearanceCm, 0.5f));
 			}
 			SpawnedOpenFloorItem->Destroy();
 		}
@@ -796,7 +797,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 			ItemCollisionTemplate,
 			FailureReason));
 	const FVector ItemHalfExtent = ItemCollisionShape.GetExtent().GetAbs();
-	const FVector WallCenter(PlayerCenter.X + 50.0f, PlayerCenter.Y, PlayerCenter.Z);
+	const FVector WallCenter(PlayerCenter.X + 0.5f * FloorStageTuning.ForwardDistanceCm, PlayerCenter.Y, PlayerCenter.Z);
 	UBoxComponent* Wall = SpawnBlockingBox(TEXT("ShopUnboxWall"), WallCenter, FVector(10.0f, 200.0f, 150.0f));
 	TestNotNull(TEXT("Fifty-centimetre wall blocker is created"), Wall);
 	RandomStream.Initialize(1002);
@@ -808,7 +809,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 		*BoxForQuery,
 		ShopUnboxTest::MakeShapes(Definitions),
 		ShopUnboxTest::MakeRequest(*Player),
-		ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f),
+		FloorStageTuning,
 		RandomStream,
 		SpawnTransforms,
 		FailureReason));
@@ -822,11 +823,11 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 		WallClearanceParams.AddIgnoredActor(Player);
 		WallClearanceParams.AddIgnoredActor(BoxForQuery);
 		const FVector WallCandidateHalfExtent = ItemCollisionShape.GetExtent().GetAbs();
-		const FVector WallClearanceCenter = ItemCollisionLocation + FVector(0.0f, 0.0f, 4.0f);
+		const FVector WallClearanceCenter = ItemCollisionLocation + FVector(0.0f, 0.0f, FloorStageTuning.OverlapDepthCm * 0.5f);
 		const FVector WallClearanceExtent(
-			WallCandidateHalfExtent.X + 8.0f,
-			WallCandidateHalfExtent.Y + 8.0f,
-			WallCandidateHalfExtent.Z + 4.0f);
+			WallCandidateHalfExtent.X + FloorStageTuning.OverlapDepthCm,
+			WallCandidateHalfExtent.Y + FloorStageTuning.OverlapDepthCm,
+			WallCandidateHalfExtent.Z + FloorStageTuning.OverlapDepthCm * 0.5f);
 		TestFalse(TEXT("Wall candidate clears blocking geometry with horizontal and upper 8 cm clearance"),
 			FacilityPlacementCollision::HasBlockingOverlap(
 				*World,
@@ -841,7 +842,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 	const FVector BlockedRowCenter(
 		FootLocation.X,
 		FootLocation.Y,
-		FootLocation.Z + ItemHalfExtent.Z + 20.0f);
+		FootLocation.Z + ItemHalfExtent.Z + FloorStageTuning.ForwardFloorClearanceCm);
 	UBoxComponent* FloorBlocker = SpawnBlockingBox(
 		TEXT("ShopUnboxFloorBlocker"),
 		BlockedRowCenter,
@@ -856,7 +857,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 		*BoxForQuery,
 		ShopUnboxTest::MakeShapes(Definitions),
 		ShopUnboxTest::MakeRequest(*Player),
-		ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f),
+		FloorStageTuning,
 		RandomStream,
 		SpawnTransforms,
 		FailureReason));
@@ -873,10 +874,10 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 
 	if (FloorBlocker && FloorBlocker->GetOwner()) FloorBlocker->GetOwner()->Destroy();
 	const float CageHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
-	const float FrontCageOffset = ItemHalfExtent.X + 4.0f;
-	const float SideCageOffset = ItemHalfExtent.Y + 4.0f;
-	const FVector FrontCageHalfExtent(5.0f, ItemHalfExtent.Y + 20.0f, CageHalfHeight);
-	const FVector SideCageHalfExtent(100.0f + ItemHalfExtent.X + 20.0f, 5.0f, CageHalfHeight);
+	const float FrontCageOffset = ItemHalfExtent.X + FloorStageTuning.OverlapDepthCm * 0.5f;
+	const float SideCageOffset = ItemHalfExtent.Y + FloorStageTuning.OverlapDepthCm * 0.5f;
+	const FVector FrontCageHalfExtent(5.0f, ItemHalfExtent.Y + FloorStageTuning.OverlapDepthCm, CageHalfHeight);
+	const FVector SideCageHalfExtent(FloorStageTuning.ForwardDistanceCm + ItemHalfExtent.X + FloorStageTuning.OverlapDepthCm, 5.0f, CageHalfHeight);
 	UBoxComponent* FrontCage = SpawnBlockingBox(TEXT("ShopUnboxFrontCage"),
 		PlayerCenter + FVector(FrontCageOffset, 0.0f, 0.0f), FrontCageHalfExtent);
 	UBoxComponent* BackCage = SpawnBlockingBox(TEXT("ShopUnboxBackCage"),
@@ -898,7 +899,7 @@ bool FShopFreshInstallTrashAndUnboxingAutomationTest::RunTest(const FString& Par
 		*BoxForQuery,
 		ShopUnboxTest::MakeShapes(Definitions),
 		ShopUnboxTest::MakeRequest(*Player),
-		ShopUnboxTest::MakeFloorStageTuning(100.0f, 8.0f),
+		FloorStageTuning,
 		RandomStream,
 		SpawnTransforms,
 		FailureReason));

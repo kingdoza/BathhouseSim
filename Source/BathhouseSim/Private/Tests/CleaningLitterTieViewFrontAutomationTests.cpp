@@ -10,7 +10,7 @@ using namespace CleaningLitterTest;
 // ALitterTongsActor::BuildTieDropRequest fills (the runtime's single read point) or from the bag class shape.
 namespace
 {
-constexpr double Tol = 0.2;
+constexpr double TieViewFrontTol = 0.2;
 
 struct FTieFixture
 {
@@ -108,7 +108,7 @@ bool FCleaningLitterTieViewFrontTest::RunTest(const FString&)
 	{
 		const FVector Expected = Camera + FVector::ForwardVector * (Request.ViewDistanceCm + Half.X);
 		TestTrue(TEXT("USV-017: bag center = camera + view * (distance + half depth)"),
-			(Center - Expected).Size() <= Tol);
+			(Center - Expected).Size() <= TieViewFrontTol);
 		TestTrue(TEXT("USV-017: bag yaw is the player yaw"),
 			FMath::Abs(FMath::FindDeltaAngleDegrees(Transform.Rotator().Yaw, Fixture.Player.Pawn->GetActorRotation().Yaw)) <= 0.5f);
 	}
@@ -158,7 +158,7 @@ bool FCleaningLitterTieViewFrontTest::RunTest(const FString&)
 		const FVector Expected = Feet + FVector::ForwardVector * Level.FloorForwardDistanceCm
 			+ FVector::UpVector * (Shape.GetExtent().Z + Level.FloorClearanceCm);
 		TestTrue(TEXT("Floor-front center = feet + forward * distance + (half height + clearance)"),
-			(Center - Expected).Size() <= Tol);
+			(Center - Expected).Size() <= TieViewFrontTol);
 	}
 
 	// USV-019: a full-height wall inside the minimum distance fails, execution keeps the count.
@@ -235,7 +235,7 @@ bool FCleaningLitterTieTuningSourceTest::RunTest(const FString&)
 	{
 		TestTrue(TEXT("View-front follows the changed distance"),
 			Stage == ETrashBagDropStage::ViewFront
-			&& FMath::Abs(Center.X - (Fixture.Camera().X + Request.ViewDistanceCm + Shape.GetExtent().X)) <= Tol);
+			&& FMath::Abs(Center.X - (Fixture.Camera().X + Request.ViewDistanceCm + Shape.GetExtent().X)) <= TieViewFrontTol);
 	}
 	Fixture.AddViewStageBlocker(Request);
 	TestTrue(TEXT("Changed floor values place"), Fixture.Find(Request, Transform, Stage));
@@ -243,8 +243,8 @@ bool FCleaningLitterTieTuningSourceTest::RunTest(const FString&)
 	{
 		TestTrue(TEXT("Floor-front follows the changed distance and clearance"),
 			Stage == ETrashBagDropStage::FloorFront
-			&& FMath::Abs(Center.X - Request.FloorForwardDistanceCm) <= Tol
-			&& FMath::Abs(Center.Z - (Shape.GetExtent().Z + Request.FloorClearanceCm)) <= Tol);
+			&& FMath::Abs(Center.X - Request.FloorForwardDistanceCm) <= TieViewFrontTol
+			&& FMath::Abs(Center.Z - (Shape.GetExtent().Z + Request.FloorClearanceCm)) <= TieViewFrontTol);
 	}
 
 	// Invalid stage values skip only that stage.

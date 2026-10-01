@@ -14,7 +14,7 @@
 
 | 시나리오 | 구현 | 테스트(`BathhouseSim.` 이하) |
 |---|---|---|
-| USV-001, 002, 015 | `ShopUnboxingPlacement.cpp` 1단계 ViewFront, `PlayerViewFrontPlacement::ComputeViewFrontTranslation` | `Shop.UnboxViewFront.OpenAndRepresentative`(샤워기 1개·대표 4개·혼합 5개·최대 수량, seed 1~20), `Interaction.ViewFrontPlacement.Geometry` |
+| USV-001, 002, 015 | `ShopUnboxingPlacement.cpp` 1단계 ViewFront, `PlayerViewFrontPlacement::ComputeViewFrontTranslation` | `Shop.UnboxViewFront.OpenAndRepresentative`(샤워기 1개·대표 4개·설비 3개+품목 박스 3개 혼합·최대 수량, seed 1~20. 앞 세 case는 seed 전부 ViewFront이고 V 투영 최솟값 = `UnboxViewDistanceCm`), `Interaction.ViewFrontPlacement.Geometry` |
 | USV-003~006 | 같은 경로, pitch −45·−80·+45 | `Shop.UnboxViewFront.PitchAndFloor` |
 | USV-007~010 | 시선 당김(`BuildPullDistances`), 2단계 FloorFront, 3단계 Overhead, 4단계 FinalStack | `Shop.UnboxViewFront.BlockedStages`(낮은 천장·벽 당김·가까운 벽·cage) |
 | USV-011, 014 | `IsCandidateSafe`의 손님(`ECC_Pawn`) 검사 재사용, seed | `Shop.UnboxViewFront.GuestAndSeed` |
@@ -70,7 +70,7 @@
 - 빌드: UE 5.8 `BathhouseSimEditor Win64 Development`, `Result: Succeeded`. 경고 0(UBT 출력의 `warning` 없음). 최종 빌드 로그 `Saved/Logs/usv_build_final.log`(증분이라 컴파일 출력은 없음). 중간 빌드 로그는 Automation 실행이 `Saved/Automation/Logs`를 정리해 남지 않았다. 컴파일 오류 수정 3회 뒤 성공했고 오류 로그는 폐기됐다.
 - 빌드 시점 Source 식별값: HEAD `bd957496aa0c718a882b8eb9e0c2730c9b5e2769`, `git diff HEAD -- Source Config` + 신규 untracked 7개 파일(`### 경로` 구분, 경로 오름차순) 내용 연결본의 SHA-256 `5D815EEA8386DEDD9A07599A728B80FE3342C3934135F750CA0B8CE098AE44A7`(`git diff HEAD -- Source Config`만의 SHA-256은 `558FFDB6E9DCB3B063FCD159445109725D7A03E51AF51F45F9DEFCF2DB3FA529`). 최종 빌드는 이 상태에서 수행했다. 마지막 Automation 이후 Source 수정 없음.
 - Automation(`UnrealEditor-Cmd`, `-DDC-ForceMemoryCache`, 한 번에 `+`로 이은 필터): `BathhouseSim.Interaction.ViewFrontPlacement`, `BathhouseSim.Shop`, `BathhouseSim.Cleaning`, `BathhouseSim.Service.Shop`, `BathhouseSim.Service.Amenity.Shop`, `BathhouseSim.Interaction.Equipment` 총 46개 전부 통과. 로그: `Saved/Automation/Logs/usv_auto3_editor.log`(Editor 로그 사본, 현재 남아 있음). 이전 두 회차에서는 새 시나리오 테스트의 fixture 오류(벽 거리·회전 미반영·천장 높이)를 고쳤다. 제품 코드의 검사를 완화한 수정은 없다.
-- 관찰 지표: `OpenAndRepresentative`에서 샤워기 1개·대표 4개·혼합 5개·최대 수량 모두 ViewFront 20/20, `CameraClearance`는 push 경로 19/20 seed.
+- 관찰 지표: `OpenAndRepresentative`에서 샤워기 1개·대표 4개·설비+품목 박스 혼합·최대 수량 모두 ViewFront 20/20(앞 세 case는 최솟값 = 시선 거리 설정 단언 통과), `CameraClearance`는 push 경로 19/20 seed.
 - 정적 검사: `git diff --check`는 공백 오류 없음(LF/CRLF 변환 경고만). 4절 값 리터럴 점검: `ShopUnboxingPlacement.cpp`·`ShopUnboxingCluster.cpp`·`TrashBagDropPlacement.cpp`·`PlayerViewFrontPlacement.cpp`에 남은 수는 0 판정·`0.5`(중앙·여유 shape 기하)·`360`(yaw 정의역)·`AxisEpsilon`·`PairLimit + 0.01f`(기존 쌍 깊이 비교의 수치 안정 허용 오차)뿐이다. 마지막 항목은 설계 4.4에 명시되지 않은 기존 리터럴이라 리뷰어 판단을 요청한다(동작 조정 값이 아니라 float 비교 오차).
 - Content·Config 변경 없음: `git status --short -- Content Config` 출력 없음.
 
@@ -82,3 +82,19 @@
 - 개봉 `OverlapDepthCm` getter fallback·범위는 기존 동작과 같다(`MaxUnboxOverlapDepthCm` 상수화).
 - 미검증: 실제 Editor·PIE의 카메라 입력(`UPlayerEquipmentUseComponent::BuildContext`)과 Project Settings UI 표시. `Interaction.Equipment`·`Service.*Shop` 회귀 테스트가 실제 컴포넌트 경로의 개봉 성공을 통과했다.
 - Architecture 정본(`ShopSystem.md`, `CleaningLitterSystem.md`, `InteractionSystem.md`, `0_ARCHITECTURE.md`)은 아키텍처 단계에서 이미 현재 구조로 반영돼 있어 구현 중 갱신하지 않았다. 구현이 추가한 `UShopSettings::MaxUnboxOverlapDepthCm`·`UnboxMinStepCm` 같은 보조 상수와 `FShopUnboxClusterTuning` 위치는 정본의 책임 기술과 충돌하지 않는다.
+
+## 8. 코드 리뷰 1회차 재작업(R1~R4) 처리
+
+제품 Source 변경 없음(테스트만). 구현 커밋 `515c7d2` 대비 변경은 `Tests/` 5개 파일이다.
+
+- R1: `CleaningLitterToolAutomationTests.cpp` BagScaleAndFrontDrop의 높이·당김·offset mesh 중심 기대값과 벽 fixture를 `TieFloorOnlyRequest` 값과 봉투 class shape에서 계산(첫 후보만 막는 벽 = 첫 후보 먼 면 안쪽 반 당김 간격). `ShopAutomationTests.cpp`의 바닥 여유 `+20`, 벽 여유 8/4, cage·바닥 막힘 fixture, 벽 위치, tuning 입력을 `FloorStageTuning`(설정 원본에서 만든 값) 멤버로 교체.
+- R2: `ShopUnboxViewFrontAutomationTests.cpp` fixture가 shape 목록(`Shapes`)을 쓰도록 확장(`AddItemBoxShapes`, `ResolveBoxes`는 shape의 `BuildCollisionQuery`). 혼합 case는 설비 3개+품목 박스 3개로 실제 박스 shape를 섞었다. USV-015 행과 관찰 지표를 위 내용으로 정정했다. 대표 4개·혼합·샤워기 1개는 ViewFront 20/20과 최솟값 = 시선 거리 단언을 통과했다(당김 발생 seed 없음, QNA 불필요).
+- R3: RoomPhysics 방 크기를 시선 거리 설정 기준(반폭 ×3, 천장 ×4)으로 줄이고, 180 tick 뒤 물품 충돌 box가 벽 안·바닥 위·천장 아래이며 최저 밑면이 바닥에 안착했음을 단언. 채택 단계는 AddInfo(이번 실행 ViewFront).
+- R4: `CameraClearanceCm * 0.0f` 항 제거. `PairLimit + 0.01f`는 리뷰 판단대로 유지. 추가로 신규 테스트 파일의 익명 namespace 상수 `Tolerance`·`Tol`을 파일 고유 이름으로 바꿨다(커밋 뒤 adaptive unity에 포함돼 엔진 헤더 지역 이름과 충돌, C4459).
+
+재검증
+
+- 빌드 `BathhouseSimEditor Win64 Development` 성공, `warning C` 0건. 로그 `Saved/Logs/usv_r1_build.log`.
+- Automation 같은 6개 필터 46개 전부 Success. Editor 로그 `Saved/Logs/usv_r1_auto_editor.log`.
+- 빌드 시점 Source 식별값(재현 방식): 구현 커밋 `515c7d2` 기준, 작업 트리(HEAD `59b292b` + 미커밋 테스트 수정)에서 `git diff 515c7d2 -- Source Config | sha256sum` = `ba33521ac3056ceb56dd9940a5a49e3294be5877d9994218c619be5dda0097be`(구현 시점 4절 식별값은 이 재작업으로 대체). 제품 Source는 `515c7d2`와 동일하다.
+- `git status --short -- Content Config` 출력 없음.

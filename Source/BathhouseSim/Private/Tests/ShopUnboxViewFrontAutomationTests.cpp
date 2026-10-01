@@ -13,6 +13,7 @@
 #include "Placement/FacilityPlacementCollisionUtils.h"
 #include "Placement/FacilityPlacementDefinition.h"
 #include "Placement/PlaceableFacilityItemActor.h"
+#include "Service/ItemBoxActor.h"
 #include "Shop/ShopDeliveryBoxActor.h"
 #include "Shop/ShopSettings.h"
 #include "Shop/ShopUnboxingCluster.h"
@@ -76,6 +77,7 @@ struct FViewFrontFixture
 	ACharacter* Player = nullptr;
 	AShopDeliveryBoxActor* Box = nullptr;
 	TArray<UFacilityPlacementDefinition*> Definitions;
+	TArray<FShopUnboxItemShape> Shapes; // facility shapes followed by optional item box shapes
 
 	bool Initialize(FAutomationTestBase& Test, const TCHAR* Name, const bool bSimulatePhysics = false,
 		const bool bAddFloor = true, const FVector& PlayerLocation = FVector(0.0f, 0.0f, 1000.0f))
@@ -194,6 +196,28 @@ struct FViewFrontFixture
 			}
 			Definitions.Add(Definition);
 		}
+		Shapes = ShopUnboxTest::MakeShapes(Definitions);
+		return true;
+	}
+
+	/** Appends item box shapes (the configured item box class, falling back to the native class). */
+	bool AddItemBoxShapes(FAutomationTestBase& Test, const int32 Count)
+	{
+		TSubclassOf<AItemBoxActor> BoxClass = GetDefault<UShopSettings>()->LoadItemBoxClass();
+		if (!BoxClass)
+		{
+			BoxClass = AItemBoxActor::StaticClass();
+		}
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			FShopUnboxItemShape Shape;
+			FText Failure;
+			if (!Test.TestTrue(TEXT("Item box shape resolves"), FShopUnboxItemShape::FromItemBoxClass(BoxClass, Shape, Failure)))
+			{
+				return false;
+			}
+			Shapes.Add(Shape);
+		}
 		return true;
 	}
 
@@ -202,13 +226,13 @@ struct FViewFrontFixture
 	{
 		FRandomStream Stream(Seed);
 		return FShopUnboxingPlacement::FindSpawnTransforms(*World, *Player, *Player->GetCapsuleComponent(), *Box,
-			ShopUnboxTest::MakeShapes(Definitions), Request, Tuning, Stream, OutTransforms, OutFailure, &OutStage);
+			Shapes, Request, Tuning, Stream, OutTransforms, OutFailure, &OutStage);
 	}
 
 	bool ResolveBoxes(const TArray<FTransform>& Transforms, TArray<FResultBox>& OutBoxes) const
 	{
 		OutBoxes.Reset();
-		if (Transforms.Num() != Definitions.Num())
+		if (Transforms.Num() != Shapes.Num())
 		{
 			return false;
 		}
@@ -218,8 +242,8 @@ struct FViewFrontFixture
 			FCollisionShape Shape;
 			const UPrimitiveComponent* Template = nullptr;
 			FText Failure;
-			if (!APlaceableFacilityItemActor::BuildDefinitionCollisionQuery(
-				*Definitions[Index], Transforms[Index], Result.Center, Result.Rotation, Shape, Template, Failure))
+			if (!Shapes[Index].BuildCollisionQuery
+				|| !Shapes[Index].BuildCollisionQuery(Transforms[Index], Result.Center, Result.Rotation, Shape, Template, Failure))
 			{
 				return false;
 			}
@@ -348,9 +372,9 @@ bool FShopUnboxViewFrontOpenAutomationTest::RunTest(const FString& Parameters)
 		Tuning.ViewDistanceCm, Tuning.ViewMinDistanceCm, Tuning.ViewPullStepCm, Distances);
 
 	const auto RunCase = [&](const TCHAR* Label, const TArray<int32>& Indices, const bool bRequireViewFront,
-		const bool bExpectExactDistance)
+		const bool bExpectExactDistance, const int32 ItemBoxCount = 0)
 	{
-		if (!Fixture.Load(*this, Indices))
+		if (!Fixture.Load(*this, Indices) || !Fixture.AddItemBoxShapes(*this, ItemBoxCount))
 		{
 			return;
 		}
@@ -395,7 +419,7 @@ bool FShopUnboxViewFrontOpenAutomationTest::RunTest(const FString& Parameters)
 	};
 
 	RunCase(TEXT("one shower"), { ShowerIndex }, true, true);
-	RunCase(TEXT("four representative items"), { 0, 1, 2, 3 }, true, false);
+	RunCase(TEXT("four representative items"), { 0, 1, 2, 3 }, true, true);
 
 	// Center of a lone item lines up with the camera on the screen vertical.
 	if (Fixture.Load(*this, { ShowerIndex }))
@@ -416,15 +440,8 @@ bool FShopUnboxViewFrontOpenAutomationTest::RunTest(const FString& Parameters)
 		}
 	}
 
-	// Mixed facilities and item boxes when the item box class is configured.
-	{
-		const UShopSettings* Settings = GetDefault<UShopSettings>();
-		TArray<int32> Mixed = RepeatIndices(5);
-		Fixture.Load(*this, Mixed);
-		AddInfo(FString::Printf(TEXT("UnboxViewFront mixed: item box class %s"),
-			Settings->ItemBoxClass.IsNull() ? TEXT("not configured (facility-only mix)") : TEXT("configured")));
-		RunCase(TEXT("mixed facilities"), Mixed, false, false);
-	}
+	// USV-015: facilities mixed with item boxes (the only non-cuboid shape), every seed in front of the camera.
+	RunCase(TEXT("mixed facilities and item boxes"), { 0, 1, 2 }, true, true, 3);
 
 	// Maximum quantity of facilities: regardless of stage the camera is never wrapped.
 	const int32 MaxQuantity = GetDefault<UShopSettings>()->GetCartTotalQuantityLimit();
@@ -772,7 +789,7 @@ bool FShopUnboxViewFrontCameraClearanceAutomationTest::RunTest(const FString& Pa
 					bBelowCamera || bSeparated);
 				TestTrue(TEXT("Floor-front lowest surface keeps the configured height"),
 					FMath::Abs(GetMinZ(Boxes) - (Fixture.GetFoot().Z + Tuning.ForwardFloorClearanceCm))
-						<= DistanceTolerance + Tuning.CameraClearanceCm * 0.0f);
+						<= DistanceTolerance);
 				if (!bBelowCamera && FMath::Abs(MinForward - Tuning.CameraClearanceCm) <= DistanceTolerance)
 				{
 					++PushedCount;
@@ -1121,8 +1138,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FShopUnboxViewFrontRoomPhysicsAutomationTest::RunTest(const FString& Parameters)
 {
 	(void)Parameters;
-	constexpr float InnerHalfWidth = 6000.0f;
-	constexpr float InnerCeiling = 4000.0f;
+	// The room is sized from the view distance setting so the cluster lands near walls and ceiling.
+	const FShopUnboxingTuning Tuning = ShopUnboxTest::MakeTuning();
+	const float InnerHalfWidth = Tuning.ViewDistanceCm * 3.0f;
+	const float InnerCeiling = Tuning.ViewDistanceCm * 4.0f;
 	FViewFrontFixture Fixture;
 	if (!Fixture.Initialize(*this, TEXT("UnboxViewFrontRoomWorld"), true, true, FVector(0.0f, 0.0f, 120.0f)))
 	{
@@ -1139,13 +1158,13 @@ bool FShopUnboxViewFrontRoomPhysicsAutomationTest::RunTest(const FString& Parame
 	{
 		return false;
 	}
-	const FShopUnboxingTuning Tuning = ShopUnboxTest::MakeTuning();
 	const FShopUnboxingPlacementRequest Request = MakeRequestAt(Fixture, 60.0f);
 	TArray<FTransform> Transforms;
 	EShopUnboxPlacementStage Stage = EShopUnboxPlacementStage::None;
 	FText Failure;
 	TestTrue(TEXT("Room placement succeeds"), Fixture.Find(Request, Tuning, 20260928, Transforms, Stage, Failure));
 	TestEqual(TEXT("One transform per item"), Transforms.Num(), MaxQuantity);
+	AddInfo(FString::Printf(TEXT("UnboxViewFront RoomPhysics adopted stage %s"), StageName(Stage)));
 	TArray<APlaceableFacilityItemActor*> Items;
 	for (int32 Index = 0; Index < FMath::Min(Transforms.Num(), Fixture.Definitions.Num()); ++Index)
 	{
@@ -1160,19 +1179,32 @@ bool FShopUnboxViewFrontRoomPhysicsAutomationTest::RunTest(const FString& Parame
 			AddError(FString::Printf(TEXT("Item %d could not be activated: %s"), Index, *Failure.ToString()));
 		}
 	}
-	for (int32 Step = 0; Step < 120; ++Step)
+	for (int32 Step = 0; Step < 180; ++Step)
 	{
 		++GFrameCounter;
 		Fixture.World->Tick(LEVELTICK_All, 1.0f / 60.0f);
 	}
-	for (const APlaceableFacilityItemActor* Item : Items)
+	float LowestBottom = TNumericLimits<float>::Max();
+	for (int32 Index = 0; Index < Items.Num(); ++Index)
 	{
-		const FVector Location = Item->GetActorLocation();
+		FVector Center;
+		FQuat Rotation;
+		FCollisionShape Shape;
+		const UPrimitiveComponent* Template = nullptr;
+		if (!Fixture.Shapes[Index].BuildCollisionQuery(
+			Items[Index]->GetActorTransform(), Center, Rotation, Shape, Template, Failure))
+		{
+			AddError(TEXT("Settled item collision query failed."));
+			continue;
+		}
+		const FVector Extent = Shape.GetExtent().GetAbs();
 		TestTrue(TEXT("Item stays inside the room walls"),
-			FMath::Abs(Location.X) < InnerHalfWidth && FMath::Abs(Location.Y) < InnerHalfWidth);
-		TestTrue(TEXT("Item is above the floor and below the ceiling"),
-			Location.Z > Foot.Z - 1.0f && Location.Z < Foot.Z + InnerCeiling);
+			FMath::Abs(Center.X) + Extent.X < InnerHalfWidth + 1.0f && FMath::Abs(Center.Y) + Extent.Y < InnerHalfWidth + 1.0f);
+		TestTrue(TEXT("Item rests above the floor"), Center.Z - Extent.Z > Foot.Z - 1.0f);
+		TestTrue(TEXT("Item stays below the ceiling"), Center.Z + Extent.Z < Foot.Z + InnerCeiling + 1.0f);
+		LowestBottom = FMath::Min(LowestBottom, Center.Z - Extent.Z);
 	}
+	TestTrue(TEXT("The lowest item bottom has settled on the floor"), FMath::Abs(LowestBottom - Foot.Z) <= 2.0f);
 	return true;
 }
 

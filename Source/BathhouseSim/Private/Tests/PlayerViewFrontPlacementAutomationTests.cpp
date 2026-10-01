@@ -42,7 +42,7 @@ void GetBruteForceRange(const TArray<FVector>& Corners, const FVector& Origin, c
 	}
 }
 
-constexpr double Tolerance = 0.01;
+constexpr double ViewFrontGeometryTolerance = 0.01;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -72,13 +72,13 @@ bool FViewFrontPlacementGeometryAutomationTest::RunTest(const FString& Parameter
 		double Max = 0.0;
 		GetBruteForceRange(Corners, Camera, Direction, Min, Max);
 		TestTrue(FString::Printf(TEXT("%s: nearest view projection equals the requested distance"), Label),
-			FMath::Abs(Min - DistanceCm) <= Tolerance);
+			FMath::Abs(Min - DistanceCm) <= ViewFrontGeometryTolerance);
 		GetBruteForceRange(Corners, Camera, ViewMatrix.GetUnitAxis(EAxis::Y), Min, Max);
 		TestTrue(FString::Printf(TEXT("%s: right range is centered on the camera"), Label),
-			FMath::Abs(Min + Max) <= Tolerance);
+			FMath::Abs(Min + Max) <= ViewFrontGeometryTolerance);
 		GetBruteForceRange(Corners, Camera, ViewMatrix.GetUnitAxis(EAxis::Z), Min, Max);
 		TestTrue(FString::Printf(TEXT("%s: up range is centered on the camera"), Label),
-			FMath::Abs(Min + Max) <= Tolerance);
+			FMath::Abs(Min + Max) <= ViewFrontGeometryTolerance);
 		double RangeMin = 0.0;
 		double RangeMax = 0.0;
 		TArray<FViewFrontBox> Moved = Boxes;
@@ -89,7 +89,7 @@ bool FViewFrontPlacementGeometryAutomationTest::RunTest(const FString& Parameter
 		PlayerViewFrontPlacement::GetProjectionRange(Moved, Camera, Direction, RangeMin, RangeMax);
 		GetBruteForceRange(Corners, Camera, Direction, Min, Max);
 		TestTrue(FString::Printf(TEXT("%s: GetProjectionRange matches the brute-force corner range"), Label),
-			FMath::Abs(RangeMin - Min) <= Tolerance && FMath::Abs(RangeMax - Max) <= Tolerance);
+			FMath::Abs(RangeMin - Min) <= ViewFrontGeometryTolerance && FMath::Abs(RangeMax - Max) <= ViewFrontGeometryTolerance);
 	};
 
 	for (const float Yaw : { 0.0f, 45.0f })
@@ -164,7 +164,7 @@ bool FViewFrontPlacementGeometryAutomationTest::RunTest(const FString& Parameter
 		double Min = 0.0;
 		double Max = 0.0;
 		PlayerViewFrontPlacement::GetProjectionRange(MakeArrayView(&Pushed, 1), Camera, Forward, Min, Max);
-		TestTrue(TEXT("Pushed forward projection minimum equals the clearance"), FMath::Abs(Min - ClearanceCm) <= Tolerance);
+		TestTrue(TEXT("Pushed forward projection minimum equals the clearance"), FMath::Abs(Min - ClearanceCm) <= ViewFrontGeometryTolerance);
 
 		// Already in front: no push.
 		FViewFrontBox Ahead = Tall;
