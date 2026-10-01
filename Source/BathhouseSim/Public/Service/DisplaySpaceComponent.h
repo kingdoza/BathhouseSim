@@ -59,6 +59,8 @@ public:
 	}
 
 	FVector GetSlotsWorldCenter() const;
+	/** World positions of the visible display items (in-use included, empty slots excluded), same as the stock visual. */
+	void GetVisibleItemWorldLocations(TArray<FVector>& OutLocations) const;
 	FPlayerInteractionQuery BuildHeldUseQuery(const FPlayerInteractionContext& Context) const;
 	FPlayerInteractionResult ExecuteRoutedHeldTargetUse(const FPlayerInteractionContext& Context,
 														EPlayerHeldTargetUseDirection Direction);

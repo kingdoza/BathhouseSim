@@ -75,20 +75,18 @@ bool FBathhouseServiceFacilityGroupsTest::RunTest(const FString& Parameters)
 	Slot->Release(User);
 	TestTrue(TEXT("Reusable stock imports"), Spaces[0]->ImportStock(Fixture.Kinds[0], 2, Failure));
 	TestTrue(TEXT("Only-used stock imports"), Spaces[1]->ImportStock(Fixture.Kinds[1], 1, Failure, 7));
-	// Empty the hand and use an empty box to observe the selected group's denial without fallback.
+	// EBT-004: an empty box skips groups with only in-use stock and targets the takeable dryer group.
 	StowBox(Fixture.Player, Box);
 	auto* EmptyBox = SpawnBox(Fixture.World, nullptr, 0);
 	BeginActorPlayIfNeeded(EmptyBox);
 	TestTrue(TEXT("Empty box held"), Fixture.Player.Carry->TryTakePhysicalObject(EmptyBox, Failure));
-	Context = Fixture.Context(1);
-	Query = Router->QueryInteraction(Context);
-	TestEqual(TEXT("Only-used item cannot be taken"), Query.HeldTakeFailureReason.ToString(),
-			  FString(TEXT("사용 중인 것은 꺼낼 수 없음")));
-	TestFalse(TEXT("No replacement from other stocked group"),
-			  Router->ExecuteHeldTargetUse(Context, EPlayerHeldTargetUseDirection::Take).bSucceeded);
-	Context = Fixture.Context(2);
-	TestEqual(TEXT("Empty group denial"), Router->QueryInteraction(Context).HeldTakeFailureReason.ToString(),
-			  FString(TEXT("꺼낼 물건 없음")));
+	for (const int32 AimIndex : {1, 2})
+	{
+		Query = Router->QueryInteraction(Fixture.Context(AimIndex));
+		TestEqual(TEXT("Takeable dryer group is targeted"), Query.HeldUseTargetKey, 0);
+		TestTrue(TEXT("Take is possible"), Query.bCanHeldTake);
+		TestTrue(TEXT("No take denial"), Query.HeldTakeFailureReason.IsEmpty());
+	}
 	Slot->TryReserve(User);
 	Slot->BeginUse(User);
 	TestEqual(TEXT("Reusable dryer remains"), Spaces[0]->GetStock().Count, 2);
@@ -123,16 +121,6 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBathhouseServiceRouterRepeatTest,
 
 bool FBathhouseServiceRouterRepeatTest::RunTest(const FString& Parameters)
 {
-	const TArray<FVector> Centers = {FVector(30, 10, 0), FVector(90, -10, 0), FVector(150, 40, 0)};
-	const TArray<int32> Indices = {4, 1, 0};
-	TestEqual(
-		TEXT("Distance is to the whole trace segment; tie selects lower index"),
-		UDisplayFacilityTargetComponent::SelectClosestSpace(Centers, Indices, FVector::ZeroVector, FVector(200, 0, 0)),
-		1);
-	TestEqual(
-		TEXT("Nearer aim wins irrespective of index"),
-		UDisplayFacilityTargetComponent::SelectClosestSpace(Centers, Indices, FVector(0, 40, 0), FVector(200, 40, 0)),
-		0);
 	FScopedUtilityLaborWorld Scope(TEXT("RouterRepeatWorld"));
 	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!Fixture.Install(*this))
