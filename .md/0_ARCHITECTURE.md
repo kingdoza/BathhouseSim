@@ -242,4 +242,4 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - `COMPUTER-WHEEL-SCROLL`: 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합. 컴퓨터 Active 동안 휠을 virtual pointer로 화면에 주입해 커서 아래 스크롤 영역을 스크롤한다. Content 변경은 없다([ComputerSystem.md](Architecture/ComputerSystem.md) Screen Wheel Scroll, [CharacterSystem.md](Architecture/CharacterSystem.md)).
 - 빈 박스 빼기 대상 선택 통일(ServiceFacilityDisplaySystem, `EMPTY-BOX-TAKE-TARGET`): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.
 - 플레이어 앞 생성 위치 카메라 시선 기준(UNBOX-SPAWN-VIEW, Shop·CleaningLitter·Interaction): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.
-- 확장 구입·공간 건물(`EXPANSION-PURCHASE`): 2026-10-02 단위 `EXP-U1`(공간 건물) 설계([BuildingSystem.md](Architecture/BuildingSystem.md), Placement Space Zones, CleaningLitter 공간 생성 조각). Source 미반영, 사용자 승인 대기. 구현 입력은 `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md`다.
+- 확장 구입·공간 건물(`EXPANSION-PURCHASE`): 2026-10-02 단위 `EXP-U1`(공간 건물) 설계([BuildingSystem.md](Architecture/BuildingSystem.md), Placement Space Zones, CleaningLitter 공간 생성 조각). Source 미반영, 사용자 승인(2026-10-02). 구현 입력은 `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md`다.
