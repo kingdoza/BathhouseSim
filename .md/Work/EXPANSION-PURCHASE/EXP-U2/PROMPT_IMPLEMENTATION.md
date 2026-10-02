@@ -4,6 +4,7 @@
 - 단계: 아키텍처
 - 상태: 완료
 - 복귀 재설계(2026-10-02, Editor 작업 R1, RET-003): 넓힘 미리보기 글자의 위치·글꼴·지하 공간 표시. 18절. 6.4 해당 문장을 18절로 대체한다. 사용자 동작 변경 없음(글자 문구 `넓힘 미리보기 N회`·` · 겹침 있음` 유지)
+- 복귀 재설계 2(2026-10-02, Editor 재확인 `REPORT_UNREAL_EDITOR.md` 10.3 R3, RET-004): 글자 component의 hidden-in-game 제거와 그리기·갱신 조건. 18.5절. 18.2·18.4의 해당 항목을 18.5가 대체한다
 
 - 상위 계약: [../PROMPT_ARCHITECTURE.md](../PROMPT_ARCHITECTURE.md)(상태 완료). 이번 범위는 EXP-020~032, 대표 흐름은 EXP-023(홀 확장 구입) → EXP-028(늘어난 한도로 1칸 락커 설치)이다.
 - 선행 결과: `EXP-U1` 병합 `8ca6a24`. U1이 확정한 넓힘 목록·편집 미리보기 형태는 [../../../Architecture/BuildingSystem.md](../../../Architecture/BuildingSystem.md) Expansion 절이 정본이다. U1 Editor 데이터 관리 개요는 `git show 8ca6a24:.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md` 0절이다.
@@ -540,7 +541,7 @@ struct FBathhouseExpansionView
   - `bSouthOfCenter` = 다른 snapshot 중 `OuterRect`가 XY에서 양의 넓이로 겹치고 `FloorZ`가 더 높은 것이 있음(허용 오차 `UE_KINDA_SMALL_NUMBER`).
 - `ABathhouseSpaceActor::RebuildShell`(편집 world, 효과 횟수 > 0): 지금의 위치 계산(`CeilingZ + SlabThickness`)을 위 helper로 바꾼다. `FBathhouseShellVisualInputs`에 `PreviewLabelLocation`, `bPreviewLabelSouthOfCenter`, `PreviewLabelWorldSizeCm`, `PreviewLabelFontSize`를 채운다. 문구 생성(`BuildExpansionPreviewLabel`)은 그대로다.
 - `UBathhouseSpaceShellComponent`: `UTextRenderComponent` 생성 코드를 `UWidgetComponent` 생성으로 바꾼다.
-  - 기존 계약 유지: `RF_Transient`, `CreationMethod = UserConstructionScript`, `bIsEditorOnly = true`, Movable, `NoCollision`, `SetCanEverAffectNavigation(false)`, `SetHiddenInGame(true)`, shell에 attach, 같은 정리 경로(`PreviewLabelComponent`), `bPreviewChunks`(편집 world)일 때만.
+  - 기존 계약 유지: `RF_Transient`, `CreationMethod = UserConstructionScript`, `bIsEditorOnly = true`, Movable, `NoCollision`, `SetCanEverAffectNavigation(false)`, shell에 attach, 같은 정리 경로(`PreviewLabelComponent`), `bPreviewChunks`(편집 world)일 때만. (18.5로 정정: `SetHiddenInGame(true)`는 쓰지 않는다. 그리기 설정은 18.5.)
   - 위젯 설정: `Space = World`, `bDrawAtDesiredSize = true`, `bReceiveHardwareInput = false`, `WidgetClass = UBathhouseSpacePreviewLabelWidget`, 위젯 재질은 엔진 기본값 유지. Pivot은 북쪽 붙임이면 글자 아래 가장자리 가운데, 남쪽 붙임이면 위 가장자리 가운데를 component 원점에 맞춘다. 등록 뒤 `GetUserWidgetObject()`에 `SetLabel(문구, PreviewLabelFontSize)`를 호출한다.
   - 방향: 글자 앞면이 world +Z를 보고 글자 위쪽이 world +Y(북)를 향한다(위에서 읽힘, 지금과 같은 결과). `UWidgetComponent`의 앞면·위쪽 축은 `UTextRenderComponent`와 다르므로 회전값은 구현이 엔진 축에서 정하고 자동화로 확인한다.
   - 크기: component relative scale = `PreviewLabelWorldSizeCm / PreviewLabelFontSize`(균일, 글꼴 크기 1당 cm). 0 이하·비유한이면 글자를 만들지 않는다.
@@ -558,7 +559,50 @@ struct FBathhouseExpansionView
 | 확인 | 기준 |
 |---|---|
 | 순수 placement | 공간 하나: Z = 자기 `CeilingZ + s + HeightCm`. 홀·목욕(같은 바닥)·지하: 세 글자 Z가 모두 (가장 높은 천장 판 윗면 + HeightCm)로 같음. 지하는 남쪽, 홀·목욕은 북쪽. XY = 효과 횟수 안쪽 중심. 기대값은 fixture snapshot과 인자에서 계산 |
-| 편집 world shell | 미리보기 > 0이면 `UWidgetComponent`가 하나 있다: editor-only, Transient, NoCollision, Nav 비관련, `WidgetClass` = 글자 widget class, 위치 = helper 결과, 앞면 축 = +Z·위쪽 축 = +Y, scale = 크기/글꼴 크기, `GetPreviewLabelText()` = `넓힘 미리보기 N회`(겹침 시 ` · 겹침 있음`). Slate가 초기화된 환경이면 user widget의 `UTextBlock` 문구가 같고 글꼴 object가 `UTextBlock` CDO 기본 글꼴과 같은지(override 없음)도 확인 |
+| 편집 world shell(18.5 그리기 조건 기준 추가) | 미리보기 > 0이면 `UWidgetComponent`가 하나 있다: editor-only, Transient, NoCollision, Nav 비관련, `WidgetClass` = 글자 widget class, 위치 = helper 결과, 앞면 축 = +Z·위쪽 축 = +Y, scale = 크기/글꼴 크기, `GetPreviewLabelText()` = `넓힘 미리보기 N회`(겹침 시 ` · 겹침 있음`). Slate가 초기화된 환경이면 user widget의 `UTextBlock` 문구가 같고 글꼴 object가 `UTextBlock` CDO 기본 글꼴과 같은지(override 없음)도 확인 |
 | game world | 같은 공간에 글자 component 없음(기존) |
 | 코드 리뷰 | `UTextRenderComponent` 사용 없음, Slate 직접 사용 없음, 글꼴 object 변경 없음, 높이·크기·해상도 리터럴 없음(Settings), 400줄 파일 무변경 |
 | Editor 재확인(asset 변경 없음) | 편집 world에서 홀 미리보기 1: 홀 위에 한글 `넓힘 미리보기 1회`가 위에서 읽힌다. 작업공간 미리보기 1: 홀 지붕 위(중심 남쪽)에 보인다. 홀·작업공간 동시: 두 글자가 겹치지 않는다. 0으로 돌린 뒤 저장할 asset이 없다 |
+
+### 18.5 복귀 재설계 2 — 그리기·갱신 조건 (2026-10-02, RET-004)
+
+근거: [REPORT_UNREAL_EDITOR.md](REPORT_UNREAL_EDITOR.md) 10.3. 위치·pivot·방향·scale은 계약대로였지만 render target이 만들어지지 않았다. 18.2가 `SetHiddenInGame(true)`를 유지 항목으로 남긴 것이 원인이다. 엔진 `USceneComponent::IsVisible()`은 `bHiddenInGame`이면 world 종류와 무관하게 false다(`SceneComponent.cpp` `IsVisible`). `UWidgetComponent::ShouldDrawWidget()`은 `IsVisible()`일 때만 그린다(`WidgetComponent.cpp` `ShouldDrawWidget`). 18.4 자동화는 component 구조만 보고 그리기 조건을 보지 않아 놓쳤다.
+
+#### 결정
+
+- hidden-in-game을 쓰지 않는다. 글자는 `bPreviewChunks`(편집 world)일 때만 만들어지고 Transient·editor-only라 PIE 복제·cook에 나가지 않는다. 그래서 "game world에 글자 없음"은 생성 조건으로 지켜진다.
+- 갱신을 화면 렌더 기록에 의존시키지 않는다. `TickWhenOffscreen = true`, `TickMode = Enabled`, 자동 redraw(`bManuallyRedraw = false`, `RedrawTime = 0`)로 두고, `SetLabel` 뒤 `RequestRedraw()`를 한 번 부른다. 첫 그리기는 `LastWidgetRenderTime == 0`이라 허용되지만, 이후는 `TickWhenOffscreen`이 `WasRecentlyRendered`(편집 world의 world 시간·viewport 렌더 기록) 판단을 건너뛰게 한다. 매 편집 tick 다시 그리는 비용은 미리보기를 켠 공간당 작은 글자 하나뿐이다(편집 전용, 미리보기 0이면 component 없음).
+- 아래 엔진 그리기 조건을 component 생성 계약으로 모두 만족시키고 자동화가 확인한다.
+
+#### 엔진 소스로 확인한 그리기 조건(UE 5.8 `UWidgetComponent`)
+
+| 조건 | 출처 | 계약 |
+|---|---|---|
+| 편집 world에서 component tick이 돈다 | `ActorComponent.cpp` `RegisterComponentWithWorld`가 비게임 world에서도 tick 함수 등록, `FActorComponentTickFunction::ExecuteTick`이 `bTickInEditor`로 `LEVELTICK_ViewportsOnly` 허용, `UWidgetComponent` 생성자가 `bCanEverTick`·`bTickInEditor` true | 바꾸지 않는다. tick을 끄지 않는다 |
+| `TickMode != Disabled` | `TickComponent`가 Disabled면 tick을 끔. 기본값은 cvar에 따라 Enabled/Automatic | `SetTickMode(ETickMode::Enabled)` 명시 |
+| 위젯 생성 | `OnRegister`가 편집 world에서 `InitWidget()`. `InitWidget`은 `WidgetClass`가 있고 `FSlateApplication`이 초기화돼 있을 때만 `CreateWidget` | `WidgetClass`를 `RegisterComponent` **전에** 지정 |
+| `WidgetRenderer` 존재 | `OnRegister`가 `Space != Screen`이고 `!GUsingNullRHI`일 때만 생성 | `SetWidgetSpace(World)`를 등록 전에 지정. `-nullrhi`에서는 그리지 않음(엔진) |
+| `SlateWindow` 존재 | `UpdateWidget`(매 tick)이 Slate 초기화 때 생성하고 `TakeWidget`으로 내용 지정 | 조치 없음 |
+| `IsVisible()` | `bHiddenInGame` false, `bVisible` true, level collection 보임 | hidden-in-game 쓰지 않음, visibility 끄지 않음 |
+| 위젯 보임 | `IsWidgetVisible`: World space면 component·`SlateWindow` 보임, 그리고 `UUserWidget::IsVisible()`(cached Slate widget 보임). Automatic tick에서 안 보이면 tick을 끔 | root `UTextBlock`과 user widget visibility를 Collapsed·Hidden으로 두지 않음. `WindowVisibility` 기본값 유지 |
+| 그리기 시점 | `ShouldDrawWidget`: `IsVisible()` && (`TickWhenOffscreen` \|\| `WasRecentlyRendered(0.5)` \|\| `LastWidgetRenderTime == 0`) && 경과 ≥ `RedrawTime` && (manual이면 `bRedrawRequested`) | `TickWhenOffscreen` true, `RedrawTime` 0, manual 아님 |
+| draw size | `DrawWidgetToRenderTarget`은 `DrawSize`가 0 이하이거나 최대 2D texture 크기를 넘으면 그리기 전에 return한다(`bDrawAtDesiredSize`여도 먼저 검사) | `DrawSize`는 엔진 기본값(양수)을 그대로 둔다. 0으로 바꾸지 않는다 |
+| desired size | `bDrawAtDesiredSize`면 prepass 뒤 desired size로 render target 크기를 정하고, 0 이하면 render target이 없다 | 문구가 비면 component를 만들지 않음(기존). 글꼴 크기 Settings는 1 이상(ClampMin) |
+| render target | `UpdateRenderTarget`이 크기가 양수면 `UTextureRenderTarget2D`를 만들고 위젯 재질 parameter에 넣음 | 조치 없음. Editor 재확인 대상 |
+| 앞면 | 위젯 재질은 기본 one-sided(`bIsTwoSided` false). 앞면이 +Z | 18.2 방향 계약 유지 |
+
+#### 변경 범위·수정 파일·유지 범위
+
+- 수정 파일: `Private/Building/BathhouseSpaceShellComponent.cpp`(글자 component 설정: hidden-in-game 제거, `SetTickMode(Enabled)`, `SetTickWhenOffscreen(true)`, 등록 전 `WidgetClass`·Space 지정 확인, `SetLabel` 뒤 `RequestRedraw()`), `Private/Tests/BathhouseExpansionAutomationTests.cpp`(아래 기준). 다른 파일 변경 없음. Content·Config 변경 없음. Settings 값은 그대로(원본 `Config/DefaultGame.ini`).
+- 영향 시나리오: 사용자 PIE 없음(편집 world 전용). Editor 단계의 편집 world 미리보기 재확인만 다시 한다.
+- 유지: 18.1~18.3 결정(글꼴·높이·남북 붙임·문구), 18.2 나머지 component 계약, 넓힘·구입·확장 탭·락커 판매·검증, Editor 단계에서 저장한 Content(`22e20c7`), game world에 글자 없음.
+
+#### 자동화 기준(18.4에 추가)
+
+| 확인 | 기준 |
+|---|---|
+| 그리기 조건(headless 가능) | 편집 world 글자 component에서 `bHiddenInGame` false, `IsVisible()` true, `GetWidgetSpace() == World`, `GetTickWhenOffscreen()` true, `IsComponentTickEnabled()` true, `bTickInEditor` true, `PrimaryComponentTick.IsTickFunctionRegistered()` true, `GetDrawSize()` 두 축 양수, `GetWidgetClass()` = 글자 widget class. 엔진 `ShouldDrawWidget`은 protected라 이 공개 조건 묶음을 같은 판정으로 본다 |
+| 위젯 보임(Slate 초기화 환경) | user widget이 있고 root `UTextBlock`·user widget visibility가 Collapsed·Hidden이 아님 |
+| render target(RHI 필요, Editor 재확인) | 편집 world에서 몇 tick 뒤 `GetRenderTarget()`이 null이 아니고 크기가 양수, `GetMaterialInstance()`가 있음, 화면에 한글 문구가 보임. `-nullrhi` headless에서는 엔진이 그리지 않으므로 자동화 단언 대상이 아니다 |
+| 코드 리뷰 | 글자 component에 `SetHiddenInGame`·visibility 끄기·`SetTickMode(Disabled)`·`DrawSize` 0 지정 없음 |
+

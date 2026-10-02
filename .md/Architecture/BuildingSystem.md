@@ -206,7 +206,8 @@ Validation (U2): `ValidateWorld`는 위 표를 0회 복사본에 적용하고(�
 - 편집 미리보기: 미리보기 횟수를 바꾸면 OnConstruction과 편집 동기화가 모든 공간을 다시 짓는다. 횟수 > 0이면 shell이 `넓힘 미리보기 N회`를 띄우고, 효과 횟수 snapshot에서 이 공간 부피 겹침이 있으면 ` · 겹침 있음`을 덧붙인다(2026-10-02 복귀 R1·RET-003로 표시 방식 재설계).
   - component: editor-only Transient `UWidgetComponent`(World space, 충돌 없음, Nav 비관련, `bDrawAtDesiredSize`)에 코드로 만든 native `UBathhouseSpacePreviewLabelWidget`(root `UTextBlock` 하나, WBP 없음)을 띄운다. 글꼴은 `UTextBlock` 기본 글꼴(프로젝트 WBP와 같은 엔진 기본 UMG 글꼴, 한글은 엔진 fallback)이며 크기만 Settings `EditorPreviewLabelFontSize`로 정한다. `UTextRenderComponent`는 offline 글꼴만 그려 한글을 못 쓰므로 쓰지 않는다.
   - 위치: 순수 `FBathhouseSpaceLayout::PreviewLabelPlacement`. XY = 효과 횟수 안쪽 중심, Z = 모든 공간 중 가장 높은 천장 판 윗면 + Settings `EditorPreviewLabelHeightCm`(모든 공간 같은 높이라 지하 글자도 위에서 보임). XY가 겹치는 다른 공간 중 바닥이 더 높은 것이 있으면(아래층) 글자를 중심 남쪽에, 아니면 북쪽에 붙인다.
-  - 방향·크기: 앞면 world +Z, 글자 위쪽 world +Y. component scale = `EditorPreviewLabelWorldSizeCm / EditorPreviewLabelFontSize`. default subobject를 추가하지 않는다. 직렬화된 `ZoneBounds`(미리보기 결과)는 BeginPlay가 다시 계산하므로 게임에 영향이 없다.
+  - 방향·크기: 앞면 world +Z, 글자 위쪽 world +Y. component scale = `EditorPreviewLabelWorldSizeCm / EditorPreviewLabelFontSize`.
+  - 그리기(2026-10-02 복귀 RET-004): hidden-in-game을 쓰지 않는다(엔진 `IsVisible()`이 false가 되어 `UWidgetComponent`가 그리지 않음). game world 비노출은 편집 world에서만 만든다는 생성 조건이 지킨다. `WidgetClass`·World space를 등록 전에 지정하고, `TickMode` Enabled, `TickWhenOffscreen` true, 자동 redraw, `DrawSize`는 엔진 기본값(양수), 문구 지정 뒤 `RequestRedraw()`. default subobject를 추가하지 않는다. 직렬화된 `ZoneBounds`(미리보기 결과)는 BeginPlay가 다시 계산하므로 게임에 영향이 없다.
 - 검증은 미리보기와 무관하게 0회 복사본(기존 규칙)과 목록 끝 복사본(아래 Validation (U2) 표)을 검사한다.
 
 ## Implementation Notes (2026-10-02 구현)
