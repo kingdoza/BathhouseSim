@@ -1,9 +1,9 @@
 # CONTEXT — BUG-2026-10-02_bath_water_map_grid_scale_mismatch 욕탕 관리 지도 그리드 누락·욕탕 비율 불일치
 - 목표 / 상위·선행·관련 작업: 컴퓨터 욕탕 관리 지도의 그리드 선 누락과 욕탕 타일 크기가 실제 점유 범위와 맞는지 확인. 버그 리포트 `.md/BugReports/2026-10-02_bath_water_map_grid_scale_mismatch.md`. 관련: 욕탕 관리 UI(BathWaterManagementUISystem), 공간 넓힘 `EXP-U3`(병합 `201b2d0`), 관련 작업 `PLACEMENT-FOOTPRINT-PREVIEW`(footprint와 메시 크기 차이 주제 공유).
-- 현재 단계와 재개 지점: 구현 완료(빌드 성공, `BathhouseSim.BathWater.Operations` 8/8 Success) → 코드 리뷰 1회차. QNA_ARCHITECTURE Q1 파일에 "답변: A"가 기입돼 있음(작성자 미확인, 사용자 확인 요청 중, Editor 단계 전까지).
+- 현재 단계와 재개 지점: 코드 리뷰 1회차 승인(`654aaa3`, 재빌드·Operations 8/8 Success) → Editor 작업(`PROMPT_UNREAL.md`). 병행: 아키텍처 정본의 "Source 미반영" 표기 정리를 아키텍처 워커에 재개 지시(리뷰 비차단 후속 a). QNA_ARCHITECTURE Q1 = A 사용자 확인(2026-10-02 "두 QNA 답변했다").
 - 명세 승인 일자(자동/명시)와 사전 허용: 2026-10-02 사용자 명시 "둘 다 수정" — 버그 리포트를 기능 계약으로 보고 기능 명세 생략(Content 영향은 `WBP_BathWaterBathTile` 한 asset). 사전 허용 범위: `WBP_BathWaterBathTile`, 지도 선 표시 조정값 원본 asset(아키텍처가 정하는 범위), `.md/Unreal/PlacementSystem.md` 정본 정리. PIE 통과 후 병합은 미확인(병합 전에 묻는다).
 - 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/BUG-2026-10-02_bath_water_map_grid_scale_mismatch`(main `f92277a`에서 분기). 아키텍처 시작 `f92277a`. 구현 시작 `5f39fd8`. 코드 리뷰 시작 = 구현 커밋.
-- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 해당 없음(진단 단계).
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 리뷰 1회차 승인, 리뷰 승인 커밋 `654aaa3`. 아키텍처 자동 복귀 미사용. 기능 명세 생략(버그 리포트를 기능 계약으로).
 - 복귀 기록: 없음
 - 진단 중 드러난 정본 불일치(이 작업 범위 밖): `.md/Unreal/PlacementSystem.md` BP_Bath 줄 footprint (145,120,38)·부모 BathhouseFacilityActor ↔ 실제 CDO (150,120,38)·BathhouseBathFacilityActor. Editor 워커의 정본 쓰기가 auto-mode 권한 분류기에 거부됨 → 마스터가 대신 쓰지 않고 사용자에게 보고. 진단 종료 뒤 마스터가 git status·BP_ClothesLocker 해시(6c81ae31…5967) 무변경과 Editor 종료를 확인함.
 - 회고 대상(ORCHESTRATOR·UNREAL_EDITOR): Editor 진단 워커가 정본 불일치를 "수치 정정"으로 보고하고 마스터도 그대로 "문서 값 정정"으로 사용자에게 물음. 조정값 원본 원칙(`AGENT_WORKFLOW.md`, `a566ad1` 2026-10-01 채택, `AGENT_UNREAL_EDITOR.md` 115행)상 수치 복제 자체가 위반이므로 원본 참조로 바꾸는 것이 맞았음. `.md/Unreal/PlacementSystem.md` Definition 표는 원칙 채택 전(`13ef199` 2026-09-11) 작성분이 정리되지 않은 상태. 사용자 지적(2026-10-02): "원본참조로 시스템문서를 작성하라고 지침서에 없었냐?"
