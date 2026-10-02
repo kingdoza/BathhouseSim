@@ -2,7 +2,7 @@
 
 - 작업 ID: `EXP-U1`
 - 단계: Editor 작업
-- 상태: 보류 — 지형 구멍 칠하기 미완료(공식 API 재시도 2회 실패, USER_UNREAL.md, 사용자 Landscape 모드 직접 칠하기), 책임: 사용자 Editor 조작, 재개 조건: 사용자 칠하기 완료 알림 뒤 Editor 역할이 저장·재로드·`Space_Hall`/`Space_Work` Validation 확인
+- 상태: 보류 — 지형 구멍 칠하기 미완료(공식 import 3회 모두 충돌 미반영, 화면 구멍 원인인 재질은 수정·저장됨), 책임: 사용자 Editor 조작(Landscape 모드 Visibility 칠하기), 재개 조건: 사용자 칠하기 완료 알림 뒤 Editor 역할이 저장·재로드·`Space_Hall`/`Space_Work` Validation·화면 구멍 확인
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -175,3 +175,50 @@
 - `USER_UNREAL.md` EXP-U1 칠하기 항목에 이번 재시도(공식 레이어 정보 확인, 결과, 버림)를 덧붙이고 항목은 유지했다. 사용자가 Landscape 모드 Paint > Visibility로 홀 안쪽을 칠한 뒤 Editor 역할이 저장·재로드·Validation을 확인한다.
 - `BuildingSystem.md`·`WorldSystem.md`는 저장 상태가 바뀌지 않아 수정하지 않았다(지형 구멍 미칠 기록 유지).
 - 남은 보류 사유는 지형 구멍 칠하기뿐이다.
+
+## 12. 지형 구멍 보이는 Editor 재시도 (2026-10-02)
+
+- 입력: 마스터 추가 지시(사용자 승인 "2번으로 진행해"). 시작 HEAD `ba7f500`.
+- 기준선: UnrealEditor 0, 포트 리스너 0, Content 변경 없음. 사용자 미추적 파일(`.md/Work/MODEL-M1/`, `ArtSource/Bathhouse/*`, `.md/MODELING_STYLE_GUIDE.md`)은 건드리지 않았다.
+- 실행:
+  - 보이는 창 작업용 Editor PID 28408(숨김 옵션 없음, harness 큐). 화면 조작은 하지 않았다.
+  - 확인용 숨김 Editor PID 9380은 스크립트 끝에서 `QUIT_EDITOR`로 정상 종료했다.
+- 스크립트: `Saved/Claude/EXP-U1/49_land_diag.py`(+`.json`), `50_mic.py`, `51_lmic.py`, `52_land_hole3.py`, `53_mat_probe.py`, `54_mat_fix.py`, `56_trace_complex.py`, `57_hlod.py`, `58_save_mat.py`, `59_mat_verify.py`.
+- 캡처: `cap_stair3.png`(수정 전), `cap_stair4.png`·`cap_stair5.png`(수정 후), `cap_land_fix.png`.
+
+### 충돌 구멍(실패, 저장 안 함)
+
+- 방법: §11과 같은 공식 API(`landscape_import_weightmap_from_render_target`, `__LANDSCAPE_VISIBILITY__`, edit layer 0)로 홀 안쪽 꼭짓점 X −700~1200, Y −600~600에 import했다. 약 2분 기다린 뒤 `ForceLayersFullUpdate`(동기 갱신)를 불렀다.
+- 관찰:
+  - Visibility 재질 조합 4개가 생겼고, 아래 재질 수정 뒤 화면에서 계단 구멍이 뚫렸다(최종 데이터에 Visibility 있음).
+  - 단순 충돌 trace 8지점(홀 안 (0,0)·(500,−540) 포함)은 모두 지형 Z 0에 맞았다.
+  - `Space_Hall`·`Space_Work`의 계단 통로 지형 오류도 그대로였다.
+  - 사용자의 Landscape 모드 칠하기는 충돌을 뚫었으므로, Python import 경로에서만 충돌 layer data 갱신이 일어나지 않는 것으로 본다.
+- 판정: 실패(지시상 마지막 시도). Landscape proxy 63개 dirty를 저장하지 않았다. 작업용 Editor PID 28408만 종료해 버렸고 `git status`상 Landscape package 변경은 없다.
+
+### 화면 구멍 원인 진단과 수정(성공, 저장)
+
+- 진단:
+  - 홀 아래 proxy 4개와 Landscape: `LandscapeMaterial`은 `M_Landscape_ProcGridHole`, `LandscapeHoleMaterial`은 None, `bEnableNanite=False`, override 없음.
+  - 메모리의 `LandscapeMaterialInstanceConstant` 378개(조합 126 + component 252)는 모두 `M_Landscape_ProcGridHole`을 부모로 한다.
+  - package 이름 표의 `M_ProcGrid` 참조는 저장된 MIC import 잔재로, 렌더 부모 체인에는 쓰이지 않는다.
+  - 원인: `M_Landscape_ProcGridHole`(M_ProcGrid 복제)은 `bUseMaterialAttributes=True`다. 따라서 §3에서 연결한 Opacity Mask 핀(`LandscapeVisibilityMask`)이 무시돼 구멍 자리도 그려졌다.
+- 수정(허용 범위: 이 재질 자체): 기존 attribute 출력(`SetMaterialAttributes_0`) → `BreakMaterialAttributes` → `MakeMaterialAttributes` → 재질 출력.
+  - Make의 OpacityMask에 `LandscapeVisibilityMask`를 연결하고 나머지 18개 attribute는 Break에서 그대로 전달했다.
+  - CustomizedUVs는 재질에서 쓰지 않는다(`NumCustomizedUVs=0`).
+- 확인:
+  - 같은 세션에서 계단 구멍을 내려다보면 지형 격자 대신 계단 판이 보인다(`cap_stair4/5.png`).
+  - 마당 개관(`cap_land_fix.png`)의 지형 격자·색은 그대로다(밝기 차이는 노출 차이).
+  - 재질만 개별 저장, Data Validation VALID.
+  - 새 프로세스 재로드에서 출력 노드 `MakeMaterialAttributes`, Masked, VALID, Landscape 64개 재질 지정 유지, dirty 0.
+- 디스크 변경: `/Game/Bathhouse/Materials/World/M_Landscape_ProcGridHole` 1개.
+
+### 기타 관찰
+
+- 편집 world에 로드된 `WorldPartitionHLOD` 64개(HLOD0_Instancing)의 `LandscapeMeshProxyComponent`는 보이지 않지만 QueryOnly 충돌을 가진다. 그래서 complex trace가 Z 0에서 이 mesh에 맞는다. 공간 Validation의 단순 trace는 Landscape proxy에 맞으므로 이번 판정과는 무관하다. 지형 구멍 뒤에도 편집 world complex trace가 막히면 이 HLOD가 원인 후보다.
+
+### 남은 작업과 정본
+
+- `USER_UNREAL.md` EXP-U1 칠하기 항목에 3차 시도와 재질 수정을 덧붙였고 항목은 유지했다. 사용자가 Landscape 모드 Visibility로 홀 안쪽을 칠하면 충돌(사용자 실험으로 확인)과 화면(재질 수정)이 함께 반영될 것으로 본다. 칠한 뒤 Editor 역할이 저장·재로드·Validation·화면을 확인한다.
+- `.md/Unreal/BuildingSystem.md` 지형 절에 재질 구조(Break/Make OpacityMask)와 공식 Visibility layer info를 반영했다. `WorldSystem.md`는 바뀐 사실이 없어 수정하지 않았다.
+- 작업용 Editor 종료 확인: UnrealEditor 0, 포트 8000 리스너 0.

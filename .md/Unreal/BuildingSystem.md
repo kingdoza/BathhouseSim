@@ -45,7 +45,8 @@ Compile 결과 `BS_UP_TO_DATE`(경고 없음). component 계층: `SpaceRoot`(roo
 
 ## 지형(Q1 A)
 
-- `Landscape`와 `LandscapeStreamingProxy` 63개(전체 64)의 Landscape Material은 `/Game/Bathhouse/Materials/World/M_Landscape_ProcGridHole`이다. `/Engine/OpenWorldTemplate/LandscapeMaterial/M_ProcGrid` 그래프 복제 + Blend Mode Masked + `LandscapeVisibilityMask` → Opacity Mask이며 바깥 지형 모습은 같다.
+- `Landscape`와 `LandscapeStreamingProxy` 63개(전체 64)의 Landscape Material은 `/Game/Bathhouse/Materials/World/M_Landscape_ProcGridHole`이다. `/Engine/OpenWorldTemplate/LandscapeMaterial/M_ProcGrid` 그래프 복제 + Blend Mode Masked다. 이 재질은 Material Attributes를 쓰므로 Opacity Mask 핀이 무시된다. 그래서 기존 attribute 출력 → `BreakMaterialAttributes` → `MakeMaterialAttributes`(OpacityMask = `LandscapeVisibilityMask`, 나머지 attribute는 그대로 전달) → 출력으로 연결했다(같은 세션에서 칠한 Visibility 자리가 화면에서 뚫리는 것 확인, 새 프로세스 재로드 VALID). 바깥 지형 모습은 같다.
+- 지형 구멍 레이어는 엔진 공식 `/Engine/EngineResources/LandscapeVisibilityLayerInfo`가 자동 지정된다(별도 layer info asset 없음).
 - 0회 홀 안쪽 바닥 아래 지형 구멍은 아직 칠해지지 않았다. 남은 칠하기는 [USER_UNREAL.md](../USER_UNREAL.md) `EXP-U1` 항목이며 그 전까지 계단 통로 장애물 Data Validation 오류가 남는다.
 
 ## 설비 정의 종류 태그
