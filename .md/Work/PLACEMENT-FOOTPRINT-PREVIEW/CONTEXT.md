@@ -1,9 +1,9 @@
 # CONTEXT — PLACEMENT-FOOTPRINT-PREVIEW 배치 미리보기의 footprint 공간 표시
 - 목표 / 상위·선행·관련 작업: 설비 배치 미리보기에서 비주얼 메시와 함께 Placement Footprint의 XY 평면 점유 공간을 보여 준다. 관련: PlacementSystem(범용 native preview), `EXP-U3` D4(배치 미리보기 숨김), `BUG-2026-10-02_bath_water_map_grid_scale_mismatch`(footprint와 메시 크기 차이 주제 공유).
-- 현재 단계와 재개 지점: 구현 완료(빌드 성공, Placement 12/12, 전체 184 중 4 실패 — FootprintPreviewMaterial 미지정 1, 쿨러 비정수 cell 3, Editor 단계 뒤 재확인) → 코드 리뷰 1회차. 구현 시작 `0c5f8a0`. 사용자 지시: PIE 승인 뒤 BUG 먼저, 이 작업 다음 순서로 main에 --no-ff 병합.
+- 현재 단계와 재개 지점: 코드 리뷰 1회차 실패(작은 범위, production 결함 없음): F1 PROMPT_UNREAL 7절 Shop 3개·전체 실패 0 확인 누락, F2 T2 fixture root scale 0.5 probe, F3 Architecture 정본 상태 문구, F4 PROMPT_REVIEW 로그 경로. 기준선 비교(리뷰어): 작업 전 177/0 실패 → 실패 4개는 예상 원인. 재작업: 같은 구현 워커(F1·F2·F4), F3는 정본 소유 단계인 같은 아키텍처 워커. 이후 같은 리뷰어 재검증.
 - 명세 승인 일자(자동/명시)와 사전 허용: 2026-10-02 자동 승인(S4 아니오). 근거: 모든 동작이 답변·추천안·옛 사본 전제에서 나왔고 철회 외 새 질문 없음, 반투명 확인은 옛 Q5 A 결과를 바꾸지 않음, 세 설비 판정 변화는 Q10 B 선택지에 명시. 사전 허용(S2): 범위 밖 asset 변경도 멈추지 않고 진행·단계 보고에 기록(`BP_ClothesLocker` 사용자 변경은 제외). S3: PIE 통과 후 main 병합 예.
 - 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 명세는 worktree branch `spec/PLACEMENT-FOOTPRINT-PREVIEW`에서 작성 후 main으로 fast-forward. 아키텍처부터 `work/PLACEMENT-FOOTPRINT-PREVIEW`(worktree `.claude/worktrees/PLACEMENT-FOOTPRINT-PREVIEW`), 아키텍처 시작 커밋 = main 명세 커밋(git log).
-- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 없음
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 리뷰 1회차 실패(자동 재작업 1/2). 아키텍처 자동 복귀 미사용.
 - 복귀 기록: 없음
 - 회고 대상(UNREAL_EDITOR·ORCHESTRATOR): 사전 조사가 재질 그래프만으로 "화면상 불투명"을 추론했고(보고서 8절에 화면 판정 불가 명시), 마스터가 한계를 빼고 사용자에게 사실로 전달 → 사용자 관찰(반투명)과 어긋남. 화면 외형 판단은 사용자 관찰로 확인하고 질문지 전제로 쓰지 않아야 했음.
 - 사용자 지시 모델 덮어쓰기: 없음
