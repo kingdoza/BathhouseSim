@@ -2,7 +2,7 @@
 
 - 작업 ID: `EXP-U1`
 - 단계: Editor 작업
-- 상태: 보류 — 지형 구멍 칠하기 미완료(USER_UNREAL.md, 사용자가 직접 칠하기로 결정), 책임: 사용자 Editor 조작, 재개 조건: 사용자 칠하기 완료 알림 뒤 Editor 역할이 저장·재로드·`Space_Hall`/`Space_Work` Validation 확인
+- 상태: 보류 — 지형 구멍 칠하기 미완료(공식 API 재시도 2회 실패, USER_UNREAL.md, 사용자 Landscape 모드 직접 칠하기), 책임: 사용자 Editor 조작, 재개 조건: 사용자 칠하기 완료 알림 뒤 Editor 역할이 저장·재로드·`Space_Hall`/`Space_Work` Validation 확인
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -139,3 +139,39 @@
 
 - 6절의 boiler 멈춤 항목은 해소됐다. 남은 보류 사유는 지형 구멍 칠하기(USER_UNREAL.md `EXP-U1` 항목, 사용자 직접)뿐이다. `Space_Hall`·`Space_Work`의 계단 통로 지형 오류 1개는 그 작업 뒤 확인한다.
 - 같은 세션에서 사용자 요청(스태틱 메시 모델링 목록) 읽기 전용 조사를 했다. 결과는 `.md/MODELING_STATIC_MESH_LIST.md`(마스터 저장)이고 근거는 `Saved/Claude/EXP-U1/41_mesh_probe.py`·`.json`, `42_mesh_extra.py`다. 조사 중 modify·저장은 없었다.
+
+## 11. 지형 구멍 재시도 (2026-10-02)
+
+- 입력: 마스터 추가 지시(사용자 승인 "레이어 정보를 만들고 자동화 재시도 진행해"). 시작 HEAD `7c53d88`.
+- 기준선: UnrealEditor 프로세스 0, 포트 8000 리스너 0, Content 변경 없음.
+- 작업 트리의 사용자 미추적 파일(`.md/Work/MODEL-M1/`, `ArtSource/Bathhouse/*`, `.md/MODELING_STYLE_GUIDE.md`)은 건드리지 않았다.
+- 실행: 작업용 Editor PID 27084(harness 큐). 스크립트는 `Saved/Claude/EXP-U1/45_land_probe3.py`, `46_land_hole2.py`, `47_layers2.py`, `48_dirty.py`, 캡처는 `cap_stair2.png`다.
+
+### 레이어 정보
+
+- UE 5.8 엔진 소스 확인 결과 공식 Visibility 레이어 정보는 `/Engine/EngineResources/LandscapeVisibilityLayerInfo`(`ALandscapeProxy::VisibilityLayer`, LayerName `__LANDSCAPE_VISIBILITY__`)다.
+  - `Landscape.cpp`: proxy PostLoad가 Visibility target layer를 넣는다. `ULandscapeInfo::UpdateLayerInfoMapInternal`은 `LayerInfoObj=None`이면 그 자리를 공식 객체로 채운다.
+  - `UE::Landscape::IsVisibilityLayer`는 이 정적 객체와 같은지만 비교한다.
+- 그래서 새 `ULandscapeLayerInfoObject`는 구멍 레이어로 인정되지 않는다. 지시의 "엔진 공식 레이어 정보 우선"에 따라 새 asset을 만들지 않았고 Landscape 연결도 바꾸지 않았다. 남기거나 지울 asset은 없다.
+- edit layer: `Base Landscape`(index 0), `Flat Middle`(1). 둘 다 visible, weightmap alpha 1이다. merge shader(`LandscapeEditLayersWeightmaps.usf`)는 Visibility를 weight blending 없이 더한다.
+
+### 재시도(2회째, 같은 원인 제한 도달)
+
+- 방법: `LandscapeProxy.landscape_import_weightmap_from_render_target(rt, "__LANDSCAPE_VISIBILITY__", 0)`.
+  - 임시 render target 2017×2017에 홀 안쪽 꼭짓점 X −700~1200, Y −600~600만 흰색으로 칠했다(픽셀 확인, 충돌 구멍이 홀 안쪽 −800~1300 × −700~700에 머물게).
+  - `LogLandscape` verbose를 켜고 import했다. 반환값 True.
+- 관찰:
+  - 로그에 홀이 걸친 proxy 4개의 `M_Landscape_ProcGridHole___LANDSCAPE_VISIBILITY__0` 재질 조합 생성이 남았다. Visibility allocation은 최종 merge까지 왔다.
+  - 약 3분(수백 frame) 뒤에도 충돌 trace 8지점(홀 안 (0,0), (500,−540) 포함)이 모두 지형 Z 0에 맞았다.
+  - 계단 구멍을 내려다본 캡처에 지형 격자가 보인다. `Space_Hall`·`Space_Work`의 계단 통로 지형 오류도 그대로다.
+- 판정: 실패. 1차(같은 API·같은 layer)와 같은 결과라 두 번 제한으로 중단했다. 원인은 미확정이다. Visibility 데이터가 충돌·렌더 갱신(edit layer readback 뒤 collision layer data·재질 반영)으로 이어지지 않는 것으로 추정한다. Landscape 모드 도구 없이 이 경로를 더 밀려면 새 도구가 필요해 승인 범위 밖이다.
+- 되돌림:
+  - import는 `SetData`가 전체 영역 component에 갱신을 요청해 Landscape proxy 63개 package를 dirty로 만들었다. 그 밖의 dirty는 없었다.
+  - 앞 세션에서 `reload_packages`가 메모리 값을 되돌리지 못하고 dirty만 지운 전례가 있다. 그래서 저장하지 않고 작업용 Editor PID 27084만 종료해 미저장 변경을 버렸다.
+  - 종료 뒤 UnrealEditor 프로세스 0, 포트 리스너 0. `git status`상 Landscape package를 포함한 Content 변경 없음.
+
+### 남은 작업과 정본
+
+- `USER_UNREAL.md` EXP-U1 칠하기 항목에 이번 재시도(공식 레이어 정보 확인, 결과, 버림)를 덧붙이고 항목은 유지했다. 사용자가 Landscape 모드 Paint > Visibility로 홀 안쪽을 칠한 뒤 Editor 역할이 저장·재로드·Validation을 확인한다.
+- `BuildingSystem.md`·`WorldSystem.md`는 저장 상태가 바뀌지 않아 수정하지 않았다(지형 구멍 미칠 기록 유지).
+- 남은 보류 사유는 지형 구멍 칠하기뿐이다.
