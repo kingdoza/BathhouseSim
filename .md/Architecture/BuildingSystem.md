@@ -6,6 +6,7 @@
 - 가게를 홀·목욕공간·작업공간(지하) 세 공간으로 나누고, 공간마다 직사각형 바닥 경계를 따라 벽·바닥·천장·조명·출입구·통로·계단을 만든다. 공간은 그 바닥의 설비 배치 구역이자 생성 조각의 생성자다(홀 = 쓰레기 조각, 목욕공간 = 물 얼룩 조각, 작업공간 = 없음, D1).
 - 2026-10-02 `EXP-U2` 설계·구현, 사용자 PIE 통과·병합(`3c17e41`): 아래 Expansion 절의 넓힘 목록·runtime 넓힘 적용·편집 미리보기·넓힘 검증. 구입·확장 탭·열쇠·한도·락커 판매는 [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)다. 구현 지시는 병합 커밋 `3c17e41`의 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md`(작업 폴더 제거됨, Git 이력)다.
 - 2026-10-02 `EXP-U3` 설계·구현, 사용자 PIE 통과: 사용자 결정 D2(넓힘 줄마다 가격, 전체 상한 없음)와 D3(넓힘 한 번에 여러 벽, 벽별 양)를 Expansion 절·Validation (U2·U3) 표에 합쳤다. 구현 지시는 병합 커밋의 `.md/Work/EXPANSION-PURCHASE/EXP-U3/PROMPT_IMPLEMENTATION.md`(Git 이력) 5·6절이다.
+- `EXPANSION-PURCHASE` 완료(2026-10-02, U3 병합 `201b2d0`). 작업 폴더는 제거됐고, 이 문서의 `.md/Work/EXPANSION-PURCHASE/…` 경로는 해당 병합 커밋 이력에서 읽는다.
 
 ## Source Scope
 

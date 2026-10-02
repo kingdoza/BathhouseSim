@@ -4,6 +4,7 @@
 
 - 2026-10-02 `EXP-U2`(확장 구입 수직, 홀 1회) 설계·구현, 사용자 PIE 통과·병합(`3c17e41`).
 - 2026-10-02 `EXP-U3`(전체 확장 묶음) 설계·구현, 사용자 PIE 통과: 사용자 결정 D2(전체 상한 삭제, 공간별·넓힘별 가격, 선택지별 단계 표시)와 D3(넓힘 한 번에 여러 벽)를 본문에 합쳤다. 구현 지시는 병합 커밋의 `.md/Work/EXPANSION-PURCHASE/EXP-U3/PROMPT_IMPLEMENTATION.md`(Git 이력)다.
+- `EXPANSION-PURCHASE` 완료(2026-10-02, U3 병합 `201b2d0`). 작업 폴더는 제거됐고, 이 문서의 `.md/Work/EXPANSION-PURCHASE/…` 경로는 해당 병합 커밋 이력에서 읽는다.
 - 입력 계약은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-020~032, EXP-040~048)다.
 - 컴퓨터 `확장` 탭에서 돈을 내고 공간 하나를 넓힌다. 공간마다 그 공간의 넓힘 줄 수까지 넓힐 수 있고 가격은 그 공간의 몇 번째 넓힘인지로 정한다. 홀을 넓히면 열쇠 수와 락커 칸 설치 한도가 오른다. 상점은 1·4·8칸 락커를 판다.
 - 공간 넓힘의 형상·검증·편집 미리보기는 [BuildingSystem.md](BuildingSystem.md) Expansion 절이 정본이다. 이 문서는 구입 상태·transaction·확장 데이터·확장 탭·락커 판매 규칙을 다룬다.
