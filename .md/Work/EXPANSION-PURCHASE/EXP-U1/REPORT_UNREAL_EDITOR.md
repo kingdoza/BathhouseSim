@@ -2,7 +2,7 @@
 
 - 작업 ID: `EXP-U1`
 - 단계: Editor 작업
-- 상태: 보류 — 지형 구멍 칠하기 미완료(공식 import 3회 모두 충돌 미반영, 화면 구멍 원인인 재질은 수정·저장됨), 책임: 사용자 Editor 조작(Landscape 모드 Visibility 칠하기), 재개 조건: 사용자 칠하기 완료 알림 뒤 Editor 역할이 저장·재로드·`Space_Hall`/`Space_Work` Validation·화면 구멍 확인
+- 상태: 보류 — 사용자 지형 칠하기가 계단 구멍 남쪽 가장자리(Y −615~−600)와 홀 안쪽 나머지를 덮지 않아 계단 통로 Validation 오류 남음(PIE는 통과), 책임: 사용자 Editor 조작(Landscape 모드 Visibility로 홀 안쪽 전체 칠하기), 재개 조건: 다시 칠한 뒤 Editor 역할이 게임 충돌 object trace·Validation·화면 확인
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -222,3 +222,41 @@
 - `USER_UNREAL.md` EXP-U1 칠하기 항목에 3차 시도와 재질 수정을 덧붙였고 항목은 유지했다. 사용자가 Landscape 모드 Visibility로 홀 안쪽을 칠하면 충돌(사용자 실험으로 확인)과 화면(재질 수정)이 함께 반영될 것으로 본다. 칠한 뒤 Editor 역할이 저장·재로드·Validation·화면을 확인한다.
 - `.md/Unreal/BuildingSystem.md` 지형 절에 재질 구조(Break/Make OpacityMask)와 공식 Visibility layer info를 반영했다. `WorldSystem.md`는 바뀐 사실이 없어 수정하지 않았다.
 - 작업용 Editor 종료 확인: UnrealEditor 0, 포트 8000 리스너 0.
+
+## 13. 사용자 칠하기 확인 (2026-10-02)
+
+- 입력: 마스터 마무리 지시. HEAD `4e695af`.
+  - 사용자 칠하기 commit `8960140`: proxy `_3_3_0`(`E/5Y/MJQIJ8RYADZHO7ZS6IE5NM`), `_4_3_0`(`B/NX/PF1O5HWD53VE14YXX78A8H`).
+  - 사용자 PIE 승인 2026-10-02.
+  - 사용자 변경 commit `4e695af`: `r.DefaultFeature.AutoExposure=False`, 공간 3개 조명 값.
+- 실행: 새 프로세스 숨김 작업용 Editor PID 14984, 읽기 전용이다. 끝에서 dirty 0 확인 뒤 `QUIT_EDITOR`로 정상 종료했고 프로세스 0, 포트 리스너 0이다.
+  - 스크립트: `Saved/Claude/EXP-U1/60_paint_verify.py`(+`.json`), `61_obj_trace.py`, `62_hole_extent.py`(+`.json`).
+  - 캡처: `cap_stair_user.png`.
+- 사용자 미추적 파일은 건드리지 않았고 저장도 하지 않았다.
+
+### 판정 기준 정정 — Editor 전용 heightfield
+
+- 편집 world(게임 world 아님)의 Landscape 충돌에는 구멍이 없는 Editor 전용 heightfield가 하나 더 있다. 이 shape는 Visibility 채널을 Block한다(엔진 `LandscapeCollision.cpp` 462~488행, Landscape 편집 도구용). 그래서 편집 world의 Visibility 채널 trace는 구멍과 무관하게 항상 지형에 맞는다.
+- §5·§11·§12의 "충돌 trace가 지형에 맞음" 판정은 이 채널을 썼으므로 근거가 아니었다. 게임 충돌은 공간 Validation처럼 WorldStatic·WorldDynamic object type trace로 봐야 한다.
+- §12 import는 게임 충돌에 반영됐을 가능성이 있다. 다만 꼭짓점을 Y −600까지만 칠해, 아래 같은 가장자리 문제로 Validation은 실패했을 것이다.
+
+### 게임 충돌 확인(object trace, 단순 충돌)
+
+| 항목 | 결과 |
+|---|---|
+| 구멍 범위(홀 주변 25cm 격자) | 구멍 표본 224개, bbox X 100~775, Y −600~−425. 홀 안쪽 밖으로 벗어난 구멍 0 |
+| 계단 구멍 R(world X 100~740, Y −615~−465) | 중앙·북쪽 표본 통과. 남쪽 가장자리 띠 Y −615~−600은 지형 남음 |
+| Validation 계단 trace 9지점 | Y −540·−465 6곳 통과, Y −615 3곳(X 100·420·740) `LandscapeStreamingProxy_4_3_0` 지형 hit |
+| `Space_Hall`·`Space_Work` Validation | 계단 통로 지형 오류 1개 남음. `Space_Bath`는 오류 0(경고 2, 기존과 같음) |
+| 홀 안쪽 나머지 | 지형 남음(표본 4,341개). Q1 A의 "0회 홀 안쪽 전체" 미충족 |
+| 마당·목욕공간 아래 | 지형 hit(정상) |
+| 화면 | 계단 구멍을 내려다보면 계단 판이 보이고 지형 격자는 거의 없음(`cap_stair_user.png`) |
+| dirty | 0 |
+
+- 편집 world에 로드된 `WorldPartitionHLOD` landscape mesh(QueryOnly)는 complex trace에서만 맞는다. 단순 trace를 쓰는 Validation에는 영향이 없다.
+
+### 판정과 남은 작업
+
+- 지시 1항의 "계단 자리를 다 덮지 못함"에 해당해 수정·정본 갱신 없이 보고한다. 사용자 PIE는 통과했다(남쪽 15cm 띠는 계단 옆 벽 아래라 걷기에 영향이 적은 것으로 보인다). 그러나 Validation 오류와 Q1 A 범위가 남는다.
+- 재개 조건: 사용자가 Landscape 모드 Visibility로 홀 안쪽 전체를 칠한다. 최소한으로는 계단 구멍보다 사방 1칸(100cm, 지형 꼭짓점 간격) 넓게, 남쪽은 Y −700까지 칠한다. 그 뒤 Editor 역할이 같은 스크립트(`60`·`62`)로 게임 충돌·Validation·화면을 다시 확인하고 `USER_UNREAL.md` 항목 제거와 정본 갱신을 한다.
+- `USER_UNREAL.md` EXP-U1 항목은 그대로 둔다(이번 확인에서 문서 수정 없음). 사용자 조명 값(공간 instance `Lighting`)과 Auto Exposure(`Config/DefaultEngine.ini` `r.DefaultFeature.AutoExposure`) 반영은 위 확인 완료 뒤 정본 갱신 때 함께 한다.
