@@ -27,9 +27,9 @@ Compile 결과 `BS_UP_TO_DATE`(경고 없음). component 계층: `SpaceRoot`(roo
 
 - 지상 바닥 높이(`Space_Hall`·`Space_Bath` Location Z)는 지형 면보다 판 두께 이상 위이고 Recast `AgentMaxStepHeight`와 캐릭터 `MaxStepHeight` 이하다(출입구 문턱). 지하 깊이는 `Space_Work` Location Z와 홀 Z의 차다.
 - `Space_Hall` `Openings`: 서쪽 바깥 출입구 1개(`ConnectedSpace` 없음), 동쪽 통로 1개(`ConnectedSpace` = `Space_Bath`). `Space_Bath`·`Space_Work` `Openings`는 비어 있다.
-- `Space_Hall` `Stairs[0]`: `LowerSpace` = `Space_Work`, 동쪽으로 내려가며 맨 위 가장자리가 홀 남쪽 레인에 있다. 계단 재질은 이 항목 안에 있다. 다른 공간 `Stairs`는 비어 있다.
+- `Space_Hall` `Stairs[0]`: `LowerSpace` = `Space_Work`, 동쪽으로 내려가며 맨 위 가장자리가 홀 남쪽 레인에 있다. 위치(`TopEdgeCenterOffsetCm`)·폭·길이·판 수·재질의 정본은 이 항목이다(2026-10-02 사용자 결정으로 칠한 지형 구멍 안에 들도록 북쪽으로 옮김). 다른 공간 `Stairs`는 비어 있다.
 - `AllowedFacilityTags`: 홀 `ClothesLocker`·`DrinkFridge`·`MassageChair`·`RestBench`·`Television`·`Vanity`, 목욕공간 `Bath`·`Shower`·`ScrubTable`, 작업공간 `Boiler`·`Cooler`·`Circulator`·`Washer`·`Dryer`(모두 `Facility.Type.` 접두).
-- `Lighting`: 세 공간 같은 값으로 시작했다(그림자 끔). 밝기 조정은 instance 값에서 한다.
+- `Lighting`: 원본은 각 공간 instance `Lighting`이다(그림자 끔, 밝기는 2026-10-02 사용자가 PIE에서 조정). 화면 밝기는 Project Settings 자동 노출 끔(`Config/DefaultEngine.ini` `r.DefaultFeature.AutoExposure`)을 전제로 맞춘 값이다.
 - 컴퓨터 `ManagedBathPlacementZone`은 `Space_Bath`다([InteractionUISystem.md](InteractionUISystem.md)).
 
 ## 재질
@@ -47,7 +47,8 @@ Compile 결과 `BS_UP_TO_DATE`(경고 없음). component 계층: `SpaceRoot`(roo
 
 - `Landscape`와 `LandscapeStreamingProxy` 63개(전체 64)의 Landscape Material은 `/Game/Bathhouse/Materials/World/M_Landscape_ProcGridHole`이다. `/Engine/OpenWorldTemplate/LandscapeMaterial/M_ProcGrid` 그래프 복제 + Blend Mode Masked다. 이 재질은 Material Attributes를 쓰므로 Opacity Mask 핀이 무시된다. 그래서 기존 attribute 출력 → `BreakMaterialAttributes` → `MakeMaterialAttributes`(OpacityMask = `LandscapeVisibilityMask`, 나머지 attribute는 그대로 전달) → 출력으로 연결했다(같은 세션에서 칠한 Visibility 자리가 화면에서 뚫리는 것 확인, 새 프로세스 재로드 VALID). 바깥 지형 모습은 같다.
 - 지형 구멍 레이어는 엔진 공식 `/Engine/EngineResources/LandscapeVisibilityLayerInfo`가 자동 지정된다(별도 layer info asset 없음).
-- 0회 홀 안쪽 바닥 아래 지형 구멍은 아직 칠해지지 않았다. 남은 칠하기는 [USER_UNREAL.md](../USER_UNREAL.md) `EXP-U1` 항목이며 그 전까지 계단 통로 장애물 Data Validation 오류가 남는다.
+- 지형 구멍(Visibility)은 사용자가 Landscape 모드로 칠했다(저장 proxy `LandscapeStreamingProxy_3_3_0` `/Game/__ExternalActors__/Maps/DefaultMap/E/5Y/MJQIJ8RYADZHO7ZS6IE5NM`, `_4_3_0` `…/B/NX/PF1O5HWD53VE14YXX78A8H`). 구멍은 홀 계단 구멍과 그 주변을 덮고 홀 벽 밖에는 없다. 홀 안쪽 나머지는 칠하지 않았다(비고: 홀 바닥 판이 가려 보이지 않음). 계단을 옮기면 새 계단 통로가 구멍 안에 드는지 Data Validation이 알린다.
+- Editor 확인 방법: 편집 world에서는 Landscape에 구멍 없는 Editor 전용 heightfield가 Visibility 채널로 붙고(엔진 `LandscapeCollision.cpp`), 로드된 `WorldPartitionHLOD` 지형 mesh가 complex 충돌로 맞는다. 게임 충돌 확인은 WorldStatic·WorldDynamic object type의 단순 충돌 trace로 한다(공간 Validation 계단 통로 검사와 같은 방식).
 
 ## 설비 정의 종류 태그
 
@@ -56,4 +57,4 @@ Compile 결과 `BS_UP_TO_DATE`(경고 없음). component 계층: `SpaceRoot`(roo
 ## Data Validation 현재 상태
 
 - `Space_Bath`: 오류 0. 경고 2개(배치된 `UsedTowelBin`·`CleanTowelStack`이 허용 종류가 아님 — opt-out 정의에 종류 태그가 없어서다).
-- `Space_Hall`·`Space_Work`: 오류 1개(계단 통로를 지형이 막음, 지형 구멍 미칠). 그 밖의 오류·경고 없음.
+- `Space_Hall`·`Space_Work`: 오류 0, 경고 0.

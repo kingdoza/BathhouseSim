@@ -2,7 +2,7 @@
 
 - 작업 ID: `EXP-U1`
 - 단계: Editor 작업
-- 상태: 보류 — 계단 북쪽 이동(사용자 (나))으로 게임 충돌상 계단 통로는 열렸으나, C++ 계단 통로 검사가 complex trace(엔진 기본 query param)로 편집 world의 WorldPartition HLOD 지형 mesh에 맞아 `Space_Hall`·`Space_Work` Validation 오류 1개 남음, 책임: 구현(검사 trace를 단순 충돌로 하거나 HLOD actor 제외), 재개 조건: 구현 수정·리뷰 뒤 Editor 역할이 Validation 0 확인 후 USER_UNREAL 항목 제거·정본 갱신
+- 상태: 완료
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -329,3 +329,31 @@
 
 - 통과 조건(Validation 0)을 채우지 못해 `USER_UNREAL.md` EXP-U1 항목 제거, `BuildingSystem.md`·`WorldSystem.md` 갱신은 하지 않았다.
 - 구현 수정·리뷰 뒤 Editor 역할이 Validation 0을 확인하면 다음을 갱신한다: 항목 제거, 지형 구멍 상태(계단 통로 + 주변, 홀 안쪽 일부 미칠 비고), 계단 위치는 `Space_Hall` `Stairs` 원본 참조, 사용자 조명 원본 = 공간 instance `Lighting`, Auto Exposure 원본 = `Config/DefaultEngine.ini` `r.DefaultFeature.AutoExposure`.
+
+## 16. 검사 수정 뒤 최종 확인 (2026-10-02)
+
+- 입력: 마스터 최종 확인 지시. 구현 수정 `2c170b9`(계단 통로 trace `bTraceComplex=false`, 코드 리뷰 3회차 승인), HEAD `aa85c4f`, 브랜치 `work/EXP-U1`.
+  - 정규 빌드 바이너리 `UnrealEditor-BathhouseSim.dll`(16:44:51)이 수정 Source(`BathhouseSpaceWorldValidation.cpp` 16:41:00)보다 새롭다. Source에 `FCollisionQueryParams StairQueryParams(..., false)`가 있다.
+- 환경: 다른 프로젝트 Editor(PID 30900, `BeekeepingSim.uproject`)가 떠 있었다. 실행 인자로 구분했고 건드리지 않았다. 포트 8000 리스너는 없었다. 충돌을 피하려고 작업용 Editor는 `-ModelContextProtocolStartServer` 없이 Python harness만으로 띄웠다(숨김, PID 30048).
+- 스크립트: `Saved/Claude/EXP-U1/68_final.py`, `64_stair9.py`, `48_dirty.py`, `44_quit.py`. 읽기 전용이며 저장은 없다.
+
+| 항목 | 결과 |
+|---|---|
+| `Space_Hall` Data Validation | VALID, 오류 0, 경고 0 |
+| `Space_Work` Data Validation | VALID, 오류 0, 경고 0 |
+| `Space_Bath` Data Validation | VALID, 오류 0, 경고 2(배치된 `UsedTowelBin`·`CleanTowelStack` 종류 태그 없음, 기존과 같음) |
+| 계단 구멍 9지점(단순 WorldStatic·WorldDynamic object trace, Z 25→−75) | 9곳 모두 공간 외 blocking 없음 |
+| dirty | 0 |
+
+- 종료: `QUIT_EDITOR`로 정상 종료하고 PID 30048 소멸을 확인했다. 남은 Editor는 BeekeepingSim PID 30900뿐이고 포트 8000 리스너 0이다.
+- 정본·큐 갱신:
+  - `USER_UNREAL.md`: EXP-U1 지형 구멍 칠하기 항목 제거.
+  - `.md/Unreal/BuildingSystem.md`:
+    - 계단 위치는 `Space_Hall` `Stairs[0]` 원본 참조(사용자 결정으로 북쪽 이동).
+    - 조명 원본은 공간 instance `Lighting`, 자동 노출 원본은 `Config/DefaultEngine.ini` `r.DefaultFeature.AutoExposure`.
+    - 지형 구멍은 계단 통로와 주변을 사용자가 칠함(저장 proxy `_3_3_0`·`_4_3_0`). 홀 안쪽 나머지 미칠은 비고.
+    - Editor 확인 방법: 편집 world Visibility 채널 Editor 전용 heightfield, HLOD complex 충돌 주의. 게임 충돌은 단순 object trace로 본다.
+    - Data Validation 현재 상태 갱신.
+  - `.md/Unreal/WorldSystem.md`: 지형 구멍·자동 노출·조명 원본 참조 추가.
+- 금지 항목(저장, PIE, 커밋, 화면 작업, Source 수정, stash·`main`·브랜치 변경)은 지켰다.
+- 판정: EXP-U1 Editor 작업의 남은 보류 사유가 모두 해소돼 완료다.
