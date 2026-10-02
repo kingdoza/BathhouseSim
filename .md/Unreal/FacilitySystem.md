@@ -34,9 +34,9 @@
 
 ## 확장 정의와 관리자
 
-- `/Game/Bathhouse/Data/Expansion/DA_BathhouseExpansion_Default`(`UBathhouseExpansionDefinition`): `Max Purchase Count`(전체 구입 횟수 상한), `Purchase Prices`(줄 k = k+1번째 구입 가격, 상한과 같은 줄 수), `Tiers`(줄 = 홀 넓힘 횟수, 열쇠 수·락커 칸 한도, 상한 + 1줄). 값의 정본은 이 asset이다. `ValidatePurchaseData`와 Data Validation 오류 0(`EXP-U2` 저장·새 프로세스 재로드).
+- `/Game/Bathhouse/Data/Expansion/DA_BathhouseExpansion_Default`(`UBathhouseExpansionDefinition`): 필드는 `Tiers`(줄 = 홀 넓힘 횟수 0회부터, 열쇠 수·락커 칸 한도)뿐이다. 줄 수는 홀 `Expansion Steps` 줄 수 + 1 이상이어야 한다(공간 Validation이 알림). 값의 정본은 이 asset이다. 넓힘 가격·공간별 상한은 공간 instance `Expansion Steps`에 있다([BuildingSystem.md](BuildingSystem.md)). 지운 `Max Purchase Count`·`Purchase Prices`는 `EXP-U3` 재저장으로 파일에서 정리됐다. `ValidatePurchaseData`와 Data Validation 오류 0(저장·새 프로세스 재로드).
 - DefaultMap `ExpansionAuthority`(`BP_BathhouseExpansionAuthority_C`, package `/Game/__ExternalActors__/Maps/DefaultMap/1/T8/BSY81Z2446YMM4DNR4DC1B`): `Expansion Definition` = 위 asset, `Initial Tier Index` 0. Data Validation 오류 0(확인만, 저장하지 않음).
-- DefaultMap `KeyRack`(`BP_BathhouseKeyRack_C`, package `/Game/__ExternalActors__/Maps/DefaultMap/8/3G/CDTHV2ALC56NYO6HJ2VG2Q`): `Pair Transforms` 개수가 도달 가능한 `Tiers` 줄의 최대 열쇠 수 이상이다. Data Validation 오류 0(확인만).
-- `DA_FacilityPlacement_ClothesLocker_1`은 상점 상품이다([ShopSystem.md](ShopSystem.md)). Data Validation 경고 1개(`Recovery Item Mesh` 미지정, Engine Cube 대체)는 기존 상태다.
+- DefaultMap `KeyRack`(`BP_BathhouseKeyRack_C`, package `/Game/__ExternalActors__/Maps/DefaultMap/8/3G/CDTHV2ALC56NYO6HJ2VG2Q`): `Pair Transforms` 개수가 `Tiers` 모든 줄의 최대 열쇠 수 이상이다(검사 범위 = 효과 표 모든 줄). Data Validation 오류 0(확인만, `EXP-U3`).
+- `DA_FacilityPlacement_ClothesLocker_1`·`_4`·`_8`은 상점 상품이다([ShopSystem.md](ShopSystem.md)). 각 Data Validation 경고 1개(`Recovery Item Mesh` 미지정, Engine Cube 대체)는 기존 상태다.
 
 현재 저장 상태를 불러온 깨끗한 PIE 2회에서 duplicate ID, expansion limit, capacity 중복 합산 또는 startup locker 오류가 발생하지 않았다. 개별 Level actor Data Validation과 World Partition 저장이 필요한 항목은 [USER_UNREAL.md](../USER_UNREAL.md)에 남아 있다.
