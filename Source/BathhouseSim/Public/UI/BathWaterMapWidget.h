@@ -59,6 +59,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bath Water Map")
 	TSubclassOf<UBathWaterBathTileWidget> BathTileWidgetClass;
 
+	/** 굵은 칸 선의 render target px 두께. 1 미만은 선이 사라질 수 있어 허용하지 않는다. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bath Water Map|Grid", meta = (ClampMin = "1"))
+	float GridLineThicknessPx = 1.0f;
+	/** Zone 경계선의 render target px 두께. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bath Water Map|Grid", meta = (ClampMin = "1"))
+	float BoundaryLineThicknessPx = 2.0f;
+	UPROPERTY(EditDefaultsOnly, Category = "Bath Water Map|Grid")
+	FLinearColor GridLineColor = FLinearColor(0.20f, 0.49f, 0.56f, 0.36f);
+	UPROPERTY(EditDefaultsOnly, Category = "Bath Water Map|Grid")
+	FLinearColor BoundaryLineColor = FLinearColor(0.25f, 0.78f, 0.85f, 0.85f);
+
 private:
 	FVector2D ResolveCanvasSize(const UCanvasPanel* Canvas) const;
 	bool IsSnapshotInsideZone(const FBathWaterBathSnapshot& Snapshot) const;
@@ -78,8 +89,10 @@ private:
 	FTransform LastGridZoneTransform;
 	FVector LastGridZoneExtent = FVector::ZeroVector;
 	float LastMajorGridSpacingCm = 0.0f;
+	FVector2D LastGridRenderScale = FVector2D::ZeroVector;
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FBathWaterOperationsUIWidgetTest;
+	friend class FBathWaterMapGridLineLayoutTest;
 	int32 RebuildCount = 0;
 	int32 LayoutWriteCount = 0;
 #endif

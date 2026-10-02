@@ -172,6 +172,7 @@ Blueprint에서 동적으로 row를 생성하는 것은 표현 데이터 렌더�
 - UI는 `10%`를 상수로 저장하지 않고 condition snapshot의 파생 임계치를 표시한다.
 - 구조 revision이 바뀔 때만 map을 rebuild하고, 연속 값은 presentation cache가 달라질 때만 갱신한다.
 - 지도는 Zone world 종횡비를 보존한 중앙 letterbox content rect와 네 world corner의 단일 투영 결과로 위치·크기·yaw를 계산한다.
+- 지도 격자 선 두께는 render px 단위 WBP Class Default이고 native가 누적 배율로 레이아웃 두께를 역산한다. 타일은 slot(footprint 투영) 전체를 채운다([BathWaterManagementUISystem.md](BathWaterManagementUISystem.md) Map Grid Lines, Bath Tile Fill).
 - 종류별 capacity는 text/progress/status를 함께 표시하고, 욕탕별 circulation/heating/cooling deficit은 독립 flag로 동시에 표현한다.
 - 선택 대상이 사라지거나 Zone이 invalid면 detail을 비우고 mutation을 차단한다.
 - focus-out은 widget을 파괴하지 않아 같은 computer Actor lifetime 동안 선택과 표시 상태를 유지한다.
