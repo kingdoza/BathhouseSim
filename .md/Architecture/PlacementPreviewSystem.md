@@ -5,7 +5,7 @@
 ## 상태
 
 - Generic Native Preview, Preview Without Aim, Compatible Zone Grid: Source 반영.
-- Footprint Display와 Draw Order: Source 반영, Editor 작업·사용자 PIE 전(`PLACEMENT-FOOTPRINT-PREVIEW`).
+- Footprint Display와 Draw Order: 사용자 PIE 통과(2026-10-03)(`PLACEMENT-FOOTPRINT-PREVIEW`).
 
 ## Source Scope
 

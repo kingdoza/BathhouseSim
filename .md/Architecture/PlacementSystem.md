@@ -123,7 +123,7 @@ CellsXY = round(FullSizeXY / GridSizeCm)
 
 각 축의 full size는 양수·finite이고 `GridSizeCm`의 정수배여야 한다. 허용 오차 안에서 정수배가 아니면 Definition/Data Validation과 runtime placement가 실패한다. grid 또는 footprint를 바꾸면 cell 값을 별도로 갱신하지 않는다.
 
-파생식 적용(2026-10-02 `PLACEMENT-FOOTPRINT-PREVIEW`, Source 반영, Editor 작업·사용자 PIE 전):
+파생식 적용(2026-10-02 `PLACEMENT-FOOTPRINT-PREVIEW`, 사용자 PIE 통과 2026-10-03):
 
 - 이전 `DeriveFootprintCells`는 `PlacementFootprint` component-to-world scale을 써서, component-to-world를 갱신하지 않는 Blueprint CDO 검사(Definition·Data Validation·preview 초기화)에서 root scale과 하위 component scale이 빠졌다(쿨러 비정수 footprint 미검출).
 - 위 식의 scale 항은 `GetFootprintRelativeToRoot()` 합성 scale × root relative scale로 계산한다. CDO와 instance에서 같은 값이며(instance root relative scale = Actor scale), 판정의 `RelativeFootprint * Candidate`와 같은 FTransform 합성 규칙이다. 식 자체는 `UFacilityPlacementComponent::ComputeScaledFootprintFullSize` 하나로 두고 cell 파생과 footprint 표시가 함께 쓴다.
