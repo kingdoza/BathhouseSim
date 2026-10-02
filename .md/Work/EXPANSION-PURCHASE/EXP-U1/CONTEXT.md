@@ -18,3 +18,4 @@
   - 사용자 지시 7(2026-10-02): 모델링 목록 지금 바로 조사, 칠하기는 나중에. Editor 워커 재개: boiler Z+25 저장 + 스태틱 메시 목록 읽기 전용 조사 → `.md/MODELING_STATIC_MESH_LIST.md`(마스터 저장).
   - 사용자 지시 8(2026-10-02): 레이어 정보 생성 후 자동화 재시도 승인 → 공식 Visibility 레이어(엔진 객체)로 재시도했으나 실패(2회 제한), Content 저장 없음. 지형 칠하기는 사용자 직접으로 남음.
   - 사용자 지시 9(2026-10-02): 보이는 창 Editor로 자동화 재시도 → 충돌 구멍은 실패(저장 안 함), 화면 구멍 원인(Material Attributes 재질에서 OpacityMask 무시) 수정·저장. 사용자 실험으로 Landscape 모드 Visibility 칠하기는 충돌을 뚫음 확인. 남은 일: 사용자 Top 뷰 클릭 찍기로 홀 안쪽 칠하기.
+  - 2026-10-02 16:22 GitHub Desktop이 `work/EXP-U1`에서 미추적 MODEL-M1 파일을 stash(`stash@{1}`)하고 `main`(MODEL-M1 커밋 `888324e`)으로 전환. 사용자 재칠하기는 main 작업 트리에 저장됨(`stash@{0}`도 생김). 마스터가 대조: 변경 130개 중 128개는 `work/EXP-U1` 커밋과 동일, 지형 proxy 2개만 새 칠하기 → 사용자 승인 후 2개 백업, `checkout -f work/EXP-U1`, 2개 복원·커밋. stash 2개와 main 커밋은 건드리지 않음.
