@@ -1,6 +1,6 @@
 # CONTEXT — PLACEMENT-FOOTPRINT-PREVIEW 배치 미리보기의 footprint 공간 표시
 - 목표 / 상위·선행·관련 작업: 설비 배치 미리보기에서 비주얼 메시와 함께 Placement Footprint의 XY 평면 점유 공간을 보여 준다. 관련: PlacementSystem(범용 native preview), `EXP-U3` D4(배치 미리보기 숨김), `BUG-2026-10-02_bath_water_map_grid_scale_mismatch`(footprint와 메시 크기 차이 주제 공유).
-- 현재 단계와 재개 지점: 코드 리뷰 2회차 승인(`9213231`, 리뷰 승인 커밋) → Editor 작업(`PROMPT_UNREAL.md`, 같은 사전 조사 Editor 워커 재개). F4 잔여(낮음): `fpv_r1_build.log` 파일 없음 — DLL·테스트로 빌드 확인됨.
+- 현재 단계와 재개 지점: Editor 작업 보류(`REPORT_UNREAL_EDITOR.md`) — 첫 asset 저장(`M_FacilityPlacementFootprint`·MI)을 auto mode 권한 분류기가 "Modify Shared Resources"로 거부, 우회 없음, 디스크 변경 0. 수정 전 상태 확인 완료(Validation: Circulator·Boiler 축 정렬 오류, Cooler 비정수 — 구현 검사 동작 확인). 재개 조건: 사용자가 Editor asset 저장·`Config/DefaultGame.ini` 수정 권한을 허용 → 같은 Editor 워커 재개(보고서 5절 순서). 같은 날 BUG 작업의 WBP 저장은 허용됐음.
 - 명세 승인 일자(자동/명시)와 사전 허용: 2026-10-02 자동 승인(S4 아니오). 근거: 모든 동작이 답변·추천안·옛 사본 전제에서 나왔고 철회 외 새 질문 없음, 반투명 확인은 옛 Q5 A 결과를 바꾸지 않음, 세 설비 판정 변화는 Q10 B 선택지에 명시. 사전 허용(S2): 범위 밖 asset 변경도 멈추지 않고 진행·단계 보고에 기록(`BP_ClothesLocker` 사용자 변경은 제외). S3: PIE 통과 후 main 병합 예.
 - 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 명세는 worktree branch `spec/PLACEMENT-FOOTPRINT-PREVIEW`에서 작성 후 main으로 fast-forward. 아키텍처부터 `work/PLACEMENT-FOOTPRINT-PREVIEW`(worktree `.claude/worktrees/PLACEMENT-FOOTPRINT-PREVIEW`), 아키텍처 시작 커밋 = main 명세 커밋(git log).
 - 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 리뷰 1회차 실패(작은 범위) → 2회차 승인, 리뷰 승인 커밋 `9213231`. 아키텍처 자동 복귀 미사용.
