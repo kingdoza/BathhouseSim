@@ -8,7 +8,7 @@
 - 사용자 지시 모델 덮어쓰기: 없음
 - 결과물 목록과 사용자 지시 요약:
   - 결과물: `REPORT_UNREAL_DISCOVERY.md`(완료), `ArtSource/Bathhouse/{Boiler_03,Circulator_01,Shower_01,Vanity_01,ClothesLocker_01}/`(blend·FBX·텍스처·턴어라운드·README·manifest·validation), 공용 `ArtSource/Bathhouse/_Pipeline/`, 라인업 `MODEL-M1_Lineup.png`, 시간 기록 `timing.log`.
-  - 검증: 5종 모두 FBX 재수입 bounds·UV·재질·UCX 검사 통과. 미검증: FBX의 Unreal 실제 import 축(glb 실측 기반 추정), Unreal 조명에서의 외형.
+  - 검증: 5종 모두 FBX 재수입 bounds·UV·재질·UCX 검사 통과. FBX import 축은 사용자가 `SM_Boiler_03` 본체를 import해 정면 −Y로 확인함(2026-10-02). 미검증: Unreal 조명에서의 외형, 부품 메시 import.
   - 조사로 드러난 BP 이상값(정정은 Editor 작업 몫): `BP_Boiler.GaugeNeedlePivot` (67.77,−34,129.13) → 모델은 (0,−34,90) 기준. 목록·정본 불일치는 보고서 8절.
   - 사고 기록: 정리 중 넓은 glob으로 추적 파일 `Boiler_01.blend1`·`Boiler_02.blend1`을 지웠다가 `git checkout`으로 즉시 복구함. 같은 유형으로 `Boiler_01.blend1`을 한 번 더 지우고 복구함(2회, 회고 대상). 재발 방지: `run_all.sh`가 자기 에셋의 `.blend1`만 지우게 바꿈.
   - 사용자 추가 지시(2026-10-02): "작업 다 끝나면 모델링별 작업시간도 알려줘" → `timing.log` 기준 보고.
@@ -19,3 +19,4 @@
   - 사용자 요청(2026-10-02): "5종을 더 낡은 느낌 추가해봐" → 공용 노화 층(`age_all_materials`)과 재질별 노화(도장 녹 번짐, 철 녹, 나무 긁힘·물얼룩, 줄눈 때)를 추가함. 강도는 `palettes.json` `age_default` 0.7, 에셋별 `age`. 5종 재베이크, 검증 모두 통과.
   - 사용자 결정(2026-10-02): "처음 저티어 설치물품들은 이런 낡은느낌이고 고티어로 갈수록 낡은 노이즈는 없어지고 점점 깨끗해짐" → `palettes.json` `tiers`(1: 0.7 … 4: 0.0)와 `assets.<에셋>.tier`, 노화 0.35 미만에서 기본 마모까지 줄어드는 규칙을 추가함. 현재 5종은 1티어(결과물 변화 없음). 비교 `Tier_Compare.png`. 게임 쪽 티어 체계는 정본에 아직 없음(티어별 mesh·재질 교체는 향후 기능 작업).
   - Blender(사용자 MCP 세션)가 티어 비교 렌더 중 종료됨. 크래시 로그 없음, 열려 있던 것은 임시 비교 장면뿐. 남은 렌더는 백그라운드 Blender(CPU)로 마침.
+  - 사용자 요청(2026-10-02): "모델제작되고 내가 승인하면 언리얼로의 임포트와 에셋 설정까지의 작업방식도 작성해" → `.md/MODELING_WORKFLOW.md` 신규(7단계, 승인 관문, import·텍스처·마스터 재질·BP 연결·PIE·커밋·재작업). 지침서 정본 관계 줄과 `AGENTS.md` 정본 목록에 경로 추가.

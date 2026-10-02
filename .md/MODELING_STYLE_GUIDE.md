@@ -4,7 +4,7 @@
 - 적용 대상: BathhouseSim 설비·소품 스태틱 메시. 모델링 대상과 사용처는 [MODELING_STATIC_MESH_LIST.md](MODELING_STATIC_MESH_LIST.md)에 있다.
 - 정본 관계
   - 색과 구역별 재질 종류의 원본은 `ArtSource/Bathhouse/_Pipeline/palettes.json`이고, 재질 표현 방식의 원본은 `bh_lib.py`(`mat_*`, `standard_mats`)다. 이 문서의 색 코드는 읽기용 사본이다. 원본을 바꾸면 이 문서도 함께 고친다.
-  - 제작 절차와 import 설정은 `ArtSource/Bathhouse/_Pipeline/README.md`를 따른다.
+  - 제작 절차는 `ArtSource/Bathhouse/_Pipeline/README.md`, 사용자 승인 뒤 Unreal import·BP 연결은 [MODELING_WORKFLOW.md](MODELING_WORKFLOW.md)를 따른다.
 - 기준 에셋: `Boiler_03`, `Circulator_01`, `Shower_01`, `Vanity_01`, `ClothesLocker_01`. 라인업 렌더는 `.md/Work/MODEL-M1/MODEL-M1_Lineup.png`다.
 
 ## 1. 스타일 기준
@@ -74,9 +74,7 @@
     - `tile_a` / `tile_b` / `tile_band` / `tile_grout`
     - `label` / `ink` / `dial_red` / `sign_ink`
     - `shade` / `mirror` / `white`
-- **공통 재료색**(테마와 무관, `palettes.json` `base`)
-  - 크롬 #C9CDD0, 강철 #9AA2A6, 주철 #3B3F42, 황동 #C49A4A, 구리 #B66A43, 녹 #7A4128
-  - 표시등 초록 #7FD08A / 호박색 #F0A040
+- **공통 재료색**(테마와 무관, `palettes.json` `base`): 크롬 #C9CDD0, 강철 #9AA2A6, 주철 #3B3F42, 황동 #C49A4A, 구리 #B66A43, 녹 #7A4128, 표시등 #7FD08A / #F0A040
 - **배분 원칙**
   - 주색 60%, 보조(진한색·밝은색) 30%, 포인트(포인트색·크롬·황동·구리) 10%로 나눈다.
   - 냉·온수의 파랑·빨강은 기능 표시이므로 모든 테마에서 유지한다.
@@ -126,9 +124,10 @@
 
 ## 5. 기술 규격
 
-- **단위·좌표**
-  - build 값은 해당 Blueprint **SceneRoot 로컬 Unreal cm**로 적는다. 변환식은 `Blender = (X, −Y, Z) / 100`이다.
-  - 정면이 UE −Y인 설비는 Blender +Y가 정면이고, UE +X인 설비는 Blender +X가 정면이다.
+- **단위·좌표·정면**
+  - build 값은 해당 Blueprint **SceneRoot 로컬 Unreal cm**로 적는다. 변환식은 `Blender = (X, −Y, Z) / 100`이다. FBX import로 확인했고, 조건은 Force Front X Axis 끔이다.
+  - 정면 대응: UE +X = Blender +X(Right 뷰, Numpad 3), UE −Y = Blender +Y(Back 뷰, Ctrl+Numpad 1), UE +Y = Blender −Y(Front 뷰, Numpad 1), UE −X = Blender −X(Left 뷰).
+  - **Blender Front 뷰는 UE 정면이 아니다.** BP 정면 축에 대응하는 뷰에서 설비 정면이 보이게 만들고, 그 뷰로 확인한다.
 - **pivot**
   - 본체는 바닥 중심 (0,0,0)이다.
   - 움직이는 부품은 BP pivot component 위치가 원점이고, 정지 자세는 BP 자식 mesh 방향을 따른다. 예: 바늘 +X, 문 −X로 뻗음, 레버 +Z.
@@ -183,7 +182,7 @@
 - [ ] 날카로운 모서리가 없고, bevel이 크기 기준표에 맞다
 - [ ] 설비 구역에 맞는 테마와 재질이고(`palettes.json` `assets`), 주색·보조·포인트 비율이 맞고, 포인트 색이 2가지 이하다
 - [ ] 노화 층이 적용됐고, 칠 벗겨짐·닳음은 모서리에, 때는 틈새·바닥·흘러내림에 몰려 있다
-- [ ] 정면 방향, pivot, 회전 정지 자세가 BP와 같다
+- [ ] 정면 방향(대응 Blender 뷰에서 확인), pivot, 회전 정지 자세가 BP와 같다
 - [ ] footprint와 모듈 경계를 지켰다(넘으면 README에 근거를 적었다)
 - [ ] 진열·조작 위치(상판 높이, 진열 칸, 레버 회전 공간)를 가리지 않는다
 - [ ] 재질 슬롯 1개, UV0·UV1, UCX 이름, 삼각형 예산을 지켰고 validate를 모두 통과했다

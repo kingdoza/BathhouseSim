@@ -26,6 +26,7 @@ Read the relevant `.md/` documents before making architecture, implementation, o
 - `.md/Architecture/*.md`: system-specific architecture documents
 - `.md/Unreal/0_UNREAL.md`: current Editor authoring/asset-contract map
 - `.md/Unreal/*.md`: system-specific Editor authoring documents
+- `.md/MODELING_WORKFLOW.md`: static mesh modeling tasks (production → user approval → Unreal import and BP hookup); look rules in `.md/MODELING_STYLE_GUIDE.md`
 
 ## Scope
 

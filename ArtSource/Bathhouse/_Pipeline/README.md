@@ -27,7 +27,8 @@
 
 - build·cfg 값은 모두 **해당 Blueprint SceneRoot 로컬 Unreal cm**입니다. `U(x, y, z)`가 Blender m로 바꾸며 Y 부호를 뒤집습니다.
 - 근거는 `.md/Work/MODEL-M1/REPORT_UNREAL_DISCOVERY.md` 1절입니다. Bath_01 glb import에서 `UE = (Bx, −By, Bz) × 100`을 실측했습니다.
-  - FBX 경로는 표준 동작 추정입니다. 첫 import 때 보일러 문이 UE −Y 면에 오는지 확인하세요.
+  - FBX 경로도 확인했습니다(2026-10-02 사용자 import). `SM_Boiler_03`의 정면(Blender +Y)이 UE −Y로 들어왔습니다. 조건: 이 파이프라인의 export 설정 + Unreal import Force Front X Axis 끔(기본값).
+- Blender Front 뷰(Numpad 1)는 UE +Y 면입니다. UE +X 정면은 Right 뷰(Numpad 3), UE −Y 정면은 Back 뷰(Ctrl+Numpad 1)에서 보입니다.
 - 움직이는 부품(문·레버·바늘)은 별도 FBX이고 mesh 원점이 BP pivot입니다. BP에서 자식 mesh의 상대 위치를 0, scale을 1로 두면 맞습니다.
 
 ## 다시 만들기
