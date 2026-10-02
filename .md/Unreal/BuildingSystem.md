@@ -4,7 +4,7 @@
 
 ## 공용 값 원본
 
-- Project Settings > Game > Bathhouse Building(`Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`): 벽 두께, 바닥·천장 판 두께, 형상 상자 mesh(`/Engine/BasicShapes/Cube`), 조각 최대 크기, 쓰레기 조각 class `BP_LitterSpawnZone_C`, 물 얼룩 조각 class `BP_StainSpawnZone_C`, 넓힘 미리보기 글자 크기 `Editor Preview Label World Size Cm`(Config에 값 없음 = C++ 기본값).
+- Project Settings > Game > Bathhouse Building(`Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`): 벽 두께, 바닥·천장 판 두께, 형상 상자 mesh(`/Engine/BasicShapes/Cube`), 조각 최대 크기, 쓰레기 조각 class `BP_LitterSpawnZone_C`, 물 얼룩 조각 class `BP_StainSpawnZone_C`, 넓힘 미리보기 글자 높이 여유·크기·해상도 `EditorPreviewLabelHeightCm`·`EditorPreviewLabelWorldSizeCm`·`EditorPreviewLabelFontSize`(원본은 이 ini 같은 섹션, 편집 화면 전용).
 - 설비 종류 태그 `Facility.Type.*` 14개는 `Config/DefaultGameplayTags.ini`에 있다.
 
 ## Blueprint
@@ -37,7 +37,8 @@ Compile 결과 `BS_UP_TO_DATE`(경고 없음). component 계층: `SpaceRoot`(roo
 - 원본: 각 instance Details `Bathhouse Space › Expansion`의 `Expansion Steps`(줄 = 그 공간의 몇 번째 넓힘, `Side`·`Amount Cm`). 넓힘 양 값은 이 instance 값이 정본이다. 줄 수 = 공간별 넓힘 횟수 상한이고 세 공간 합이 확장 정의 `Max Purchase Count` 이상이다([FacilitySystem.md](FacilitySystem.md)).
 - 현재 방향(줄 순서): `Space_Hall` 남 → 북(동쪽 목욕공간 맞닿음·서쪽 출입구 제외), `Space_Bath` 북 → 남(서쪽 홀 맞닿음 제외), `Space_Work` 서 → 동(지하, 서쪽 띠는 홀·마당 지형 아래, 동쪽 띠는 목욕공간 바닥 아래에 묻힌다).
 - 끝 모습(모든 줄 적용)의 지상 넓힘 띠에는 Level Actor(편집 전용 sprite·frustum 제외)가 없고 지형 면은 지상 바닥 판 아래다(편집 world object trace).
-- `Editor Preview Expansion Count`(Transient, 편집 전용)는 넓힌 모습 미리보기용이며 저장 상태는 세 공간 모두 0이다. 1 이상이면 벽·바닥·천장·조명·`ZoneBounds`가 넓힌 모습을 따르고 공간 위에 `넓힘 미리보기 N회` 글자 component가 생긴다. 글자는 현재 편집 world에서 천장 판 윗면과 같은 높이라 가려지고 한글이 기본 글꼴에 없어 네모로 보인다(코드 수정 대기, `EXP-U2` 보고). 방향(위에서 읽힘, 위쪽 북)은 맞다.
+- `Editor Preview Expansion Count`(Transient, 편집 전용)는 넓힌 모습 미리보기용이며 저장 상태는 세 공간 모두 0이다. 1 이상이면 벽·바닥·천장·조명·`ZoneBounds`가 넓힌 모습을 따르고, 편집 전용 Transient `UWidgetComponent` 글자 `넓힘 미리보기 N회`가 모든 공간 중 가장 높은 천장 판 윗면 + 높이 여유에 뜬다. 아래층(지하) 글자는 안쪽 중심 남쪽, 나머지는 북쪽에 붙고 위에서 읽힌다(위쪽 북). 사용자가 보이는 Editor에서 확인했다(`EXP-U2`).
+- 판정 경로 주의: 작업용 숨김 Editor에서는 위젯 component가 그려지지 않으니(render target 미생성) 미리보기 글자의 화면 판정은 사용자 확인으로 한다(FBK-003).
 
 ## 재질
 

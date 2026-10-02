@@ -2,8 +2,7 @@
 
 - 작업 ID: `EXP-U2`
 - 단계: Editor 작업
-- 상태: 보류 — 미리보기 글자 화면 확인이 작업용 숨김 Editor에서 불가(위젯 component render target 미생성, 기존 컴퓨터 ScreenWidget도 같음, 실행 환경 차단), 책임 단계 Editor 작업(사용자 화면 확인 또는 승인된 화면 작업), 재개 조건: 보이는 Editor에서 10.2 항목 확인. Content·자동화(174/174)는 완료.
-- 마스터 메모: 남은 항목은 Editor 수정 작업이 아니라 화면 검증이므로 `PIE_CHECKLIST.md` 0번으로 사용자에게 넘김(2026-10-02). 사용자가 통과를 알리면 Editor 역할이 `BuildingSystem.md`(10.4 문구)를 갱신한다.
+- 상태: 완료
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -197,3 +196,12 @@
 - autosave 복원 데이터의 `Packages`는 비어 있다. 포트 8000 리스너 없음. 남은 Editor는 BeekeepingSim(PID 30900)뿐이다.
 - Content·Config·Source·정본 변경 없음. `BuildingSystem.md`는 통과 전이라 갱신하지 않았다. 갱신 문구는 10.4에 있다.
 - 작업 중 `git status`에 이번 작업과 무관한 변경 `.md/Work/MODEL-M1/CONTEXT.md`, `ArtSource/Bathhouse/_Pipeline/README.md`가 나타났다. 손대지 않았다.
+
+## 12. 사용자 PIE 통과 뒤 정본 갱신 (2026-10-02)
+
+- 근거: 사용자가 2026-10-02에 U2 PIE를 승인했다(마스터 전달). 보이는 Editor에서 미리보기 글자를 확인하는 항목(PIE_CHECKLIST 0번)도 통과했다. 11절에서 남긴 화면 판정 항목이 이것으로 끝났다.
+- `.md/Unreal/BuildingSystem.md` 갱신(문서만):
+  - 공용 값 원본 줄: 미리보기 글자 높이 여유·크기·해상도 `EditorPreviewLabelHeightCm`·`EditorPreviewLabelWorldSizeCm`·`EditorPreviewLabelFontSize`의 원본은 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`다.
+  - 미리보기 줄: 편집 전용 Transient `UWidgetComponent` 글자가 모든 공간 중 가장 높은 천장 판 윗면 + 높이 여유에 뜬다. 지하 글자는 남쪽, 나머지는 북쪽에 붙고 위에서 읽힌다. 사용자가 확인했다.
+  - 판정 경로 주의(FBK-003): 작업용 숨김 Editor에서는 위젯 component가 그려지지 않으므로 화면 판정은 사용자 확인으로 한다.
+- Editor 실행, Content·Source·Config 변경, 자동화 재실행 없음.
