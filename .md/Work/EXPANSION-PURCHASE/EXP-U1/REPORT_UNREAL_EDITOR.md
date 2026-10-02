@@ -2,7 +2,7 @@
 
 - 작업 ID: `EXP-U1`
 - 단계: Editor 작업
-- 상태: 보류 — 사용자 재칠하기 뒤에도 계단 구멍 남쪽 가장자리(Y −615~−600) 지형이 남아 계단 통로 Validation 오류 1개(PIE는 통과), 책임: 사용자 결정·Editor 조작, 재개 조건: (가) 홀 안쪽 남쪽 끝까지 칠하기 또는 (나) `Space_Hall` 계단을 북쪽으로 15cm 이상 옮기기 중 결정 뒤 Editor 역할이 같은 확인 반복
+- 상태: 보류 — 계단 북쪽 이동(사용자 (나))으로 게임 충돌상 계단 통로는 열렸으나, C++ 계단 통로 검사가 complex trace(엔진 기본 query param)로 편집 world의 WorldPartition HLOD 지형 mesh에 맞아 `Space_Hall`·`Space_Work` Validation 오류 1개 남음, 책임: 구현(검사 trace를 단순 충돌로 하거나 HLOD actor 제외), 재개 조건: 구현 수정·리뷰 뒤 Editor 역할이 Validation 0 확인 후 USER_UNREAL 항목 제거·정본 갱신
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -286,3 +286,46 @@
   - (가) Landscape 모드 Visibility로 남쪽을 홀 안쪽 끝(Y −700)까지 칠한다. 화면 구멍은 꼭짓점 사이를 보간하므로 벽 바깥면(Y −720) 근처 지면에 작은 틈이 보이는지 확인이 필요하다.
   - (나) `Space_Hall` `Stairs[0]`의 `TopEdgeCenterOffsetCm` Y를 북쪽으로 15cm 이상 옮긴다(Level instance 1개 변경, 지형 무변경). 현재 배치에서 계단 발자국·출입 자리·작업공간 안쪽 조건은 여유가 있다(작업공간 안쪽 북쪽 끝까지 수백 cm).
 - 재개: 결정 뒤 Editor 역할이 같은 스크립트로 게임 충돌·Validation·화면을 다시 확인한다. 통과하면 `USER_UNREAL.md` 항목 제거와 `BuildingSystem.md`·`WorldSystem.md`(지형 구멍 상태, 사용자 조명 원본 = 공간 instance `Lighting`, Auto Exposure 원본 = `Config/DefaultEngine.ini` `r.DefaultFeature.AutoExposure`)를 갱신한다.
+
+## 15. 계단 북쪽 이동과 최종 확인 (2026-10-02)
+
+- 입력: 마스터 지시, 사용자 결정 (나) "계단을 북쪽으로 40cm". 브랜치 `work/EXP-U1`(시작 HEAD는 §14 저장 커밋 `8971aa0` 이후).
+- 실행:
+  - 변경용 숨김 작업용 Editor PID 31628, 새 프로세스 확인용 PID 27840. 둘 다 dirty 0 확인 뒤 `QUIT_EDITOR`로 정상 종료했고 프로세스 0, 포트 리스너 0이다.
+  - 스크립트: `Saved/Claude/EXP-U1/63_stair_move.py`, `64_stair9.py`, `65_revalidate.py`, `66_stair9_complex.py`, `67_save_hall.py`, `62_hole_extent.py`. 캡처: `cap_stair_final.png`.
+- stash, `main`, 브랜치, 사용자 미추적 파일은 건드리지 않았다.
+
+### 변경
+
+| 항목 | 결과 |
+|---|---|
+| 대상 | `Space_Hall`(`BP_BathhouseSpace_C_UAID_F02F7433CA362F0703_1270228495`) `Stairs[0]` |
+| 값 | `TopEdgeCenterOffsetCm` (−150,−540) → (−150,−500). 전후 export 비교에서 이 값 외 변화 없음 |
+| 저장 | `/Game/__ExternalActors__/Maps/DefaultMap/8/7N/V36YOPHA8C46E77EZIX78C`만 개별 저장. 지형·다른 actor 변경 없음 |
+| 새 계단 범위(world) | 발자국 X 80~760, Y −595~−405. 구멍 R X 100~740, Y −575~−425. 위 출입 자리 X −70~80, 아래 출구 X 760~910(Y −575~−425) |
+| 겹침 | 대기 배회 구역(X 320~680, Y 280~520)·카운터·열쇠걸이·배송 지점·락커와 겹침 없음 |
+| 겹침 오탐 | 2D 검사에서 `DryingSpot`(지하 Z −380~−275)이 위 출입 자리(홀 바닥)와 XY로만 겹침. 다른 층이라 실제 겹침 아님. 지하에서는 계단 위쪽 끝 벽(X 80~100)과 떨어져 있음 |
+| Validation 기타 계단 규칙 | 발자국·출입 자리·작업공간 안쪽·경사 오류 없음 |
+
+### 새 프로세스 확인
+
+| 항목 | 결과 |
+|---|---|
+| 계단 구멍 R 9지점(Validation과 같은 위치, 단순 object trace, Z 25→−75) | 9곳 모두 공간 외 blocking 없음(지형 통과) |
+| 구멍 범위 | 표본 408개, X 25~975, Y −600~−325. 벽 밖 구멍 0. 홀 안쪽 나머지 미칠 표본 4,157개(비고) |
+| 화면 | 계단 구멍에 계단 판이 보이고 지형 없음(`cap_stair_final.png`) |
+| `Space_Hall`·`Space_Work` Validation | 계단 통로 오류 1개 남음 |
+| `Space_Bath` Validation | 오류 0(경고 2, 기존과 같음) |
+| dirty | 0 |
+
+### 남은 오류 원인(구현 복귀 대상)
+
+- `Source/BathhouseSim/Private/Building/BathhouseSpaceWorldValidation.cpp`의 계단 통로 검사는 `World.LineTraceMultiByObjectType(Hits, Start, End, ObjectParams)`를 query param 없이 부른다. 기본값 `FCollisionQueryParams::DefaultQueryParam`은 엔진 `Engine/Private/Collision/WorldCollision.cpp` 50행에서 `bTraceComplex=true`다.
+- 같은 9지점을 complex object trace로 찍으면 모두 `HLOD0_Instancing/OpenWorld_MainGrid_L0_X0_Y-1_Z0`(`WorldPartitionHLOD`)의 `LandscapeMeshProxyComponent`에 Z 0에서 맞는다. 이 HLOD 지형 mesh는 편집 world에 로드돼 있고 보이지 않으며 QueryOnly 충돌을 가진다. 지형 구멍이 반영되지 않은 HLOD 생성물이다.
+- 단순 충돌(게임 Landscape heightfield)로는 9곳 모두 통과하므로 Content 측 작업은 끝났다. 검사가 계약("공간이 아닌 blocking 물체(지형 등)")과 다르게 편집 전용 HLOD를 막힘으로 판정하는 구현 문제다.
+- 수정 방향(구현 단계 판단): 계단 통로 trace를 단순 충돌(`bTraceComplex=false`)로 하거나 `AWorldPartitionHLOD` actor를 제외한다. 참고로 §5·§11·§12 판정은 편집 world의 Visibility 채널(구멍 없는 Editor 전용 heightfield)을 썼으므로 근거가 아니었다(§13).
+
+### 정본·큐
+
+- 통과 조건(Validation 0)을 채우지 못해 `USER_UNREAL.md` EXP-U1 항목 제거, `BuildingSystem.md`·`WorldSystem.md` 갱신은 하지 않았다.
+- 구현 수정·리뷰 뒤 Editor 역할이 Validation 0을 확인하면 다음을 갱신한다: 항목 제거, 지형 구멍 상태(계단 통로 + 주변, 홀 안쪽 일부 미칠 비고), 계단 위치는 `Space_Hall` `Stairs` 원본 참조, 사용자 조명 원본 = 공간 instance `Lighting`, Auto Exposure 원본 = `Config/DefaultEngine.ini` `r.DefaultFeature.AutoExposure`.
