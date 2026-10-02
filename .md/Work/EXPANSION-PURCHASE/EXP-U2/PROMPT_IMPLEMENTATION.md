@@ -61,7 +61,7 @@ U1 개요 0.2 표의 "U2 예정" 행이 이번에 실제가 된다. 수치는 �
 | 기존 Level Actor | `NavMeshBounds` | 넓힌 끝 홀·목욕공간을 덮지 않는다는 오류가 나오면만 크기 조정 |
 | 새 Widget Blueprint | `/Game/Bathhouse/UI/WBP_ExpansionScreen`(parent `UExpansionScreenWidget`), `/Game/Bathhouse/UI/WBP_ExpansionSpaceOption`(parent `UExpansionSpaceOptionWidget`) | 만든다 |
 | 기존 Widget Blueprint | `/Game/Bathhouse/UI/WBP_ComputerScreenRoot` | `확장` 탭 버튼과 Switcher 세 번째 화면 추가 |
-| Project Settings | Bathhouse Building `Editor Preview Label World Size Cm` | C++ 기본값 사용, 필요하면 조정 |
+| Project Settings | Bathhouse Building 미리보기 글자 값 3개(18절) | 원본 `Config/DefaultGame.ini`, 필요하면 조정 |
 
 ### 0.5 핵심 결정과 대안
 
@@ -414,7 +414,7 @@ struct FBathhouseExpansionView
 
 ## 10. lifecycle·전역 설정 영향
 
-- Project/World/Input/Collision/Nav 설정 변경 없음. Config 변경 없음(신규 Settings 값은 C++ 기본값, Editor가 바꾸면 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`에 저장).
+- Project/World/Input/Collision/Nav 설정 변경 없음. 미리보기 Settings 값의 원본은 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`다(18.2).
 - 런타임 형상 재생성은 넓힌 공간 하나의 Static ISM·Movable 조명을 다시 만든다. Recast Dynamic이 그 범위 tile을 다시 만든다(손님 길 갱신). 나머지 공간·설비·손님·물리 물체에는 호출이 없다.
 - World Partition: 공간 Actor는 항상 로드(`bIsSpatiallyLoaded=false`, U1)라 등록부가 셋을 모두 받는다.
 - 저장 없음. 게임을 다시 시작하면 0회(계약 4.5).
@@ -534,7 +534,7 @@ struct FBathhouseExpansionView
   - 기존 `EditorPreviewLabelWorldSizeCm`: tooltip 뜻을 "글자 높이(대략, cm)"로 갱신.
   - 신규 `float EditorPreviewLabelHeightCm`(ClampMin 1): 가장 높은 천장 판 윗면에서 글자까지의 여유.
   - 신규 `int32 EditorPreviewLabelFontSize`(ClampMin 1): 글자를 그리는 글꼴 크기(렌더 해상도).
-  - C++ 기본값만 두고 Config 키는 쓰지 않는다. 값 원본은 이 class 기본값이고, Editor가 바꾸면 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`에 저장된다.
+  - 세 값의 원본은 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`다(코드 리뷰 3회차 결정, U1 Building Settings 관례·Project Settings 저장 위치). C++ 초기값은 Config 키가 없을 때의 예비값이다.
 - 순수 helper(`FBathhouseSpaceLayout`, `BathhouseSpaceExpansionLayout.cpp`): `static FBathhousePreviewLabelPlacement PreviewLabelPlacement(const TArray<FBathhouseSpaceSnapshot>& Snapshots, int32 Index, double SlabThicknessCm, double HeightCm)` → `{ FVector Location; bool bSouthOfCenter; }`.
   - Location XY = `Snapshots[Index].Interior` 중심. Z = 사용 가능한 모든 snapshot의 `CeilingZ + SlabThicknessCm` 최댓값 + `HeightCm`.
   - `bSouthOfCenter` = 다른 snapshot 중 `OuterRect`가 XY에서 양의 넓이로 겹치고 `FloorZ`가 더 높은 것이 있음(허용 오차 `UE_KINDA_SMALL_NUMBER`).
@@ -551,7 +551,7 @@ struct FBathhouseExpansionView
 
 - 영향: 사용자 PIE 시나리오는 없다(편집 world 전용 표시). Editor 작업 단계의 편집 world 미리보기 확인 항목만 다시 본다.
 - 유지: 넓힘 데이터·runtime 넓힘·구입·확장 탭·락커 판매·검증, Editor 단계에서 저장한 모든 Content(`22e20c7`), 미리보기 문구, 겹침 표시 규칙, game world에 글자가 없다는 계약. R2(`Service.BlueprintLoad` 상품 수 리터럴)는 이 설계 범위 밖이며 구현이 따로 고친다.
-- Content 변경 없음. Editor 단계가 바꿀 수 있는 것은 위 세 Settings 값(`Config/DefaultGame.ini`)뿐이고, 기본값으로 잘 보이면 바꾸지 않는다.
+- Content 변경 없음. Editor 단계가 바꿀 수 있는 것은 위 세 Settings 값의 원본(`Config/DefaultGame.ini`)뿐이고, 지금 값으로 잘 보이면 바꾸지 않는다.
 
 ### 18.4 자동화·검증 기준
 
