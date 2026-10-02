@@ -6,6 +6,7 @@
 - domain 정본: [BathWaterOperationsSystem.md](BathWaterOperationsSystem.md)
 - computer session 정본: [ComputerSystem.md](ComputerSystem.md)
 - 공통 native Widget 정책: [UISystem.md](UISystem.md)
+- 2026-10-02 버그 설계(`BUG-2026-10-02_bath_water_map_grid_scale_mismatch`, Source 미반영): 지도 격자 선 두께를 render px 기준으로 배율 보정하고 선·타일 표현 상수를 WBP Class Defaults로 옮긴다. 타일 크기는 Editor asset(slot Fill) 수정이다. 아래 `Map Grid Lines`, `Bath Tile Fill`이 정본이다.
 - 2026-10-01 버그 수정(`BUG-2026-09-25_bath_water_slider_overrun_and_computer_focus_out`, Source 반영, 사용자 PIE 대기): slider 손잡이를 요청 callback 안에서 확정값으로 되돌리고 polling 동기화를 cache gate 앞으로 옮긴다. 아래 `Slider Synchronization`이 정본이다.
 - 2026-09-24 Source 확장: [UtilityLaborSystem.md](UtilityLaborSystem.md)의 예약/가동/설치 값, 이중 부족 상태와 snapshot cache를 native summary에 반영했다. 기존 WBP의 줄바꿈/높이 확인은 Editor 단계에서 필요하며, 빌드와 automation은 미실행이다.
 
@@ -25,6 +26,7 @@ Source/BathhouseSim/Private/UI/
   BathWaterMapWidget.cpp
   BathWaterBathTileWidget.cpp
   BathWaterDetailWidget.cpp
+  BathWaterMapGridLayout.h/.cpp   (설계, 비 UObject letterbox·격자 선 계산 helper)
 ```
 
 `BathhouseComputerActor.h/.cpp`에는 관리 Zone context 주입만 추가한다. focus/input session은 변경하지 않는다.
@@ -79,6 +81,24 @@ UBathWaterManagementScreenWidget
 - Zone world X:Y 비율을 보존하는 중앙 letterbox content rect를 사용하고 uniform pixels-per-world-unit 하나만 적용한다.
 - footprint의 네 world corner에 Actor/component scale을 포함해 한 번 투영하고, 인접 edge에서 tile size와 yaw를 계산한다.
 - Bath topology 또는 Zone geometry가 바뀔 때만 tile set을 rebuild한다. provider-only capacity 변화는 tile identity를 바꾸지 않는다.
+- letterbox 계산(px/cm, content 원점·크기)은 private helper `BathWaterMapGridLayout`의 한 함수를 `ProjectFootprint`와 격자가 같이 쓴다(2026-10-02 `BUG-2026-10-02_bath_water_map_grid_scale_mismatch` 설계, Source 미반영).
+
+### Map Grid Lines
+
+2026-10-02 `BUG-2026-10-02_bath_water_map_grid_scale_mismatch` 설계, Source 미반영.
+
+- 그리는 주체는 native `UBathWaterMapWidget`이다. `GridCanvas`에 선마다 `UBorder` 하나를 둔다. WBP graph·재질·배치 구역 `GridVisual`은 관여하지 않는다.
+- 간격 원본: `UFacilityPlacementSettings` `GridSizeCm` × 관리 Zone `MajorGridIntervalCells`. 선은 Zone 중심에서 `Cell × 간격` 좌표에 중심을 두고, Zone 경계와 같은 좌표의 칸 선은 만들지 않는다(경계선이 그린다). 경계선 네 개는 content rect 안쪽에 붙는다.
+- 두께 단위는 render target px다. 레이아웃 두께 = `max(1, 두께Px) / 축 배율`이며 축 배율은 `GridCanvas` paint-space geometry의 누적 render transform에서 X·Y 단위 벡터 길이로 읽는다. 컴퓨터 화면 root의 `ManagementScale`(ScaleBox) 배율이 1 미만이어도 모든 선이 1 render px 이상이 되어 사라지지 않는다. geometry가 없거나 배율이 무효면 `(1,1)`로 보고 다음 polling에서 다시 그린다.
+- 격자 rebuild key: canvas 크기, Zone transform·extent, 굵은 칸 간격, 축 배율. `ClearGrid`가 모두 초기화한다.
+- 조정값 원본: `WBP_BathWaterMap` Class Defaults의 `GridLineThicknessPx`, `BoundaryLineThicknessPx`(ClampMin 1), `GridLineColor`, `BoundaryLineColor`. C++ 초기값은 시작값일 뿐이며 문서·테스트는 수치를 복제하지 않는다.
+- 코드에 남는 상수는 조정값이 아닌 것뿐이다: 최소 render 두께 1px(1px 미만 사각형은 픽셀 중심을 못 덮을 수 있음), cached geometry 미배치 판정, 축별 선 수 안전 상한(비정상 geometry에서 widget 폭증 방지), 중앙 정렬 0.5, 부동소수 0 판정, 무효 배율의 항등 대체.
+
+### Bath Tile Fill
+
+- 타일의 보이는 영역과 클릭 영역은 `LayoutTile`이 canvas slot에 넣은 footprint 투영 사각형 전체다. render pivot 0.5 회전도 이 사각형 기준이다.
+- Editor 계약: `WBP_BathWaterBathTile` `RootOverlay` 직속 `SelectButton` OverlaySlot은 H·V Fill이다. 글자 묶음 `TileColumn`은 중앙 정렬이다. 넓힘으로 타일이 글자 묶음보다 작아질 때의 표시(축소·자르기)는 WBP layout이 소유하며 C++은 관여하지 않는다. 현재 저장 상태는 [InteractionUISystem.md](../Unreal/InteractionUISystem.md)가 기록한다.
+- 상태색(부족·선택·기본)과 선택·비선택 opacity의 원본은 `WBP_BathWaterBathTile` Class Defaults의 `DeficitTileColor`, `SelectedTileColor`, `NormalTileColor`, `SelectedRenderOpacity`, `UnselectedRenderOpacity`다. 우선순위(부족 > 선택 > 기본)는 native가 정한다.
 
 ## Refresh And Mutation
 
@@ -155,6 +175,7 @@ WidgetTree의 현재 hierarchy, 필수 `BindWidget` 이름·타입과 컴퓨터/
 - invalid/missing Zone이 mutation 없이 unavailable 상태가 되는지 확인한다.
 - 여러 computer가 같은 Zone을 참조하면 같은 domain 값을 표시하는지 확인한다.
 - world `+X` up, `+Y` right와 footprint 크기/yaw 투영을 확인한다.
+- 격자 선 render 두께가 1 미만 배율·임의 소수 오프셋에서도 1px 이상이고, 칸 선 수가 Zone extent·간격에서 계산한 값과 같은지 원본 값으로 계산해 확인한다(`BathhouseSim.BathWater.Operations.MapGridLineLayout`).
 - Zone 밖 Bath와 non-Bath utility가 지도에서 제외되는지 확인한다.
 - topology revision에서만 tile set을 rebuild하는지 확인한다.
 - slider가 subsystem transaction을 거쳐 committed/limited result를 표시하고 다른 Bath 설정을 바꾸지 않는지 확인한다.
