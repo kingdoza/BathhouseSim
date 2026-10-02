@@ -20,9 +20,24 @@ void ABathhouseSpaceActor::CollectStepSnapshots(TArray<FBathhouseExpansionStepSn
 	for (const FBathhouseSpaceExpansionStep& Step : ExpansionSteps)
 	{
 		FBathhouseExpansionStepSnapshot& Item = OutSteps.AddDefaulted_GetRef();
-		Item.Side = Step.Side;
-		Item.AmountCm = Step.AmountCm;
+		Item.Price = Step.Price;
+		for (const FBathhouseSpaceExpansionSide& Wall : Step.Sides)
+		{
+			FBathhouseExpansionSideSnapshot& WallItem = Item.Sides.AddDefaulted_GetRef();
+			WallItem.Side = Wall.Side;
+			WallItem.AmountCm = Wall.AmountCm;
+		}
 	}
+}
+
+int32 ABathhouseSpaceActor::GetNextExpansionPrice() const
+{
+	return ExpansionSteps.IsValidIndex(AppliedExpansionCount) ? ExpansionSteps[AppliedExpansionCount].Price : 0;
+}
+
+bool ABathhouseSpaceActor::IsAtExpansionLimit() const
+{
+	return AppliedExpansionCount >= ExpansionSteps.Num();
 }
 
 FBox2D ABathhouseSpaceActor::GetInteriorRectForCount(const int32 Count) const
@@ -57,10 +72,33 @@ bool ABathhouseSpaceActor::CanApplyNextExpansion(FText& OutFailureReason) const
 		OutFailureReason = LOCTEXT("StepsExhausted", "이 공간은 더 넓힐 수 없습니다.");
 		return false;
 	}
-	const float Amount = ExpansionSteps[AppliedExpansionCount].AmountCm;
-	if (!(Amount > 0.0f) || !FMath::IsFinite(Amount))
+	TArray<FBathhouseExpansionStepSnapshot> Steps;
+	CollectStepSnapshots(Steps);
+	const FBathhouseExpansionStepSnapshot& Next = Steps[AppliedExpansionCount];
+	if (Next.Sides.IsEmpty())
 	{
-		OutFailureReason = LOCTEXT("InvalidAmount", "다음 넓힘 줄의 양이 0보다 큰 유한한 값이 아닙니다.");
+		OutFailureReason = LOCTEXT("NoSides", "다음 넓힘 줄에 물러날 벽이 없습니다.");
+		return false;
+	}
+	for (int32 Index = 0; Index < Next.Sides.Num(); ++Index)
+	{
+		for (int32 Other = 0; Other < Index; ++Other)
+		{
+			if (Next.Sides[Other].Side == Next.Sides[Index].Side)
+			{
+				OutFailureReason = LOCTEXT("DuplicateSide", "다음 넓힘 줄에 같은 벽이 두 번 있습니다.");
+				return false;
+			}
+		}
+	}
+	if (!FBathhouseSpaceLayout::IsStepApplicable(Next))
+	{
+		OutFailureReason = LOCTEXT("InvalidAmount", "다음 넓힘 줄의 벽 양이 0보다 큰 유한한 값이 아닙니다.");
+		return false;
+	}
+	if (!(Next.Price > 0))
+	{
+		OutFailureReason = LOCTEXT("InvalidPrice", "다음 넓힘 줄의 가격이 0 이하입니다.");
 		return false;
 	}
 	if (!GetActorRotation().IsNearlyZero(UE_KINDA_SMALL_NUMBER)
@@ -101,9 +139,16 @@ bool ABathhouseSpaceActor::ApplyNextExpansion(FBathhouseSpaceExpansionUndo& OutU
 	{
 		TArray<FBathhouseExpansionStepSnapshot> Steps;
 		CollectStepSnapshots(Steps);
-		const FBox2D Band = FBathhouseSpaceLayout::ExpansionBand(GetBaseInteriorRect(), Steps, OutUndo.PreviousCount);
+		TArray<FBox2D> Bands;
+		FBathhouseSpaceLayout::ExpansionBandRects(GetBaseInteriorRect(), Steps, OutUndo.PreviousCount, Bands);
+		const FVector2D ChunkMax = GetDefault<UBathhouseBuildingSettings>()->GetCleaningChunkMaxSizeCm();
 		TArray<FBox2D> Rects;
-		FBathhouseSpaceLayout::SplitChunks(Band, GetDefault<UBathhouseBuildingSettings>()->GetCleaningChunkMaxSizeCm(), Rects);
+		for (const FBox2D& Band : Bands)
+		{
+			TArray<FBox2D> BandChunks;
+			FBathhouseSpaceLayout::SplitChunks(Band, ChunkMax, BandChunks);
+			Rects.Append(BandChunks);
+		}
 		FBathhouseCleaningChunkSpawner::Spawn(*this, CleaningChunkKind, Rects, GetFloorZ(), CleaningChunks);
 	}
 	return true;

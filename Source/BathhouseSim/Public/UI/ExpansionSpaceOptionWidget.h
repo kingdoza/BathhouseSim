@@ -33,8 +33,16 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> NameText;
 
+	/** 선택지별 `확장 단계 N/M`. 기존 WBP에 필수 binding을 더하지 않도록 Optional이다(존재는 content 자동화가 단언). */
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> StageText;
+
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> SizeText;
+
+	/** 선택지별 `다음 넓힘 N원`. Optional 근거는 StageText와 같다. */
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> PriceText;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> EffectText;

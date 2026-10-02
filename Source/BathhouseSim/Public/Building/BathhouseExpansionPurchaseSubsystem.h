@@ -16,7 +16,7 @@ DECLARE_MULTICAST_DELEGATE(FOnBathhouseExpansionChangedNative);
 
 /**
  * 확장 구입 조율. 공간 등록부, 화면 view, 구입 transaction과 변경 방송을 맡는다.
- * 공간별 넓힌 횟수는 각 공간 Actor가 가지며 전체 구입 횟수는 그 합으로 계산한다(저장하지 않는다).
+ * 넓힌 횟수·가격·상한은 각 공간 Actor가 가진다(저장하지 않는다). 전체 구입 횟수·상한은 없다.
  */
 UCLASS()
 class BATHHOUSESIM_API UBathhouseExpansionPurchaseSubsystem : public UWorldSubsystem
@@ -30,17 +30,17 @@ public:
 	void RegisterSpace(ABathhouseSpaceActor& Space);
 	void UnregisterSpace(ABathhouseSpaceActor& Space);
 
-	/** 등록된 공간의 넓힌 횟수 합. */
-	int32 GetPurchaseCount() const;
-
 	FBathhouseExpansionView BuildView(const APlayerState* Buyer) const;
 
-	/** 부작용 없이 구입 가능 여부를 순서대로 판정한다. 가능하면 None이고 OutPrice에 가격을 돌려준다. */
+	/**
+	 * 부작용 없이 구입 가능 여부를 순서대로 판정한다. 가능하면 None이고 OutPrice에 고른 공간의 다음 줄 가격을 돌려준다.
+	 * ExpectedAppliedCount는 화면이 본 그 공간의 넓힌 횟수다.
+	 */
 	EBathhouseExpansionFailure EvaluatePurchase(
-		const APlayerState* Buyer, EBathhouseSpaceKind Kind, int32 ExpectedPurchaseCount, int32* OutPrice = nullptr) const;
+		const APlayerState* Buyer, EBathhouseSpaceKind Kind, int32 ExpectedAppliedCount, int32* OutPrice = nullptr) const;
 
 	/** 동기 transaction. 실패하면 돈·공간·열쇠·한도가 구입 전과 같다. */
-	EBathhouseExpansionFailure TryPurchase(APlayerState* Buyer, EBathhouseSpaceKind Kind, int32 ExpectedPurchaseCount);
+	EBathhouseExpansionFailure TryPurchase(APlayerState* Buyer, EBathhouseSpaceKind Kind, int32 ExpectedAppliedCount);
 
 	/** 구입 commit, 공간 등록·해제, 확장 관리자 등록 변경 때 한 번 방송한다. */
 	FOnBathhouseExpansionChangedNative OnExpansionChanged;

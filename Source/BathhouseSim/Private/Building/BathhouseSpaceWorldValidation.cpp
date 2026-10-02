@@ -174,16 +174,16 @@ void FBathhouseSpaceValidation::ValidateWorld(
 	}
 	ValidateNavigation(BaseSnapshots, NavBoxes, Inputs, OutProblems);
 
-	int32 MaxPurchaseCount = INDEX_NONE;
+	int32 HallEffectRowCount = INDEX_NONE;
 	for (TActorIterator<ABathhouseExpansionAuthority> It(&World); It; ++It)
 	{
 		if (IsValid(*It) && It->GetExpansionDefinition())
 		{
-			MaxPurchaseCount = It->GetExpansionDefinition()->GetMaxPurchaseCount();
+			HallEffectRowCount = It->GetExpansionDefinition()->Tiers.Num();
 			break;
 		}
 	}
-	ValidateExpansion(OutSnapshots, NavBoxes, Inputs, MaxPurchaseCount, OutProblems);
+	ValidateExpansion(OutSnapshots, NavBoxes, Inputs, HallEffectRowCount, OutProblems);
 
 	// 계단 통로(구멍 안)를 공간이 아닌 blocking 물체(지형 등)가 막는지 수직 trace로 본다.
 	FCollisionObjectQueryParams ObjectParams;

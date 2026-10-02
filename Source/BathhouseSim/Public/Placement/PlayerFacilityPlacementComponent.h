@@ -52,6 +52,7 @@ private:
 	friend class FBathhouseHeldTargetUseOwnerRoutingTest;
 	friend class FBathhouseComputerWheelRoutingTest;
 	friend class FBathhouseSpacePlacementAutomationTest;
+	friend class FBathhouseFacilityPlacementPreviewAimTest;
 
 	UFUNCTION()
 	void HandleHeldObjectChanged(AActor* NewHeldObject);
@@ -72,7 +73,7 @@ private:
 	bool CanProcessSession() const;
 	bool TracePlacementZone(AFacilityPlacementZoneActor*& OutZone, FVector& OutPoint) const;
 	AActor* TraceRecoveryTarget() const;
-	FFacilityPlacementTransactionResult ValidateCurrentPlacement(FTransform& OutCandidate, AFacilityPlacementZoneActor*& OutZone) const;
+	FFacilityPlacementTransactionResult ValidateCurrentPlacement(FTransform& OutCandidate, AFacilityPlacementZoneActor*& OutZone, bool& bOutHasCandidate) const;
 	FFacilityPlacementTransactionResult ValidateWorldPlacement(
 		APlaceableFacilityItemActor& Item,
 		const FTransform& Candidate,

@@ -161,17 +161,32 @@ struct BATHHOUSESIM_API FBathhouseStairSpec
 	TObjectPtr<UMaterialInterface> StairWallMaterial = nullptr;
 };
 
-/** 공간 넓힘 한 줄. 그 방향 벽 한 면만 바깥으로 물러난다. */
+/** 넓힘 한 번에 물러나는 벽 하나와 그 양. */
+USTRUCT(BlueprintType)
+struct BATHHOUSESIM_API FBathhouseSpaceExpansionSide
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bathhouse Space",
+		meta = (ToolTip = "물러나는 벽 방향(world 축 기준). 0회에 다른 공간과 맞닿은 벽은 넓힐 수 없다."))
+	EBathhouseSpaceSide Side = EBathhouseSpaceSide::East;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bathhouse Space",
+		meta = (ClampMin = "0.0", ForceUnits = "cm", ToolTip = "이 벽이 바깥으로 물러나는 양(cm)."))
+	float AmountCm = 0.0f;
+};
+
+/** 공간 넓힘 한 번(한 단계). 여러 벽이 함께 물러나고 가격은 이 넓힘 단위다. */
 USTRUCT(BlueprintType)
 struct BATHHOUSESIM_API FBathhouseSpaceExpansionStep
 {
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bathhouse Space",
-		meta = (ToolTip = "넓히는 벽 방향(world 축 기준). 0회에 다른 공간과 맞닿은 벽은 넓힐 수 없다."))
-	EBathhouseSpaceSide Side = EBathhouseSpaceSide::East;
+		meta = (TitleProperty = "Side", ToolTip = "이 넓힘에 함께 물러나는 벽과 양. 항목 하나 = 벽 하나. 같은 벽은 한 번만."))
+	TArray<FBathhouseSpaceExpansionSide> Sides;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bathhouse Space",
-		meta = (ClampMin = "0.0", ForceUnits = "cm", ToolTip = "그 방향으로 벽이 물러나는 양(cm)."))
-	float AmountCm = 0.0f;
+		meta = (ClampMin = "0", ToolTip = "이 넓힘의 구입 가격(원). 그 공간의 몇 번째 넓힘인지별, 전체 구입 순번과 무관."))
+	int32 Price = 0;
 };

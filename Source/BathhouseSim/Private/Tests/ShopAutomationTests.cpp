@@ -1294,11 +1294,11 @@ bool FShopBlueprintLoadAutomationTest::RunTest(const FString& Parameters)
 			const FIntProperty* StartingMoneyProperty = FindFProperty<FIntProperty>(
 				UPlayerWalletComponent::StaticClass(), TEXT("StartingMoney"));
 			TestNotNull(TEXT("Wallet StartingMoney property is present"), StartingMoneyProperty);
-			TestEqual(TEXT("PlayerState wallet keeps the 100000 default"),
-				Wallet && StartingMoneyProperty
-					? StartingMoneyProperty->GetPropertyValue_InContainer(Wallet)
-					: INDEX_NONE,
-				100000);
+			// StartingMoney는 Blueprint 기본값이 원본(사용자 조정값)이라 리터럴로 고정하지 않는다. 지갑이 있고 값이 읽히며 음수가 아님만 본다.
+			const int32 StartingMoney = Wallet && StartingMoneyProperty
+				? StartingMoneyProperty->GetPropertyValue_InContainer(Wallet)
+				: INDEX_NONE;
+			TestTrue(TEXT("PlayerState wallet has a readable non-negative StartingMoney"), StartingMoney >= 0);
 		}
 		else if (Spec->NativeParent == ABathhouseComputerActor::StaticClass())
 		{

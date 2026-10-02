@@ -59,11 +59,27 @@ namespace
 		return Inputs;
 	}
 
-	FBathhouseExpansionStepSnapshot MakeStep(const EBathhouseSpaceSide Side, const double Amount)
+	// 줄 가격은 fixture 입력이다(검증이 가격 > 0을 요구한다).
+	constexpr int32 FixtureStepPrice = 1000;
+
+	/** 벽 하나짜리 줄. */
+	FBathhouseExpansionStepSnapshot MakeStep(const EBathhouseSpaceSide Side, const double Amount, const int32 Price = FixtureStepPrice)
 	{
 		FBathhouseExpansionStepSnapshot Step;
-		Step.Side = Side;
-		Step.AmountCm = Amount;
+		Step.Sides.Add({ Side, Amount });
+		Step.Price = Price;
+		return Step;
+	}
+
+	/** 같은 양의 여러 벽 줄. */
+	FBathhouseExpansionStepSnapshot MakeMultiStep(const int32 Price, const double Amount, std::initializer_list<EBathhouseSpaceSide> Sides)
+	{
+		FBathhouseExpansionStepSnapshot Step;
+		Step.Price = Price;
+		for (const EBathhouseSpaceSide Side : Sides)
+		{
+			Step.Sides.Add({ Side, Amount });
+		}
 		return Step;
 	}
 
@@ -116,9 +132,13 @@ namespace
 		Stair.bHasStepMaterial = true;
 		Stair.bHasStairWallMaterial = true;
 		Hall.Stairs.Add(Stair);
-		Hall.Steps = { MakeStep(EBathhouseSpaceSide::South, 200.0), MakeStep(EBathhouseSpaceSide::North, 200.0) };
-		Bath.Steps = { MakeStep(EBathhouseSpaceSide::North, 200.0), MakeStep(EBathhouseSpaceSide::South, 200.0) };
-		Work.Steps = { MakeStep(EBathhouseSpaceSide::West, 200.0), MakeStep(EBathhouseSpaceSide::East, 200.0) };
+		const double Amount = FBathhouseExpansionTestWorld::FixtureAmountCm;
+		const EBathhouseSpaceSide South = EBathhouseSpaceSide::South;
+		const EBathhouseSpaceSide North = EBathhouseSpaceSide::North;
+		const EBathhouseSpaceSide East = EBathhouseSpaceSide::East;
+		Hall.Steps = { MakeMultiStep(FixtureStepPrice, Amount, { South, North }), MakeMultiStep(FixtureStepPrice, Amount, { South, North }) };
+		Bath.Steps = { MakeMultiStep(FixtureStepPrice, Amount, { South, North, East }), MakeMultiStep(FixtureStepPrice, Amount, { South, North, East }) };
+		Work.Steps = { MakeMultiStep(FixtureStepPrice, Amount, { East, North }), MakeMultiStep(FixtureStepPrice, Amount, { East, North }) };
 		return { Hall, Bath, Work };
 	}
 
@@ -248,14 +268,14 @@ bool FBathhouseExpansionLayoutTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Zero steps leave the base"), RectNear(FBathhouseSpaceLayout::ExpandInterior(Base, Steps, 0), Base));
 	const FBox2D One = FBathhouseSpaceLayout::ExpandInterior(Base, Steps, 1);
 	TestTrue(TEXT("East step moves only the east edge"),
-		RectNear(One, FBox2D(Base.Min, FVector2D(Base.Max.X + Steps[0].AmountCm, Base.Max.Y))));
+		RectNear(One, FBox2D(Base.Min, FVector2D(Base.Max.X + Steps[0].Sides[0].AmountCm, Base.Max.Y))));
 	const FBox2D Two = FBathhouseSpaceLayout::ExpandInterior(Base, Steps, 2);
 	TestTrue(TEXT("West step then moves only the west edge"),
-		RectNear(Two, FBox2D(FVector2D(Base.Min.X - Steps[1].AmountCm, Base.Min.Y), One.Max)));
+		RectNear(Two, FBox2D(FVector2D(Base.Min.X - Steps[1].Sides[0].AmountCm, Base.Min.Y), One.Max)));
 	const FBox2D Three = FBathhouseSpaceLayout::ExpandInterior(Base, Steps, 3);
-	TestEqual(TEXT("North step moves the north edge"), Three.Max.Y, Base.Max.Y + Steps[2].AmountCm);
+	TestEqual(TEXT("North step moves the north edge"), Three.Max.Y, Base.Max.Y + Steps[2].Sides[0].AmountCm);
 	const FBox2D Four = FBathhouseSpaceLayout::ExpandInterior(Base, Steps, 4);
-	TestEqual(TEXT("South step moves the south edge"), Four.Min.Y, Base.Min.Y - Steps[3].AmountCm);
+	TestEqual(TEXT("South step moves the south edge"), Four.Min.Y, Base.Min.Y - Steps[3].Sides[0].AmountCm);
 	TestTrue(TEXT("Count beyond the list clamps to the end"), RectNear(FBathhouseSpaceLayout::ExpandInterior(Base, Steps, 99), Four));
 	TestTrue(TEXT("Negative count clamps to the base"), RectNear(FBathhouseSpaceLayout::ExpandInterior(Base, Steps, -3), Base));
 
@@ -265,19 +285,31 @@ bool FBathhouseExpansionLayoutTest::RunTest(const FString& Parameters)
 	WithBad.Insert(MakeStep(EBathhouseSpaceSide::North, std::numeric_limits<double>::infinity()), 3);
 	TestTrue(TEXT("Invalid amounts are skipped in the shape"),
 		RectNear(FBathhouseSpaceLayout::ExpandInterior(Base, WithBad, WithBad.Num()), Four));
-	TestEqual(TEXT("A skipped step has an empty band"), RectArea(FBathhouseSpaceLayout::ExpansionBand(Base, WithBad, 1)), 0.0);
+	{
+		TArray<FBox2D> SkippedBand;
+		FBathhouseSpaceLayout::ExpansionBandRects(Base, WithBad, 1, SkippedBand);
+		TestEqual(TEXT("A skipped step has an empty band"), SkippedBand.Num(), 0);
+	}
 
 	for (int32 Index = 0; Index < Steps.Num(); ++Index)
 	{
 		const FBox2D Before = FBathhouseSpaceLayout::ExpandInterior(Base, Steps, Index);
 		const FBox2D After = FBathhouseSpaceLayout::ExpandInterior(Base, Steps, Index + 1);
-		const FBox2D Band = FBathhouseSpaceLayout::ExpansionBand(Base, Steps, Index);
-		ExpectNear(*this, FString::Printf(TEXT("Band %d area = after - before"), Index), RectArea(Band), RectArea(After) - RectArea(Before), ExpTolerance);
-		TestEqual(TEXT("Band does not overlap the previous interior"), IntersectionArea(Band, Before), 0.0);
-		TestTrue(TEXT("Band stays inside the next interior"), Band.Min.X >= After.Min.X - ExpTolerance && Band.Max.X <= After.Max.X + ExpTolerance
-			&& Band.Min.Y >= After.Min.Y - ExpTolerance && Band.Max.Y <= After.Max.Y + ExpTolerance);
+		TArray<FBox2D> Bands;
+		FBathhouseSpaceLayout::ExpansionBandRects(Base, Steps, Index, Bands);
+		double BandArea = 0.0;
 		TArray<FBox2D> Chunks;
-		FBathhouseSpaceLayout::SplitChunks(Band, FixtureValues().ChunkMaxSizeCm, Chunks);
+		for (const FBox2D& Band : Bands)
+		{
+			BandArea += RectArea(Band);
+			TestEqual(TEXT("Band does not overlap the previous interior"), IntersectionArea(Band, Before), 0.0);
+			TestTrue(TEXT("Band stays inside the next interior"), Band.Min.X >= After.Min.X - ExpTolerance && Band.Max.X <= After.Max.X + ExpTolerance
+				&& Band.Min.Y >= After.Min.Y - ExpTolerance && Band.Max.Y <= After.Max.Y + ExpTolerance);
+			TArray<FBox2D> BandChunks;
+			FBathhouseSpaceLayout::SplitChunks(Band, FixtureValues().ChunkMaxSizeCm, BandChunks);
+			Chunks.Append(BandChunks);
+		}
+		ExpectNear(*this, FString::Printf(TEXT("Band %d area = after - before"), Index), BandArea, RectArea(After) - RectArea(Before), ExpTolerance);
 		double Sum = 0.0;
 		for (int32 A = 0; A < Chunks.Num(); ++A)
 		{
@@ -287,7 +319,7 @@ bool FBathhouseExpansionLayoutTest::RunTest(const FString& Parameters)
 				TestEqual(TEXT("Band chunks do not overlap"), IntersectionArea(Chunks[A], Chunks[B]), 0.0);
 			}
 		}
-		ExpectNear(*this, TEXT("Band chunks cover the band"), Sum, RectArea(Band), ExpTolerance);
+		ExpectNear(*this, TEXT("Band chunks cover the bands"), Sum, BandArea, ExpTolerance);
 	}
 
 	// 넓힌 뒤에도 이웃 공간 계획은 변하지 않는다(이웃은 넓힌 공간의 안쪽 직사각형을 읽지 않는다).
@@ -322,10 +354,10 @@ bool FBathhouseExpansionValidationTest::RunTest(const FString& Parameters)
 	const FBathhouseValidationInputs Inputs = FixtureInputs();
 	const FSnapshots Valid = MakeSnapshots(Values);
 	const FBox Cover = MakeCover(Valid, Values, 50.0);
-	const int32 TotalSteps = Valid[0].Steps.Num() + Valid[1].Steps.Num() + Valid[2].Steps.Num();
+	const int32 HallRows = Valid[0].Steps.Num() + 1;
 
 	FProblems Problems;
-	FBathhouseSpaceValidation::ValidateExpansion(Valid, { Cover }, Inputs, TotalSteps, Problems);
+	FBathhouseSpaceValidation::ValidateExpansion(Valid, { Cover }, Inputs, HallRows, Problems);
 	TestEqual(TEXT("A valid expansion list has no problems"), Problems.Num(), 0);
 
 	// 미리보기·적용 횟수와 무관하다.
@@ -335,21 +367,88 @@ bool FBathhouseExpansionValidationTest::RunTest(const FString& Parameters)
 		AtEnd.Add(FBathhouseSpaceLayout::WithExpansionCount(Snapshot, Snapshot.Steps.Num()));
 	}
 	FProblems EndProblems;
-	FBathhouseSpaceValidation::ValidateExpansion(AtEnd, { Cover }, Inputs, TotalSteps, EndProblems);
+	FBathhouseSpaceValidation::ValidateExpansion(AtEnd, { Cover }, Inputs, HallRows, EndProblems);
 	TestEqual(TEXT("Counts on the snapshots do not change the expansion result"), EndProblems.Num(), Problems.Num());
 
-	// 합계 경고와 상한 없음 생략.
+	// EXP-045 홀 효과 표 길이: 홀 줄 수 + 1줄은 통과, 짧으면 오류(홀), 표 정보 없음은 생략.
 	Problems.Reset();
-	FBathhouseSpaceValidation::ValidateExpansion(Valid, { Cover }, Inputs, TotalSteps + 1, Problems);
-	TestTrue(TEXT("Step total below the cap warns"), HasCode(Problems, EBathhouseProblemCode::ExpansionStepsBelowCap, EBathhouseProblemSeverity::Warning));
+	FBathhouseSpaceValidation::ValidateExpansion(Valid, { Cover }, Inputs, HallRows - 1, Problems);
+	TestTrue(TEXT("A hall effect table shorter than hall steps + 1 is an error"),
+		HasCode(Problems, EBathhouseProblemCode::ExpansionHallEffectShort, EBathhouseProblemSeverity::Error));
+	const FBathhouseLayoutProblem* ShortProblem = Problems.FindByPredicate([](const FBathhouseLayoutProblem& P)
+	{
+		return P.Code == EBathhouseProblemCode::ExpansionHallEffectShort;
+	});
+	TestTrue(TEXT("The short effect table error belongs to the hall"), ShortProblem && ShortProblem->OwnerIndex == 0);
 	Problems.Reset();
 	FBathhouseSpaceValidation::ValidateExpansion(Valid, { Cover }, Inputs, INDEX_NONE, Problems);
-	TestFalse(TEXT("No cap skips the total warning"), HasCodeAny(Problems, EBathhouseProblemCode::ExpansionStepsBelowCap));
+	TestFalse(TEXT("No effect table information skips the length check"), HasCodeAny(Problems, EBathhouseProblemCode::ExpansionHallEffectShort));
+	TestEqual(TEXT("A valid list still has no problems without the table"), Problems.Num(), 0);
+
+	// EXP-040~048 줄 형식: 빈 벽, 같은 벽 중복, 가격, 항목별 양.
+	{
+		FSnapshots Bad = Valid;
+		Bad[0].Steps[0].Sides.Reset();
+		Problems.Reset();
+		FBathhouseSpaceValidation::ValidateExpansion(Bad, { Cover }, Inputs, INDEX_NONE, Problems);
+		TestTrue(TEXT("A step without walls is an error"), HasCode(Problems, EBathhouseProblemCode::ExpansionSidesEmpty, EBathhouseProblemSeverity::Error));
+		Bad = Valid;
+		const FBathhouseExpansionSideSnapshot FirstWall = Bad[0].Steps[0].Sides[0];
+		Bad[0].Steps[0].Sides.Add(FirstWall);
+		Problems.Reset();
+		FBathhouseSpaceValidation::ValidateExpansion(Bad, { Cover }, Inputs, INDEX_NONE, Problems);
+		int32 DuplicateCount = 0;
+		for (const FBathhouseLayoutProblem& Problem : Problems)
+		{
+			DuplicateCount += Problem.Code == EBathhouseProblemCode::ExpansionSideDuplicate ? 1 : 0;
+		}
+		TestEqual(TEXT("The same wall twice in one step is one error"), DuplicateCount, 1);
+		TestFalse(TEXT("The duplicate item adds no amount error"), HasCodeAny(Problems, EBathhouseProblemCode::ExpansionAmountInvalid));
+		Bad = Valid;
+		Bad[0].Steps[1].Price = 0;
+		Problems.Reset();
+		FBathhouseSpaceValidation::ValidateExpansion(Bad, { Cover }, Inputs, INDEX_NONE, Problems);
+		TestTrue(TEXT("A step price of zero is an error"), HasCode(Problems, EBathhouseProblemCode::ExpansionPriceInvalid, EBathhouseProblemSeverity::Error));
+		const FBathhouseLayoutProblem* PriceProblem = Problems.FindByPredicate([](const FBathhouseLayoutProblem& P)
+		{
+			return P.Code == EBathhouseProblemCode::ExpansionPriceInvalid;
+		});
+		TestTrue(TEXT("The price error names the step index"), PriceProblem && PriceProblem->OwnerIndex == 0 && PriceProblem->ItemIndex == 1);
+		Bad = Valid;
+		Bad[1].Steps[0].Sides[1].AmountCm = -5.0;
+		Bad[1].Steps[0].Sides[2].AmountCm = 0.0;
+		Problems.Reset();
+		FBathhouseSpaceValidation::ValidateExpansion(Bad, { Cover }, Inputs, INDEX_NONE, Problems);
+		int32 AmountCount = 0;
+		for (const FBathhouseLayoutProblem& Problem : Problems)
+		{
+			AmountCount += Problem.Code == EBathhouseProblemCode::ExpansionAmountInvalid ? 1 : 0;
+		}
+		TestEqual(TEXT("Each wall item with a bad amount is its own error"), AmountCount, 2);
+		// 같은 줄의 항목은 항목마다 맞닿음을 본다: 홀 줄에 남(통과)과 동(통로 변)을 함께 두면 동만 오류.
+		Bad = Valid;
+		Bad[0].Steps[0] = MakeMultiStep(FixtureStepPrice, 100.0, { EBathhouseSpaceSide::South, EBathhouseSpaceSide::East });
+		Problems.Reset();
+		FBathhouseSpaceValidation::ValidateExpansion(Bad, { Cover }, Inputs, INDEX_NONE, Problems);
+		int32 TouchCount = 0;
+		for (const FBathhouseLayoutProblem& Problem : Problems)
+		{
+			TouchCount += Problem.Code == EBathhouseProblemCode::ExpansionTouchingSide ? 1 : 0;
+		}
+		TestEqual(TEXT("Only the touching wall item is a touching error"), TouchCount, 1);
+		// 출입구 변 경고도 항목마다.
+		Bad = Valid;
+		Bad[0].Steps[0] = MakeMultiStep(FixtureStepPrice, 100.0, { EBathhouseSpaceSide::South, EBathhouseSpaceSide::West });
+		Problems.Reset();
+		FBathhouseSpaceValidation::ValidateExpansion(Bad, { MakeCover(Bad, Values, 50.0) }, Inputs, INDEX_NONE, Problems);
+		TestTrue(TEXT("The entrance wall item warns"), HasCode(Problems, EBathhouseProblemCode::ExpansionEntranceSide, EBathhouseProblemSeverity::Warning));
+		TestFalse(TEXT("The other wall item does not add a touching error"), HasCodeAny(Problems, EBathhouseProblemCode::ExpansionTouchingSide));
+	}
 
 	// 잘못된 양.
 	{
 		FSnapshots Bad = Valid;
-		Bad[0].Steps[0].AmountCm = 0.0;
+		Bad[0].Steps[0].Sides[0].AmountCm = 0.0;
 		Problems.Reset();
 		FBathhouseSpaceValidation::ValidateExpansion(Bad, { Cover }, Inputs, INDEX_NONE, Problems);
 		TestTrue(TEXT("A zero amount is an error"), HasCode(Problems, EBathhouseProblemCode::ExpansionAmountInvalid, EBathhouseProblemSeverity::Error));
@@ -430,7 +529,7 @@ bool FBathhouseExpansionValidationTest::RunTest(const FString& Parameters)
 			HasCode(Problems, EBathhouseProblemCode::ExpansionNavWorkCovered, EBathhouseProblemSeverity::Error));
 	}
 
-	// world 검증: 횟수와 무관한 결과, 합계 경고.
+	// world 검증: 횟수와 무관한 결과, 효과 표 길이.
 	FBathhouseExpansionTestWorld Fx;
 	if (Fx.Create(*this, TEXT("ExpansionValidationWorld")))
 	{
@@ -448,12 +547,12 @@ bool FBathhouseExpansionValidationTest::RunTest(const FString& Parameters)
 		{
 			TestEqual(TEXT("ValidateWorld problem code does not depend on the applied count"), AtApplied[Index].Code, AtZero[Index].Code);
 		}
-		TestFalse(TEXT("Fixture steps meet the purchase cap"), HasCodeAny(AtZero, EBathhouseProblemCode::ExpansionStepsBelowCap));
-		Fx.Definition->MaxPurchaseCount = 7;
-		FProblems Below;
-		FBathhouseSpaceValidation::ValidateWorld(*Fx.World, Snapshots, Below);
-		TestTrue(TEXT("World validation warns when the steps cannot reach the cap"),
-			HasCode(Below, EBathhouseProblemCode::ExpansionStepsBelowCap, EBathhouseProblemSeverity::Warning));
+		TestFalse(TEXT("Fixture effect table covers the hall steps"), HasCodeAny(AtZero, EBathhouseProblemCode::ExpansionHallEffectShort));
+		Fx.Definition->Tiers.Pop();
+		FProblems Short;
+		FBathhouseSpaceValidation::ValidateWorld(*Fx.World, Snapshots, Short);
+		TestTrue(TEXT("World validation reports a hall effect table shorter than hall steps + 1"),
+			HasCode(Short, EBathhouseProblemCode::ExpansionHallEffectShort, EBathhouseProblemSeverity::Error));
 	}
 	Fx.Destroy();
 	return true;
@@ -468,16 +567,10 @@ bool FBathhouseExpansionDataTest::RunTest(const FString& Parameters)
 	UBathhouseExpansionDefinition* Definition = FBathhouseExpansionTestWorld::MakeDefinition();
 	FText Reason;
 	TestTrue(TEXT("Fixture definition is valid"), Definition->ValidatePurchaseData(Reason));
-	const int32 Max = Definition->GetMaxPurchaseCount();
 	TestTrue(TEXT("Hall effect below zero clamps to the first row"), Definition->GetHallEffect(-5) == &Definition->Tiers[0]);
 	TestTrue(TEXT("Hall effect past the table clamps to the last row"),
 		Definition->GetHallEffect(Definition->Tiers.Num() + 10) == &Definition->Tiers.Last());
 	TestEqual(TEXT("Hall effect index follows the count"), Definition->GetHallEffectIndex(1), 1);
-	int32 Price = 0;
-	TestTrue(TEXT("First purchase price is readable"), Definition->TryGetPurchasePrice(0, Price));
-	TestEqual(TEXT("First purchase price comes from the definition"), Price, Definition->PurchasePrices[0]);
-	TestFalse(TEXT("Price index out of range fails"), Definition->TryGetPurchasePrice(Definition->PurchasePrices.Num(), Price));
-	TestFalse(TEXT("Negative price index fails"), Definition->TryGetPurchasePrice(-1, Price));
 
 	auto Mutated = [&](TFunctionRef<void(UBathhouseExpansionDefinition&)> Mutate)
 	{
@@ -485,28 +578,20 @@ bool FBathhouseExpansionDataTest::RunTest(const FString& Parameters)
 		Mutate(*Copy);
 		return Copy;
 	};
-	TestFalse(TEXT("Fewer prices than the cap is invalid"),
-		Mutated([](UBathhouseExpansionDefinition& D) { D.PurchasePrices.Pop(); })->ValidatePurchaseData(Reason));
-	TestFalse(TEXT("A price of zero is invalid"),
-		Mutated([](UBathhouseExpansionDefinition& D) { D.PurchasePrices[1] = 0; })->ValidatePurchaseData(Reason));
-	TestFalse(TEXT("A negative price is invalid"),
-		Mutated([](UBathhouseExpansionDefinition& D) { D.PurchasePrices[0] = -10; })->ValidatePurchaseData(Reason));
-	TestFalse(TEXT("Fewer effect rows than cap + 1 is invalid"),
-		Mutated([](UBathhouseExpansionDefinition& D) { D.Tiers.Pop(); })->ValidatePurchaseData(Reason));
 	TestFalse(TEXT("Empty effect table is invalid"),
 		Mutated([](UBathhouseExpansionDefinition& D) { D.Tiers.Reset(); })->ValidatePurchaseData(Reason));
 	TestFalse(TEXT("Shrinking keys between rows is invalid"),
 		Mutated([](UBathhouseExpansionDefinition& D) { D.Tiers[2].KeyPoolSize = D.Tiers[1].KeyPoolSize - 1; })->ValidatePurchaseData(Reason));
 	TestFalse(TEXT("Keys below locker slots is invalid"),
 		Mutated([](UBathhouseExpansionDefinition& D) { D.Tiers[0].KeyPoolSize = D.Tiers[0].MaxInstalledLockerSlots - 1; })->ValidatePurchaseData(Reason));
-	TestTrue(TEXT("Longer price and effect tables than the cap are allowed"),
+	TestTrue(TEXT("A longer effect table than the hall steps + 1 is allowed"),
 		Mutated([](UBathhouseExpansionDefinition& D)
 		{
-			D.PurchasePrices.Add(9000);
 			const FBathhouseExpansionTier LastTier = D.Tiers.Last();
 			D.Tiers.Add(LastTier);
 		})->ValidatePurchaseData(Reason));
-	(void)Max;
+	TestTrue(TEXT("A one-row effect table passes the definition rules (the space validation owns the length)"),
+		Mutated([](UBathhouseExpansionDefinition& D) { D.Tiers.SetNum(1); })->ValidatePurchaseData(Reason));
 
 #if WITH_EDITOR
 	{
@@ -515,8 +600,8 @@ bool FBathhouseExpansionDataTest::RunTest(const FString& Parameters)
 		FDataValidationContext Bad;
 		UBathhouseExpansionDefinition* Broken = Mutated([](UBathhouseExpansionDefinition& D)
 		{
-			D.PurchasePrices.Reset();
-			D.Tiers.Pop();
+			D.Tiers[2].KeyPoolSize = D.Tiers[1].KeyPoolSize - 1;
+			D.Tiers[0].KeyPoolSize = D.Tiers[0].MaxInstalledLockerSlots - 1;
 		});
 		TestEqual(TEXT("Broken definition fails Data Validation"), Broken->IsDataValid(Bad), EDataValidationResult::Invalid);
 		TestTrue(TEXT("Each problem has its own error"), Bad.GetNumErrors() >= 2);
@@ -535,8 +620,11 @@ bool FBathhouseExpansionDataTest::RunTest(const FString& Parameters)
 	FBathhouseExpansionTestWorld Fx;
 	if (Fx.Create(*this, TEXT("ExpansionKeyRackWorld")))
 	{
-		const int32 Reachable = Fx.Definition->GetHallEffectIndex(Fx.Definition->GetMaxPurchaseCount());
-		const int32 NeededKeys = Fx.Definition->Tiers[Reachable].KeyPoolSize;
+		int32 NeededKeys = 0;
+		for (const FBathhouseExpansionTier& Tier : Fx.Definition->Tiers)
+		{
+			NeededKeys = FMath::Max(NeededKeys, Tier.KeyPoolSize);
+		}
 		FDataValidationContext RackOk;
 		TestEqual(TEXT("A rack with enough pairs is valid"), Fx.Rack->IsDataValid(RackOk), EDataValidationResult::Valid);
 		ABathhouseKeyRackActor* Small = Fx.World->SpawnActorDeferred<ABathhouseKeyRackActor>(
@@ -550,13 +638,21 @@ bool FBathhouseExpansionDataTest::RunTest(const FString& Parameters)
 		FDataValidationContext SmallBad;
 		TestEqual(TEXT("A rack with fewer pairs than the reachable key count is invalid"),
 			Small->IsDataValid(SmallBad), EDataValidationResult::Invalid);
-		// 도달할 수 없는 줄은 무시한다.
-		Fx.Definition->MaxPurchaseCount = 0;
-		Fx.Definition->PurchasePrices.Reset();
-		FDataValidationContext SmallReachable;
-		const bool bFirstRowFits = Fx.Definition->Tiers[0].KeyPoolSize <= NeededKeys - 1;
-		TestEqual(TEXT("Rows beyond the purchase cap are ignored"),
-			Small->IsDataValid(SmallReachable), bFirstRowFits ? EDataValidationResult::Valid : EDataValidationResult::Invalid);
+		// 열쇠걸이는 홀 넓힘 줄 수와 무관하게 효과 표 모든 줄의 열쇠 수를 본다(표 끝 쪽 줄이 더 커도 포함).
+		ABathhouseKeyRackActor* Exact = Fx.World->SpawnActorDeferred<ABathhouseKeyRackActor>(
+			ABathhouseKeyRackActor::StaticClass(), FTransform(FVector(0.0f, 8000.0f, 0.0f)));
+		Access::AddRackPairs(*Exact, NeededKeys);
+		Exact->FinishSpawning(FTransform(FVector(0.0f, 8000.0f, 0.0f)));
+		if (!Exact->HasActorBegunPlay())
+		{
+			Exact->DispatchBeginPlay();
+		}
+		FDataValidationContext ExactOk;
+		TestEqual(TEXT("A rack with exactly the largest key count of all rows is valid"), Exact->IsDataValid(ExactOk), EDataValidationResult::Valid);
+		Fx.Definition->Tiers.Add({ NeededKeys + 2, NeededKeys + 2 });
+		FDataValidationContext ExactBad;
+		TestEqual(TEXT("A larger key count in the last row (beyond the hall steps) makes the rack invalid"),
+			Exact->IsDataValid(ExactBad), EDataValidationResult::Invalid);
 	}
 	Fx.Destroy();
 #endif
@@ -583,7 +679,9 @@ bool FBathhouseExpansionSpaceRuntimeTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Game world starts at zero expansions"), Hall->GetAppliedExpansionCount(), 0);
 	TestEqual(TEXT("Game world effective count is the applied count"), Hall->GetEffectiveExpansionCount(), 0);
 	TestEqual(TEXT("Step count comes from the authored list"), Hall->GetExpansionStepCount(), 2);
-	TestEqual(TEXT("Spaces are registered with the purchase subsystem"), Fx.Purchase->GetPurchaseCount(), 0);
+	TestEqual(TEXT("Hall next price is the first step price"), Hall->GetNextExpansionPrice(), Access::Steps(*Hall)[0].Price);
+	TestFalse(TEXT("A fresh hall is not at its limit"), Hall->IsAtExpansionLimit());
+	TestTrue(TEXT("Spaces are registered with the purchase subsystem"), Fx.Purchase->BuildView(Fx.Player).Options[0].bPresent);
 	const FBox2D Base = Hall->GetBaseInteriorRect();
 	TestTrue(TEXT("Interior equals the base at zero"), RectNear(Hall->GetInteriorRect(), Base));
 
@@ -607,16 +705,26 @@ bool FBathhouseExpansionSpaceRuntimeTest::RunTest(const FString& Parameters)
 	const FBox2D Expanded = Hall->GetInteriorRect();
 	TestTrue(TEXT("The interior matches the one-step rectangle"), RectNear(Expanded, Hall->GetInteriorRectForCount(1)));
 	const FBathhouseSpaceExpansionStep& FirstStep = Access::Steps(*Hall)[0];
-	TestTrue(TEXT("The fixture hall steps south first"), FirstStep.Side == EBathhouseSpaceSide::South);
-	ExpectNear(*this, TEXT("Only the south edge moves, by the step amount"), Expanded.Min.Y, Base.Min.Y - FirstStep.AmountCm, ExpTolerance);
-	TestTrue(TEXT("The other edges stay"), FMath::IsNearlyEqual(Expanded.Max.Y, Base.Max.Y, ExpTolerance)
-		&& FMath::IsNearlyEqual(Expanded.Min.X, Base.Min.X, ExpTolerance) && FMath::IsNearlyEqual(Expanded.Max.X, Base.Max.X, ExpTolerance));
+	TestEqual(TEXT("The fixture hall step has two walls (D3)"), FirstStep.Sides.Num(), 2);
+	double SouthAmount = 0.0;
+	double NorthAmount = 0.0;
+	for (const FBathhouseSpaceExpansionSide& Wall : FirstStep.Sides)
+	{
+		(Wall.Side == EBathhouseSpaceSide::South ? SouthAmount : NorthAmount) = Wall.AmountCm;
+	}
+	ExpectNear(*this, TEXT("The south edge moves by its amount in one application"), Expanded.Min.Y, Base.Min.Y - SouthAmount, ExpTolerance);
+	ExpectNear(*this, TEXT("The north edge moves by its amount in the same application"), Expanded.Max.Y, Base.Max.Y + NorthAmount, ExpTolerance);
+	TestTrue(TEXT("The east and west edges stay"), FMath::IsNearlyEqual(Expanded.Min.X, Base.Min.X, ExpTolerance) && FMath::IsNearlyEqual(Expanded.Max.X, Base.Max.X, ExpTolerance));
+	TestEqual(TEXT("The hall next price is now the second step price"), Hall->GetNextExpansionPrice(), Access::Steps(*Hall)[1].Price);
 	const UBoxComponent* Zone = Hall->GetZoneBounds();
 	ExpectNear(*this, TEXT("Zone Y extent follows the expanded interior"), Zone->GetUnscaledBoxExtent().Y, (Expanded.Max.Y - Expanded.Min.Y) * 0.5, ExpTolerance);
 	ExpectNear(*this, TEXT("Zone X extent is unchanged"), Zone->GetUnscaledBoxExtent().X, ZoneExtentBefore.X, ExpTolerance);
 	const FVector2D ZoneCenter(Zone->GetComponentLocation().X, Zone->GetComponentLocation().Y);
 	TestTrue(TEXT("Zone center follows the expanded interior"), ZoneCenter.Equals(Expanded.GetCenter(), ExpTolerance));
-	TestFalse(TEXT("Zone relative location changed"), Zone->GetRelativeLocation().Equals(ZoneLocationBefore, ExpTolerance));
+	// 양쪽 벽이 다른 양으로 물러나면 중심이 옮겨 상대 위치가 바뀐다. 같은 양이면 중심이 그대로다(기대는 fixture에서 계산).
+	const bool bCenterMoved = !Expanded.GetCenter().Equals(Base.GetCenter(), ExpTolerance);
+	TestEqual(TEXT("Zone relative location changes exactly when the interior center moves"),
+		!Zone->GetRelativeLocation().Equals(ZoneLocationBefore, ExpTolerance), bCenterMoved);
 
 	// shell이 넓힌 바깥 직사각형을 덮는다.
 	FSnapshots Snapshots;
@@ -642,10 +750,22 @@ bool FBathhouseExpansionSpaceRuntimeTest::RunTest(const FString& Parameters)
 	TArray<FBathhouseExpansionStepSnapshot> StepSnapshots;
 	for (const FBathhouseSpaceExpansionStep& Step : Access::Steps(*Hall))
 	{
-		StepSnapshots.Add(MakeStep(Step.Side, Step.AmountCm));
+		FBathhouseExpansionStepSnapshot& Item = StepSnapshots.AddDefaulted_GetRef();
+		Item.Price = Step.Price;
+		for (const FBathhouseSpaceExpansionSide& Wall : Step.Sides)
+		{
+			Item.Sides.Add({ Wall.Side, Wall.AmountCm });
+		}
 	}
+	TArray<FBox2D> BandRects;
+	FBathhouseSpaceLayout::ExpansionBandRects(Base, StepSnapshots, 0, BandRects);
 	TArray<FBox2D> BandChunks;
-	FBathhouseSpaceLayout::SplitChunks(FBathhouseSpaceLayout::ExpansionBand(Base, StepSnapshots, 0), Values.ChunkMaxSizeCm, BandChunks);
+	for (const FBox2D& BandRect : BandRects)
+	{
+		TArray<FBox2D> Part;
+		FBathhouseSpaceLayout::SplitChunks(BandRect, Values.ChunkMaxSizeCm, Part);
+		BandChunks.Append(Part);
+	}
 	TestEqual(TEXT("The band adds its split chunks"), Hall->GetCleaningChunks().Num(), ChunkCountBefore + BandChunks.Num());
 	for (int32 Index = 0; Index < ChunksBefore.Num(); ++Index)
 	{
@@ -665,7 +785,7 @@ bool FBathhouseExpansionSpaceRuntimeTest::RunTest(const FString& Parameters)
 	// 띠 조각이 없는 공간(조각 종류 없음).
 	FBathhouseSpaceExpansionUndo WorkUndo;
 	TestEqual(TEXT("Work has no chunks"), Work->GetCleaningChunks().Num(), 0);
-	TestTrue(TEXT("Work expansion applies"), Work->ApplyNextExpansion(WorkUndo, Reason));
+	TestTrue(TEXT("Work expansion applies (east and north together)"), Work->ApplyNextExpansion(WorkUndo, Reason));
 	TestEqual(TEXT("Work still has no chunks"), Work->GetCleaningChunks().Num(), 0);
 	Work->UndoExpansion(WorkUndo);
 
@@ -675,6 +795,8 @@ bool FBathhouseExpansionSpaceRuntimeTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Second hall step"), Hall->ApplyNextExpansion(B, Reason));
 	TestFalse(TEXT("The per-space cap blocks the third step"), Hall->CanApplyNextExpansion(Reason));
 	TestFalse(TEXT("The reason text is set"), Reason.IsEmpty());
+	TestTrue(TEXT("At the limit"), Hall->IsAtExpansionLimit());
+	TestEqual(TEXT("No next price at the limit"), Hall->GetNextExpansionPrice(), 0);
 	TestFalse(TEXT("Applying past the cap fails"), Hall->ApplyNextExpansion(C, Reason));
 	TestFalse(TEXT("A failed apply leaves no undo record"), C.IsSet());
 	TestEqual(TEXT("A failed apply leaves the count"), Hall->GetAppliedExpansionCount(), 2);
@@ -703,24 +825,39 @@ bool FBathhouseExpansionPurchaseTest::RunTest(const FString& Parameters)
 	const FDelegateHandle Handle = Purchase->OnExpansionChanged.AddLambda([&ChangedCount]() { ++ChangedCount; });
 	const UBathhouseExpansionDefinition* Definition = Fx.Definition;
 
+	// 가격 합이 크므로 잔액을 넉넉히 둔다. 기대값은 공간 줄 가격에서 읽는다.
+	Wallet->TryAddMoney(100000);
+	auto StepPrice = [&Fx](const EBathhouseSpaceKind Kind, const int32 Index)
+	{
+		return Access::Steps(*Fx.Space(Kind))[Index].Price;
+	};
+
 	// EXP-021 view.
 	FBathhouseExpansionView View = Purchase->BuildView(Fx.Player);
 	TestTrue(TEXT("View is available"), View.bAvailable);
 	TestFalse(TEXT("View is not busy"), View.bBusy);
-	TestEqual(TEXT("Zero purchases at the start"), View.PurchaseCount, 0);
-	TestEqual(TEXT("Cap comes from the definition"), View.MaxPurchaseCount, Definition->GetMaxPurchaseCount());
-	int32 FirstPrice = 0;
-	Definition->TryGetPurchasePrice(0, FirstPrice);
-	TestEqual(TEXT("Next price comes from the definition"), View.NextPrice, FirstPrice);
+	TestFalse(TEXT("Not every space is at its limit"), View.bAllAtLimit);
 	TestEqual(TEXT("Balance is the wallet money"), View.Balance, Wallet->GetCurrentMoney());
-	TestEqual(TEXT("No shortfall with enough money"), View.Shortfall, 0);
 	TestEqual(TEXT("Locker limit is the tier-0 limit"), View.LockerSlotLimit, Definition->Tiers[0].MaxInstalledLockerSlots);
 	TestEqual(TEXT("No installed locker slots in the fixture"), View.InstalledLockerSlots, 0);
 	for (int32 Index = 0; Index < 3; ++Index)
 	{
-		TestTrue(TEXT("Each option has a space and can expand"), View.Options[Index].bPresent && View.Options[Index].bCanExpand);
-		TestTrue(TEXT("The next size is larger in one axis"), View.Options[Index].NextSizeCm.X * View.Options[Index].NextSizeCm.Y
-			> View.Options[Index].CurrentSizeCm.X * View.Options[Index].CurrentSizeCm.Y);
+		const EBathhouseSpaceKind Kind = static_cast<EBathhouseSpaceKind>(Index);
+		const FBathhouseExpansionOptionView& Option = View.Options[Index];
+		TestTrue(TEXT("Each option has a space and can expand"), Option.bPresent && Option.bCanExpand);
+		TestEqual(TEXT("Each option starts at zero applied"), Option.AppliedCount, 0);
+		TestEqual(TEXT("The step count is the number of rows of that space"), Option.StepCount, Fx.Space(Kind)->GetExpansionStepCount());
+		TestFalse(TEXT("No option is at its limit"), Option.bAtLimit);
+		TestEqual(TEXT("Each option shows the first step price of its own space"), Option.NextPrice, StepPrice(Kind, 0));
+		TestTrue(TEXT("The next size is larger in one axis"), Option.NextSizeCm.X * Option.NextSizeCm.Y > Option.CurrentSizeCm.X * Option.CurrentSizeCm.Y);
+	}
+	TestTrue(TEXT("Prices differ between spaces in the fixture"),
+		StepPrice(EBathhouseSpaceKind::Hall, 0) != StepPrice(EBathhouseSpaceKind::Bath, 0));
+	// 여러 벽 결과: 다음 크기는 두 방향이 함께 반영된 크기.
+	{
+		const FBox2D HallNext = Fx.Hall->GetInteriorRectForCount(1);
+		TestTrue(TEXT("The hall next size is the multi-wall result"),
+			View.Options[0].NextSizeCm.Equals(FVector2D(HallNext.Max.X - HallNext.Min.X, HallNext.Max.Y - HallNext.Min.Y), ExpTolerance));
 	}
 	TestTrue(TEXT("Only the hall has an effect"), View.Options[0].bHasHallEffect && !View.Options[1].bHasHallEffect && !View.Options[2].bHasHallEffect);
 	TestEqual(TEXT("Hall keys now"), View.Options[0].KeysNow, Definition->Tiers[0].KeyPoolSize);
@@ -728,42 +865,67 @@ bool FBathhouseExpansionPurchaseTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Hall locker limit next"), View.Options[0].LockerLimitNext, Definition->Tiers[1].MaxInstalledLockerSlots);
 	TestEqual(TEXT("Rack starts with the tier-0 keys"), Fx.Rack->GetMaterializedPairCount(), Definition->Tiers[0].KeyPoolSize);
 
-	// EXP-023 hall purchase.
+	// EXP-023 hall purchase: 홀 1번째 가격 1회, 여러 벽 한 번에, 홀 다음 가격 표시.
 	ChangedCount = 0;
+	const int32 HallFirst = StepPrice(EBathhouseSpaceKind::Hall, 0);
 	const int32 MoneyBefore = Wallet->GetCurrentMoney();
-	TestEqual(TEXT("Evaluate agrees before the purchase"), Purchase->EvaluatePurchase(Fx.Player, EBathhouseSpaceKind::Hall, 0), EBathhouseExpansionFailure::None);
+	Probe->ChangeCount = 0;
+	int32 EvaluatedPrice = 0;
+	TestEqual(TEXT("Evaluate agrees before the purchase"), Purchase->EvaluatePurchase(Fx.Player, EBathhouseSpaceKind::Hall, 0, &EvaluatedPrice), EBathhouseExpansionFailure::None);
+	TestEqual(TEXT("Evaluate returns the hall first price"), EvaluatedPrice, HallFirst);
 	TestEqual(TEXT("Hall purchase succeeds"), Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 0), EBathhouseExpansionFailure::None);
-	TestEqual(TEXT("Money drops by the price exactly once"), Wallet->GetCurrentMoney(), MoneyBefore - FirstPrice);
+	TestEqual(TEXT("Money drops by the hall first price exactly once"), Wallet->GetCurrentMoney(), MoneyBefore - HallFirst);
 	TestEqual(TEXT("The HUD money change fires once"), Probe->ChangeCount, 1);
 	TestEqual(TEXT("Only the hall expanded"), Fx.Hall->GetAppliedExpansionCount() * 100 + Fx.Bath->GetAppliedExpansionCount() * 10 + Fx.Work->GetAppliedExpansionCount(), 100);
-	TestEqual(TEXT("Purchase count rises"), Purchase->GetPurchaseCount(), 1);
-	TestEqual(TEXT("Authority advanced one effect row"), Fx.Authority->GetCurrentTierIndex(), 1);
+	TestEqual(TEXT("Authority advanced one effect row for the multi-wall step"), Fx.Authority->GetCurrentTierIndex(), 1);
 	TestEqual(TEXT("Rack materialized the new key count"), Fx.Rack->GetMaterializedPairCount(), Definition->Tiers[1].KeyPoolSize);
 	TestEqual(TEXT("Locker limit is the new limit"), Facilities->GetMaxInstalledLockerSlots(), Definition->Tiers[1].MaxInstalledLockerSlots);
 	TestEqual(TEXT("The expansion change broadcasts once"), ChangedCount, 1);
+	View = Purchase->BuildView(Fx.Player);
+	TestEqual(TEXT("The hall option shows 1 applied"), View.Options[0].AppliedCount, 1);
+	TestEqual(TEXT("The hall option now shows the second step price"), View.Options[0].NextPrice, StepPrice(EBathhouseSpaceKind::Hall, 1));
+	TestEqual(TEXT("The bath option still shows its first step price"), View.Options[1].NextPrice, StepPrice(EBathhouseSpaceKind::Bath, 0));
+	TestEqual(TEXT("The work option still shows its first step price"), View.Options[2].NextPrice, StepPrice(EBathhouseSpaceKind::Work, 0));
 
 	// EXP-027 double click: the second request with the same expected count is stale.
 	TestEqual(TEXT("A second request from the same confirmation is stale"),
 		Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 0), EBathhouseExpansionFailure::StaleState);
-	TestEqual(TEXT("The stale request charges nothing"), Wallet->GetCurrentMoney(), MoneyBefore - FirstPrice);
+	TestEqual(TEXT("The stale request charges nothing"), Wallet->GetCurrentMoney(), MoneyBefore - HallFirst);
 	TestEqual(TEXT("The stale request broadcasts nothing"), ChangedCount, 1);
 
-	// Other space: tier and keys stay.
-	int32 SecondPrice = 0;
-	Definition->TryGetPurchasePrice(1, SecondPrice);
+	// EXP-042: 다른 공간을 사고 나서도 홀 2번째는 홀 2번째 가격, 열쇠는 다음 효과 줄.
 	const int32 KeysAfterHall = Fx.Rack->GetMaterializedPairCount();
-	TestEqual(TEXT("Bath purchase succeeds"), Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Bath, 1), EBathhouseExpansionFailure::None);
-	TestEqual(TEXT("Bath purchase charges the second price"), Wallet->GetCurrentMoney(), MoneyBefore - FirstPrice - SecondPrice);
+	TestEqual(TEXT("Bath purchase succeeds with the bath applied count"), Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Bath, 0), EBathhouseExpansionFailure::None);
+	TestEqual(TEXT("Bath purchase charges the bath first price (not a global order)"),
+		Wallet->GetCurrentMoney(), MoneyBefore - HallFirst - StepPrice(EBathhouseSpaceKind::Bath, 0));
 	TestEqual(TEXT("Bath purchase leaves the tier"), Fx.Authority->GetCurrentTierIndex(), 1);
 	TestEqual(TEXT("Bath purchase leaves the keys"), Fx.Rack->GetMaterializedPairCount(), KeysAfterHall);
 	TestEqual(TEXT("Bath expanded once"), Fx.Bath->GetAppliedExpansionCount(), 1);
-	TestEqual(TEXT("Hall second step uses the third price and the next effect row"),
-		Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 2), EBathhouseExpansionFailure::None);
-	TestEqual(TEXT("Hall keys follow the third row"), Fx.Rack->GetMaterializedPairCount(), Definition->Tiers[2].KeyPoolSize);
-	TestEqual(TEXT("Purchase cap reached"), Purchase->EvaluatePurchase(Fx.Player, EBathhouseSpaceKind::Work, 3), EBathhouseExpansionFailure::MaxPurchasesReached);
 	View = Purchase->BuildView(Fx.Player);
-	TestTrue(TEXT("View reports the maximum"), View.bMaxReached);
-	TestEqual(TEXT("No shortfall at the maximum"), View.Shortfall, 0);
+	TestEqual(TEXT("The hall price is unchanged by the bath purchase"), View.Options[0].NextPrice, StepPrice(EBathhouseSpaceKind::Hall, 1));
+	TestEqual(TEXT("A hall expected count of 0 is stale after the hall expanded (counts are per space)"),
+		Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 0), EBathhouseExpansionFailure::StaleState);
+	TestEqual(TEXT("Hall second step uses the hall second price and the next effect row"),
+		Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 1), EBathhouseExpansionFailure::None);
+	TestEqual(TEXT("Hall second step charged the hall second price"), Wallet->GetCurrentMoney(),
+		MoneyBefore - HallFirst - StepPrice(EBathhouseSpaceKind::Bath, 0) - StepPrice(EBathhouseSpaceKind::Hall, 1));
+	TestEqual(TEXT("Hall keys follow the third row"), Fx.Rack->GetMaterializedPairCount(), Definition->Tiers[2].KeyPoolSize);
+
+	// EXP-043·044: 홀만 상한이면 홀만 막히고 다른 공간은 구입 가능, 모두 상한일 때만 최대.
+	TestEqual(TEXT("The hall at its limit is rejected as space max"),
+		Purchase->EvaluatePurchase(Fx.Player, EBathhouseSpaceKind::Hall, 2), EBathhouseExpansionFailure::SpaceMaxReached);
+	View = Purchase->BuildView(Fx.Player);
+	TestTrue(TEXT("The hall option is at its limit"), View.Options[0].bAtLimit && !View.Options[0].bCanExpand);
+	TestEqual(TEXT("The capped option shows no price"), View.Options[0].NextPrice, 0);
+	TestTrue(TEXT("The work option can still expand"), View.Options[2].bCanExpand);
+	TestFalse(TEXT("Not all spaces are at the limit"), View.bAllAtLimit);
+	TestEqual(TEXT("Work can still be bought at its first price"), Purchase->EvaluatePurchase(Fx.Player, EBathhouseSpaceKind::Work, 0), EBathhouseExpansionFailure::None);
+	TestEqual(TEXT("Work first"), Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Work, 0), EBathhouseExpansionFailure::None);
+	TestEqual(TEXT("Work second"), Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Work, 1), EBathhouseExpansionFailure::None);
+	TestEqual(TEXT("Bath second"), Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Bath, 1), EBathhouseExpansionFailure::None);
+	View = Purchase->BuildView(Fx.Player);
+	TestTrue(TEXT("All spaces at their limits report the maximum"), View.bAllAtLimit);
+	TestEqual(TEXT("A purchase at the limit is space max"), Purchase->EvaluatePurchase(Fx.Player, EBathhouseSpaceKind::Bath, 2), EBathhouseExpansionFailure::SpaceMaxReached);
 
 	Purchase->OnExpansionChanged.Remove(Handle);
 	Fx.Destroy();
@@ -823,19 +985,33 @@ bool FBathhouseExpansionPurchaseFailureTest::RunTest(const FString& Parameters)
 			Fx.Destroy();
 			return false;
 		}
-		int32 Price = 0;
-		Fx.Definition->TryGetPurchasePrice(0, Price);
+		const int32 Price = FBathhouseExpansionAutomationAccess::Steps(*Fx.Hall)[0].Price;
 		UPlayerWalletComponent* Wallet = Fx.Wallet();
 		Wallet->TrySpendMoney(Wallet->GetCurrentMoney() - (Price - 1));
 		const FState Before = Capture(Fx);
 		TestEqual(TEXT("Insufficient money is reported"), Fx.Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 0), EBathhouseExpansionFailure::InsufficientMoney);
 		ExpectSame(TEXT("Insufficient money"), Before, Capture(Fx));
 		FBathhouseExpansionView View = Fx.Purchase->BuildView(Fx.Player);
-		TestEqual(TEXT("The view reports the shortfall"), View.Shortfall, 1);
+		TestEqual(TEXT("The view balance is one below the hall first price"), View.Options[0].NextPrice - View.Balance, 1);
 		Wallet->TryAddMoney(1);
 		View = Fx.Purchase->BuildView(Fx.Player);
-		TestEqual(TEXT("Money arriving later removes the shortfall"), View.Shortfall, 0);
+		TestEqual(TEXT("Money arriving later covers the hall first price"), View.Balance, View.Options[0].NextPrice);
+		TestEqual(TEXT("Evaluate agrees once the money arrives"), Fx.Purchase->EvaluatePurchase(Fx.Player, EBathhouseSpaceKind::Hall, 0), EBathhouseExpansionFailure::None);
 		TestEqual(TEXT("A stale expected count is rejected"), Fx.Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 5), EBathhouseExpansionFailure::StaleState);
+		// EXP-022: 잔액 부족은 고른 공간의 가격 기준이다(홀 가격에는 부족하지만 더 싼 공간에는 충분할 수 있다).
+		{
+			const int32 HallPrice = FBathhouseExpansionAutomationAccess::Steps(*Fx.Hall)[0].Price;
+			const int32 WorkPrice = FBathhouseExpansionAutomationAccess::Steps(*Fx.Work)[0].Price;
+			const int32 Cheaper = FMath::Min(HallPrice, WorkPrice);
+			const EBathhouseSpaceKind CheaperKind = Cheaper == HallPrice ? EBathhouseSpaceKind::Hall : EBathhouseSpaceKind::Work;
+			const EBathhouseSpaceKind OtherKind = CheaperKind == EBathhouseSpaceKind::Hall ? EBathhouseSpaceKind::Work : EBathhouseSpaceKind::Hall;
+			if (HallPrice != WorkPrice)
+			{
+				Wallet->TrySpendMoney(Wallet->GetCurrentMoney() - Cheaper);
+				TestEqual(TEXT("The pricier space is rejected for the balance"), Fx.Purchase->EvaluatePurchase(Fx.Player, OtherKind, 0), EBathhouseExpansionFailure::InsufficientMoney);
+				TestEqual(TEXT("The cheaper space is affordable with the same balance"), Fx.Purchase->EvaluatePurchase(Fx.Player, CheaperKind, 0), EBathhouseExpansionFailure::None);
+			}
+		}
 		Wallet->TryAddMoney(100000);
 		TestEqual(TEXT("First hall step"), Fx.Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 0), EBathhouseExpansionFailure::None);
 		TestEqual(TEXT("Second hall step"), Fx.Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 1), EBathhouseExpansionFailure::None);
@@ -901,14 +1077,14 @@ bool FBathhouseExpansionPurchaseFailureTest::RunTest(const FString& Parameters)
 		AddExpectedError(TEXT("확장을 사용할 수 없습니다"), EAutomationExpectedErrorFlags::Contains, 0);
 		const int32 Money = Fx.Wallet()->GetCurrentMoney();
 		// Definition이 잘못되면 사용 불가.
-		TArray<int32> SavedPrices = Fx.Definition->PurchasePrices;
-		Fx.Definition->PurchasePrices.Reset();
+		TArray<FBathhouseExpansionTier> SavedTiers = Fx.Definition->Tiers;
+		Fx.Definition->Tiers.Reset();
 		FBathhouseExpansionView View = Fx.Purchase->BuildView(Fx.Player);
 		TestFalse(TEXT("An invalid definition makes the view unavailable"), View.bAvailable);
 		TestEqual(TEXT("Balance stays visible when unavailable"), View.Balance, Money);
 		TestEqual(TEXT("Unavailable data rejects the purchase"), Fx.Purchase->TryPurchase(Fx.Player, EBathhouseSpaceKind::Hall, 0), EBathhouseExpansionFailure::Unavailable);
 		TestEqual(TEXT("Money is unchanged"), Fx.Wallet()->GetCurrentMoney(), Money);
-		Fx.Definition->PurchasePrices = SavedPrices;
+		Fx.Definition->Tiers = SavedTiers;
 		TestTrue(TEXT("Restored data is available again"), Fx.Purchase->BuildView(Fx.Player).bAvailable);
 		// tier 불일치는 사용 불가.
 		FText TierReason;

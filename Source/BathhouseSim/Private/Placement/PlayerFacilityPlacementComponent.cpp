@@ -177,12 +177,23 @@ void UPlayerFacilityPlacementComponent::RefreshPreview()
 		return;
 	}
 	AFacilityPlacementZoneActor* Zone = nullptr;
-	CurrentPlacementQuery = ValidateCurrentPlacement(CurrentCandidate, Zone);
+	FTransform Candidate = CurrentCandidate;
+	bool bHasCandidate = false;
+	CurrentPlacementQuery = ValidateCurrentPlacement(Candidate, Zone, bHasCandidate);
 	PreviewZone = Zone;
+	if (bHasCandidate)
+	{
+		CurrentCandidate = Candidate;
+	}
 	if (AFacilityPlacementPreviewActor* LivePreview = PreviewActor.Get())
 	{
-		LivePreview->SetActorTransform(CurrentCandidate);
-		LivePreview->SetPlacementValidity(CurrentPlacementQuery.bSucceeded, CurrentPlacementQuery.FailureReason);
+		// 후보가 없으면 옮기지 않고 숨기기만 한다. 다시 후보가 생기면 옮긴 뒤 보인다.
+		if (bHasCandidate)
+		{
+			LivePreview->SetActorTransform(CurrentCandidate);
+			LivePreview->SetPlacementValidity(CurrentPlacementQuery.bSucceeded, CurrentPlacementQuery.FailureReason);
+		}
+		LivePreview->SetActorHiddenInGame(!bHasCandidate);
 	}
 }
 
@@ -258,7 +269,8 @@ FPlayerInteractionResult UPlayerFacilityPlacementComponent::ConfirmPlacement()
 	}
 	FTransform Candidate;
 	AFacilityPlacementZoneActor* Zone = nullptr;
-	const FFacilityPlacementTransactionResult Query = ValidateCurrentPlacement(Candidate, Zone);
+	bool bHasCandidate = false;
+	const FFacilityPlacementTransactionResult Query = ValidateCurrentPlacement(Candidate, Zone, bHasCandidate);
 	APlaceableFacilityItemActor* Item = PreviewFacility.Get();
 	if (!Query.bSucceeded || !IsValid(PreviewActor.Get()) || !Item
 		|| !Carry || Carry->GetHeldObject() != Item || !Zone)

@@ -31,11 +31,18 @@ struct FBathhouseStairSnapshot
 	bool bHasStairWallMaterial = false;
 };
 
-/** 넓힘 한 줄 snapshot. */
-struct FBathhouseExpansionStepSnapshot
+/** 넓힘 한 번에 물러나는 벽 하나 snapshot. */
+struct FBathhouseExpansionSideSnapshot
 {
 	EBathhouseSpaceSide Side = EBathhouseSpaceSide::East;
 	double AmountCm = 0.0;
+};
+
+/** 넓힘 한 줄 snapshot. */
+struct FBathhouseExpansionStepSnapshot
+{
+	TArray<FBathhouseExpansionSideSnapshot> Sides;
+	int32 Price = 0;
 };
 
 /** 공간 Actor의 authored 값만 담은 입력. 다른 공간의 생성 component는 읽지 않는다. */
@@ -136,10 +143,18 @@ public:
 	/** 안쪽 직사각형을 간격 이하의 같은 칸으로 나눈 칸 중심. */
 	static void SplitLightCenters(const FBox2D& Rect, double SpacingCm, TArray<FVector2D>& OutCenters);
 
-	/** Base에서 Steps의 앞 Count줄(0..Steps.Num() clamp)을 순서대로 적용한 안쪽 직사각형. 양이 0 이하·비유한인 줄은 건너뛴다. */
+	/** 벽 항목의 양이 0보다 큰 유한한 값인가. */
+	static bool IsUsableSide(const FBathhouseExpansionSideSnapshot& Side);
+	/** 줄 형상이 적용 가능한가: 벽 1개 이상, 모든 벽 양 유효, 같은 벽 중복 없음. 가격은 보지 않는다. */
+	static bool IsStepApplicable(const FBathhouseExpansionStepSnapshot& Step);
+	/**
+	 * Base에서 Steps의 앞 Count줄(0..Steps.Num() clamp)을 적용한 안쪽 직사각형. 줄의 모든 벽을 같은 직사각형에 적용한다.
+	 * 양이 쓸 수 없는 항목과 같은 줄 뒤쪽에 나온 같은 벽 항목은 건너뛴다.
+	 */
 	static FBox2D ExpandInterior(const FBox2D& Base, const TArray<FBathhouseExpansionStepSnapshot>& Steps, int32 Count);
-	/** StepIndex번째 줄이 늘리는 띠(ExpandInterior(StepIndex+1) 중 ExpandInterior(StepIndex) 밖). 건너뛴 줄이면 면적 0. */
-	static FBox2D ExpansionBand(const FBox2D& Base, const TArray<FBathhouseExpansionStepSnapshot>& Steps, int32 StepIndex);
+	/** StepIndex번째 줄이 늘리는 영역(ExpandInterior(StepIndex+1) − ExpandInterior(StepIndex))의 겹치지 않는 직사각형 목록. 범위 밖·늘어난 면적 없음이면 빈 목록. */
+	static void ExpansionBandRects(
+		const FBox2D& Base, const TArray<FBathhouseExpansionStepSnapshot>& Steps, int32 StepIndex, TArray<FBox2D>& OutRects);
 	/**
 	 * 미리보기 글자 위치: XY = Index 공간 안쪽 중심, Z = 사용 가능한 모든 공간의 가장 높은 천장 판 윗면 + HeightCm.
 	 * 바깥 직사각형이 XY에서 겹치고 바닥이 더 높은 공간이 있으면(= 이 공간이 아래층) 남쪽에 붙인다.

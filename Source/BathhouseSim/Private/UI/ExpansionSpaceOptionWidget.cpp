@@ -35,9 +35,19 @@ void UExpansionSpaceOptionWidget::ApplyModel(const FExpansionOptionDisplay& Disp
 	{
 		NameText->SetText(Display.Name);
 	}
+	if (StageText)
+	{
+		StageText->SetText(Display.Stage);
+		StageText->SetVisibility(Display.bStageVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
 	if (SizeText)
 	{
 		SizeText->SetText(Display.Size);
+	}
+	if (PriceText)
+	{
+		PriceText->SetText(Display.Price);
+		PriceText->SetVisibility(Display.bPriceVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	}
 	if (EffectText)
 	{

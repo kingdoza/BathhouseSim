@@ -92,19 +92,6 @@ ABathhouseSpaceActor* UBathhouseExpansionPurchaseSubsystem::FindSpace(const EBat
 	return Spaces[KindIndex(Kind)].Get();
 }
 
-int32 UBathhouseExpansionPurchaseSubsystem::GetPurchaseCount() const
-{
-	int32 Total = 0;
-	for (const TWeakObjectPtr<ABathhouseSpaceActor>& Space : Spaces)
-	{
-		if (const ABathhouseSpaceActor* Actor = Space.Get())
-		{
-			Total += Actor->GetAppliedExpansionCount();
-		}
-	}
-	return Total;
-}
-
 void UBathhouseExpansionPurchaseSubsystem::LogUnavailableOnce(const EUnavailableCause Cause, const FString& Detail) const
 {
 	const uint32 Bit = 1u << static_cast<uint32>(Cause);
@@ -183,18 +170,6 @@ FBathhouseExpansionView UBathhouseExpansionPurchaseSubsystem::BuildView(const AP
 		return View;
 	}
 	View.bAvailable = true;
-	View.PurchaseCount = GetPurchaseCount();
-	View.MaxPurchaseCount = Resolved.Definition->GetMaxPurchaseCount();
-	View.bMaxReached = View.PurchaseCount >= View.MaxPurchaseCount;
-	if (!View.bMaxReached)
-	{
-		int32 Price = 0;
-		if (Resolved.Definition->TryGetPurchasePrice(View.PurchaseCount, Price))
-		{
-			View.NextPrice = Price;
-			View.Shortfall = FMath::Max(0, Price - View.Balance);
-		}
-	}
 	if (const ULockerCapacitySubsystem* Lockers = GetWorld()->GetSubsystem<ULockerCapacitySubsystem>())
 	{
 		View.InstalledLockerSlots = Lockers->GetInstalledLockerCapacity();
@@ -203,6 +178,8 @@ FBathhouseExpansionView UBathhouseExpansionPurchaseSubsystem::BuildView(const AP
 	{
 		View.LockerSlotLimit = Facility->GetMaxInstalledLockerSlots();
 	}
+	bool bAnyPresent = false;
+	bool bEveryPresentAtLimit = true;
 	for (int32 Index = 0; Index < 3; ++Index)
 	{
 		FBathhouseExpansionOptionView& Option = View.Options[Index];
@@ -213,12 +190,18 @@ FBathhouseExpansionView UBathhouseExpansionPurchaseSubsystem::BuildView(const AP
 		{
 			continue;
 		}
+		bAnyPresent = true;
+		Option.AppliedCount = Space->GetAppliedExpansionCount();
+		Option.StepCount = Space->GetExpansionStepCount();
+		Option.bAtLimit = Space->IsAtExpansionLimit();
+		bEveryPresentAtLimit &= Option.bAtLimit;
 		Option.CurrentSizeCm = RectSize(Space->GetInteriorRect());
 		FText Unused;
 		Option.bCanExpand = Space->CanApplyNextExpansion(Unused);
 		if (Option.bCanExpand)
 		{
 			Option.NextSizeCm = RectSize(Space->GetInteriorRectForCount(Space->GetAppliedExpansionCount() + 1));
+			Option.NextPrice = Space->GetNextExpansionPrice();
 		}
 		if (Option.Kind == EBathhouseSpaceKind::Hall)
 		{
@@ -231,11 +214,12 @@ FBathhouseExpansionView UBathhouseExpansionPurchaseSubsystem::BuildView(const AP
 			Option.LockerLimitNext = Next ? Next->MaxInstalledLockerSlots : Option.LockerLimitNow;
 		}
 	}
+	View.bAllAtLimit = bAnyPresent && bEveryPresentAtLimit;
 	return View;
 }
 
 EBathhouseExpansionFailure UBathhouseExpansionPurchaseSubsystem::EvaluatePurchase(
-	const APlayerState* Buyer, const EBathhouseSpaceKind Kind, const int32 ExpectedPurchaseCount, int32* OutPrice) const
+	const APlayerState* Buyer, const EBathhouseSpaceKind Kind, const int32 ExpectedAppliedCount, int32* OutPrice) const
 {
 	if (bPurchasing)
 	{
@@ -246,30 +230,21 @@ EBathhouseExpansionFailure UBathhouseExpansionPurchaseSubsystem::EvaluatePurchas
 	{
 		return EBathhouseExpansionFailure::Unavailable;
 	}
-	const int32 PurchaseCount = GetPurchaseCount();
-	if (ExpectedPurchaseCount != PurchaseCount)
-	{
-		return EBathhouseExpansionFailure::StaleState;
-	}
-	if (PurchaseCount >= Resolved.Definition->GetMaxPurchaseCount())
-	{
-		return EBathhouseExpansionFailure::MaxPurchasesReached;
-	}
 	const ABathhouseSpaceActor* Space = FindSpace(Kind);
 	if (!Space)
 	{
 		return EBathhouseExpansionFailure::SpaceUnavailable;
+	}
+	if (ExpectedAppliedCount != Space->GetAppliedExpansionCount())
+	{
+		return EBathhouseExpansionFailure::StaleState;
 	}
 	FText Unused;
 	if (!Space->CanApplyNextExpansion(Unused))
 	{
 		return EBathhouseExpansionFailure::SpaceMaxReached;
 	}
-	int32 Price = 0;
-	if (!Resolved.Definition->TryGetPurchasePrice(PurchaseCount, Price))
-	{
-		return EBathhouseExpansionFailure::Unavailable;
-	}
+	const int32 Price = Space->GetNextExpansionPrice();
 	if (!Resolved.Wallet->CanSpendMoney(Price))
 	{
 		return EBathhouseExpansionFailure::InsufficientMoney;
@@ -291,10 +266,10 @@ EBathhouseExpansionFailure UBathhouseExpansionPurchaseSubsystem::EvaluatePurchas
 }
 
 EBathhouseExpansionFailure UBathhouseExpansionPurchaseSubsystem::TryPurchase(
-	APlayerState* Buyer, const EBathhouseSpaceKind Kind, const int32 ExpectedPurchaseCount)
+	APlayerState* Buyer, const EBathhouseSpaceKind Kind, const int32 ExpectedAppliedCount)
 {
 	int32 Price = 0;
-	const EBathhouseExpansionFailure Evaluation = EvaluatePurchase(Buyer, Kind, ExpectedPurchaseCount, &Price);
+	const EBathhouseExpansionFailure Evaluation = EvaluatePurchase(Buyer, Kind, ExpectedAppliedCount, &Price);
 	if (Evaluation != EBathhouseExpansionFailure::None)
 	{
 		return Evaluation;

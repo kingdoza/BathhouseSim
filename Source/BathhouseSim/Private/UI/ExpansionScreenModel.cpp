@@ -50,15 +50,13 @@ FExpansionScreenDisplay FExpansionScreenModel::Build(const FBathhouseExpansionVi
 		return Display;
 	}
 
-	Display.Stage = FText::Format(LOCTEXT("Stage", "현재 확장 단계: {0}"), FText::AsNumber(View.PurchaseCount));
-	Display.bStageVisible = true;
 	Display.Locker = FText::Format(LOCTEXT("Locker", "설치된 락커 칸 {0}/{1}"),
 		FText::AsNumber(View.InstalledLockerSlots), FText::AsNumber(View.LockerSlotLimit));
 	Display.bLockerVisible = true;
 	Display.Result = LOCTEXT("Completed", "확장 완료");
 	Display.bResultVisible = State.bShowCompleted;
 
-	if (View.bMaxReached)
+	if (View.bAllAtLimit)
 	{
 		Display.Message = LOCTEXT("MaxReached", "최대 확장 단계입니다");
 		Display.bMessageVisible = true;
@@ -67,16 +65,25 @@ FExpansionScreenDisplay FExpansionScreenModel::Build(const FBathhouseExpansionVi
 	}
 
 	bool bSelectedUsable = false;
+	int32 SelectedPrice = 0;
 	for (int32 Index = 0; Index < 3; ++Index)
 	{
 		const FBathhouseExpansionOptionView& Option = View.Options[Index];
 		FExpansionOptionDisplay& Out = Display.Options[Index];
 		Out.Name = SpaceName(Option.Kind);
+		if (Option.bPresent)
+		{
+			Out.Stage = FText::Format(LOCTEXT("Stage", "확장 단계 {0}/{1}"),
+				FText::AsNumber(Option.AppliedCount), FText::AsNumber(Option.StepCount));
+			Out.bStageVisible = true;
+		}
 		const bool bUsable = Option.bPresent && Option.bCanExpand;
 		if (bUsable)
 		{
 			Out.Size = FText::Format(LOCTEXT("SizeChange", "{0} → {1}"),
 				FormatSize(Option.CurrentSizeCm), FormatSize(Option.NextSizeCm));
+			Out.Price = FText::Format(LOCTEXT("NextPrice", "다음 넓힘 {0}"), FormatMoney(Option.NextPrice));
+			Out.bPriceVisible = true;
 			Out.bEnabled = true;
 			if (Option.bHasHallEffect)
 			{
@@ -98,6 +105,7 @@ FExpansionScreenDisplay FExpansionScreenModel::Build(const FBathhouseExpansionVi
 		if (bIsSelected)
 		{
 			bSelectedUsable = bUsable;
+			SelectedPrice = bUsable ? Option.NextPrice : 0;
 			if (!bUsable)
 			{
 				Display.bClearSelection = true;
@@ -106,16 +114,16 @@ FExpansionScreenDisplay FExpansionScreenModel::Build(const FBathhouseExpansionVi
 	}
 	Display.bOptionsVisible = true;
 
-	Display.Price = FText::Format(LOCTEXT("Price", "이번 구입 가격 {0}"), FormatMoney(View.NextPrice));
-	Display.bPriceVisible = true;
-	Display.PurchaseButtonText = FText::Format(LOCTEXT("PurchaseButton", "확장 구입 ({0})"), FormatMoney(View.NextPrice));
-	if (View.Shortfall > 0)
+	Display.PurchaseButtonText = bSelectedUsable
+		? FText::Format(LOCTEXT("PurchaseButtonPrice", "확장 구입 ({0})"), FormatMoney(SelectedPrice))
+		: LOCTEXT("PurchaseButton", "확장 구입");
+	if (bSelectedUsable && View.Balance < SelectedPrice)
 	{
-		Display.Shortfall = FText::Format(LOCTEXT("Shortfall", "{0} 부족"), FormatMoney(View.Shortfall));
+		Display.Shortfall = FText::Format(LOCTEXT("Shortfall", "{0} 부족"), FormatMoney(SelectedPrice - View.Balance));
 		Display.bShortfallVisible = true;
 	}
 
-	const bool bCanPurchase = bSelectedUsable && View.Shortfall == 0;
+	const bool bCanPurchase = bSelectedUsable && View.Balance >= SelectedPrice;
 	if (State.bConfirmPending && !Display.bClearSelection)
 	{
 		Display.bConfirmPanelVisible = true;
