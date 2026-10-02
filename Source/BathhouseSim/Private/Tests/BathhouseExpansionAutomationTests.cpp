@@ -919,6 +919,22 @@ bool FBathhouseExpansionPurchaseFailureTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Money is still unchanged"), Fx.Wallet()->GetCurrentMoney(), Money);
 		Fx.Destroy();
 	}
+	// 구매자 없는 평가(BeginPlay 순서, 사용자 없음)는 로그 없이 사용 불가, 구매자가 있으면 원인별 한 번 Error.
+	{
+		FBathhouseExpansionTestWorld Fx;
+		if (!Fx.Create(*this, TEXT("ExpansionNoBuyerWorld"), false))
+		{
+			Fx.Destroy();
+			return false;
+		}
+		// 이 구간에 expected error가 없으므로 로그가 남으면 실패한다.
+		TestFalse(TEXT("No buyer is unavailable"), Fx.Purchase->BuildView(nullptr).bAvailable);
+		TestEqual(TEXT("No buyer rejects the purchase"), Fx.Purchase->EvaluatePurchase(nullptr, EBathhouseSpaceKind::Hall, 0), EBathhouseExpansionFailure::Unavailable);
+		AddExpectedError(TEXT("확장을 사용할 수 없습니다"), EAutomationExpectedErrorFlags::Contains, 1);
+		TestFalse(TEXT("A buyer without an authority is unavailable"), Fx.Purchase->BuildView(Fx.Player).bAvailable);
+		TestFalse(TEXT("The cause is logged only once"), Fx.Purchase->BuildView(Fx.Player).bAvailable);
+		Fx.Destroy();
+	}
 	return true;
 }
 

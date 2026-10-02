@@ -253,9 +253,9 @@ void FBathhouseSpaceValidation::ValidateWorld(
 		}
 		const FVector Location = Actor->GetActorLocation();
 		int32 SpaceIndex = INDEX_NONE;
-		for (int32 I = 0; I < OutSnapshots.Num(); ++I)
+		for (int32 I = 0; I < BaseSnapshots.Num(); ++I)
 		{
-			const FBathhouseSpaceSnapshot& Space = OutSnapshots[I];
+			const FBathhouseSpaceSnapshot& Space = BaseSnapshots[I];
 			if (IsUsable(Space) && Space.Interior.IsInside(FVector2D(Location.X, Location.Y))
 				&& Location.Z >= Space.FloorZ - Inputs.Layout.SlabThicknessCm
 				&& Location.Z <= FBathhouseSpaceLayout::CeilingZ(Space))

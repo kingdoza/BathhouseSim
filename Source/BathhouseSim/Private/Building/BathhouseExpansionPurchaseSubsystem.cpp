@@ -120,6 +120,11 @@ UBathhouseExpansionPurchaseSubsystem::FResolved UBathhouseExpansionPurchaseSubsy
 	FResolved Result;
 	const ABathhousePlayerState* BuyerState = Cast<ABathhousePlayerState>(Buyer);
 	Result.Wallet = BuyerState ? BuyerState->GetWallet() : nullptr;
+	// 구매자(wallet)가 없는 평가는 정상 상태(사용자 없음, BeginPlay 순서)라 로그 없이 사용 불가로 끝낸다.
+	if (!Result.Wallet)
+	{
+		return Result;
+	}
 
 	const UWorld* World = GetWorld();
 	const UBathhouseFacilitySubsystem* Facility = World ? World->GetSubsystem<UBathhouseFacilitySubsystem>() : nullptr;

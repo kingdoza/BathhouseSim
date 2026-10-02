@@ -95,3 +95,17 @@
 - 락커 설치 전 경로: 한도 판정(`CanInstallLockerSlots`)만 자동화했고 상점 카트·주문·배송·개봉·운반·배치·회수로 이어지는 락커 상품 end-to-end와 "설치된 락커 칸 +1", 손님 3명 동시 락커는 PIE.
 - 목욕·작업공간 구입(같은 경로라 `Purchase.Transaction`이 Bath를 포함하나 PIE는 U3), 두 번째 구입·최대 표시·상한 조정의 PIE.
 - `Content.ScreenContract`(Editor 작업 뒤 실행).
+
+## 8. 재작업 1회차(코드 리뷰 1회차, 출처 PROMPT_IMPLEMENTATION_R.md)
+
+재작업 시작 커밋 `2741e57`. 범위는 R1~R3만이며 유지 범위는 바꾸지 않았다.
+
+| 지적 | 변경 위치 | 새 단언 |
+|---|---|---|
+| R1 가짜 Error 로그 | `BathhouseExpansionPurchaseSubsystem.cpp` `Resolve`: wallet을 먼저 구하고 없으면 어떤 로그도 없이 사용 불가로 반환(판정 규칙·순서·view 값 불변) | `Purchase.FailuresAndRollback`에 Authority 없는 world 블록 추가. `BuildView(nullptr)`·`EvaluatePurchase(nullptr)`는 expected error 없이 통과(로그가 남으면 실패), wallet 있는 `BuildView(Player)`는 `LogBathhouseExpansion` Error를 정확히 1회 |
+| R2 설비 소속 | `BathhouseSpaceWorldValidation.cpp` 설비 소속 루프가 `BaseSnapshots`(0회 복사본) 사용 | 코드 확인(world 적용 횟수 변경 불변 단언은 기존 `Validation.Rules`가 유지) |
+| R3 content 계약 | `ExpansionScreenAutomationTests.cpp`: `ValidatePurchaseData`를 먼저 호출한 뒤 결과·`Reason`으로 단언, `GetMaxPurchaseCount() >= 1` 단언 추가 | Editor 작업 전에는 계속 실패(예상) |
+
+문서: `PROMPT_UNREAL.md` content 계약 설명에 `Max Purchase Count` 1 이상 추가, `ExpansionPurchaseSystem.md` 구현 상세의 wallet 문장 정정.
+
+새 빌드 식별값: 성공(오류·경고 0, `Saved/Logs/build_exp_u2_r1.log`). HEAD `2741e57037de8fe2d63ca869d53ab863465d9239`, `git diff HEAD -- Source Config | sha256sum` = `9e5225e246b75c61a68b57539b0e14cabc3f81309aa77b80f9ff02cd455bd863`(신규 Source 파일은 이제 모두 HEAD에 있어 untracked 0). 자동화 `BathhouseSim` 전체 173개 중 통과 172, 실패 1(`Expansion.Content.ScreenContract`, Editor 작업 전 예상 실패, 이제 `Max Purchase Count` 단언도 실패 목록에 포함). `Computer.Input.ScreenWheelContentContract` 통과. 로그 `Saved/Logs/auto_exp_u2_r1.log`.

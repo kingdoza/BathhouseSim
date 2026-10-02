@@ -124,7 +124,7 @@ allowlist 밖 asset(다른 설비 정의, 다른 Widget, 지형, 설비·장식 
 
 - helper 설치·버전 조건: 구현 단계가 새 helper를 만들지 않았다. 기존 helper(external actor 저장 `save_packages` 등)만 쓴다. Python/MCP로 구조체 배열·위젯 트리 편집이 막히면 어느 단계에서 막혔는지 `USER_UNREAL.md`에 정확히 기록한다.
 - 순서: 비저장 로드 확인 → 3.1 → 3.5 → 3.2(미리보기 확인 포함) → 3.3(필요 시) → 3.4 → 3.6. 각각 Compile/개별 Save/새 프로세스 재로드로 확인하고 확인하지 못한 항목은 미검증으로 적는다.
-- 끝으로 자동화를 다시 돌린다: 필터 `BathhouseSim` 전체. 구현 단계 기준은 173개 중 172 통과, 실패 1개가 `BathhouseSim.Expansion.Content.ScreenContract`이며 이 테스트는 Editor 작업 뒤 통과해야 한다(root 탭 버튼·화면·Switcher child 3개, 두 WBP 로드, 카탈로그 마지막 상품이 1칸 락커 정의, `DA_BathhouseExpansion_Default` `ValidatePurchaseData` 통과). `Computer.Input.ScreenWheelContentContract`는 계속 통과해야 한다.
+- 끝으로 자동화를 다시 돌린다: 필터 `BathhouseSim` 전체. 구현 단계 기준은 173개 중 172 통과, 실패 1개가 `BathhouseSim.Expansion.Content.ScreenContract`이며 이 테스트는 Editor 작업 뒤 통과해야 한다(root 탭 버튼·화면·Switcher child 3개, 두 WBP 로드, 카탈로그 마지막 상품이 1칸 락커 정의, `DA_BathhouseExpansion_Default` `ValidatePurchaseData` 통과와 `Max Purchase Count` 1 이상). `Computer.Input.ScreenWheelContentContract`는 계속 통과해야 한다.
 - 멈춤 조건(저장하지 않고 보고, 영향 없는 allowlist 항목은 저장·재로드까지 마침): 비저장 로드에서 오류, 데이터 검증이 같은 규칙 안에서 풀리지 않는 오류, 끝 모습에 Level Actor가 걸림, allowlist 밖 asset 수정이 필요, 상점 락커 상품이 규칙에 걸림, 미리보기 글자 방향·크기 이상(코드 문제), C++ 계약이 실제 asset·엔진 동작과 맞지 않음(아키텍처 복귀).
 
 ## 5. Blueprint에서 구현하면 안 되는 C++/domain 로직

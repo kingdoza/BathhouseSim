@@ -78,7 +78,7 @@ Private/Shop/
 
 - 되돌릴 수 없는 tier 상승(열쇠 생성)을 마지막에 둔다. 사전 검사가 2·4단계 성공을 보장한다.
 - `ExpectedPurchaseCount`가 같은 확인에서 온 두 번째 요청을 거절한다(연타 1회 결제).
-- 구현 상세: 사용 가능 판정(`Resolve`)은 transaction 도중(`bPurchasing`)에는 tier 일관성을 확인하지 않고(공간 횟수와 tier가 잠시 어긋남), Authority 변경 방송은 transaction 안에서는 전달하지 않는다(commit 방송 한 번으로 묶음). Buyer wallet이 없으면 사용 불가이지만 정상 상태(사용자 없음)라 Error 로그는 남기지 않는다. 자동화 실패 주입(4·5·6단계)은 `WITH_DEV_AUTOMATION_TESTS` 안의 private 값이다.
+- 구현 상세: 사용 가능 판정(`Resolve`)은 transaction 도중(`bPurchasing`)에는 tier 일관성을 확인하지 않고(공간 횟수와 tier가 잠시 어긋남), Authority 변경 방송은 transaction 안에서는 전달하지 않는다(commit 방송 한 번으로 묶음). Buyer wallet이 없는 평가는 정상 상태(사용자 없음, BeginPlay 순서)라 다른 원인 확인 전에 로그 없이 사용 불가로 끝낸다. 자동화 실패 주입(4·5·6단계)은 `WITH_DEV_AUTOMATION_TESTS` 안의 private 값이다.
 - `OnExpansionChanged`(native)는 구입 commit, 공간 등록·해제, Authority 등록 변경(`UBathhouseFacilitySubsystem::OnExpansionAuthorityChanged` 전달) 때 방송한다.
 - 3단계 wallet `OnMoneyChanged` 동기 callback에서 `BuildView`는 `bBusy=true`를 돌려주고, `TryPurchase` 재호출은 `Busy`다.
 

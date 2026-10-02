@@ -354,8 +354,9 @@ bool FExpansionScreenContentContractTest::RunTest(const FString& Parameters)
 	if (TestNotNull(TEXT("The expansion definition loads"), Expansion))
 	{
 		FText Reason;
-		TestTrue(*FString::Printf(TEXT("The expansion definition passes the purchase data rules (%s)"), *Reason.ToString()),
-			Expansion->ValidatePurchaseData(Reason));
+		const bool bDataValid = Expansion->ValidatePurchaseData(Reason);
+		TestTrue(*FString::Printf(TEXT("The expansion definition passes the purchase data rules (%s)"), *Reason.ToString()), bDataValid);
+		TestTrue(TEXT("The purchase cap allows at least one purchase (Max Purchase Count is set)"), Expansion->GetMaxPurchaseCount() >= 1);
 	}
 	return true;
 }
