@@ -2,7 +2,7 @@
 
 - 작업 ID: `EXP-U1`
 - 단계: Editor 작업
-- 상태: 보류 — 지형 구멍 칠하기 자동화 실패(USER_UNREAL.md, 화면 작업 후보)와 장식 `boiler` 바닥 겹침(설계 S2, 사용자 결정), 책임: 사용자 Editor 조작·사용자 결정, 재개 조건: 칠하기 완료 알림 뒤 Editor 역할이 저장·재로드·Validation 확인, boiler 처리 결정 전달
+- 상태: 보류 — 지형 구멍 칠하기 미완료(USER_UNREAL.md, 사용자가 직접 칠하기로 결정), 책임: 사용자 Editor 조작, 재개 조건: 사용자 칠하기 완료 알림 뒤 Editor 역할이 저장·재로드·`Space_Hall`/`Space_Work` Validation 확인
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -116,3 +116,26 @@
 
 - 작업용 Editor PID 32372를 정상 종료했다. UnrealEditor 프로세스 0개, 포트 8000 리스너 0개를 확인했다. PIE는 실행하지 않았고 커밋도 하지 않았다.
 - `git status`: Content 신규(BP 1, 재질 11, 공간 actor 3), 수정(정의 16, external actor 106 = 이동·연결·Nav 42 + Landscape 64), 삭제 17. `.md/Unreal` 7개 파일과 `USER_UNREAL.md`가 바뀌었다.
+
+## 10. 추가 작업 (2026-10-02)
+
+- 입력: 마스터 추가 지시(사용자 결정 2026-10-02). 장식 `boiler`는 Z +25, 지형 구멍은 사용자가 나중에 직접 칠함(이번에 확인하지 않음, USER_UNREAL 항목 유지). 시작 HEAD `a59628b`.
+- 기준선: UnrealEditor 프로세스 0, 포트 8000 리스너 0, Content 변경 없음, dirty 0.
+- 실행: 작업용 Editor PID 5428(harness 큐) → 재로드 확인용 PID 32736.
+  - PID 32736은 `CloseMainWindow`가 False를 반환해 닫히지 않았다. dirty 0을 확인한 뒤 `QUIT_EDITOR` 콘솔 명령으로 정상 종료했다.
+  - 종료 후 프로세스 0, 포트 리스너 0.
+- 스크립트: `Saved/Claude/EXP-U1/40_boiler.py`(변경), `43_boiler_verify.py`(새 프로세스 확인), `44_quit.py`.
+
+### 6절 멈춤 해소 — 장식 boiler
+
+| 항목 | 결과 |
+|---|---|
+| 대상 | Level `boiler` StaticMeshActor(`/Game/Bathhouse/Meshes/boiler`), package `/Game/__ExternalActors__/Maps/DefaultMap/D/8Z/B7P48YHJ18CIPB7PW9OBU2` |
+| 변경 | Location (1528,−532,0) → (1528,−532,25). XY·회전·scale 그대로. Z만 지상 바닥 높이(`Zg`)만큼 올림 |
+| 저장 | 이 package만 Python `save_packages`로 저장. 저장 전후 dirty 집합이 이 package 하나와 일치 |
+| 새 프로세스 재로드 | 위치 (1528,−532,25), bounds Z 25~127.7(바닥 판 윗면 위), dirty 0 |
+| Validation | `Space_Bath` VALID, 오류 0, 경고 2(opt-out Bin·Stack, 기존과 같음) |
+| 정본 | `.md/Unreal/WorldSystem.md` boiler 주의 기록을 현재 상태로 교체 |
+
+- 6절의 boiler 멈춤 항목은 해소됐다. 남은 보류 사유는 지형 구멍 칠하기(USER_UNREAL.md `EXP-U1` 항목, 사용자 직접)뿐이다. `Space_Hall`·`Space_Work`의 계단 통로 지형 오류 1개는 그 작업 뒤 확인한다.
+- 같은 세션에서 사용자 요청(스태틱 메시 모델링 목록) 읽기 전용 조사를 했다. 결과는 `.md/MODELING_STATIC_MESH_LIST.md`(마스터 저장)이고 근거는 `Saved/Claude/EXP-U1/41_mesh_probe.py`·`.json`, `42_mesh_extra.py`다. 조사 중 modify·저장은 없었다.

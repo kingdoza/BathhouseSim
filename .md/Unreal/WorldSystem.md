@@ -8,12 +8,12 @@
 - 바닥은 공간 바닥 생성 형상(지상 두 공간은 지형보다 위, 작업공간은 지하)이고, 출입구 밖 마당 바닥은 지형(world Z=0 평면)이다.
 - 설비·물건 배치(`EXP-U1` 이동 결과, 위치는 각 Level instance가 정본):
   - 홀: `Counter`, `Computer`, `KeyRack`, `BP_ShopDeliveryPoint`, `BP_DrinkCollectionBox`, `ShoeLocker_1/2`, `ClothesLocker_1/2`, `MonkeyWrenchFixedSlot`+`BP_MonkeyWrench`, `WetMopFixedSlot`+`WetMop`, `LitterTongsSlot`+`LitterTongs`, `PlayerStart`(카운터 근처), 장식 `SM_Fridge`·`cleaner`, `CustomerQueueOverflowWanderVolume_Checkout_0`(카운터 옆, 크기·카운터 기준 상대 위치 유지)
-  - 목욕공간: `Shower`, `Bath`, `Bath2`, `CleanTowelStack`, `UsedTowelBin`, `ScrubTowelSlot`+`ScrubTowel`, 장식 `boiler`(위치 미변경, 아래 주의)
+  - 목욕공간: `Shower`, `Bath`, `Bath2`, `CleanTowelStack`, `UsedTowelBin`, `ScrubTowelSlot`+`ScrubTowel`, 장식 `boiler`
   - 작업공간(지하): `BP_Circulator`, `BP_Cooler`, `BP_Boiler`, `CoalSupply`, `BP_DryIceSupply`, `ShovelSlot`+`BP_UtilityShovel`, `Washer`, `Dryer`, `DryingSpot`, `TowelBasketFixedSlot`+`TowelBasketCart`
   - 출입구 밖 마당(홀 서쪽): `Spawner`, `Exit`, `TrashCollectionZone`
   - 고정 거치대의 `AssignedItem`과 `ItemAnchor` 상대 0은 이동 뒤에도 유지된다.
 - 삭제된 Level actor(Blueprint asset은 유지): `PlacementZone`, `LitterSpawnZone_Dressing`, `BathCleaningZone`, `DressingCleaningZone`, 북쪽 임시 벽 `Wall`, 장식 `SM_Bath_old`·`SM_Bath_01_Body`·`Plane`·`SM_Kitchen_Countertop_C/C2/C3/C4`, 빈 actor `Studio_floor`·`Cooler_Lid`·`Cooler_Needle`·`Cooler_Needle_Mesh`·`RootNode`.
-- 주의: 장식 `boiler` StaticMeshActor(`/Game/Bathhouse/Meshes/boiler`)는 목욕공간 안 world Z=0에 그대로 있어 바닥 판과 겹친다(아래쪽이 바닥에 묻힘). 처리 방법은 사용자 결정 대기다(`EXP-U1` 보고).
+- 장식 `boiler` StaticMeshActor(`/Game/Bathhouse/Meshes/boiler`, package `/Game/__ExternalActors__/Maps/DefaultMap/D/8Z/B7P48YHJ18CIPB7PW9OBU2`)는 목욕공간 안에 있고, 2026-10-02 사용자 결정으로 XY는 그대로 두고 Z만 지상 바닥 높이만큼 올려 바닥 판 위에 선다(새 프로세스 재로드 확인).
 - 선배치 Clothes Locker 두 개의 `RegistrationId`는 [FacilitySystem.md](FacilitySystem.md)에 있다.
 
 ## Navigation
