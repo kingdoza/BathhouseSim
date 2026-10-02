@@ -11,6 +11,7 @@
 #include "Placement/FacilityPlacementSettings.h"
 #include "Placement/FacilityPlacementZoneActor.h"
 #include "UI/BathWaterBathTileWidget.h"
+#include "UI/BathWaterMapGridLayout.h"
 
 void UBathWaterMapWidget::SetPlacementZone(AFacilityPlacementZoneActor* InZone)
 {
@@ -103,6 +104,7 @@ void UBathWaterMapWidget::ClearGrid()
 	LastGridCanvasSize = FVector2D::ZeroVector;
 	LastGridZoneExtent = FVector::ZeroVector;
 	LastMajorGridSpacingCm = 0.0f;
+	LastGridRenderScale = FVector2D::ZeroVector;
 }
 
 FVector2D UBathWaterMapWidget::ResolveCanvasSize(const UCanvasPanel* Canvas) const
@@ -139,13 +141,16 @@ void UBathWaterMapWidget::RebuildGrid(const FTransform& ZoneTransform, const FVe
 	}
 	const float MajorSpacing = GetDefault<UFacilityPlacementSettings>()->GetGridSizeCm()
 		* PlacementZone->GetMajorGridIntervalCells();
+	const FVector2D RenderScale = ResolveRenderPixelsPerLayoutUnit(GridCanvas->GetPaintSpaceGeometry());
 	if (LastGridCanvasSize.Equals(CanvasSize) && LastGridZoneTransform.Equals(ZoneTransform)
 		&& LastGridZoneExtent.Equals(ZoneExtent)
-		&& FMath::IsNearlyEqual(LastMajorGridSpacingCm, MajorSpacing))
+		&& FMath::IsNearlyEqual(LastMajorGridSpacingCm, MajorSpacing)
+		&& LastGridRenderScale.Equals(RenderScale))
 	{
 		return;
 	}
 	GridCanvas->ClearChildren();
+	LastGridRenderScale = RenderScale;
 	LastGridCanvasSize = CanvasSize;
 	LastGridZoneTransform = ZoneTransform;
 	LastGridZoneExtent = ZoneExtent;
@@ -153,44 +158,28 @@ void UBathWaterMapWidget::RebuildGrid(const FTransform& ZoneTransform, const FVe
 	GridCanvas->SetVisibility(ESlateVisibility::HitTestInvisible);
 
 	const FVector ZoneScale = ZoneTransform.GetScale3D().GetAbs();
-	const float HalfX = ZoneExtent.X * ZoneScale.X;
-	const float HalfY = ZoneExtent.Y * ZoneScale.Y;
-	if (!FMath::IsFinite(HalfX) || !FMath::IsFinite(HalfY) || HalfX <= 0.0f || HalfY <= 0.0f
-		|| !FMath::IsFinite(MajorSpacing) || MajorSpacing <= 0.0f)
+	FBathWaterMapGridInput Input;
+	Input.CanvasSize = CanvasSize;
+	Input.ZoneHalfXCm = ZoneExtent.X * ZoneScale.X;
+	Input.ZoneHalfYCm = ZoneExtent.Y * ZoneScale.Y;
+	Input.MajorSpacingCm = MajorSpacing;
+	Input.RenderPixelsPerLayoutUnit = RenderScale;
+	Input.GridThicknessPx = GridLineThicknessPx;
+	Input.BoundaryThicknessPx = BoundaryLineThicknessPx;
+	TArray<FBathWaterMapGridLine> Lines;
+	if (!BuildBathWaterMapGridLines(Input, Lines))
 	{
 		return;
 	}
-	const float PixelsPerUnit = FMath::Min(CanvasSize.X / (2.0f * HalfY), CanvasSize.Y / (2.0f * HalfX));
-	const FVector2D ContentSize(2.0f * HalfY * PixelsPerUnit, 2.0f * HalfX * PixelsPerUnit);
-	const FVector2D Origin = (CanvasSize - ContentSize) * 0.5f;
-	const FLinearColor GridColor(0.20f, 0.49f, 0.56f, 0.36f);
-	const FLinearColor BoundaryColor(0.25f, 0.78f, 0.85f, 0.85f);
-	auto AddLine = [this](const FVector2D& Position, const FVector2D& Size, const FLinearColor& Color)
+	for (const FBathWaterMapGridLine& Entry : Lines)
 	{
 		UBorder* Line = WidgetTree->ConstructWidget<UBorder>();
-		Line->SetBrushColor(Color);
+		Line->SetBrushColor(Entry.bBoundary ? BoundaryLineColor : GridLineColor);
 		Line->SetVisibility(ESlateVisibility::HitTestInvisible);
-		UCanvasPanelSlot* Slot = GridCanvas->AddChildToCanvas(Line);
-		Slot->SetPosition(Position);
-		Slot->SetSize(Size);
-	};
-	if (HalfX / MajorSpacing < 200.0f && HalfY / MajorSpacing < 200.0f)
-	{
-		for (int32 Cell = FMath::CeilToInt(-HalfY / MajorSpacing); Cell <= FMath::FloorToInt(HalfY / MajorSpacing); ++Cell)
-		{
-			const float X = Origin.X + (Cell * MajorSpacing + HalfY) * PixelsPerUnit;
-			AddLine(FVector2D(X, Origin.Y), FVector2D(1.0f, ContentSize.Y), GridColor);
-		}
-		for (int32 Cell = FMath::CeilToInt(-HalfX / MajorSpacing); Cell <= FMath::FloorToInt(HalfX / MajorSpacing); ++Cell)
-		{
-			const float Y = Origin.Y + (HalfX - Cell * MajorSpacing) * PixelsPerUnit;
-			AddLine(FVector2D(Origin.X, Y), FVector2D(ContentSize.X, 1.0f), GridColor);
-		}
+		UCanvasPanelSlot* LineSlot = GridCanvas->AddChildToCanvas(Line);
+		LineSlot->SetPosition(Entry.Position);
+		LineSlot->SetSize(Entry.Size);
 	}
-	AddLine(Origin, FVector2D(ContentSize.X, 2.0f), BoundaryColor);
-	AddLine(Origin + FVector2D(0.0f, ContentSize.Y - 2.0f), FVector2D(ContentSize.X, 2.0f), BoundaryColor);
-	AddLine(Origin, FVector2D(2.0f, ContentSize.Y), BoundaryColor);
-	AddLine(Origin + FVector2D(ContentSize.X - 2.0f, 0.0f), FVector2D(2.0f, ContentSize.Y), BoundaryColor);
 }
 
 void UBathWaterMapWidget::NativeDestruct()
@@ -245,9 +234,13 @@ bool UBathWaterMapWidget::ProjectFootprint(
 		return false;
 	}
 
-	const float PixelsPerUnit = FMath::Min(CanvasSize.X / (2.0f * HalfY), CanvasSize.Y / (2.0f * HalfX));
-	const FVector2D ContentSize(2.0f * HalfY * PixelsPerUnit, 2.0f * HalfX * PixelsPerUnit);
-	const FVector2D Origin = (CanvasSize - ContentSize) * 0.5f;
+	FBathWaterMapLetterbox Letterbox;
+	if (!ComputeBathWaterMapLetterbox(CanvasSize, HalfX, HalfY, Letterbox))
+	{
+		return false;
+	}
+	const float PixelsPerUnit = Letterbox.PixelsPerCm;
+	const FVector2D Origin = Letterbox.Origin;
 	const FVector ZoneCenter = ZoneTransform.GetLocation();
 	const FVector2D Signs[4] = {
 		FVector2D(-1.0f, -1.0f), FVector2D(-1.0f, 1.0f),
