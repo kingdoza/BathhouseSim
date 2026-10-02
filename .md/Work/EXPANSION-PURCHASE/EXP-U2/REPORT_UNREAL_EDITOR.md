@@ -2,7 +2,7 @@
 
 - 작업 ID: `EXP-U2`
 - 단계: Editor 작업
-- 상태: 보류 — 구현 복귀 2건(R1 미리보기 글자 표시, R2 `Service.BlueprintLoad` 상품 수 고정), 책임 단계 구현(R1의 Z 위치 문구는 설계 6.4와 함께 판단), 재개 조건: 구현 수정·빌드 뒤 Editor가 편집 world 미리보기 글자 화면만 다시 확인(asset 변경 없음)과 자동화 재실행. allowlist Content는 모두 저장·재로드 완료이며 게임 PIE 시나리오는 막히지 않는다.
+- 상태: 보류 — R3 미리보기 글자 미렌더(설계 18.2의 SetHiddenInGame(true)가 UWidgetComponent 그리기를 막음), 책임 단계 아키텍처, 재개 조건: 설계·구현 수정과 빌드 뒤 Editor가 편집 world 글자 캡처 재확인(asset 변경 없음). Content·자동화(174/174)는 완료.
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -127,3 +127,39 @@
 - 스크립트·결과·캡처: `Saved/Claude/EXP-U2/`(README.md, 01~18, `01_inspect.json`, `03_spaces.json`, `17_fresh_readback.json`, `cap_*.png`, queue 출력)
 - 백업·해시: `Saved/MigrationBackup/20261002_EXP-U2/`
 - 자동화: `Saved/Logs/auto_exp_u2_editor.log`, `Saved/Automation/Reports/20261002/exp_u2_editor/`
+
+## 10. 미리보기 글자 재확인 (2026-10-02)
+
+입력: 아키텍처 복귀 RET-003(`add655f`, `PROMPT_IMPLEMENTATION.md` 18절), 구현 `0536304`(코드 리뷰 3회차 승인), HEAD `60999d7`. 바이너리 `UnrealEditor-BathhouseSim.dll`은 18:44 빌드이고 `Source`의 모든 파일보다 새롭다. 시작 때 `git status`는 깨끗했다. Settings 원본은 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`의 `EditorPreviewLabelWorldSizeCm`·`EditorPreviewLabelHeightCm`·`EditorPreviewLabelFontSize`이고, 값은 바꾸지 않았다.
+
+### 10.1 실행
+
+- 작업용 숨김 Editor PID 5568(`-ModelContextProtocolStartServer`, harness)을 띄웠다. 스크립트는 `Saved/Claude/EXP-U2/20_label_set.py`(미리보기 횟수 설정과 글자 component 조회)와 `21_label_diag.py`(렌더 상태 진단)다. 캡처는 MCP `CaptureViewport`로 `cap2_hall1_top.png`, `cap2_hall1_top_b.png`, `cap2_hall1_oblique.png`를 찍었다.
+- 확인한 조합은 홀 1회, 작업공간 1회, 세 공간 2회이고, 마지막에 0으로 되돌렸다.
+
+### 10.2 결과
+
+| 항목 | 결과 |
+|---|---|
+| component | 미리보기 > 0인 공간마다 `UWidgetComponent` 1개. `IsEditorOnly` true, Space World, 위젯 class `BathhouseSpacePreviewLabelWidget`, draw at desired size true |
+| 위치(효과 횟수 2) | 세 글자 모두 Z 695 = 가장 높은 천장 판 윗면 395 + `EditorPreviewLabelHeightCm`. XY는 안쪽 중심(홀 250,0 / 목욕 1840,0 / 작업 250,−200) |
+| 붙는 쪽 | 홀·목욕공간 pivot (0.5, 1)로 북쪽, 작업공간 pivot (0.5, 0)으로 남쪽. 설계 18.1과 일치 |
+| 방향·크기 | forward +Z, up +Y(위에서 읽힘, 위쪽 북). scale 1.5625 = `WorldSizeCm`/`FontSize` |
+| 화면 | **글자가 보이지 않는다.** 위·비스듬한 캡처 모두 위젯 사각 테두리(draw size 500×500 크기)만 보이고 문구가 없다. 기다렸다가 다시 찍어도 같다 |
+| 렌더 상태 | `GetRenderTarget()` None, `GetMaterialInstance()` None, `IsWidgetVisible()` false, `IsVisible()` false(`bVisible` true, `bHiddenInGame` true), 위젯 desired size 0×0, current draw size는 기본값 500×500 그대로 |
+
+### 10.3 원인과 복귀 (R3, 아키텍처)
+
+- 엔진 `USceneComponent::IsVisible()`은 `bHiddenInGame`이면 world 종류와 상관없이 false를 돌려준다(`Engine/Source/Runtime/Engine/Private/Components/SceneComponent.cpp:3555`). `UWidgetComponent::ShouldDrawWidget()`은 `IsVisible()`이 true일 때만 위젯을 render target에 그린다(`Engine/Source/Runtime/UMG/Private/Components/WidgetComponent.cpp:1369`). 그래서 render target과 위젯 재질이 만들어지지 않는다. `UTextRenderComponent`는 game hidden flag를 scene proxy 단계에서 처리해서 이 문제가 드러나지 않았다.
+- 설계 18.2는 `SetHiddenInGame(true)`를 "기존 계약 유지" 항목으로 명시했다. 계약이 엔진 동작과 맞지 않으므로 아키텍처로 돌려보낸다. 판단 근거: 글자는 편집 world에서만 만들어지므로(18.2 `bPreviewChunks` 조건) hidden-in-game 없이도 "game world에 글자 없음" 계약이 지켜진다. 확인할 점: 첫 그리기는 `LastWidgetRenderTime == 0`으로 허용되지만, 이후 갱신은 `TickWhenOffscreen`·`WasRecentlyRendered`에 달려 있다.
+- 자동화(18.4)는 component 구조와 위치만 검사해서 이 문제를 잡지 못했다.
+- 영향: Content 없음. 사용자 PIE 시나리오 영향 없음(편집 world 전용 표시).
+- 확인하지 못한 항목: 한글 표시, 화면상 크기의 적정성, 위층·지하 글자가 화면에서 겹치지 않는지. 위치 수치상으로는 같은 높이에서 남·북으로 나뉜다.
+
+### 10.4 정리·자동화·정본
+
+- 미리보기를 0으로 되돌린 뒤에도 공간 package 3개(`…/8/7N/V36YOPHA8C46E77EZIX78C`, `…/6/85/2UD4T92UQSBNFKC3N8BZFK`, `…/9/0G/5Z3D27MZMK7HDNFHFAEYU2`)가 dirty였다. 저장하지 않았다. 명령줄·시작 시각을 확인한 작업용 PID 5568만 강제 종료해 버렸다. autosave 복원 데이터의 `Packages`는 비어 있다(복원 창 없음). 포트 8000 리스너 없음, `git status` 깨끗함, Config 무변경. 남은 Editor는 BeekeepingSim(PID 30900)뿐이다.
+- headless 자동화 `BathhouseSim` 전체: 174개 중 174개 통과. 로그 `Saved/Logs/auto_exp_u2_editor_recheck.log`, 리포트 `Saved/Automation/Reports/20261002/exp_u2_editor_recheck`.
+- 정본: 재확인이 통과하지 않아 갱신하지 않았다. `.md/Unreal/BuildingSystem.md` 넓힘 목록 절의 글자 설명과 공용 값 원본 줄은 이제 낡았다. 재확인 통과 뒤 넣을 문구:
+  - 공용 값 원본 줄: "넓힘 미리보기 글자 높이 여유·크기·해상도 `EditorPreviewLabelHeightCm`·`EditorPreviewLabelWorldSizeCm`·`EditorPreviewLabelFontSize`(원본 `Config/DefaultGame.ini` 같은 섹션)."
+  - 미리보기 줄: "1 이상이면 편집 전용 Transient `UWidgetComponent` 글자 `넓힘 미리보기 N회`가 모든 공간 중 가장 높은 천장 판 윗면 + 높이 여유에 뜨고, 아래층(지하) 글자는 안쪽 중심 남쪽, 나머지는 북쪽에 붙는다."

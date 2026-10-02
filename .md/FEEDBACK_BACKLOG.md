@@ -49,6 +49,16 @@
 - 검출 실패 단계: 코드 리뷰(엔진 기본 글꼴 한글 미지원과 면 겹침은 코드·설계로 판단 가능)
 - 근거: `.md/Work/EXPANSION-PURCHASE/EXP-U2/REPORT_UNREAL_EDITOR.md` 4절 R1, 구현 커밋 `151420f`
 
+### RET-004 미리보기 글자 WidgetComponent에 SetHiddenInGame(true)를 요구해 편집 world에서도 그려지지 않음
+
+- 일자·작업 ID: 2026-10-02, `EXP-U2`
+- 발견 단계: Editor 작업
+- 복귀 대상: 아키텍처
+- 문제: 재설계 18.2가 "기존 계약 유지"로 `SetHiddenInGame(true)`를 남겼는데, `USceneComponent::IsVisible()`이 world 종류와 무관하게 false가 되어 `UWidgetComponent`가 render target을 만들지 않음
+- 놓친 이유: TextRender에서 WidgetComponent로 바꾸며 기존 숨김 플래그가 새 component의 그리기 조건에 주는 영향을 엔진 소스로 확인하지 않음
+- 검출 실패 단계: 코드 리뷰(엔진 소스로 판단 가능), 자동화는 구조·위치만 검사
+- 근거: `.md/Work/EXPANSION-PURCHASE/EXP-U2/REPORT_UNREAL_EDITOR.md` 10.3, 구현 커밋 `0536304`
+
 ## 이전 형식 기록
 
 정책 채택 전에 쌓인 원문 기록이다. 회고에서 검토해 일반화 항목의 근거로 연결한 뒤 제거한다.
