@@ -1,6 +1,6 @@
 # CONTEXT — BUG-2026-10-02_bath_water_map_grid_scale_mismatch 욕탕 관리 지도 그리드 누락·욕탕 비율 불일치
 - 목표 / 상위·선행·관련 작업: 컴퓨터 욕탕 관리 지도의 그리드 선 누락과 욕탕 타일 크기가 실제 점유 범위와 맞는지 확인. 버그 리포트 `.md/BugReports/2026-10-02_bath_water_map_grid_scale_mismatch.md`. 관련: 욕탕 관리 UI(BathWaterManagementUISystem), 공간 넓힘 `EXP-U3`(병합 `201b2d0`), 관련 작업 `PLACEMENT-FOOTPRINT-PREVIEW`(footprint와 메시 크기 차이 주제 공유).
-- 현재 단계와 재개 지점: 사용자 PIE 승인(2026-10-02 "PIE 승인", 체크리스트 7항목 통과 처리). 버그 리포트 상태·수정 결과 갱신. 재개 지점: main 병합 여부 사용자 확인 대기(사전 허용 없음) → 병합 후 작업 폴더 제거.
+- 현재 단계와 재개 지점: 사용자 PIE 승인(2026-10-02). 사용자 지시(2026-10-02): "footprint 까지 작업완료하고 PIE 승인하면 그때 함께 병합" → `PLACEMENT-FOOTPRINT-PREVIEW` PIE 승인 뒤 이 브랜치를 main에 --no-ff 병합(먼저), 이어서 footprint 브랜치 병합. 그때 작업 폴더 제거. footprint 구현 브랜치는 이 브랜치를 병합해 두 수정을 함께 빌드·PIE한다.
 - 명세 승인 일자(자동/명시)와 사전 허용: 2026-10-02 사용자 명시 "둘 다 수정" — 버그 리포트를 기능 계약으로 보고 기능 명세 생략(Content 영향은 `WBP_BathWaterBathTile` 한 asset). 사전 허용 범위: `WBP_BathWaterBathTile`, 지도 선 표시 조정값 원본 asset(아키텍처가 정하는 범위), `.md/Unreal/PlacementSystem.md` 정본 정리. PIE 통과 후 병합은 미확인(병합 전에 묻는다).
 - 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/BUG-2026-10-02_bath_water_map_grid_scale_mismatch`(main `f92277a`에서 분기). 아키텍처 시작 `f92277a`. 구현 시작 `5f39fd8`. 코드 리뷰 시작 = 구현 커밋.
 - 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 리뷰 1회차 승인, 리뷰 승인 커밋 `654aaa3`. 아키텍처 자동 복귀 미사용. 기능 명세 생략(버그 리포트를 기능 계약으로).
