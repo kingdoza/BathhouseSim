@@ -103,7 +103,7 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 - `ServiceFacilityDisplaySystem.md`: Service 하위 설비 전체 조준 진열·소모품·화장대·샤워 비품·진열 payload 일반화·공용 표시 도구 경계.
 - `PlacementSystem.md`: 설비 mode/preview/placement/recovery, 확장 단계와 락커 capacity lease 경계
 - `BuildingSystem.md`: `Public/Building`, `Private/Building`의 공간(홀·목욕·지하) 벽·바닥·천장·조명·개구부·계단 생성, 공간별 배치 구역과 생성 조각, 공간 넓힘 적용·미리보기 경계(EXP-U1, EXP-U2 설계)
-- `ExpansionPurchaseSystem.md`: Building 하위 확장 구입 subsystem·transaction, 공간별·넓힘별 가격과 홀 효과 tier, 컴퓨터 확장 탭, 락커 상품 허용 경계(EXP-U2 설계, EXP-U3 설계)
+- `ExpansionPurchaseSystem.md`: Building 하위 확장 구입 subsystem·transaction, 공간별·넓힘별 가격과 홀 효과 tier, 컴퓨터 확장 탭, 락커 상품 허용 경계(EXP-U2·U3)
 - `EconomySystem.md`: wallet과 cash claim 경계
 - `CustomerSystem.md`: StateTree routine과 customer session 경계
 - `UISystem.md`: native Widget/Widget Blueprint 경계
@@ -147,7 +147,7 @@ Cleaning/Towel/Computer, Combat/Customer Recovery, Physical Carry와 Bath Water 
 
 - 확장 구입(EXP-U2): 넓힌 횟수는 공간 Actor, 구입 조율은 Building의 새 world subsystem, 홀 효과는 기존 Authority tier가 맡는다. 400줄을 넘었거나 닿은 `BathhouseSpaceLayout.cpp`·`BathhouseSpaceValidation.cpp`에는 새 규칙을 넣지 않고 넓힘 적용·layout·검증을 새 cpp 세 개로 둔다. 확장 탭 표시 규칙은 순수 모델로 분리하고 widget은 적용·입력 의도만 맡는다. Computer component·Character는 바꾸지 않는다.
 
-- 전체 확장(EXP-U3 설계): 넓힘 줄의 여러 벽·가격과 띠 조각 목록은 U2의 새 cpp 세 개(`BathhouseSpaceExpansion*.cpp`)에만 둔다. 400줄 근처 `BathhouseSpaceLayout.cpp`·`BathhouseSpaceValidation.cpp`와 `BathhouseSpaceActor.cpp`는 바꾸지 않는다. 418줄 `PlayerFacilityPlacementComponent.cpp`에는 미리보기 갱신의 숨김 조건(같은 책임) 몇 줄만 추가하고 판정은 기존 `ValidateCurrentPlacement`의 후보 flag로 받는다.
+- 전체 확장(EXP-U3): 넓힘 줄의 여러 벽·가격과 띠 조각 목록은 U2의 새 cpp 세 개(`BathhouseSpaceExpansion*.cpp`)에만 둔다. 400줄 근처 `BathhouseSpaceLayout.cpp`·`BathhouseSpaceValidation.cpp`와 `BathhouseSpaceActor.cpp`는 바꾸지 않는다. 418줄 `PlayerFacilityPlacementComponent.cpp`에는 미리보기 갱신의 숨김 조건(같은 책임) 몇 줄만 추가하고 판정은 기존 `ValidateCurrentPlacement`의 후보 flag로 받는다.
 
 ## Manual Review Points
 

@@ -5,7 +5,7 @@
 - 2026-10-02 `EXP-U1` 설계·구현(공간 건물). Source·Editor 반영, 2026-10-02 사용자 PIE 통과·병합(`8ca6a24`). 같은 날 사후 결정 D1(공간별 조각 종류 하나), 아키텍처 Q1 A(지형 구멍), 넓힘 목록 형태 확정(U2 구현)을 반영했다. 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-001~015)이고 구현 지시는 병합 커밋 `8ca6a24`의 `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md`(작업 폴더 제거됨, Git 이력)다.
 - 가게를 홀·목욕공간·작업공간(지하) 세 공간으로 나누고, 공간마다 직사각형 바닥 경계를 따라 벽·바닥·천장·조명·출입구·통로·계단을 만든다. 공간은 그 바닥의 설비 배치 구역이자 생성 조각의 생성자다(홀 = 쓰레기 조각, 목욕공간 = 물 얼룩 조각, 작업공간 = 없음, D1).
 - 2026-10-02 `EXP-U2` 설계·구현, 사용자 PIE 통과·병합(`3c17e41`): 아래 Expansion 절의 넓힘 목록·runtime 넓힘 적용·편집 미리보기·넓힘 검증. 구입·확장 탭·열쇠·한도·락커 판매는 [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)다. 구현 지시는 병합 커밋 `3c17e41`의 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md`(작업 폴더 제거됨, Git 이력)다.
-- 2026-10-02 `EXP-U3` 설계: 사용자 결정 D2(넓힘 줄마다 가격, 전체 상한 없음)와 D3(넓힘 한 번에 여러 벽, 벽별 양)를 Expansion 절·Validation (U2·U3) 표에 합쳤다. **Source 미반영, `EXP-U3` 구현 단계에서 반영한다.** 반영 전 Source는 넓힘 줄 = 벽 하나(`Side`·`AmountCm`), 띠 = 직사각형 하나(`ExpansionBand`), 전체 상한 합계 경고(`ExpansionStepsBelowCap`)다. 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U3/PROMPT_IMPLEMENTATION.md` 5·6절이다.
+- 2026-10-02 `EXP-U3` 설계·구현, 사용자 PIE 통과: 사용자 결정 D2(넓힘 줄마다 가격, 전체 상한 없음)와 D3(넓힘 한 번에 여러 벽, 벽별 양)를 Expansion 절·Validation (U2·U3) 표에 합쳤다. 구현 지시는 병합 커밋의 `.md/Work/EXPANSION-PURCHASE/EXP-U3/PROMPT_IMPLEMENTATION.md`(Git 이력) 5·6절이다.
 
 ## Source Scope
 
@@ -192,15 +192,15 @@ Validation (U2·U3): `ValidateWorld`는 위 표를 0회 복사본에 적용하�
 ## Blueprint/API Contracts
 
 - 신규 reflected: 위 class·enum·struct와 property·component 이름(`SpaceRoot`, `Shell`), `UBathhouseBuildingSettings` 값. (U2) `FBathhouseSpaceExpansionStep`, `ExpansionSteps`, editor-only `EditorPreviewExpansionCount`, `AppliedExpansionCount`, Settings `EditorPreviewLabelWorldSizeCm`·`EditorPreviewLabelHeightCm`·`EditorPreviewLabelFontSize`, 편집 전용 native widget class `UBathhouseSpacePreviewLabelWidget`. 모두 추가라 redirect가 필요 없다.
-- (U3 설계) 신규 `FBathhouseSpaceExpansionSide`(`Side`, `AmountCm`), `FBathhouseSpaceExpansionStep::Sides`(TitleProperty `Side`)·`Price`. 삭제 `FBathhouseSpaceExpansionStep::Side`·`AmountCm`. struct 이름 유지·property 삭제라 redirect가 필요 없고, 옛 Level 값은 load 때 건너뛰므로 Editor 단계가 세 공간 줄을 다시 입력·저장한다.
+- (U3) 신규 `FBathhouseSpaceExpansionSide`(`Side`, `AmountCm`), `FBathhouseSpaceExpansionStep::Sides`(TitleProperty `Side`)·`Price`. 삭제 `FBathhouseSpaceExpansionStep::Side`·`AmountCm`. struct 이름 유지·property 삭제라 redirect가 필요 없고, 옛 Level 값은 load 때 건너뛰므로 Editor 단계가 세 공간 줄을 다시 입력·저장한다.
 - Blueprint `BP_BathhouseSpace`(parent `ABathhouseSpaceActor`)는 상속 `GridVisual`에 Plane과 `MI_FacilityPlacementGrid`만 지정한다. 형상·조명·조각을 Blueprint graph로 만들지 않는다.
 - 공간 Actor는 C++ public으로 `GetSpaceKind()`, `GetInteriorRect()`(현재 안쪽 바닥 world XY), `GetFloorZ()`, `GetCeilingZ()`를 제공한다.
 - 기존 class 이름 변경·삭제가 없어 Core Redirect가 필요 없다.
 - 지형(Q1 A): 계단 통로가 지형을 지나므로 구멍을 지원하는 프로젝트 지형 재질(지금 엔진 격자 재질과 같은 모습)을 지형에 지정하고, 0회 홀 안쪽 바닥 아래에 지형 구멍을 둔다. 계단이 그 범위를 벗어나면 편집 world 검증이 알린다. Editor 정본은 `.md/Unreal/`이 기록한다.
 
-## Expansion (U1 형태 확정, U2 구현, U3 설계)
+## Expansion (U1 형태 확정, U2·U3 구현)
 
-넓힘 데이터·편집 미리보기 형태는 2026-10-02 사용자 승인 형태에 D2(줄마다 가격)·D3(줄마다 여러 벽)를 더한 것이다. 구입 상태 owner·tier는 [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)가 정한다. U3 설계 항목은 Status의 전환 설명대로 구현 전이다.
+넓힘 데이터·편집 미리보기 형태는 2026-10-02 사용자 승인 형태에 D2(줄마다 가격)·D3(줄마다 여러 벽)를 더한 것이다. 구입 상태 owner·tier는 [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)가 정한다.
 
 - `ExpansionSteps`: `TArray<FBathhouseSpaceExpansionStep>`(EditAnywhere, Level instance 정본). 줄 하나 = 그 공간의 넓힘 한 번(한 단계). index `k` = `k+1`번째 넓힘. 공간별 넓힘 횟수 상한 = 줄 수. 전체 구입 상한은 없다(D2).
   - `Sides`: `TArray<FBathhouseSpaceExpansionSide>`, 항목 = 함께 물러날 벽 하나(`Side`, world 축)와 양(`AmountCm`, 양수). 같은 벽은 한 줄에 한 번(D3).
@@ -233,7 +233,7 @@ Validation (U2·U3): `ValidateWorld`는 위 표를 0회 복사본에 적용하�
 ## Dependencies
 
 - Building → Placement(`AFacilityPlacementZoneActor`, `IPlaceableFacility`, 배치 trace 채널), Cleaning(조각 zone class와 크기 API), NavigationSystem(`ANavMeshBoundsVolume` 검증, U2 dirty area), DeveloperSettings, Engine(ISM·PointLight·CharacterMovement CDO 읽기), UMG(U2 편집 world 미리보기 글자 `UWidgetComponent`·`UTextBlock`만, 기존 module 의존)
-- (U2) Building → Facility(Authority Definition 읽기: U2는 전체 상한, U3 설계는 효과 표 줄 수, 구입 subsystem), Economy(구입 subsystem의 wallet). [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)
+- (U2) Building → Facility(Authority Definition 읽기: 효과 표 줄 수, 구입 subsystem), Economy(구입 subsystem의 wallet). [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)
 - Placement·Cleaning·Customer·Facility·Economy는 Building을 모른다. Computer는 기존 zone type으로만 참조한다. UI(확장 탭)는 구입 subsystem을 쓴다.
 - 새 module은 없다.
 

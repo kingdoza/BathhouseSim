@@ -3,7 +3,7 @@
 ## Status And Scope
 
 - 2026-10-02 `EXP-U2`(확장 구입 수직, 홀 1회) 설계·구현, 사용자 PIE 통과·병합(`3c17e41`).
-- 2026-10-02 `EXP-U3`(전체 확장 묶음) 설계: 사용자 결정 D2(전체 상한 삭제, 공간별·넓힘별 가격, 선택지별 단계 표시)와 D3(넓힘 한 번에 여러 벽)를 본문에 합쳤다. **Source 미반영, `EXP-U3` 구현 단계에서 반영한다.** 반영 전 Source(U2)와 다른 점은 맨 아래 Transition 절에 있다. 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U3/PROMPT_IMPLEMENTATION.md`(완료 뒤 Git 이력)다.
+- 2026-10-02 `EXP-U3`(전체 확장 묶음) 설계·구현, 사용자 PIE 통과: 사용자 결정 D2(전체 상한 삭제, 공간별·넓힘별 가격, 선택지별 단계 표시)와 D3(넓힘 한 번에 여러 벽)를 본문에 합쳤다. 구현 지시는 병합 커밋의 `.md/Work/EXPANSION-PURCHASE/EXP-U3/PROMPT_IMPLEMENTATION.md`(Git 이력)다.
 - 입력 계약은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-020~032, EXP-040~048)다.
 - 컴퓨터 `확장` 탭에서 돈을 내고 공간 하나를 넓힌다. 공간마다 그 공간의 넓힘 줄 수까지 넓힐 수 있고 가격은 그 공간의 몇 번째 넓힘인지로 정한다. 홀을 넓히면 열쇠 수와 락커 칸 설치 한도가 오른다. 상점은 1·4·8칸 락커를 판다.
 - 공간 넓힘의 형상·검증·편집 미리보기는 [BuildingSystem.md](BuildingSystem.md) Expansion 절이 정본이다. 이 문서는 구입 상태·transaction·확장 데이터·확장 탭·락커 판매 규칙을 다룬다.
@@ -129,16 +129,3 @@ Private/Shop/
 - 자동화: transaction 성공(돈 1회·고른 공간만·홀 tier/열쇠/한도·방송 1회), 공간별·넓힘별 가격(다른 공간 구입 뒤 홀 2번째 가격), 공간 상한 뒤 다른 공간 구입 가능, `bAllAtLimit`, 실패 코드별 무변화, 강제 실패 주입 되돌림, 재진입 `Busy`, `StaleState`, Definition·Authority·열쇠걸이 검증, 락커 상품 규칙, 0회 한도 거부 → 홀 구입 뒤 설치, 표시 모델 상태 표, 확인 취소 경로, content 계약(Editor 뒤).
 - 사용자 PIE: EXP-020~032(U2), EXP-040~048(U3, 대표 EXP-042·047).
 
-## Transition (EXP-U3 구현 전 Source)
-
-`EXP-U3` 구현이 끝나면 이 절을 지운다. 그 전까지 Source는 U2 상태다.
-
-| 항목 | 현재 Source(U2) | 위 본문(U3 설계) |
-|---|---|---|
-| 가격 | `UBathhouseExpansionDefinition::PurchasePrices`(몇 번째 전체 구입별) | 넓힘 줄 `Price` |
-| 상한 | `MaxPurchaseCount`(전체)와 공간 줄 수 | 공간 줄 수만 |
-| 넓힘 줄 | `Side`·`AmountCm`(벽 하나) | `Sides`(벽·양 목록)·`Price` |
-| view·평가 | `PurchaseCount`·`MaxPurchaseCount`·`bMaxReached`·`NextPrice`·`Shortfall`, `ExpectedPurchaseCount`, `MaxPurchasesReached` | `bAllAtLimit`, 선택지별 `AppliedCount`·`StepCount`·`bAtLimit`·`NextPrice`, `ExpectedAppliedCount` |
-| 화면 | `현재 확장 단계: N`, `이번 구입 가격 N원` | 선택지별 `확장 단계 N/M`·`다음 넓힘 N원` |
-| 열쇠걸이 검증 | 도달 가능 줄(전체 상한까지) | `Tiers` 모든 줄 |
-| 상점 | 1칸 락커 | 1·4·8칸 락커 |
