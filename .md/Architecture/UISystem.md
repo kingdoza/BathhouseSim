@@ -29,6 +29,8 @@ Current classes:
 
 2026-10-02 `EXP-U2` 설계: `UExpansionScreenWidget`(확장 탭 표시·입력 의도), `UExpansionSpaceOptionWidget`(공간 선택지), 순수 `FExpansionScreenModel`(표시 규칙). 계약은 [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md) Computer Expansion Tab.
 
+편집 전용 예외(2026-10-02 `EXP-U2` 복귀 R1): Building의 `UBathhouseSpacePreviewLabelWidget`은 편집 world 넓힘 미리보기 글자를 `UWidgetComponent`에 띄우는 native widget이다. WBP 없이 `Initialize()`에서 `UTextBlock` 하나를 코드로 만들고 글꼴은 기본값을 쓴다. 게임에 나오지 않고 상태·입력·domain 호출이 없다([BuildingSystem.md](BuildingSystem.md) Expansion).
+
 `Content/`의 Widget Blueprint와 UI asset은 serialized project data다. 명시적인 Editor 작업 없이 수정하거나 resave하지 않는다.
 
 ## Responsibilities

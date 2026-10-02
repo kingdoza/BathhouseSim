@@ -3,6 +3,7 @@
 - 작업 ID: `EXP-U2`
 - 단계: 아키텍처
 - 상태: 완료
+- 복귀 재설계(2026-10-02, Editor 작업 R1, RET-003): 넓힘 미리보기 글자의 위치·글꼴·지하 공간 표시. 18절. 6.4 해당 문장을 18절로 대체한다. 사용자 동작 변경 없음(글자 문구 `넓힘 미리보기 N회`·` · 겹침 있음` 유지)
 
 - 상위 계약: [../PROMPT_ARCHITECTURE.md](../PROMPT_ARCHITECTURE.md)(상태 완료). 이번 범위는 EXP-020~032, 대표 흐름은 EXP-023(홀 확장 구입) → EXP-028(늘어난 한도로 1칸 락커 설치)이다.
 - 선행 결과: `EXP-U1` 병합 `8ca6a24`. U1이 확정한 넓힘 목록·편집 미리보기 형태는 [../../../Architecture/BuildingSystem.md](../../../Architecture/BuildingSystem.md) Expansion 절이 정본이다. U1 Editor 데이터 관리 개요는 `git show 8ca6a24:.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md` 0절이다.
@@ -25,7 +26,7 @@ U1 개요 0.2 표의 "U2 예정" 행이 이번에 실제가 된다. 수치는 �
 | 공간별 넓힘 방향·양 | 공간 Actor `Expansion Steps`(U1에서 형태 확정, 이번에 구현). 줄 = 그 공간의 몇 번째 넓힘(`Side`, `Amount Cm`) | `Space_Hall` 등 선택 → Details `Bathhouse Space › Expansion` | cm. 그 방향 벽 한 면만 그만큼 물러난다 |
 | 공간별 넓힘 횟수 상한 | 같은 `Expansion Steps`의 줄 수 | 줄을 더하거나 지움 | 회 |
 | 넓힘 미리보기 횟수 | 공간 Actor `Editor Preview Expansion Count`(편집 화면 전용, 저장 안 됨) | Details 숫자 입력 | 회, 0~줄 수 |
-| 미리보기 글자 크기 | Project Settings > Game > Bathhouse Building `Editor Preview Label World Size Cm`(신규) | 설정 창 | cm. 편집 화면 표시 전용 |
+| 미리보기 글자 크기·높이·해상도 | Project Settings > Game > Bathhouse Building `Editor Preview Label World Size Cm`(글자 높이), `Editor Preview Label Height Cm`(가장 높은 천장 위 여유, 18절 신규), `Editor Preview Label Font Size`(글자 렌더 해상도, 18절 신규) | 설정 창 | cm, cm, 글꼴 크기. 편집 화면 표시 전용. 글꼴은 프로젝트 화면과 같은 엔진 기본 UMG 글꼴이라 따로 고르지 않는다 |
 | 1칸 락커 상품 가격 | `DA_ShopCatalog`에 새 상품 줄 `ClothesLocker1`(`1칸 락커`, 목록 맨 뒤) | DataAsset 열기 → 그 줄 `Price` | 원 |
 
 - 시작 상태(확장 0회, 열쇠 3개, 한도 2칸, 1칸 락커 2개)는 바뀌지 않는다. 확장 관리자 Level instance `ExpansionAuthority`의 `Initial Tier Index`는 0이어야 한다(0이 아니면 오류로 알린다. 시작은 항상 홀 0회다).
@@ -125,8 +126,8 @@ U1 개요 0.2 표의 "U2 예정" 행이 이번에 실제가 된다. 수치는 �
 | `ABathhouseSpaceActor`(Building) | 공간 authoring, 형상·조각 생성, 0회 구역 | `ExpansionSteps`, `EditorPreviewExpansionCount`, `AppliedExpansionCount`, 넓힘 적용·되돌림, 효과 횟수별 안쪽 직사각형 | 기존 확장. 새 메서드는 별도 cpp `BathhouseSpaceExpansion.cpp`(현재 cpp 269줄) |
 | `FBathhouseSpaceLayout`(순수) | 형상 계획 | 넓힌 안쪽 직사각형·넓힘 띠 계산 | 새 cpp `BathhouseSpaceExpansionLayout.cpp`(현재 cpp 419줄, 추가 금지) |
 | `FBathhouseSpaceValidation` | 0회 layout·Nav·world 검사 | 넓힘 검사, 0회·끝 모습 snapshot 분리 | 새 cpp `BathhouseSpaceExpansionValidation.cpp`(현재 `BathhouseSpaceValidation.cpp` 399줄, 추가 금지) |
-| `UBathhouseSpaceShellComponent` | 생성 component 소유 | 편집 world 미리보기 글자(Transient `UTextRenderComponent`) | 기존 확장(235줄) |
-| `UBathhouseBuildingSettings` | 공용 형상 값 | `EditorPreviewLabelWorldSizeCm` | 기존 확장 |
+| `UBathhouseSpaceShellComponent` | 생성 component 소유 | 편집 world 미리보기 글자(Transient `UWidgetComponent` + 코드로 만든 글자 widget, 18절) | 기존 확장 |
+| `UBathhouseBuildingSettings` | 공용 형상 값 | `EditorPreviewLabelWorldSizeCm`, `EditorPreviewLabelHeightCm`, `EditorPreviewLabelFontSize`(18절) | 기존 확장 |
 | `UBathhouseExpansionPurchaseSubsystem`(Building, 신규) | 없음 | 공간 등록부, 구입 화면 view, 구입 transaction, 변경 방송 | 신규 `UWorldSubsystem` |
 | `UBathhouseExpansionDefinition`(Facility) | tier 표 | 가격 목록·전체 상한·검증 helper, tier = 홀 효과 표 | 기존 확장 |
 | `ABathhouseExpansionAuthority`(Facility) | tier 상태·변경 방송 | Definition getter, Data Validation | 기존 확장(81줄) |
@@ -138,7 +139,7 @@ U1 개요 0.2 표의 "U2 예정" 행이 이번에 실제가 된다. 수치는 �
 | `FExpansionScreenModel`(UI private, 신규) | 없음 | view + 표시 상태 → 문구·활성·표시 여부(순수) | 신규, 자동화 대상 |
 | `FShopProductRules`(Shop) | 설비 상품 = non-locker + Discardable | locker 상품 허용(Discardable 금지) | 규칙 한 줄 변경 |
 
-새 의존: Building → Facility(Authority·Definition·FacilitySubsystem·LockerCapacitySubsystem), Building → Economy(wallet), UI → Building(구입 subsystem·view type). 순환은 없다(Facility·Economy는 Building을 모른다). 새 module·plugin은 없다(`UTextRenderComponent`는 Engine).
+새 의존: Building → Facility(Authority·Definition·FacilitySubsystem·LockerCapacitySubsystem), Building → Economy(wallet), UI → Building(구입 subsystem·view type). 순환은 없다(Facility·Economy는 Building을 모른다). 새 module·plugin은 없다(미리보기 글자는 기존 `UMG` 의존을 편집 world에서만 쓴다, 18절).
 
 ## 5. 확장 데이터 — Definition·Authority·열쇠걸이
 
@@ -223,7 +224,7 @@ void UndoExpansion(const FBathhouseSpaceExpansionUndo& Undo);
 ### 6.4 편집 미리보기
 
 - `RebuildShell`이 편집 world(`EWorldType::Editor`)에서 효과 횟수 > 0이면 `FBathhouseShellVisualInputs.PreviewLabel`에 `넓힘 미리보기 {N}회`를 넣고, 같은 snapshot 목록(효과 횟수 기준)에서 이 공간이 관련된 부피 겹침이 있으면 ` · 겹침 있음`을 덧붙인다. 겹침 판정은 내부 header `BathhouseSpaceValidationInternal.h`의 기존 `BathhouseSpaceValidationDetail::VolumesOverlap`을 재사용한다(새 cpp `BathhouseSpaceExpansion.cpp`에서 include, 400줄 파일 변경 없음).
-- shell은 `PreviewLabel`이 비어 있지 않으면 editor-only Transient `UTextRenderComponent` 하나를 만든다(`RF_Transient`, 충돌 없음, `CreationMethod = UserConstructionScript`, 다른 생성 component와 같은 정리 경로). 위치 = 효과 횟수 안쪽 직사각형 중심, Z = 천장 판 윗면, 위를 향하게(위에서 읽히게) 가운데 정렬, 글자 크기 = `UBathhouseBuildingSettings::EditorPreviewLabelWorldSizeCm`. game world에서는 만들지 않는다. default subobject를 추가하지 않으므로 Blueprint·Level 구조 변경이 없다.
+- (2026-10-02 18절로 대체) shell이 만드는 글자 component·글꼴·위치는 18절이 정본이다. game world에서는 만들지 않고 default subobject를 추가하지 않는 계약은 유지한다.
 - 미리보기 값 변경 → OnConstruction → 기존 `FBathhouseSpaceEditorSync::RequestRebuild`가 모든 공간을 다시 짓는다(통로 구멍 포함). 추가 작업 없음.
 
 ### 6.5 lifecycle 변경
@@ -420,7 +421,7 @@ struct FBathhouseExpansionView
 
 ## 11. Blueprint/API, Core Redirect와 Editor migration
 
-- 신규 reflected: `FBathhouseSpaceExpansionStep`, 공간 `ExpansionSteps`·`EditorPreviewExpansionCount`(editor-only)·`AppliedExpansionCount`, Definition `MaxPurchaseCount`·`PurchasePrices`, Settings `EditorPreviewLabelWorldSizeCm`, root `ExpansionTabButton`·`ExpansionScreen`(optional), `UExpansionScreenWidget`·`UExpansionSpaceOptionWidget`과 그 BindWidget, `UBathhouseExpansionPurchaseSubsystem`.
+- 신규 reflected: `FBathhouseSpaceExpansionStep`, 공간 `ExpansionSteps`·`EditorPreviewExpansionCount`(editor-only)·`AppliedExpansionCount`, Definition `MaxPurchaseCount`·`PurchasePrices`, Settings `EditorPreviewLabelWorldSizeCm`·`EditorPreviewLabelHeightCm`·`EditorPreviewLabelFontSize`(18절), 편집 전용 글자 widget class `UBathhouseSpacePreviewLabelWidget`(18절), root `ExpansionTabButton`·`ExpansionScreen`(optional), `UExpansionScreenWidget`·`UExpansionSpaceOptionWidget`과 그 BindWidget, `UBathhouseExpansionPurchaseSubsystem`.
 - rename·삭제 없음 → Core Redirect 불필요. default subobject 추가 없음(미리보기 글자는 shell Transient 생성물). 모두 tagged property 추가라 기존 export와 호환된다. CoreSystem 규칙에 따라 Editor 작업 전 `DA_BathhouseExpansion_Default`, `WBP_ComputerScreenRoot`, 공간 external actor 3개를 새 빌드로 비저장 로드해 오류가 없는지 먼저 확인한다(기존 Blueprint load 자동화 또는 headless load).
 - Editor 작업 단계 할 일(구현 단계가 `PROMPT_UNREAL.md`로 정리):
   1. `DA_BathhouseExpansion_Default`: `MaxPurchaseCount`, `PurchasePrices`(상한 수만큼)를 상위 계약 4.7 제안값으로. `Tiers` 그대로. 저장·재로드, Data Validation 오류 0.
@@ -437,7 +438,7 @@ struct FBathhouseExpansionView
 |---|---|
 | 구입 가격, 전체 상한, 홀 효과 표 | `DA_BathhouseExpansion_Default` `PurchasePrices`·`MaxPurchaseCount`·`Tiers` |
 | 넓힘 방향·양, 공간별 상한 | 공간 Level instance `ExpansionSteps` |
-| 조각 최대 크기, 벽·판 두께, 미리보기 글자 크기 | `UBathhouseBuildingSettings` |
+| 조각 최대 크기, 벽·판 두께, 미리보기 글자 크기·높이 여유·렌더 해상도 | `UBathhouseBuildingSettings` |
 | 락커 상품 가격 | `DA_ShopCatalog` `ClothesLocker1.Price` |
 | 열쇠걸이 자리 수 | `BP_BathhouseKeyRack` `PairTransforms` |
 | HUD 변화량 표시 시간 | 기존 `WBP_MoneyHud` `DeltaDisplaySeconds` |
@@ -510,3 +511,54 @@ struct FBathhouseExpansionView
 - 구현 단계는 헤더·UPROPERTY를 바꾸므로 같은 프로젝트 Unreal Editor를 닫고 빌드한다(Live Coding 불가). 사용자가 BeekeepingSim Editor를 열어 둔 경우 실행 인자의 uproject 경로로 구분해 BathhouseSim Editor만 확인한다.
 - Editor 작업 단계는 새 빌드로 MCP Editor를 띄운다(`-ModelContextProtocolStartServer`). 미리보기 횟수를 0으로 돌린 뒤 저장한다.
 - Editor 사실 추가 조사는 필요 없다(사전 조사 1·2차와 U1 Unreal 정본으로 충분).
+
+## 18. 복귀 재설계 — 넓힘 미리보기 글자 (2026-10-02, Editor 작업 R1, RET-003)
+
+근거: [REPORT_UNREAL_EDITOR.md](REPORT_UNREAL_EDITOR.md) 4절 R1. 문제는 셋이다. (a) 글자가 천장 판 윗면과 같은 평면이라 렌더되지 않는다. (b) `UTextRenderComponent`가 엔진 기본 `RobotoDistanceField`를 써서 한글이 네모로 나온다. (c) 작업공간(지하) 글자가 홀 바닥·지형 아래라 위에서 보이지 않는다. 방향(위에서 읽힘, 글자 위쪽 = 북)은 맞았다.
+
+### 18.1 결정
+
+| 문제 | 결정 | 버린 대안 |
+|---|---|---|
+| (b) 글꼴 | `UTextRenderComponent`를 쓰지 않는다. 대신 editor-only Transient `UWidgetComponent`(World space)에 코드로 만든 native 글자 widget(`UTextBlock` 하나)을 띄운다. 글꼴은 `UTextBlock` 기본 글꼴을 그대로 쓴다. 프로젝트의 모든 WBP가 쓰는 엔진 기본 UMG 글꼴(`/Engine/EngineFonts/Roboto` composite)이고, 한글은 엔진 fallback `Faces/DroidSansFallback`이 그린다. Content에 글꼴 asset이 없는데도 컴퓨터 화면이 이 글꼴로 한글을 표시하므로 같은 원본을 쓴다. 글꼴 object는 바꾸지 않고 크기만 정한다 | 한글 offline 글꼴 asset 새로 만들기: `UTextRenderComponent`는 offline 글꼴만 그린다(엔진 `TextRenderComponent.cpp`가 runtime 글꼴을 거부한다). Hangul 전체를 굽는 큰 atlas asset이 필요하고 Content 변경이다. 문구를 영문으로 바꾸기: U1에서 사용자가 승인한 표시 문구가 바뀐다 |
+| (a) 높이 | 모든 공간 글자를 같은 높이에 둔다. Z = (현재 효과 횟수 snapshot에서 **모든 공간 중 가장 높은 천장 판 윗면** `Zc + s`) + Settings `EditorPreviewLabelHeightCm`. 여유가 0보다 크므로 어떤 판 윗면과도 같은 평면이 아니다 | 판 두께만큼 띄우기: 판 두께는 형상 값이라 글자 여유와 뜻이 다르고, 판 두께를 바꾸면 글자 위치도 바뀐다 |
+| (c) 지하 | 위 높이 규칙이 곧 "위로 투영"이다. 지하 공간 글자도 가장 높은 지상 천장 위에 뜬다. 두 글자가 겹치지 않게 붙는 쪽을 나눈다. XY 바깥 직사각형이 양의 넓이로 겹치는 다른 공간 중 바닥 Z가 더 높은 공간이 있으면 아래층이다. 아래층 글자는 안쪽 직사각형 중심의 **남쪽**에, 위층 글자는 **북쪽**에 붙인다(글자 가장자리가 중심점에 닿는다). 문구는 바꾸지 않는다 | 지하 글자를 자기 천장에 두고 깊이 무시(전경)로 렌더: deferred 렌더에서 일반 primitive의 전경 DPG·깊이 무시가 보장되지 않는다. 글자에 공간 이름 붙이기: 승인 문구가 바뀐다 |
+
+### 18.2 변경 범위와 구현 지시
+
+- 새 class `UBathhouseSpacePreviewLabelWidget : UUserWidget`(`Private/Building/BathhouseSpacePreviewLabelWidget.h/.cpp`, `UCLASS(NotBlueprintable)`, 편집 world에서만 생성).
+  - `Initialize()` override: `Super::Initialize()` 뒤 `WidgetTree->RootWidget`이 없으면 `WidgetTree->ConstructWidget<UTextBlock>()`을 root로 둔다. native class라 WidgetTree가 비어 있고, `NativeOnInitialized`는 편집 world(player context 없음)에서 불리지 않으므로 쓰지 않는다.
+  - `void SetLabel(const FText& Text, int32 FontSize)`: root `UTextBlock`에 문구를 넣고 가운데 정렬한다. 글꼴은 그 `UTextBlock`의 현재 `FSlateFontInfo`를 복사해 `Size`만 바꿔 `SetFont`한다(글꼴 object 유지).
+  - UMG API만 쓴다. Slate 직접 사용은 금지다(CoreSystem). WBP를 만들지 않는다(Content 변경 금지가 근거이며, UISystem Native Widget Policy의 편집 전용 예외로 기록).
+- `UBathhouseBuildingSettings`(Category `Editor Preview`, Config, 한국어 tooltip에 게임 영향 없음 명시):
+  - 기존 `EditorPreviewLabelWorldSizeCm`: tooltip 뜻을 "글자 높이(대략, cm)"로 갱신.
+  - 신규 `float EditorPreviewLabelHeightCm`(ClampMin 1): 가장 높은 천장 판 윗면에서 글자까지의 여유.
+  - 신규 `int32 EditorPreviewLabelFontSize`(ClampMin 1): 글자를 그리는 글꼴 크기(렌더 해상도).
+  - C++ 기본값만 두고 Config 키는 쓰지 않는다. 값 원본은 이 class 기본값이고, Editor가 바꾸면 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`에 저장된다.
+- 순수 helper(`FBathhouseSpaceLayout`, `BathhouseSpaceExpansionLayout.cpp`): `static FBathhousePreviewLabelPlacement PreviewLabelPlacement(const TArray<FBathhouseSpaceSnapshot>& Snapshots, int32 Index, double SlabThicknessCm, double HeightCm)` → `{ FVector Location; bool bSouthOfCenter; }`.
+  - Location XY = `Snapshots[Index].Interior` 중심. Z = 사용 가능한 모든 snapshot의 `CeilingZ + SlabThicknessCm` 최댓값 + `HeightCm`.
+  - `bSouthOfCenter` = 다른 snapshot 중 `OuterRect`가 XY에서 양의 넓이로 겹치고 `FloorZ`가 더 높은 것이 있음(허용 오차 `UE_KINDA_SMALL_NUMBER`).
+- `ABathhouseSpaceActor::RebuildShell`(편집 world, 효과 횟수 > 0): 지금의 위치 계산(`CeilingZ + SlabThickness`)을 위 helper로 바꾼다. `FBathhouseShellVisualInputs`에 `PreviewLabelLocation`, `bPreviewLabelSouthOfCenter`, `PreviewLabelWorldSizeCm`, `PreviewLabelFontSize`를 채운다. 문구 생성(`BuildExpansionPreviewLabel`)은 그대로다.
+- `UBathhouseSpaceShellComponent`: `UTextRenderComponent` 생성 코드를 `UWidgetComponent` 생성으로 바꾼다.
+  - 기존 계약 유지: `RF_Transient`, `CreationMethod = UserConstructionScript`, `bIsEditorOnly = true`, Movable, `NoCollision`, `SetCanEverAffectNavigation(false)`, `SetHiddenInGame(true)`, shell에 attach, 같은 정리 경로(`PreviewLabelComponent`), `bPreviewChunks`(편집 world)일 때만.
+  - 위젯 설정: `Space = World`, `bDrawAtDesiredSize = true`, `bReceiveHardwareInput = false`, `WidgetClass = UBathhouseSpacePreviewLabelWidget`, 위젯 재질은 엔진 기본값 유지. Pivot은 북쪽 붙임이면 글자 아래 가장자리 가운데, 남쪽 붙임이면 위 가장자리 가운데를 component 원점에 맞춘다. 등록 뒤 `GetUserWidgetObject()`에 `SetLabel(문구, PreviewLabelFontSize)`를 호출한다.
+  - 방향: 글자 앞면이 world +Z를 보고 글자 위쪽이 world +Y(북)를 향한다(위에서 읽힘, 지금과 같은 결과). `UWidgetComponent`의 앞면·위쪽 축은 `UTextRenderComponent`와 다르므로 회전값은 구현이 엔진 축에서 정하고 자동화로 확인한다.
+  - 크기: component relative scale = `PreviewLabelWorldSizeCm / PreviewLabelFontSize`(균일, 글꼴 크기 1당 cm). 0 이하·비유한이면 글자를 만들지 않는다.
+  - `GetPreviewLabelText()`는 shell이 저장한 마지막 문구를 돌려준다(Slate가 없는 headless에서도 확인할 수 있게).
+- 파일: `Public/Building/BathhouseBuildingSettings.h`, `Public/Building/BathhouseSpaceShellComponent.h`, `Private/Building/BathhouseSpaceShellComponent.cpp`, `Private/Building/BathhouseSpaceActor.cpp`(위치 계산 몇 줄), `Private/Building/BathhouseSpaceLayout.h`(helper 선언·결과 struct), `Private/Building/BathhouseSpaceExpansionLayout.cpp`, 신규 `Private/Building/BathhouseSpacePreviewLabelWidget.h/.cpp`, 자동화 `Private/Tests/BathhouseExpansionAutomationTests.cpp`. `BathhouseSpaceLayout.cpp`·`BathhouseSpaceValidation.cpp`는 바꾸지 않는다.
+
+### 18.3 영향 시나리오와 유지 범위
+
+- 영향: 사용자 PIE 시나리오는 없다(편집 world 전용 표시). Editor 작업 단계의 편집 world 미리보기 확인 항목만 다시 본다.
+- 유지: 넓힘 데이터·runtime 넓힘·구입·확장 탭·락커 판매·검증, Editor 단계에서 저장한 모든 Content(`22e20c7`), 미리보기 문구, 겹침 표시 규칙, game world에 글자가 없다는 계약. R2(`Service.BlueprintLoad` 상품 수 리터럴)는 이 설계 범위 밖이며 구현이 따로 고친다.
+- Content 변경 없음. Editor 단계가 바꿀 수 있는 것은 위 세 Settings 값(`Config/DefaultGame.ini`)뿐이고, 기본값으로 잘 보이면 바꾸지 않는다.
+
+### 18.4 자동화·검증 기준
+
+| 확인 | 기준 |
+|---|---|
+| 순수 placement | 공간 하나: Z = 자기 `CeilingZ + s + HeightCm`. 홀·목욕(같은 바닥)·지하: 세 글자 Z가 모두 (가장 높은 천장 판 윗면 + HeightCm)로 같음. 지하는 남쪽, 홀·목욕은 북쪽. XY = 효과 횟수 안쪽 중심. 기대값은 fixture snapshot과 인자에서 계산 |
+| 편집 world shell | 미리보기 > 0이면 `UWidgetComponent`가 하나 있다: editor-only, Transient, NoCollision, Nav 비관련, `WidgetClass` = 글자 widget class, 위치 = helper 결과, 앞면 축 = +Z·위쪽 축 = +Y, scale = 크기/글꼴 크기, `GetPreviewLabelText()` = `넓힘 미리보기 N회`(겹침 시 ` · 겹침 있음`). Slate가 초기화된 환경이면 user widget의 `UTextBlock` 문구가 같고 글꼴 object가 `UTextBlock` CDO 기본 글꼴과 같은지(override 없음)도 확인 |
+| game world | 같은 공간에 글자 component 없음(기존) |
+| 코드 리뷰 | `UTextRenderComponent` 사용 없음, Slate 직접 사용 없음, 글꼴 object 변경 없음, 높이·크기·해상도 리터럴 없음(Settings), 400줄 파일 무변경 |
+| Editor 재확인(asset 변경 없음) | 편집 world에서 홀 미리보기 1: 홀 위에 한글 `넓힘 미리보기 1회`가 위에서 읽힌다. 작업공간 미리보기 1: 홀 지붕 위(중심 남쪽)에 보인다. 홀·작업공간 동시: 두 글자가 겹치지 않는다. 0으로 돌린 뒤 저장할 asset이 없다 |

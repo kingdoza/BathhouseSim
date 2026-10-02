@@ -26,6 +26,7 @@ Private/Building/
   BathhouseSpaceExpansion.cpp      (U2) 공간 Actor 넓힘 적용·되돌림·효과 횟수·미리보기 글자
   BathhouseSpaceExpansionLayout.cpp  (U2) 순수: 넓힌 안쪽 직사각형·넓힘 띠
   BathhouseSpaceExpansionValidation.cpp  (U2) 넓힘 검사(`ValidateExpansion`)
+  BathhouseSpacePreviewLabelWidget.h/.cpp  (U2 복귀 R1) 편집 미리보기 글자 native widget
 Private/Tests/
   BathhouseBuildingAutomationTests.cpp
   BathhouseExpansionAutomationTests.cpp  (U2)
@@ -185,7 +186,7 @@ Validation (U2): `ValidateWorld`는 위 표를 0회 복사본에 적용하고(�
 
 ## Blueprint/API Contracts
 
-- 신규 reflected: 위 class·enum·struct와 property·component 이름(`SpaceRoot`, `Shell`), `UBathhouseBuildingSettings` 값. (U2) `FBathhouseSpaceExpansionStep`, `ExpansionSteps`, editor-only `EditorPreviewExpansionCount`, `AppliedExpansionCount`, Settings `EditorPreviewLabelWorldSizeCm`. 모두 property 추가라 redirect가 필요 없다.
+- 신규 reflected: 위 class·enum·struct와 property·component 이름(`SpaceRoot`, `Shell`), `UBathhouseBuildingSettings` 값. (U2) `FBathhouseSpaceExpansionStep`, `ExpansionSteps`, editor-only `EditorPreviewExpansionCount`, `AppliedExpansionCount`, Settings `EditorPreviewLabelWorldSizeCm`·`EditorPreviewLabelHeightCm`·`EditorPreviewLabelFontSize`, 편집 전용 native widget class `UBathhouseSpacePreviewLabelWidget`. 모두 추가라 redirect가 필요 없다.
 - Blueprint `BP_BathhouseSpace`(parent `ABathhouseSpaceActor`)는 상속 `GridVisual`에 Plane과 `MI_FacilityPlacementGrid`만 지정한다. 형상·조명·조각을 Blueprint graph로 만들지 않는다.
 - 공간 Actor는 C++ public으로 `GetSpaceKind()`, `GetInteriorRect()`(현재 안쪽 바닥 world XY), `GetFloorZ()`, `GetCeilingZ()`를 제공한다.
 - 기존 class 이름 변경·삭제가 없어 Core Redirect가 필요 없다.
@@ -202,7 +203,10 @@ Validation (U2): `ValidateWorld`는 위 표를 0회 복사본에 적용하고(�
 - runtime 적용(구입 transaction만 호출): `CanApplyNextExpansion`(부작용 없음: game world·begun play·다음 줄 유효·transform·상자 mesh·두께) → `ApplyNextExpansion(Undo)`: 횟수 +1 → `ApplyZoneGeometry` → 이 공간 shell만 재생성(실패면 되돌림) → 조각 종류가 있으면 띠를 같은 분할 규칙으로 나눠 조각 추가(기존 조각 불변). `UndoExpansion(Undo)`는 추가 조각 파괴, 횟수 복원, 구역·shell 재생성.
 - 이웃 공간 shell은 다시 만들지 않는다. `BuildPlan`은 이웃의 Actor 위치·개구부·계단·바닥 Z만 읽고 안쪽 직사각형을 읽지 않으며, 맞닿은 변은 넓힐 수 없기 때문이다.
 - 재생성은 한 함수 호출 안에서 파괴 후 생성이라 바닥이 비는 물리 step이 없다. 새 벽은 옛 바깥 직사각형 밖에만 생기고 이미 놓인 Actor는 건드리지 않는다. 배치 격자는 다음 `SetGridVisible(true)`가 새 `ZoneBounds`로 다시 계산한다.
-- 편집 미리보기: 미리보기 횟수를 바꾸면 OnConstruction과 편집 동기화가 모든 공간을 다시 짓는다. 횟수 > 0이면 shell이 editor-only Transient `UTextRenderComponent`(충돌 없음, 천장 판 위 중앙, 위를 향함, 크기 = Settings `EditorPreviewLabelWorldSizeCm`)로 `넓힘 미리보기 N회`를 띄우고, 효과 횟수 snapshot에서 이 공간 부피 겹침이 있으면 ` · 겹침 있음`을 덧붙인다. default subobject를 추가하지 않는다. 직렬화된 `ZoneBounds`(미리보기 결과)는 BeginPlay가 다시 계산하므로 게임에 영향이 없다.
+- 편집 미리보기: 미리보기 횟수를 바꾸면 OnConstruction과 편집 동기화가 모든 공간을 다시 짓는다. 횟수 > 0이면 shell이 `넓힘 미리보기 N회`를 띄우고, 효과 횟수 snapshot에서 이 공간 부피 겹침이 있으면 ` · 겹침 있음`을 덧붙인다(2026-10-02 복귀 R1·RET-003로 표시 방식 재설계).
+  - component: editor-only Transient `UWidgetComponent`(World space, 충돌 없음, Nav 비관련, `bDrawAtDesiredSize`)에 코드로 만든 native `UBathhouseSpacePreviewLabelWidget`(root `UTextBlock` 하나, WBP 없음)을 띄운다. 글꼴은 `UTextBlock` 기본 글꼴(프로젝트 WBP와 같은 엔진 기본 UMG 글꼴, 한글은 엔진 fallback)이며 크기만 Settings `EditorPreviewLabelFontSize`로 정한다. `UTextRenderComponent`는 offline 글꼴만 그려 한글을 못 쓰므로 쓰지 않는다.
+  - 위치: 순수 `FBathhouseSpaceLayout::PreviewLabelPlacement`. XY = 효과 횟수 안쪽 중심, Z = 모든 공간 중 가장 높은 천장 판 윗면 + Settings `EditorPreviewLabelHeightCm`(모든 공간 같은 높이라 지하 글자도 위에서 보임). XY가 겹치는 다른 공간 중 바닥이 더 높은 것이 있으면(아래층) 글자를 중심 남쪽에, 아니면 북쪽에 붙인다.
+  - 방향·크기: 앞면 world +Z, 글자 위쪽 world +Y. component scale = `EditorPreviewLabelWorldSizeCm / EditorPreviewLabelFontSize`. default subobject를 추가하지 않는다. 직렬화된 `ZoneBounds`(미리보기 결과)는 BeginPlay가 다시 계산하므로 게임에 영향이 없다.
 - 검증은 미리보기와 무관하게 0회 복사본(기존 규칙)과 목록 끝 복사본(아래 Validation (U2) 표)을 검사한다.
 
 ## Implementation Notes (2026-10-02 구현)
@@ -219,7 +223,7 @@ Validation (U2): `ValidateWorld`는 위 표를 0회 복사본에 적용하고(�
 
 ## Dependencies
 
-- Building → Placement(`AFacilityPlacementZoneActor`, `IPlaceableFacility`, 배치 trace 채널), Cleaning(조각 zone class와 크기 API), NavigationSystem(`ANavMeshBoundsVolume` 검증, U2 dirty area), DeveloperSettings, Engine(ISM·PointLight·CharacterMovement CDO 읽기, U2 `UTextRenderComponent`)
+- Building → Placement(`AFacilityPlacementZoneActor`, `IPlaceableFacility`, 배치 trace 채널), Cleaning(조각 zone class와 크기 API), NavigationSystem(`ANavMeshBoundsVolume` 검증, U2 dirty area), DeveloperSettings, Engine(ISM·PointLight·CharacterMovement CDO 읽기), UMG(U2 편집 world 미리보기 글자 `UWidgetComponent`·`UTextBlock`만, 기존 module 의존)
 - (U2) Building → Facility(Authority Definition 전체 상한 읽기, 구입 subsystem), Economy(구입 subsystem의 wallet). [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)
 - Placement·Cleaning·Customer·Facility·Economy는 Building을 모른다. Computer는 기존 zone type으로만 참조한다. UI(확장 탭)는 구입 subsystem을 쓴다.
 - 새 module은 없다.
