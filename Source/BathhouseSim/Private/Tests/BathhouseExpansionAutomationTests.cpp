@@ -1091,7 +1091,15 @@ bool FBathhouseExpansionPreviewLabelTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Label is transient"), Label->HasAnyFlags(RF_Transient));
 		TestTrue(TEXT("Label has no collision"), Label->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 		TestFalse(TEXT("Label does not affect navigation"), Label->CanEverAffectNavigation());
-		TestTrue(TEXT("Label is hidden in game"), Label->bHiddenInGame);
+		// 그리기 조건(엔진 ShouldDrawWidget은 protected라 공개 조건 묶음으로 같은 판정을 본다).
+		TestFalse(TEXT("Label is not hidden in game (hidden blocks drawing)"), Label->bHiddenInGame);
+		TestTrue(TEXT("Label IsVisible"), Label->IsVisible());
+		TestTrue(TEXT("Label ticks when offscreen"), Label->GetTickWhenOffscreen());
+		TestEqual(TEXT("Label redraws every tick"), Label->GetRedrawTime(), 0.0f);
+		TestTrue(TEXT("Label component tick is enabled"), Label->IsComponentTickEnabled());
+		TestTrue(TEXT("Label ticks in editor"), Label->bTickInEditor);
+		TestTrue(TEXT("Label tick function is registered"), Label->PrimaryComponentTick.IsTickFunctionRegistered());
+		TestTrue(TEXT("Label draw size is positive"), Label->GetDrawSize().X > 0.0 && Label->GetDrawSize().Y > 0.0);
 		TestFalse(TEXT("Label takes no hardware input"), Label->GetReceiveHardwareInput());
 		TestTrue(TEXT("Label is a world-space widget"), Label->GetWidgetSpace() == EWidgetSpace::World);
 		TestTrue(TEXT("Label uses the preview label widget class"), Label->GetWidgetClass() == UBathhouseSpacePreviewLabelWidget::StaticClass());

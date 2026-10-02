@@ -167,3 +167,5 @@ allowlist 밖 asset(다른 설비 정의, 다른 Widget, 지형, 설비·장식 
 - 구현 변경: 미리보기 글자가 `UTextRenderComponent`에서 편집 전용 `UWidgetComponent`(코드로 만든 `UTextBlock`, 엔진 기본 UMG 글꼴)로 바뀌었고 높이 규칙과 지하 글자 배치가 바뀌었다. 새 Settings는 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`의 `EditorPreviewLabelHeightCm`(300), `EditorPreviewLabelFontSize`(64)이고 `EditorPreviewLabelWorldSizeCm`(100)은 글자 높이다. 기본값으로 잘 보이면 바꾸지 않는다.
 - 새 빌드로 Editor를 띄워 편집 world에서 확인한다: (1) `Space_Hall` 미리보기 1 → 홀 위에 한글 `넓힘 미리보기 1회`가 네모 없이 위에서 읽힌다(위쪽 = 북). (2) `Space_Work` 미리보기 1 → 홀 지붕 위(작업공간 중심의 남쪽)에 보인다. (3) 홀·작업공간 동시 → 두 글자가 겹치지 않는다. (4) 겹침이 있는 설정이면 ` · 겹침 있음`이 붙는다. (5) 0으로 돌린 뒤 저장할 asset이 없다(`git status`로 Content 변경 없음 확인). 글자 크기·높이만 마음에 안 들면 Settings 값을 조정한다.
 - 이상하면(글꼴 네모, 뒤집힘, 안 보임) 저장하지 않고 구현 복귀로 보고한다. `Expansion.Content.ScreenContract`를 포함한 `BathhouseSim` 전체 자동화가 통과해야 한다.
+
+- 재작업 3회차 갱신(RET-004): 8절 확인 (1)~(3)에서 글자가 **그려지는지**(render target이 생겨 화면에 한글이 보임)를 본다. 이전에는 hidden-in-game 때문에 그려지지 않았다. 글자는 편집 tick마다 다시 그려진다. 여전히 안 보이면 저장하지 않고 구현 복귀로 보고한다(편집 world에서 `bHiddenInGame`·`IsVisible`·render target 유무를 함께 기록).

@@ -257,7 +257,7 @@ void UBathhouseSpaceShellComponent::Rebuild(const FBathhouseSpacePlan& Plan, con
 		Label->SetMobility(EComponentMobility::Movable);
 		Label->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Label->SetCanEverAffectNavigation(false);
-		Label->SetHiddenInGame(true);
+		// hidden-in-game을 쓰지 않는다(IsVisible이 false가 되면 render target이 안 만들어진다). game world에는 이 분기가 없다.
 		Label->SetWidgetSpace(EWidgetSpace::World);
 		Label->SetDrawAtDesiredSize(true);
 		Label->SetWidgetClass(UBathhouseSpacePreviewLabelWidget::StaticClass());
@@ -265,6 +265,10 @@ void UBathhouseSpaceShellComponent::Rebuild(const FBathhouseSpacePlan& Plan, con
 		Label->SetPivot(FVector2D(0.5, Inputs.bPreviewLabelSouthOfCenter ? 0.0 : 1.0));
 		Label->SetupAttachment(this);
 		Label->RegisterComponent();
+		// 화면 렌더 기록에 의존하지 않고 편집 tick마다 다시 그린다.
+		Label->SetTickMode(ETickMode::Enabled);
+		Label->SetTickWhenOffscreen(true);
+		Label->SetRedrawTime(0.0f);
 		// 앞면(+X)이 위(+Z)를, 글자 위쪽(+Z)이 북(+Y)을 향한다. UWidgetComponent는 +X쪽에서 보이고 위쪽이 +Z다.
 		Label->SetWorldLocationAndRotation(
 			Inputs.PreviewLabelLocation, FRotationMatrix::MakeFromXZ(FVector::UpVector, FVector::RightVector).ToQuat());
@@ -277,6 +281,7 @@ void UBathhouseSpaceShellComponent::Rebuild(const FBathhouseSpacePlan& Plan, con
 		{
 			Widget->SetLabel(FText::FromString(Inputs.PreviewLabel), Inputs.PreviewLabelFontSize);
 		}
+		Label->RequestRedraw();
 		PreviewLabelText = Inputs.PreviewLabel;
 		PreviewLabelComponent = Label;
 	}

@@ -121,3 +121,12 @@
 - 빌드: 성공(오류·경고 0, `Saved/Logs/build_exp_u2_r2.log`). HEAD `add655f7c3b78f6aaf22a69e4426c9cb1df36a60`, `git diff HEAD -- Source Config | sha256sum` = `0909817bdfbb039f8d26c1b21824b1a5cd1ec2b82878f5689ec7c0aa1dbcea7a`, 추적 안 된 신규 Source 2개(`BathhouseSpacePreviewLabelWidget.h/.cpp`)의 파일별 sha256 합 = `4a525b6e54fecb94d328c0087195efad7a935dcc717072e0cbc85a4eac789c7a`.
 - 자동화: `BathhouseSim` 전체 174개 전부 통과(`Expansion.Content.ScreenContract` 포함, `Saved/Logs/auto_exp_u2_r2.log`).
 - 미검증: 편집 world에서 실제 렌더(한글 표시, 크기, 방향), Slate가 있는 환경의 widget 내부 문구·글꼴 object 동일성 — Editor 재확인 대상.
+
+## 10. 재작업 3회차(Editor 재확인 R3, 아키텍처 복귀 RET-004 18.5)
+
+재작업 시작 커밋 `1e9a657`. 범위는 미리보기 글자 component의 그리기 조건뿐이다. Content·Config·Settings 값 변경 없음.
+
+- 구현(`BathhouseSpaceShellComponent.cpp`): `SetHiddenInGame(true)` 제거(game world 미생성은 `bPreviewChunks` 생성 조건으로 유지). 등록 뒤 `SetTickMode(Enabled)`, `SetTickWhenOffscreen(true)`, `SetRedrawTime(0)`, 문구 지정 뒤 `RequestRedraw()`. `WidgetClass`·World space는 등록 전, `DrawSize`는 엔진 기본값 유지.
+- 자동화(`Expansion.Preview.LabelPlacementAndComponent`): 그리기 조건 묶음 단언 추가(`bHiddenInGame` false, `IsVisible()`, `GetTickWhenOffscreen()`, `GetRedrawTime()` 0, `IsComponentTickEnabled()`, `bTickInEditor`, tick 함수 등록, `GetDrawSize()` 양수). 기존 hidden 단언은 반대로 바꿨다. render target 생성·화면 표시는 `-nullrhi`에서 확인할 수 없어 Editor 재확인 대상이다.
+- 빌드: 성공(오류·경고 0, `Saved/Logs/build_exp_u2_r3.log`). HEAD `1e9a657`(전체 hash는 아래 명령 출력), `git diff HEAD -- Source Config | sha256sum` = `42ec3590d54a9c5ea8caab6e0f85d6bb75e22091b51a70b01afcfdf03c1e4940`. untracked Source 0개.
+- 자동화: `BathhouseSim` 전체 174개 전부 통과(`Saved/Logs/auto_exp_u2_r3.log`).
