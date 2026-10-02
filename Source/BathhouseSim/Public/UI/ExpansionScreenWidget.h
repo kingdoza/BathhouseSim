@@ -43,9 +43,6 @@ protected:
 	virtual void NativeDestruct() override;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> StageText;
-
-	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> BalanceText;
 
 	UPROPERTY(meta = (BindWidget))
@@ -62,9 +59,6 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UExpansionSpaceOptionWidget> WorkOption;
-
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> PriceText;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UPanelWidget> PurchasePanel;
@@ -128,7 +122,7 @@ private:
 	// 위젯 표시 상태. domain 값은 보관하지 않는다.
 	TOptional<EBathhouseSpaceKind> SelectedKind;
 	bool bConfirmPending = false;
-	int32 ConfirmPurchaseCount = 0;
+	int32 ConfirmAppliedCount = 0;
 	bool bShowCompleted = false;
 	bool bButtonsBound = false;
 };

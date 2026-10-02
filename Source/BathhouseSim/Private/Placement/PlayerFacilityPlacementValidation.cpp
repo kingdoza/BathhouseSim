@@ -78,8 +78,11 @@ AActor* UPlayerFacilityPlacementComponent::TraceRecoveryTarget() const
 
 FFacilityPlacementTransactionResult UPlayerFacilityPlacementComponent::ValidateCurrentPlacement(
 	FTransform& OutCandidate,
-	AFacilityPlacementZoneActor*& OutZone) const
+	AFacilityPlacementZoneActor*& OutZone,
+	bool& bOutHasCandidate) const
 {
+	// 후보 transform을 계산했는지(미리보기를 보일지 판정). 계산 뒤의 실패는 후보를 유지한다.
+	bOutHasCandidate = false;
 	APlaceableFacilityItemActor* Item = PreviewFacility.Get();
 	UFacilityPlacementDefinition* Definition = Item ? Item->GetDefinition() : nullptr;
 	AActor* PlacedCDO = Definition && Definition->PlacedFacilityClass
@@ -107,6 +110,7 @@ FFacilityPlacementTransactionResult UPlayerFacilityPlacementComponent::ValidateC
 			EFacilityPlacementFailureCode::InvalidComponents,
 			FailureReason);
 	}
+	bOutHasCandidate = true;
 	if (!OutZone->IsDefinitionAllowed(*Definition))
 	{
 		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::NoCompatibleZone, AFacilityPlacementZoneActor::GetDefinitionNotAllowedReason());

@@ -52,6 +52,10 @@ public:
 	int32 GetEffectiveExpansionCount() const;
 	int32 GetAppliedExpansionCount() const { return AppliedExpansionCount; }
 	int32 GetExpansionStepCount() const { return ExpansionSteps.Num(); }
+	/** 다음 넓힘 줄의 가격(원). 다음 줄이 없으면 0. */
+	int32 GetNextExpansionPrice() const;
+	/** 줄을 모두 적용했는가(공간별 상한 도달). */
+	bool IsAtExpansionLimit() const;
 	float GetFloorZ() const { return static_cast<float>(GetActorLocation().Z); }
 	float GetCeilingZ() const { return GetFloorZ() + CeilingHeightCm; }
 	EBathhouseCleaningChunkKind GetCleaningChunkKind() const { return CleaningChunkKind; }
@@ -117,7 +121,7 @@ protected:
 	EBathhouseCleaningChunkKind CleaningChunkKind = EBathhouseCleaningChunkKind::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bathhouse Space|Expansion",
-		meta = (ToolTip = "줄 = 이 공간의 몇 번째 넓힘. 줄 수 = 공간별 넓힘 횟수 상한."))
+		meta = (ToolTip = "줄 = 이 공간의 몇 번째 넓힘(여러 벽·가격). 줄 수 = 공간별 넓힘 횟수 상한."))
 	TArray<FBathhouseSpaceExpansionStep> ExpansionSteps;
 
 #if WITH_EDITORONLY_DATA

@@ -8,9 +8,13 @@
 struct FExpansionOptionDisplay
 {
 	FText Name;
+	FText Stage;
 	FText Size;
+	FText Price;
 	FText Effect;
 	FText Status;
+	bool bStageVisible = false;
+	bool bPriceVisible = false;
 	bool bEffectVisible = false;
 	bool bStatusVisible = false;
 	bool bEnabled = false;
@@ -28,16 +32,12 @@ struct FExpansionScreenState
 /** 모델이 계산한 문구·활성·가시성. 위젯은 그대로 적용만 한다. */
 struct FExpansionScreenDisplay
 {
-	FText Stage;
 	FText Balance;
 	FText Locker;
-	bool bStageVisible = false;
 	bool bBalanceVisible = true;
 	bool bLockerVisible = false;
 	FExpansionOptionDisplay Options[3];
 	bool bOptionsVisible = false;
-	FText Price;
-	bool bPriceVisible = false;
 	bool bPurchasePanelVisible = false;
 	FText PurchaseButtonText;
 	bool bPurchaseEnabled = false;

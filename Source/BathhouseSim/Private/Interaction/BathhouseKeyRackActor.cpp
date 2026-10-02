@@ -65,12 +65,11 @@ EDataValidationResult ABathhouseKeyRackActor::IsDataValid(FDataValidationContext
 		{
 			continue;
 		}
-		// 도달할 수 있는 효과 줄: 구입 상한까지(표 끝을 넘으면 마지막 줄).
-		const int32 LastReachable = Definition->GetHallEffectIndex(Definition->GetMaxPurchaseCount());
+		// 효과 표의 모든 줄을 본다(홀 넓힘 줄 수는 Building이 알고 열쇠걸이는 알지 않는다).
 		int32 MaxKeys = 0;
-		for (int32 Index = 0; Index <= LastReachable; ++Index)
+		for (const FBathhouseExpansionTier& Tier : Definition->Tiers)
 		{
-			MaxKeys = FMath::Max(MaxKeys, Definition->Tiers[Index].KeyPoolSize);
+			MaxKeys = FMath::Max(MaxKeys, Tier.KeyPoolSize);
 		}
 		if (MaxKeys > PairTransforms.Num())
 		{

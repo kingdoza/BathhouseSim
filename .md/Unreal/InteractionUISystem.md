@@ -34,12 +34,14 @@ UE 5.8 DLL 빌드 후 새 Editor에서 다섯 WBP와 컴퓨터 BP의 Data Valida
 
 ### 확장 화면
 
-두 WBP는 `/Game/Bathhouse/UI/`에 있고 native class를 직접 상속하며 graph가 없다(`EXP-U2`, 저장·새 프로세스 Compile/Save로 widget GUID 정리, 재로드 `BS_UP_TO_DATE`·Data Validation VALID). 문구는 고정 문구(`정말 구입할까요?`, `확인`, `취소`) 외에 C++가 채운다. 스크롤 영역은 없다.
+두 WBP는 `/Game/Bathhouse/UI/`에 있고 native class를 직접 상속하며 graph가 없다(`EXP-U2` 생성, `EXP-U3` 수정; 저장 후 새 프로세스 Compile/Save로 widget GUID 정리, 재로드 `BS_UP_TO_DATE`·Data Validation VALID). 문구는 고정 문구(`정말 구입할까요?`, `확인`, `취소`) 외에 C++가 채운다. 스크롤 영역은 없다.
 
 | WBP | Native parent | 구조 |
 |---|---|---|
-| `WBP_ExpansionSpaceOption` | `ExpansionSpaceOptionWidget` | `RootOverlay > OptionSize`(SizeBox 높이 고정) `> SelectButton`(Button, 카드 전체) `> CardOverlay` 아래 `SelectionHighlight`(Border, 반투명 청록, HitTestInvisible)와 `CardColumn`(`NameText`, `SizeText`, `EffectText`(두 줄), `StatusText`) |
-| `WBP_ExpansionScreen` | `ExpansionScreenWidget` | `RootOverlay > ExpansionFrame > ExpansionColumn`: `HeaderRow`(`StageText`·`LockerText`·`BalanceText`) → `OptionsPanel`(HorizontalBox, `HallOption`·`BathOption`·`WorkOption` = `WBP_ExpansionSpaceOption_C` 가로 3열) → `InfoColumn`(`PriceText`·`ShortfallText`·`ResultText`·`MessageText`) → `ActionOverlay`에 같은 자리로 겹친 `PurchasePanel`(`PurchaseButtonSize > PurchaseButton > PurchaseButtonText`)과 `ConfirmPanel`(`ConfirmPromptText` → `CancelButton` → `ConfirmButton`) |
+| `WBP_ExpansionSpaceOption` | `ExpansionSpaceOptionWidget` | `RootOverlay > OptionSize`(SizeBox 높이 고정) `> SelectButton`(Button, 카드 전체) `> CardOverlay` 아래 `SelectionHighlight`(Border, 반투명 청록, HitTestInvisible)와 `CardColumn`(`NameText` → `StageText` → `SizeText` → `PriceText` → `EffectText`(두 줄) → `StatusText`) |
+| `WBP_ExpansionScreen` | `ExpansionScreenWidget` | `RootOverlay > ExpansionFrame > ExpansionColumn`: `HeaderRow`(`LockerText` 왼쪽 정렬·`BalanceText` 오른쪽 정렬, 같은 Fill 비율) → `OptionsPanel`(HorizontalBox, `HallOption`·`BathOption`·`WorkOption` = `WBP_ExpansionSpaceOption_C` 가로 3열) → `InfoColumn`(`ShortfallText`·`ResultText`·`MessageText`) → `ActionOverlay`에 같은 자리로 겹친 `PurchasePanel`(`PurchaseButtonSize > PurchaseButton > PurchaseButtonText`)과 `ConfirmPanel`(`ConfirmPromptText` → `CancelButton` → `ConfirmButton`) |
+
+- 선택지별 단계·다음 넓힘 가격은 카드의 `StageText`·`PriceText`(native `BindWidgetOptional`, 문구·가시성은 C++)가 보여 준다. 화면 머리의 옛 `StageText`·`PriceText`는 없다(native binding 삭제, 존재·부재는 자동화 `BathhouseSim.Expansion.Content.ScreenContract`가 검사). 카드 높이 원본은 `OptionSize` height override이며, 두 줄이 늘어 높였다. 세 카드와 정보·구입 영역의 높이 합은 root `RootSize` 안에 드는 것을 글꼴 크기·패딩 합으로 확인했고, 실제 1024×576 화면 잘림은 사용자 PIE 확인 대상이다(숨김 Editor에서 화면 미표시, FBK-003).
 
 - `ConfirmPanel`에서 구입 버튼과 같은 왼쪽 자리는 안내 문구(`ConfirmPromptSize`, 구입 버튼 폭과 같음)이고 `취소`·`확인` 버튼은 그 오른쪽이다. 구입 버튼 더블클릭이 확인으로 이어지지 않게 하는 배치다.
 - 컨테이너는 SelfHitTestInvisible(바탕 `ExpansionFrame`만 Visible), 버튼은 Visible이다. 패널 표시·숨김과 버튼 활성은 C++가 바꾼다. 색은 상점·관리 화면 팔레트(어두운 패널·밝은 글씨)다.

@@ -4,23 +4,60 @@
 
 namespace
 {
-	bool IsUsableStep(const FBathhouseExpansionStepSnapshot& Step)
-	{
-		return Step.AmountCm > 0.0 && FMath::IsFinite(Step.AmountCm);
-	}
-
+	/** 줄 하나의 쓸 수 있는 벽(양 유효, 같은 줄에서 처음 나온 방향)을 Rect에 적용한다. */
 	FBox2D ApplyStep(const FBox2D& Rect, const FBathhouseExpansionStepSnapshot& Step)
 	{
 		FBox2D Result = Rect;
-		switch (Step.Side)
+		TArray<EBathhouseSpaceSide, TInlineAllocator<4>> Seen;
+		for (const FBathhouseExpansionSideSnapshot& Wall : Step.Sides)
 		{
-		case EBathhouseSpaceSide::East: Result.Max.X += Step.AmountCm; break;
-		case EBathhouseSpaceSide::West: Result.Min.X -= Step.AmountCm; break;
-		case EBathhouseSpaceSide::North: Result.Max.Y += Step.AmountCm; break;
-		default: Result.Min.Y -= Step.AmountCm; break;
+			if (Seen.Contains(Wall.Side))
+			{
+				continue;
+			}
+			Seen.Add(Wall.Side);
+			if (!FBathhouseSpaceLayout::IsUsableSide(Wall))
+			{
+				continue;
+			}
+			switch (Wall.Side)
+			{
+			case EBathhouseSpaceSide::East: Result.Max.X += Wall.AmountCm; break;
+			case EBathhouseSpaceSide::West: Result.Min.X -= Wall.AmountCm; break;
+			case EBathhouseSpaceSide::North: Result.Max.Y += Wall.AmountCm; break;
+			default: Result.Min.Y -= Wall.AmountCm; break;
+			}
 		}
 		return Result;
 	}
+}
+
+bool FBathhouseSpaceLayout::IsUsableSide(const FBathhouseExpansionSideSnapshot& Side)
+{
+	return Side.AmountCm > 0.0 && FMath::IsFinite(Side.AmountCm);
+}
+
+bool FBathhouseSpaceLayout::IsStepApplicable(const FBathhouseExpansionStepSnapshot& Step)
+{
+	if (Step.Sides.IsEmpty())
+	{
+		return false;
+	}
+	for (int32 Index = 0; Index < Step.Sides.Num(); ++Index)
+	{
+		if (!IsUsableSide(Step.Sides[Index]))
+		{
+			return false;
+		}
+		for (int32 Other = 0; Other < Index; ++Other)
+		{
+			if (Step.Sides[Other].Side == Step.Sides[Index].Side)
+			{
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 FBox2D FBathhouseSpaceLayout::ExpandInterior(
@@ -30,31 +67,22 @@ FBox2D FBathhouseSpaceLayout::ExpandInterior(
 	const int32 Applied = FMath::Clamp(Count, 0, Steps.Num());
 	for (int32 Index = 0; Index < Applied; ++Index)
 	{
-		if (IsUsableStep(Steps[Index]))
-		{
-			Result = ApplyStep(Result, Steps[Index]);
-		}
+		Result = ApplyStep(Result, Steps[Index]);
 	}
 	return Result;
 }
 
-FBox2D FBathhouseSpaceLayout::ExpansionBand(
-	const FBox2D& Base, const TArray<FBathhouseExpansionStepSnapshot>& Steps, const int32 StepIndex)
+void FBathhouseSpaceLayout::ExpansionBandRects(
+	const FBox2D& Base, const TArray<FBathhouseExpansionStepSnapshot>& Steps, const int32 StepIndex, TArray<FBox2D>& OutRects)
 {
-	const FBox2D Empty(FVector2D::ZeroVector, FVector2D::ZeroVector);
-	if (!Steps.IsValidIndex(StepIndex) || !IsUsableStep(Steps[StepIndex]))
+	OutRects.Reset();
+	if (!Steps.IsValidIndex(StepIndex))
 	{
-		return Empty;
+		return;
 	}
 	const FBox2D Before = ExpandInterior(Base, Steps, StepIndex);
-	const FBox2D After = ApplyStep(Before, Steps[StepIndex]);
-	switch (Steps[StepIndex].Side)
-	{
-	case EBathhouseSpaceSide::East: return FBox2D(FVector2D(Before.Max.X, Before.Min.Y), After.Max);
-	case EBathhouseSpaceSide::West: return FBox2D(After.Min, FVector2D(Before.Min.X, Before.Max.Y));
-	case EBathhouseSpaceSide::North: return FBox2D(FVector2D(Before.Min.X, Before.Max.Y), After.Max);
-	default: return FBox2D(After.Min, FVector2D(Before.Max.X, Before.Min.Y));
-	}
+	const FBox2D After = ExpandInterior(Base, Steps, StepIndex + 1);
+	SubtractRects(After, TArray<FBox2D>{Before}, OutRects);
 }
 
 FBathhouseSpaceSnapshot FBathhouseSpaceLayout::WithExpansionCount(const FBathhouseSpaceSnapshot& Snapshot, const int32 Count)

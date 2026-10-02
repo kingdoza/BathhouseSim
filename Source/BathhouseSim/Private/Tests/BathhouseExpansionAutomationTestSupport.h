@@ -13,6 +13,7 @@
 #include "Interaction/BathhouseKeyRackActor.h"
 #include "Misc/AutomationTest.h"
 #include "UI/ExpansionScreenWidget.h"
+#include "UI/ExpansionSpaceOptionWidget.h"
 #include "BathhouseExpansionAutomationTestSupport.generated.h"
 
 /** 지출 callback 안에서 구입 subsystem을 다시 부르는 확장 테스트 probe. */
@@ -33,7 +34,7 @@ public:
 			bReentered = true;
 			const FBathhouseExpansionView View = Subsystem->BuildView(Buyer.Get());
 			ViewBusyInCallback = View.bBusy;
-			ReentryResult = Subsystem->TryPurchase(Buyer.Get(), EBathhouseSpaceKind::Bath, Subsystem->GetPurchaseCount());
+			ReentryResult = Subsystem->TryPurchase(Buyer.Get(), EBathhouseSpaceKind::Bath, View.Options[1].AppliedCount);
 		}
 	}
 
@@ -50,6 +51,13 @@ public:
 /** BindWidget 없이 native 로직만 시험하는 확장 화면(Abstract 해제). */
 UCLASS(Transient, NotBlueprintable)
 class UExpansionScreenTestWidget final : public UExpansionScreenWidget
+{
+	GENERATED_BODY()
+};
+
+/** BindWidget 없이 ApplyModel의 null 안전성을 시험하는 선택지 카드(Abstract 해제). */
+UCLASS(Transient, NotBlueprintable)
+class UExpansionOptionTestWidget final : public UExpansionSpaceOptionWidget
 {
 	GENERATED_BODY()
 };
@@ -90,13 +98,20 @@ public:
 		return Actor;
 	}
 
-	static void AddStep(ABathhouseSpaceActor& Space, const EBathhouseSpaceSide Side, const float AmountCm)
+	/** 넓힘 한 줄을 더한다. 벽 항목은 같은 양이고 순서대로 들어간다. */
+	static void AddStep(ABathhouseSpaceActor& Space, const int32 Price, const float AmountCm, std::initializer_list<EBathhouseSpaceSide> Sides)
 	{
 		FBathhouseSpaceExpansionStep& Step = Space.ExpansionSteps.AddDefaulted_GetRef();
-		Step.Side = Side;
-		Step.AmountCm = AmountCm;
+		Step.Price = Price;
+		for (const EBathhouseSpaceSide Side : Sides)
+		{
+			FBathhouseSpaceExpansionSide& Wall = Step.Sides.AddDefaulted_GetRef();
+			Wall.Side = Side;
+			Wall.AmountCm = AmountCm;
+		}
 	}
-	static void SetStepAmount(ABathhouseSpaceActor& Space, const int32 Index, const float AmountCm) { Space.ExpansionSteps[Index].AmountCm = AmountCm; }
+	static void SetStepAmount(ABathhouseSpaceActor& Space, const int32 Index, const int32 SideIndex, const float AmountCm) { Space.ExpansionSteps[Index].Sides[SideIndex].AmountCm = AmountCm; }
+	static void SetStepPrice(ABathhouseSpaceActor& Space, const int32 Index, const int32 Price) { Space.ExpansionSteps[Index].Price = Price; }
 	static void SetApplied(ABathhouseSpaceActor& Space, const int32 Count) { Space.AppliedExpansionCount = Count; }
 	static void AddAllowedTag(ABathhouseSpaceActor& Space, const TCHAR* Tag) { Space.AllowedFacilityTags.AddTag(FGameplayTag::RequestGameplayTag(FName(Tag))); }
 	static void AddEntrance(ABathhouseSpaceActor& Space, const EBathhouseSpaceSide Side, const float Width, const float Height, ABathhouseSpaceActor* Connected)
@@ -158,15 +173,16 @@ struct FBathhouseExpansionTestWorld
 	UBathhouseExpansionPurchaseSubsystem* Purchase = nullptr;
 
 	// fixture 입력. 기대값은 항상 이 값에서 계산한다.
-	static constexpr int32 FixtureMaxPurchase = 3;
 	static constexpr int32 FixtureRackPairs = 6;
+	/** 공간별 넓힘 줄 수(공간별 상한)와 벽당 양. 가격은 공간 줄마다 다르다(아래 Price 표). */
+	static constexpr int32 FixtureStepCount = 2;
+	static constexpr float FixtureAmountCm = 200.0f;
 
 	static UBathhouseExpansionDefinition* MakeDefinition()
 	{
 		UBathhouseExpansionDefinition* Definition = NewObject<UBathhouseExpansionDefinition>();
-		Definition->Tiers = { { 3, 2 }, { 4, 4 }, { 6, 6 }, { 6, 6 } };
-		Definition->MaxPurchaseCount = FixtureMaxPurchase;
-		Definition->PurchasePrices = { 1000, 2000, 3000 };
+		// 홀 넓힘 줄 수 + 1줄.
+		Definition->Tiers = { { 3, 2 }, { 4, 4 }, { 6, 6 } };
 		return Definition;
 	}
 
@@ -245,12 +261,13 @@ struct FBathhouseExpansionTestWorld
 		Access::AddEntrance(*Hall, EBathhouseSpaceSide::West, 200.0f, 260.0f, nullptr);
 		Access::AddEntrance(*Hall, EBathhouseSpaceSide::East, 200.0f, 260.0f, Bath);
 		Access::AddStair(*Hall, Work);
-		Access::AddStep(*Hall, EBathhouseSpaceSide::South, 200.0f);
-		Access::AddStep(*Hall, EBathhouseSpaceSide::North, 200.0f);
-		Access::AddStep(*Bath, EBathhouseSpaceSide::North, 200.0f);
-		Access::AddStep(*Bath, EBathhouseSpaceSide::South, 200.0f);
-		Access::AddStep(*Work, EBathhouseSpaceSide::West, 200.0f);
-		Access::AddStep(*Work, EBathhouseSpaceSide::East, 200.0f);
+		// 가격은 공간마다 서로 다르다(D2). 방향은 D3 기본 모습(홀 남·북, 목욕공간 남·북·동, 작업공간 동·북).
+		Access::AddStep(*Hall, 1000, FixtureAmountCm, { EBathhouseSpaceSide::South, EBathhouseSpaceSide::North });
+		Access::AddStep(*Hall, 2000, FixtureAmountCm, { EBathhouseSpaceSide::South, EBathhouseSpaceSide::North });
+		Access::AddStep(*Bath, 1500, FixtureAmountCm, { EBathhouseSpaceSide::South, EBathhouseSpaceSide::North, EBathhouseSpaceSide::East });
+		Access::AddStep(*Bath, 2500, FixtureAmountCm, { EBathhouseSpaceSide::South, EBathhouseSpaceSide::North, EBathhouseSpaceSide::East });
+		Access::AddStep(*Work, 1200, FixtureAmountCm, { EBathhouseSpaceSide::East, EBathhouseSpaceSide::North });
+		Access::AddStep(*Work, 2200, FixtureAmountCm, { EBathhouseSpaceSide::East, EBathhouseSpaceSide::North });
 		const TCHAR* HallTags[] = { TEXT("Facility.Type.ClothesLocker"), TEXT("Facility.Type.DrinkFridge"), TEXT("Facility.Type.MassageChair"),
 			TEXT("Facility.Type.RestBench"), TEXT("Facility.Type.Television"), TEXT("Facility.Type.Vanity") };
 		const TCHAR* BathTags[] = { TEXT("Facility.Type.Bath"), TEXT("Facility.Type.Shower"), TEXT("Facility.Type.ScrubTable") };

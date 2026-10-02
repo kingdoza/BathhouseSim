@@ -1,6 +1,6 @@
 # Building Editor Authoring
 
-공간 건물(홀·목욕공간·작업공간)의 Editor 구조다. C++ 책임·형상 규칙·검증 계약은 [Architecture/BuildingSystem.md](../Architecture/BuildingSystem.md)가 정본이다. 조정값 수치는 적지 않고 원본 위치만 적는다. 저장·새 프로세스 재로드로 확인한 상태다(`EXP-U1`, 넓힘 목록은 `EXP-U2`).
+공간 건물(홀·목욕공간·작업공간)의 Editor 구조다. C++ 책임·형상 규칙·검증 계약은 [Architecture/BuildingSystem.md](../Architecture/BuildingSystem.md)가 정본이다. 조정값 수치는 적지 않고 원본 위치만 적는다. 저장·새 프로세스 재로드로 확인한 상태다(`EXP-U1`, 넓힘 목록은 `EXP-U2`, 여러 벽 넓힘 줄·가격은 `EXP-U3`).
 
 ## 공용 값 원본
 
@@ -34,9 +34,9 @@ Compile 결과 `BS_UP_TO_DATE`(경고 없음). component 계층: `SpaceRoot`(roo
 
 ### 넓힘 목록(`Expansion Steps`)
 
-- 원본: 각 instance Details `Bathhouse Space › Expansion`의 `Expansion Steps`(줄 = 그 공간의 몇 번째 넓힘, `Side`·`Amount Cm`). 넓힘 양 값은 이 instance 값이 정본이다. 줄 수 = 공간별 넓힘 횟수 상한이고 세 공간 합이 확장 정의 `Max Purchase Count` 이상이다([FacilitySystem.md](FacilitySystem.md)).
-- 현재 방향(줄 순서): `Space_Hall` 남 → 북(동쪽 목욕공간 맞닿음·서쪽 출입구 제외), `Space_Bath` 북 → 남(서쪽 홀 맞닿음 제외), `Space_Work` 서 → 동(지하, 서쪽 띠는 홀·마당 지형 아래, 동쪽 띠는 목욕공간 바닥 아래에 묻힌다).
-- 끝 모습(모든 줄 적용)의 지상 넓힘 띠에는 Level Actor(편집 전용 sprite·frustum 제외)가 없고 지형 면은 지상 바닥 판 아래다(편집 world object trace).
+- 원본: 각 instance Details `Bathhouse Space › Expansion`의 `Expansion Steps`. 줄 = 그 공간의 몇 번째 넓힘이고, 줄마다 `Sides`(항목 = 함께 물러나는 벽 하나, `Side`·`Amount Cm`)와 `Price`(그 넓힘 구입 가격, 원)가 있다. 넓힘 방향·벽별 양·가격 값은 이 instance 값이 정본이다. 줄 수 = 공간별 넓힘 횟수 상한이다(전체 구입 횟수 상한은 없다). 홀 줄 수 + 1 ≤ 확장 정의 `Tiers` 줄 수여야 한다([FacilitySystem.md](FacilitySystem.md), 공간 Validation `ExpansionHallEffectShort`).
+- 현재 방향(각 공간 줄 2개, 줄마다 같은 벽 구성, `Sides` 항목 순서): `Space_Hall` 남·북(동쪽 목욕공간 맞닿음·서쪽 출입구 제외), `Space_Bath` 남·북·동(서쪽 홀 맞닿음 제외), `Space_Work` 동·북(지하, 동쪽 띠는 홀 동쪽·목욕공간 바닥 아래, 북쪽 띠는 홀 바닥 아래에 묻힌다). 한 줄의 벽은 한 번에 함께 물러나 모서리까지 직사각형 하나가 된다(`EXP-U3`).
+- 끝 모습(모든 줄 적용)의 지상 넓힘 띠(홀 남·북, 목욕공간 남·북·동, 모서리 포함)와 지하 띠에는 Level Actor가 없다(컴퓨터의 편집 전용 `DrawFrustumComponent`만 걸침). 지상 띠의 지형 면은 지상 바닥 판 아래다(편집 world WorldStatic·WorldDynamic 단순 object trace, FBK-001).
 - `Editor Preview Expansion Count`(Transient, 편집 전용)는 넓힌 모습 미리보기용이며 저장 상태는 세 공간 모두 0이다. 1 이상이면 벽·바닥·천장·조명·`ZoneBounds`가 넓힌 모습을 따르고, 편집 전용 Transient `UWidgetComponent` 글자 `넓힘 미리보기 N회`가 모든 공간 중 가장 높은 천장 판 윗면 + 높이 여유에 뜬다. 아래층(지하) 글자는 안쪽 중심 남쪽, 나머지는 북쪽에 붙고 위에서 읽힌다(위쪽 북). 사용자가 보이는 Editor에서 확인했다(`EXP-U2`).
 - 판정 경로 주의: 작업용 숨김 Editor에서는 위젯 component가 그려지지 않으니(render target 미생성) 미리보기 글자의 화면 판정은 사용자 확인으로 한다(FBK-003).
 
@@ -64,8 +64,8 @@ Compile 결과 `BS_UP_TO_DATE`(경고 없음). component 계층: `SpaceRoot`(roo
 
 ## Data Validation 현재 상태
 
-넓힘 검사(목록 끝 모습 포함)까지 적용된 상태다.
+넓힘 검사(여러 벽 넓힘 줄, 가격, 홀 효과 표 길이, 목록 끝 모습 포함)까지 적용된 상태다(`EXP-U3` 저장·새 프로세스 재로드).
 
-- `Space_Bath`: 오류 0. 경고 2개(배치된 `UsedTowelBin`·`CleanTowelStack`이 허용 종류가 아님 — opt-out 정의에 종류 태그가 없어서다).
+- `Space_Bath`: 오류 0. 경고 2개(배치된 `UsedTowelBin`·`CleanTowelStack`이 허용 종류가 아님 — opt-out 정의에 종류 태그가 없어서다). 출입구 변 경고 없음.
 - `Space_Hall`·`Space_Work`: 오류 0, 경고 0.
-- 끝 모습 손님 길 범위 검사를 위해 `NavMeshBounds` Y 범위를 넓혔다([WorldSystem.md](WorldSystem.md) Navigation).
+- 끝 모습 손님 길 범위 검사를 위해 `NavMeshBounds` X·Y 범위를 넓혔다([WorldSystem.md](WorldSystem.md) Navigation).

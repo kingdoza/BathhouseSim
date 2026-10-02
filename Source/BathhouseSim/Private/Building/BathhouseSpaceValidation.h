@@ -49,7 +49,10 @@ enum class EBathhouseProblemCode : uint8
 	ExpansionNavOutside,
 	ExpansionNavWorkCovered,
 	ExpansionEntranceSide,
-	ExpansionStepsBelowCap
+	ExpansionSidesEmpty,
+	ExpansionSideDuplicate,
+	ExpansionPriceInvalid,
+	ExpansionHallEffectShort
 };
 
 struct FBathhouseLayoutProblem
@@ -108,13 +111,13 @@ public:
 
 	/**
 	 * 넓힘 검사(순수). 0회와 목록 끝까지 넓힌 모습만 본다. Snapshots의 횟수와 무관하다.
-	 * MaxPurchaseCount가 INDEX_NONE이면 줄 수 합계 경고를 생략한다. OutProblems에 덧붙인다.
+	 * HallEffectRowCount는 홀 효과 표(Tiers) 줄 수. INDEX_NONE이면 효과 표 길이 검사를 생략한다. OutProblems에 덧붙인다.
 	 */
 	static void ValidateExpansion(
 		const TArray<FBathhouseSpaceSnapshot>& Snapshots,
 		const TArray<FBox>& NavBoxes,
 		const FBathhouseValidationInputs& Inputs,
-		int32 MaxPurchaseCount,
+		int32 HallEffectRowCount,
 		TArray<FBathhouseLayoutProblem>& OutProblems);
 
 	/** world 검사: layout + Nav 범위 + 계단 통로 장애물 + 배치된 설비 소속. */

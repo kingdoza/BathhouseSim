@@ -10,7 +10,6 @@ enum class EBathhouseExpansionFailure : uint8
 	Unavailable,
 	Busy,
 	StaleState,
-	MaxPurchasesReached,
 	SpaceUnavailable,
 	SpaceMaxReached,
 	InsufficientMoney,
@@ -25,6 +24,13 @@ struct FBathhouseExpansionOptionView
 	bool bPresent = false;
 	/** 공간별 상한 전이고 다음 줄을 적용할 수 있다. */
 	bool bCanExpand = false;
+	/** 이 공간을 넓힌 횟수와 줄 수(공간별 상한). */
+	int32 AppliedCount = 0;
+	int32 StepCount = 0;
+	/** 줄을 모두 적용했다. */
+	bool bAtLimit = false;
+	/** bCanExpand일 때만 다음 줄 가격(원), 아니면 0. */
+	int32 NextPrice = 0;
 	FVector2D CurrentSizeCm = FVector2D::ZeroVector;
 	FVector2D NextSizeCm = FVector2D::ZeroVector;
 	/** 홀만 참. 열쇠와 락커 칸 한도의 전후 값. */
@@ -41,13 +47,9 @@ struct FBathhouseExpansionView
 	bool bAvailable = false;
 	/** transaction 진행 중. 화면은 이 view를 적용하지 않는다. */
 	bool bBusy = false;
-	int32 PurchaseCount = 0;
-	int32 MaxPurchaseCount = 0;
-	bool bMaxReached = false;
-	int32 NextPrice = 0;
+	/** 등록된 공간이 하나 이상이고 등록된 공간 모두 상한에 닿았다. */
+	bool bAllAtLimit = false;
 	int32 Balance = 0;
-	/** max(0, NextPrice - Balance). 최대 도달·사용 불가면 0. */
-	int32 Shortfall = 0;
 	int32 InstalledLockerSlots = 0;
 	int32 LockerSlotLimit = 0;
 	FBathhouseExpansionOptionView Options[3];

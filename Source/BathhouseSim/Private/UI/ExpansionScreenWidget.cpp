@@ -203,7 +203,6 @@ void UExpansionScreenWidget::RefreshFromDomain()
 
 void UExpansionScreenWidget::ApplyDisplay(const FExpansionScreenDisplay& Display)
 {
-	SetTextAndVisibility(StageText, Display.Stage, Display.bStageVisible);
 	SetTextAndVisibility(BalanceText, Display.Balance, Display.bBalanceVisible);
 	SetTextAndVisibility(LockerText, Display.Locker, Display.bLockerVisible);
 	SetPanelVisible(OptionsPanel, Display.bOptionsVisible);
@@ -215,7 +214,6 @@ void UExpansionScreenWidget::ApplyDisplay(const FExpansionScreenDisplay& Display
 			Options[Index]->ApplyModel(Display.Options[Index]);
 		}
 	}
-	SetTextAndVisibility(PriceText, Display.Price, Display.bPriceVisible);
 	SetPanelVisible(PurchasePanel, Display.bPurchasePanelVisible);
 	if (PurchaseButtonText)
 	{
@@ -244,7 +242,7 @@ void UExpansionScreenWidget::HandleOptionClicked(const EBathhouseSpaceKind Kind)
 	}
 	const FBathhouseExpansionView View = Subsystem->BuildView(CurrentPlayerState.Get());
 	const int32 Index = static_cast<int32>(Kind);
-	if (View.bBusy || !View.bAvailable || View.bMaxReached || !View.Options[Index].bPresent || !View.Options[Index].bCanExpand)
+	if (View.bBusy || !View.bAvailable || View.bAllAtLimit || !View.Options[Index].bPresent || !View.Options[Index].bCanExpand)
 	{
 		return;
 	}
@@ -270,7 +268,7 @@ void UExpansionScreenWidget::HandlePurchaseClicked()
 		return;
 	}
 	bConfirmPending = true;
-	ConfirmPurchaseCount = View.PurchaseCount;
+	ConfirmAppliedCount = View.Options[static_cast<int32>(SelectedKind.GetValue())].AppliedCount;
 	bShowCompleted = false;
 	RefreshFromDomain();
 }
@@ -287,7 +285,7 @@ void UExpansionScreenWidget::HandleConfirmClicked()
 	APlayerState* User = CurrentPlayerState.Get();
 	if (Subsystem && User && SelectedKind.IsSet())
 	{
-		if (Subsystem->TryPurchase(User, SelectedKind.GetValue(), ConfirmPurchaseCount) == EBathhouseExpansionFailure::None)
+		if (Subsystem->TryPurchase(User, SelectedKind.GetValue(), ConfirmAppliedCount) == EBathhouseExpansionFailure::None)
 		{
 			SelectedKind.Reset();
 			bShowCompleted = true;

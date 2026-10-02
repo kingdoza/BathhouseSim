@@ -42,7 +42,7 @@ void FBathhouseSpaceValidation::ValidateExpansion(
 	const TArray<FBathhouseSpaceSnapshot>& Snapshots,
 	const TArray<FBox>& NavBoxes,
 	const FBathhouseValidationInputs& Inputs,
-	const int32 MaxPurchaseCount,
+	const int32 HallEffectRowCount,
 	TArray<FBathhouseLayoutProblem>& OutProblems)
 {
 	using namespace BathhouseSpaceValidationDetail;
@@ -55,45 +55,78 @@ void FBathhouseSpaceValidation::ValidateExpansion(
 	}
 	const FBathhouseLayoutValues& Values = Inputs.Layout;
 
-	int32 TotalSteps = 0;
+	int32 HallIndex = INDEX_NONE;
 	for (int32 I = 0; I < Snapshots.Num(); ++I)
 	{
 		const FBathhouseSpaceSnapshot& Space = Snapshots[I];
-		TotalSteps += Space.Steps.Num();
+		if (Space.Kind == EBathhouseSpaceKind::Hall && HallIndex == INDEX_NONE)
+		{
+			HallIndex = I;
+		}
 		for (int32 StepIndex = 0; StepIndex < Space.Steps.Num(); ++StepIndex)
 		{
 			const FBathhouseExpansionStepSnapshot& Step = Space.Steps[StepIndex];
 			const FString Label = FString::Printf(TEXT("%s %d번째 넓힘 줄"), *Space.DisplayName, StepIndex + 1);
-			if (!(Step.AmountCm > 0.0) || !FMath::IsFinite(Step.AmountCm))
+			if (Step.Sides.IsEmpty())
 			{
-				AddProblem(OutProblems, EBathhouseProblemCode::ExpansionAmountInvalid, EBathhouseProblemSeverity::Error,
+				AddProblem(OutProblems, EBathhouseProblemCode::ExpansionSidesEmpty, EBathhouseProblemSeverity::Error,
 					I, INDEX_NONE, StepIndex,
-					FString::Printf(TEXT("%s: 넓히는 양은 0보다 큰 유한한 값이어야 합니다."), *Label));
-				continue;
+					FString::Printf(TEXT("%s에 물러날 벽이 없습니다."), *Label));
 			}
-			if (IsUsable(Base[I]))
+			if (!(Step.Price > 0))
 			{
-				for (int32 J = 0; J < Snapshots.Num(); ++J)
+				AddProblem(OutProblems, EBathhouseProblemCode::ExpansionPriceInvalid, EBathhouseProblemSeverity::Error,
+					I, INDEX_NONE, StepIndex,
+					FString::Printf(TEXT("%s의 가격이 0 이하입니다."), *Label));
+			}
+			TArray<EBathhouseSpaceSide, TInlineAllocator<4>> Seen;
+			TArray<EBathhouseSpaceSide, TInlineAllocator<4>> ReportedDuplicate;
+			for (const FBathhouseExpansionSideSnapshot& Wall : Step.Sides)
+			{
+				if (Seen.Contains(Wall.Side))
 				{
-					if (J != I && IsUsable(Base[J]) && TouchesOnExpansionSide(Base[I], Base[J], Step.Side, Values))
+					if (!ReportedDuplicate.Contains(Wall.Side))
 					{
-						AddProblem(OutProblems, EBathhouseProblemCode::ExpansionTouchingSide, EBathhouseProblemSeverity::Error,
+						ReportedDuplicate.Add(Wall.Side);
+						AddProblem(OutProblems, EBathhouseProblemCode::ExpansionSideDuplicate, EBathhouseProblemSeverity::Error,
 							I, INDEX_NONE, StepIndex,
-							FString::Printf(TEXT("%s이(가) %s과(와) 맞닿은 %s 벽을 넓힙니다. 공간 사이 벽은 움직일 수 없습니다."),
-								*Label, *KindName(Snapshots[J].Kind), *SideName(Step.Side)));
-						break;
+							FString::Printf(TEXT("%s에 %s 벽이 두 번 있습니다. 같은 벽은 한 번만 적을 수 있습니다."),
+								*Label, *SideName(Wall.Side)));
+					}
+					continue;
+				}
+				Seen.Add(Wall.Side);
+				if (!FBathhouseSpaceLayout::IsUsableSide(Wall))
+				{
+					AddProblem(OutProblems, EBathhouseProblemCode::ExpansionAmountInvalid, EBathhouseProblemSeverity::Error,
+						I, INDEX_NONE, StepIndex,
+						FString::Printf(TEXT("%s의 %s 벽: 넓히는 양은 0보다 큰 유한한 값이어야 합니다."), *Label, *SideName(Wall.Side)));
+					continue;
+				}
+				if (IsUsable(Base[I]))
+				{
+					for (int32 J = 0; J < Snapshots.Num(); ++J)
+					{
+						if (J != I && IsUsable(Base[J]) && TouchesOnExpansionSide(Base[I], Base[J], Wall.Side, Values))
+						{
+							AddProblem(OutProblems, EBathhouseProblemCode::ExpansionTouchingSide, EBathhouseProblemSeverity::Error,
+								I, INDEX_NONE, StepIndex,
+								FString::Printf(TEXT("%s이(가) %s과(와) 맞닿은 %s 벽을 넓힙니다. 공간 사이 벽은 움직일 수 없습니다."),
+									*Label, *KindName(Snapshots[J].Kind), *SideName(Wall.Side)));
+							break;
+						}
 					}
 				}
-			}
-			for (const FBathhouseOpeningSnapshot& Opening : Space.Openings)
-			{
-				if (IsExpansionOutsideOpening(Opening) && Opening.Side == Step.Side)
+				for (const FBathhouseOpeningSnapshot& Opening : Space.Openings)
 				{
-					AddProblem(OutProblems, EBathhouseProblemCode::ExpansionEntranceSide, EBathhouseProblemSeverity::Warning,
-						I, INDEX_NONE, StepIndex,
-						FString::Printf(TEXT("%s이(가) 바깥 출입구가 있는 %s 벽을 넓힙니다. 출입구는 벽을 따라가지만 바깥 물건은 따라가지 않습니다."),
-							*Label, *SideName(Step.Side)));
-					break;
+					if (IsExpansionOutsideOpening(Opening) && Opening.Side == Wall.Side)
+					{
+						AddProblem(OutProblems, EBathhouseProblemCode::ExpansionEntranceSide, EBathhouseProblemSeverity::Warning,
+							I, INDEX_NONE, StepIndex,
+							FString::Printf(TEXT("%s이(가) 바깥 출입구가 있는 %s 벽을 넓힙니다. 출입구는 벽을 따라가지만 바깥 물건은 따라가지 않습니다."),
+								*Label, *SideName(Wall.Side)));
+						break;
+					}
 				}
 			}
 		}
@@ -157,20 +190,15 @@ void FBathhouseSpaceValidation::ValidateExpansion(
 		}
 	}
 
-	if (MaxPurchaseCount != INDEX_NONE && !Snapshots.IsEmpty() && TotalSteps < MaxPurchaseCount)
+	if (HallEffectRowCount != INDEX_NONE && HallIndex != INDEX_NONE)
 	{
-		int32 Owner = 0;
-		for (int32 I = 0; I < Snapshots.Num(); ++I)
+		const int32 HallSteps = Snapshots[HallIndex].Steps.Num();
+		if (HallSteps + 1 > HallEffectRowCount)
 		{
-			if (Snapshots[I].Kind == EBathhouseSpaceKind::Hall)
-			{
-				Owner = I;
-				break;
-			}
+			AddProblem(OutProblems, EBathhouseProblemCode::ExpansionHallEffectShort, EBathhouseProblemSeverity::Error,
+				HallIndex, INDEX_NONE, INDEX_NONE,
+				FString::Printf(TEXT("홀 넓힘 효과 표(DA_BathhouseExpansion_Default Tiers)가 %d줄입니다. 홀 넓힘 %d개에는 %d줄이 필요합니다."),
+					HallEffectRowCount, HallSteps, HallSteps + 1));
 		}
-		AddProblem(OutProblems, EBathhouseProblemCode::ExpansionStepsBelowCap, EBathhouseProblemSeverity::Warning,
-			Owner, INDEX_NONE, INDEX_NONE,
-			FString::Printf(TEXT("공간별 넓힘 줄 수의 합(%d)이 전체 구입 횟수 상한(%d)보다 작습니다. 상한에 닿기 전에 모든 선택지가 막힙니다."),
-				TotalSteps, MaxPurchaseCount));
 	}
 }
