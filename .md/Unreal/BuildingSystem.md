@@ -1,10 +1,10 @@
 # Building Editor Authoring
 
-공간 건물(홀·목욕공간·작업공간)의 Editor 구조다. C++ 책임·형상 규칙·검증 계약은 [Architecture/BuildingSystem.md](../Architecture/BuildingSystem.md)가 정본이다. 조정값 수치는 적지 않고 원본 위치만 적는다. 저장·새 프로세스 재로드로 확인한 상태다(`EXP-U1`).
+공간 건물(홀·목욕공간·작업공간)의 Editor 구조다. C++ 책임·형상 규칙·검증 계약은 [Architecture/BuildingSystem.md](../Architecture/BuildingSystem.md)가 정본이다. 조정값 수치는 적지 않고 원본 위치만 적는다. 저장·새 프로세스 재로드로 확인한 상태다(`EXP-U1`, 넓힘 목록은 `EXP-U2`).
 
 ## 공용 값 원본
 
-- Project Settings > Game > Bathhouse Building(`Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`): 벽 두께, 바닥·천장 판 두께, 형상 상자 mesh(`/Engine/BasicShapes/Cube`), 조각 최대 크기, 쓰레기 조각 class `BP_LitterSpawnZone_C`, 물 얼룩 조각 class `BP_StainSpawnZone_C`.
+- Project Settings > Game > Bathhouse Building(`Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`): 벽 두께, 바닥·천장 판 두께, 형상 상자 mesh(`/Engine/BasicShapes/Cube`), 조각 최대 크기, 쓰레기 조각 class `BP_LitterSpawnZone_C`, 물 얼룩 조각 class `BP_StainSpawnZone_C`, 넓힘 미리보기 글자 크기 `Editor Preview Label World Size Cm`(Config에 값 없음 = C++ 기본값).
 - 설비 종류 태그 `Facility.Type.*` 14개는 `Config/DefaultGameplayTags.ini`에 있다.
 
 ## Blueprint
@@ -32,6 +32,13 @@ Compile 결과 `BS_UP_TO_DATE`(경고 없음). component 계층: `SpaceRoot`(roo
 - `Lighting`: 원본은 각 공간 instance `Lighting`이다(그림자 끔, 밝기는 2026-10-02 사용자가 PIE에서 조정). 화면 밝기는 Project Settings 자동 노출 끔(`Config/DefaultEngine.ini` `r.DefaultFeature.AutoExposure`)을 전제로 맞춘 값이다.
 - 컴퓨터 `ManagedBathPlacementZone`은 `Space_Bath`다([InteractionUISystem.md](InteractionUISystem.md)).
 
+### 넓힘 목록(`Expansion Steps`)
+
+- 원본: 각 instance Details `Bathhouse Space › Expansion`의 `Expansion Steps`(줄 = 그 공간의 몇 번째 넓힘, `Side`·`Amount Cm`). 넓힘 양 값은 이 instance 값이 정본이다. 줄 수 = 공간별 넓힘 횟수 상한이고 세 공간 합이 확장 정의 `Max Purchase Count` 이상이다([FacilitySystem.md](FacilitySystem.md)).
+- 현재 방향(줄 순서): `Space_Hall` 남 → 북(동쪽 목욕공간 맞닿음·서쪽 출입구 제외), `Space_Bath` 북 → 남(서쪽 홀 맞닿음 제외), `Space_Work` 서 → 동(지하, 서쪽 띠는 홀·마당 지형 아래, 동쪽 띠는 목욕공간 바닥 아래에 묻힌다).
+- 끝 모습(모든 줄 적용)의 지상 넓힘 띠에는 Level Actor(편집 전용 sprite·frustum 제외)가 없고 지형 면은 지상 바닥 판 아래다(편집 world object trace).
+- `Editor Preview Expansion Count`(Transient, 편집 전용)는 넓힌 모습 미리보기용이며 저장 상태는 세 공간 모두 0이다. 1 이상이면 벽·바닥·천장·조명·`ZoneBounds`가 넓힌 모습을 따르고 공간 위에 `넓힘 미리보기 N회` 글자 component가 생긴다. 글자는 현재 편집 world에서 천장 판 윗면과 같은 높이라 가려지고 한글이 기본 글꼴에 없어 네모로 보인다(코드 수정 대기, `EXP-U2` 보고). 방향(위에서 읽힘, 위쪽 북)은 맞다.
+
 ## 재질
 
 | Asset | 용도 |
@@ -56,5 +63,8 @@ Compile 결과 `BS_UP_TO_DATE`(경고 없음). component 계층: `SpaceRoot`(roo
 
 ## Data Validation 현재 상태
 
+넓힘 검사(목록 끝 모습 포함)까지 적용된 상태다.
+
 - `Space_Bath`: 오류 0. 경고 2개(배치된 `UsedTowelBin`·`CleanTowelStack`이 허용 종류가 아님 — opt-out 정의에 종류 태그가 없어서다).
 - `Space_Hall`·`Space_Work`: 오류 0, 경고 0.
+- 끝 모습 손님 길 범위 검사를 위해 `NavMeshBounds` Y 범위를 넓혔다([WorldSystem.md](WorldSystem.md) Navigation).
