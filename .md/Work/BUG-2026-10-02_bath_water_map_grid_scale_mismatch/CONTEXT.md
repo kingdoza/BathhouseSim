@@ -1,0 +1,14 @@
+# CONTEXT — BUG-2026-10-02_bath_water_map_grid_scale_mismatch 욕탕 관리 지도 그리드 누락·욕탕 비율 불일치
+- 목표 / 상위·선행·관련 작업: 컴퓨터 욕탕 관리 지도의 그리드 선 누락과 욕탕 타일 크기가 실제 점유 범위와 맞는지 확인. 버그 리포트 `.md/BugReports/2026-10-02_bath_water_map_grid_scale_mismatch.md`. 관련: 욕탕 관리 UI(BathWaterManagementUISystem), 공간 넓힘 `EXP-U3`(병합 `201b2d0`), 관련 작업 `PLACEMENT-FOOTPRINT-PREVIEW`(footprint와 메시 크기 차이 주제 공유).
+- 현재 단계와 재개 지점: Editor 진단 완료 → 사용자 "둘 다 수정" → 아키텍처(선 두께 보정 방식·선 두께·색 조정값 원본, 타일 slot Fill Editor 범위, 정본 원본 참조 정리 범위) 진행.
+- 명세 승인 일자(자동/명시)와 사전 허용: 2026-10-02 사용자 명시 "둘 다 수정" — 버그 리포트를 기능 계약으로 보고 기능 명세 생략(Content 영향은 `WBP_BathWaterBathTile` 한 asset). 사전 허용 범위: `WBP_BathWaterBathTile`, 지도 선 표시 조정값 원본 asset(아키텍처가 정하는 범위), `.md/Unreal/PlacementSystem.md` 정본 정리. PIE 통과 후 병합은 미확인(병합 전에 묻는다).
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/BUG-2026-10-02_bath_water_map_grid_scale_mismatch`(main에서 분기). 아키텍처 시작 커밋은 분기 직후 커밋.
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 해당 없음(진단 단계).
+- 복귀 기록: 없음
+- 진단 중 드러난 정본 불일치(이 작업 범위 밖): `.md/Unreal/PlacementSystem.md` BP_Bath 줄 footprint (145,120,38)·부모 BathhouseFacilityActor ↔ 실제 CDO (150,120,38)·BathhouseBathFacilityActor. Editor 워커의 정본 쓰기가 auto-mode 권한 분류기에 거부됨 → 마스터가 대신 쓰지 않고 사용자에게 보고. 진단 종료 뒤 마스터가 git status·BP_ClothesLocker 해시(6c81ae31…5967) 무변경과 Editor 종료를 확인함.
+- 사용자 지시 모델 덮어쓰기: 없음
+- 결과물 목록과 사용자 지시 요약:
+  - 사용자 스크린샷: `user_map_screen.webp`(지도), `user_bath_space.webp`(실제 목욕 공간).
+  - 시작 시 작업 트리: `Content/Bathhouse/Blueprints/Facility/BP_ClothesLocker.uasset` 수정됨(사용자 소유 변경으로 보고 건드리지 않음).
+  - 사용자 결정(2026-10-02): "둘 다 수정". 부수 항목 질문에 "값은 기본적으로 원본참조로 작성임." → 문서(특히 `.md/Unreal/PlacementSystem.md` Definition 표)는 수치를 복제하지 않고 원본 위치(asset·프로퍼티)를 참조하도록 정리(AGENT_WORKFLOW 조정값 원본 원칙). 정본 불일치 목록은 `../PLACEMENT-FOOTPRINT-PREVIEW/REPORT_UNREAL_DISCOVERY.md` 6절. 50cm 어긋남 의심(진단 8절)은 사용자가 선택하지 않아 범위 밖.
+  - 사용자 요청 원문(2026-10-02): "현재 컴퓨터의 BathWaterOperation 에서 욕탕영역 그리드 선이 누락된곳이 있고 실제 욕탕영역에서 욕탕이 점유하는만큼이 BathWaterOperation의 그리드 레이아웃에 대응되는지 확인좀. 사진들은 각각 BathWaterOperation 의 그리드화면과 실제 욕탕공간임. 내가보기엔 비율상으로 맞지않는것같아서."

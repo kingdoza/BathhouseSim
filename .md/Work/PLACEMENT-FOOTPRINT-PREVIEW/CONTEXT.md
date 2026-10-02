@@ -1,0 +1,11 @@
+# CONTEXT — PLACEMENT-FOOTPRINT-PREVIEW 배치 미리보기의 footprint 공간 표시
+- 목표 / 상위·선행·관련 작업: 설비 배치 미리보기에서 비주얼 메시와 함께 Placement Footprint의 XY 평면 점유 공간을 보여 준다. 관련: PlacementSystem(범용 native preview), `EXP-U3` D4(배치 미리보기 숨김), `BUG-2026-10-02_bath_water_map_grid_scale_mismatch`(footprint와 메시 크기 차이 주제 공유).
+- 현재 단계와 재개 지점: Editor 사전 조사 완료(`REPORT_UNREAL_DISCOVERY.md`). 같은 기능 명세 워커가 조사 반영·질문지 사용자용 갱신 중. 문서 병렬 작업이라 별도 git worktree `../BathhouseSim-FPV`(branch `spec/PLACEMENT-FOOTPRINT-PREVIEW`)에서 진행, 명세 확정 뒤 main에 병합.
+- 명세 승인 일자(자동/명시)와 사전 허용: 미정(질문지에서 확인).
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 기능 명세는 `main`(`b6ae16e`). 아키텍처 진입 시 `work/PLACEMENT-FOOTPRINT-PREVIEW` 생성.
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 없음
+- 복귀 기록: 없음
+- 사용자 지시 모델 덮어쓰기: 없음
+- 결과물 목록과 사용자 지시 요약:
+  - 시작 시 작업 트리: `Content/Bathhouse/Blueprints/Facility/BP_ClothesLocker.uasset` 수정됨(사용자 소유 변경으로 보고 건드리지 않음).
+  - 사용자 요청 원문(2026-10-02): "Placement Footprint 가 실제 비주얼 메시보다 넓은 경우가 생길거임. 근데 현재 배치프리뷰에는 비주얼메시만 표현되다보니깐 placement footprint 가 비주얼메시의 크기랑 꽤 다를경우에는 ux 가 불편할수있음. 비주얼메시 프리뷰와 더불어서 placement footprint 의 xy평면상에서의 공간프리뷰도 보여줬으면 좋겠다."
