@@ -5,6 +5,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
@@ -100,6 +101,11 @@ void UBathhouseSpaceShellComponent::ClearGenerated()
 			Component->DestroyComponent();
 		}
 	}
+	if (IsValid(PreviewLabelComponent))
+	{
+		PreviewLabelComponent->DestroyComponent();
+	}
+	PreviewLabelComponent = nullptr;
 	PartComponents.Reset();
 	PartComponents.SetNum(static_cast<int32>(EBathhouseShellPart::Count));
 	LightComponents.Reset();
@@ -121,7 +127,14 @@ int32 UBathhouseSpaceShellComponent::GetGeneratedComponentCount() const
 	{
 		Count += IsValid(Component) ? 1 : 0;
 	}
+	Count += IsValid(PreviewLabelComponent) ? 1 : 0;
 	return Count;
+}
+
+FString UBathhouseSpaceShellComponent::GetPreviewLabelText() const
+{
+	const UTextRenderComponent* Label = Cast<UTextRenderComponent>(PreviewLabelComponent);
+	return IsValid(Label) ? Label->Text.ToString() : FString();
 }
 
 UInstancedStaticMeshComponent* UBathhouseSpaceShellComponent::FindPartComponent(const EBathhouseShellPart Part) const
@@ -231,5 +244,25 @@ void UBathhouseSpaceShellComponent::Rebuild(const FBathhouseSpacePlan& Plan, con
 			Preview->SetWorldLocation(FVector(Center.X, Center.Y, FloorZ + Inputs.ChunkPreviewHalfHeightCm));
 			ChunkPreviewComponents.Add(Preview);
 		}
+	}
+
+	if (Inputs.bPreviewChunks && !Inputs.PreviewLabel.IsEmpty())
+	{
+		UTextRenderComponent* Label = NewObject<UTextRenderComponent>(Owner, NAME_None, RF_Transient);
+		Label->CreationMethod = EComponentCreationMethod::UserConstructionScript;
+		Label->bIsEditorOnly = true;
+		Label->SetMobility(EComponentMobility::Movable);
+		Label->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Label->SetCanEverAffectNavigation(false);
+		Label->SetHiddenInGame(true);
+		Label->SetupAttachment(this);
+		Label->SetText(FText::FromString(Inputs.PreviewLabel));
+		Label->SetWorldSize(Inputs.PreviewLabelWorldSizeCm);
+		Label->SetHorizontalAlignment(EHTA_Center);
+		Label->SetVerticalAlignment(EVRTA_TextCenter);
+		Label->RegisterComponent();
+		// 글자 앞면(+X)이 위를 보고 글자 위쪽이 북(+Y)을 향하게 눕힌다.
+		Label->SetWorldLocationAndRotation(Inputs.PreviewLabelLocation, FRotator(90.0, -90.0, 0.0));
+		PreviewLabelComponent = Label;
 	}
 }

@@ -2,7 +2,7 @@
 
 ## Status And Scope
 
-- 2026-10-02 `EXP-U2`(확장 구입 수직, 홀 1회) 설계, Source 미반영. 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-020~032)이고 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md`다.
+- 2026-10-02 `EXP-U2`(확장 구입 수직, 홀 1회) 설계, Source 반영(Editor 작업 전, 빌드·자동화 통과). 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-020~032)이고 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md`다.
 - 컴퓨터 `확장` 탭에서 돈을 내고 공간 하나를 넓힌다. 홀을 넓히면 열쇠 수와 락커 칸 설치 한도가 오른다. 상점은 락커 상품을 팔 수 있다.
 - 공간 넓힘의 형상·검증·편집 미리보기는 [BuildingSystem.md](BuildingSystem.md) Expansion 절이 정본이다. 이 문서는 구입 상태·transaction·확장 데이터·확장 탭·락커 판매 규칙을 다룬다.
 - 저장·환불·되돌리기·공사 시간은 없다. 게임을 다시 시작하면 확장 0회다.
@@ -78,6 +78,7 @@ Private/Shop/
 
 - 되돌릴 수 없는 tier 상승(열쇠 생성)을 마지막에 둔다. 사전 검사가 2·4단계 성공을 보장한다.
 - `ExpectedPurchaseCount`가 같은 확인에서 온 두 번째 요청을 거절한다(연타 1회 결제).
+- 구현 상세: 사용 가능 판정(`Resolve`)은 transaction 도중(`bPurchasing`)에는 tier 일관성을 확인하지 않고(공간 횟수와 tier가 잠시 어긋남), Authority 변경 방송은 transaction 안에서는 전달하지 않는다(commit 방송 한 번으로 묶음). Buyer wallet이 없으면 사용 불가이지만 정상 상태(사용자 없음)라 Error 로그는 남기지 않는다. 자동화 실패 주입(4·5·6단계)은 `WITH_DEV_AUTOMATION_TESTS` 안의 private 값이다.
 - `OnExpansionChanged`(native)는 구입 commit, 공간 등록·해제, Authority 등록 변경(`UBathhouseFacilitySubsystem::OnExpansionAuthorityChanged` 전달) 때 방송한다.
 - 3단계 wallet `OnMoneyChanged` 동기 callback에서 `BuildView`는 `bBusy=true`를 돌려주고, `TryPurchase` 재호출은 `Busy`다.
 

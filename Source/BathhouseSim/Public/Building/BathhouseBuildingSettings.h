@@ -23,6 +23,8 @@ public:
 	float GetSlabThicknessCm() const { return SlabThicknessCm; }
 	/** 값이 0 이하이거나 유한하지 않으면 공간 검증이 오류로 알린다(숨은 하한 없음). */
 	FVector2D GetCleaningChunkMaxSizeCm() const { return CleaningChunkMaxSizeCm; }
+	/** 편집 화면 전용 넓힘 미리보기 글자 크기(cm). */
+	float GetEditorPreviewLabelWorldSizeCm() const { return EditorPreviewLabelWorldSizeCm; }
 	UStaticMesh* LoadShellBoxMesh() const;
 	UClass* LoadLitterChunkZoneClass() const;
 	UClass* LoadStainChunkZoneClass() const;
@@ -42,6 +44,11 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Shell",
 		meta = (ToolTip = "벽·바닥·천장을 만드는 상자 mesh. 늘려 쓰므로 원점 중심의 상자를 쓴다."))
 	TSoftObjectPtr<UStaticMesh> ShellBoxMesh;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Editor Preview",
+		meta = (ClampMin = "1.0", UIMin = "1.0", ForceUnits = "cm",
+			ToolTip = "편집 화면에서 넓힘 미리보기 횟수를 켰을 때 공간 위에 뜨는 글자 크기(cm). 게임에는 영향이 없다."))
+	float EditorPreviewLabelWorldSizeCm = 100.0f;
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Cleaning",
 		meta = (ClampMin = "1.0", UIMin = "1.0", ForceUnits = "cm",

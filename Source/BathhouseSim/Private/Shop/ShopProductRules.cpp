@@ -21,9 +21,15 @@ bool FShopProductRules::ValidateDefinitions(
 	}
 	if (bHasFacility)
 	{
-		if (Facility->LockerSlotCount != 0 || !Facility->FacilityTags.HasTag(TAG_Facility_Discardable))
+		const bool bDiscardable = Facility->FacilityTags.HasTag(TAG_Facility_Discardable);
+		if (Facility->LockerSlotCount == 0 && !bDiscardable)
 		{
-			OutFailureReason = LOCTEXT("InvalidDiscardableDefinition", "설비 상품은 Facility.Discardable인 non-locker 설비여야 합니다.");
+			OutFailureReason = LOCTEXT("InvalidDiscardableDefinition", "설비 상품은 Facility.Discardable 설비여야 합니다.");
+			return false;
+		}
+		if (Facility->LockerSlotCount > 0 && bDiscardable)
+		{
+			OutFailureReason = LOCTEXT("InvalidLockerDefinition", "락커 상품에는 Facility.Discardable 태그를 둘 수 없습니다.");
 			return false;
 		}
 		return Facility->ValidateRuntime(OutFailureReason);

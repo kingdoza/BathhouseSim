@@ -2,11 +2,16 @@
 
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Facility/BathhouseExpansionAuthority.h"
+#include "Facility/BathhouseExpansionDefinition.h"
 #include "Facility/BathhouseFacilitySubsystem.h"
 #include "Interaction/BathhouseKeyActor.h"
 #include "Interaction/BathhouseKeyHookActor.h"
 #include "Kismet/GameplayStatics.h"
+#if WITH_EDITOR
+#include "Misc/DataValidation.h"
+#endif
 
 ABathhouseKeyRackActor::ABathhouseKeyRackActor()
 {
@@ -43,6 +48,41 @@ void ABathhouseKeyRackActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	OwnedHooks.Reset();
 	Super::EndPlay(EndPlayReason);
 }
+
+#if WITH_EDITOR
+EDataValidationResult ABathhouseKeyRackActor::IsDataValid(FDataValidationContext& Context) const
+{
+	EDataValidationResult Result = Super::IsDataValid(Context);
+	const UWorld* World = GetWorld();
+	if (!World || HasAnyFlags(RF_ClassDefaultObject))
+	{
+		return Result;
+	}
+	for (TActorIterator<ABathhouseExpansionAuthority> It(World); It; ++It)
+	{
+		const UBathhouseExpansionDefinition* Definition = It->GetExpansionDefinition();
+		if (!Definition || Definition->Tiers.IsEmpty())
+		{
+			continue;
+		}
+		// 도달할 수 있는 효과 줄: 구입 상한까지(표 끝을 넘으면 마지막 줄).
+		const int32 LastReachable = Definition->GetHallEffectIndex(Definition->GetMaxPurchaseCount());
+		int32 MaxKeys = 0;
+		for (int32 Index = 0; Index <= LastReachable; ++Index)
+		{
+			MaxKeys = FMath::Max(MaxKeys, Definition->Tiers[Index].KeyPoolSize);
+		}
+		if (MaxKeys > PairTransforms.Num())
+		{
+			Context.AddError(FText::Format(
+				NSLOCTEXT("BathhouseKeyRack", "TooManyKeys", "열쇠 수 {0}개가 열쇠걸이 자리 {1}개보다 많습니다."),
+				MaxKeys, PairTransforms.Num()));
+			Result = EDataValidationResult::Invalid;
+		}
+	}
+	return Result == EDataValidationResult::NotValidated ? EDataValidationResult::Valid : Result;
+}
+#endif
 
 void ABathhouseKeyRackActor::HandleExpansionTierChanged(const int32 NewTier)
 {

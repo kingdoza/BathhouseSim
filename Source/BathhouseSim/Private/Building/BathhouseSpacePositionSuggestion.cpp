@@ -222,6 +222,7 @@ void FBathhouseSpaceValidation::ApplyMove(FBathhouseSpaceSnapshot& Snapshot, con
 	using namespace BathhouseSpaceValidationDetail;
 	Snapshot.ActorXY += DeltaXY;
 	Snapshot.Interior = FBox2D(Snapshot.Interior.Min + DeltaXY, Snapshot.Interior.Max + DeltaXY);
+	Snapshot.BaseInterior = FBox2D(Snapshot.BaseInterior.Min + DeltaXY, Snapshot.BaseInterior.Max + DeltaXY);
 	Snapshot.FloorZ += DeltaZ;
 }
 
