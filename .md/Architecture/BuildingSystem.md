@@ -2,7 +2,7 @@
 
 ## Status And Scope
 
-- 2026-10-02 `EXP-U1` 설계·구현(공간 건물). Source 반영(2026-10-02 구현 단계, 코드 리뷰·Editor 작업 전), 사용자 승인(2026-10-02). 같은 날 사후 결정 D1(공간별 조각 종류 하나), 아키텍처 Q1 A(지형 구멍), 넓힘 목록 형태 확정(U2 구현)을 반영했다. 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-001~015)이고 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md`다.
+- 2026-10-02 `EXP-U1` 설계·구현(공간 건물). Source·Editor 반영, 2026-10-02 사용자 PIE 통과·병합(`8ca6a24`). 같은 날 사후 결정 D1(공간별 조각 종류 하나), 아키텍처 Q1 A(지형 구멍), 넓힘 목록 형태 확정(U2 구현)을 반영했다. 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-001~015)이고 구현 지시는 병합 커밋 `8ca6a24`의 `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md`(작업 폴더 제거됨, Git 이력)다.
 - 가게를 홀·목욕공간·작업공간(지하) 세 공간으로 나누고, 공간마다 직사각형 바닥 경계를 따라 벽·바닥·천장·조명·출입구·통로·계단을 만든다. 공간은 그 바닥의 설비 배치 구역이자 생성 조각의 생성자다(홀 = 쓰레기 조각, 목욕공간 = 물 얼룩 조각, 작업공간 = 없음, D1).
 - 비대상(U1): 확장 구입·넓힘 적용, 확장 탭, 열쇠·한도 변경, 락커 판매. 넓힘 데이터와 편집 미리보기의 형태는 아래 U2 Expansion Authoring Contract에 확정해 두고 U2가 구현한다.
 
