@@ -7,6 +7,7 @@
 - 복귀 기록: 없음
 - 진단 중 드러난 정본 불일치(이 작업 범위 밖): `.md/Unreal/PlacementSystem.md` BP_Bath 줄 footprint (145,120,38)·부모 BathhouseFacilityActor ↔ 실제 CDO (150,120,38)·BathhouseBathFacilityActor. Editor 워커의 정본 쓰기가 auto-mode 권한 분류기에 거부됨 → 마스터가 대신 쓰지 않고 사용자에게 보고. 진단 종료 뒤 마스터가 git status·BP_ClothesLocker 해시(6c81ae31…5967) 무변경과 Editor 종료를 확인함.
 - 회고 대상(ORCHESTRATOR·UNREAL_EDITOR): Editor 진단 워커가 정본 불일치를 "수치 정정"으로 보고하고 마스터도 그대로 "문서 값 정정"으로 사용자에게 물음. 조정값 원본 원칙(`AGENT_WORKFLOW.md`, `a566ad1` 2026-10-01 채택, `AGENT_UNREAL_EDITOR.md` 115행)상 수치 복제 자체가 위반이므로 원본 참조로 바꾸는 것이 맞았음. `.md/Unreal/PlacementSystem.md` Definition 표는 원칙 채택 전(`13ef199` 2026-09-11) 작성분이 정리되지 않은 상태. 사용자 지적(2026-10-02): "원본참조로 시스템문서를 작성하라고 지침서에 없었냐?"
+- 회고 대상(ORCHESTRATOR, 2026-10-02 사용자 질문 "원래 이렇게 작업하는게 지침이야?"): ① `f92277a`에 두 작업(BUG 진단, PLACEMENT-FOOTPRINT-PREVIEW 명세 초안)을 한 커밋으로 묶음(작업별 `[작업 ID] 단계: 요약` 위반). ② 문서 병렬 작업 worktree를 세션 폴더 밖(`../BathhouseSim-FPV`)에 만들어 앱 파일 창에서 열리지 않음 → 사용자가 원래 폴더의 조사 전 옛 질문지에 답함. ③ worktree 생성을 사전 안내 없이 진행.
 - 사용자 지시 모델 덮어쓰기: 없음
 - 결과물 목록과 사용자 지시 요약:
   - 사용자 스크린샷: `user_map_screen.webp`(지도), `user_bath_space.webp`(실제 목욕 공간).
