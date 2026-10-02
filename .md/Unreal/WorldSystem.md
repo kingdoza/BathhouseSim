@@ -21,8 +21,8 @@
 ## Navigation
 
 - Recast actor: `/Game/Maps/DefaultMap.DefaultMap:PersistentLevel.RecastNavMesh_UAID_F02F7433CA3615F402-Default`(package `/Game/__ExternalActors__/Maps/DefaultMap/9/GO/03SG1X02WXVMF5RN4NTIOA`). 디스크에 저장된 `RuntimeGeneration`은 `Dynamic`이다(새 프로세스 재로드 확인).
-- `NavMeshBounds`(`NavMeshBoundsVolume`, package `/Game/__ExternalActors__/Maps/DefaultMap/8/8U/DVJA0LL4M6BXDCMLJ35BD5`) 계약: 한 volume이 홀·목욕공간 바닥 전체, 앞으로의 넓힘 여유, 홀 서쪽 출입구 밖 마당(`Spawner`·`Exit`·`TrashCollectionZone`)을 덮고, Z 범위는 지상(마당 지형과 지상 바닥)만 덮어 작업공간 바닥을 넣지 않는다. 범위 값의 정본은 Level instance transform이며 공간 Data Validation이 계약을 검사한다.
-- 편집 world 확인: 손님 생성기에서 카운터·락커·목욕공간까지 경로가 있고 작업공간 바닥과 계단에는 Nav가 없다.
+- `NavMeshBounds`(`NavMeshBoundsVolume`, package `/Game/__ExternalActors__/Maps/DefaultMap/8/8U/DVJA0LL4M6BXDCMLJ35BD5`) 계약: 한 volume이 홀·목욕공간 바닥 전체와 넓힘 목록 끝 모습(`EXP-U2`에서 Y scale만 늘려 남·북 넓힘 띠를 덮음), 홀 서쪽 출입구 밖 마당(`Spawner`·`Exit`·`TrashCollectionZone`)을 덮고, Z 범위는 지상(마당 지형과 지상 바닥)만 덮어 작업공간 바닥을 넣지 않는다. 범위 값의 정본은 Level instance transform이며 공간 Data Validation이 계약을 검사한다.
+- 편집 world 확인: 손님 생성기에서 카운터·락커·목욕공간까지 경로가 있고 작업공간 바닥과 계단에는 Nav가 없다. 세 공간 미리보기 끝 모습에서도 홀·목욕공간 넓힘 띠까지 경로가 있고 작업공간 넓힘 띠에는 Nav가 없다(`EXP-U2`, Recast 편집 결과는 저장하지 않음).
 - 설비 Blueprint의 body Static Mesh Navigation 활성과 helper Navigation 비활성은 저장돼 기존 Level instance에도 반영된다.
 
 쓰레기·청소용 DefaultMap instance는 [CleaningSystem.md](CleaningSystem.md)에 있다. 세신용 `ScrubTowel`(`BP_ScrubTowel`, package `/Game/__ExternalActors__/Maps/DefaultMap/0/DK/0190JIWJICUQIWS8KMXOSL`)과 전용 `ScrubTowelSlot`(`BP_PhysicalCarryFixedSlot`, `…/E/3R/BVIBVCNJXTNW9C0FEGBWZL`)은 목욕공간에 있고 거치대의 `AssignedItem`은 그 때수건, `bStartOccupied=true`, `SlotDisplayName=때수건 거치대`다. 테스트 설비·인형·현금은 레벨에 저장하지 않는다.

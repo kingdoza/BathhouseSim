@@ -30,6 +30,11 @@ ABathhouseSpaceActor::ABathhouseSpaceActor()
 
 FBox2D ABathhouseSpaceActor::GetInteriorRect() const
 {
+	return GetInteriorRectForCount(GetEffectiveExpansionCount());
+}
+
+FBox2D ABathhouseSpaceActor::GetBaseInteriorRect() const
+{
 	const FVector Location = GetActorLocation();
 	const FVector2D Center(Location.X, Location.Y);
 	const FVector2D Half(FloorSizeCm.X * 0.5, FloorSizeCm.Y * 0.5);
@@ -47,7 +52,10 @@ void ABathhouseSpaceActor::FillSnapshot(FBathhouseSpaceSnapshot& Out) const
 		*GetActorNameOrLabel());
 	Out.ActorXY = FVector2D(Location.X, Location.Y);
 	Out.FloorZ = Location.Z;
-	Out.Interior = GetInteriorRect();
+	Out.BaseInterior = GetBaseInteriorRect();
+	CollectStepSnapshots(Out.Steps);
+	Out.ExpansionCount = GetEffectiveExpansionCount();
+	Out.Interior = FBathhouseSpaceLayout::ExpandInterior(Out.BaseInterior, Out.Steps, Out.ExpansionCount);
 	Out.CeilingHeightCm = CeilingHeightCm;
 	Out.bTransformValid = GetActorRotation().IsNearlyZero(UE_KINDA_SMALL_NUMBER)
 		&& GetActorScale3D().Equals(FVector::OneVector, UE_KINDA_SMALL_NUMBER);
@@ -89,9 +97,11 @@ void ABathhouseSpaceActor::ApplyZoneGeometry()
 		return;
 	}
 	const FVector Extent = ZoneBounds->GetUnscaledBoxExtent();
-	ZoneBounds->SetBoxExtent(FVector(FloorSizeCm.X * 0.5, FloorSizeCm.Y * 0.5, Extent.Z), false);
+	const FBox2D Interior = GetInteriorRect();
+	ZoneBounds->SetBoxExtent(FVector(
+		(Interior.Max.X - Interior.Min.X) * 0.5, (Interior.Max.Y - Interior.Min.Y) * 0.5, Extent.Z), false);
 	const FVector Location = GetActorLocation();
-	const FVector2D Offset = GetInteriorRect().GetCenter() - FVector2D(Location.X, Location.Y);
+	const FVector2D Offset = Interior.GetCenter() - FVector2D(Location.X, Location.Y);
 	const FVector Relative = ZoneBounds->GetRelativeLocation();
 	ZoneBounds->SetRelativeLocation(FVector(Offset.X, Offset.Y, Relative.Z));
 }
@@ -136,6 +146,16 @@ bool ABathhouseSpaceActor::RebuildShell()
 	}
 	Inputs.Lighting = Lighting;
 	Inputs.bPreviewChunks = World->WorldType == EWorldType::Editor;
+	if (Inputs.bPreviewChunks && Snapshots[Index].ExpansionCount > 0)
+	{
+		Inputs.PreviewLabel = BuildExpansionPreviewLabel(Snapshots, Index, Values);
+		Inputs.PreviewLabelWorldSizeCm = Settings->GetEditorPreviewLabelWorldSizeCm();
+		Inputs.PreviewLabelFontSize = Settings->GetEditorPreviewLabelFontSize();
+		const FBathhousePreviewLabelPlacement Placement = FBathhouseSpaceLayout::PreviewLabelPlacement(
+			Snapshots, Index, Values.WallThicknessCm, Values.SlabThicknessCm, Settings->GetEditorPreviewLabelHeightCm());
+		Inputs.PreviewLabelLocation = Placement.Location;
+		Inputs.bPreviewLabelSouthOfCenter = Placement.bSouthOfCenter;
+	}
 	Inputs.ChunkKind = CleaningChunkKind;
 	Inputs.ChunkPreviewHalfHeightCm = static_cast<float>(Values.SlabThicknessCm * 0.5);
 	Shell->Rebuild(Plan, Inputs);
@@ -159,14 +179,18 @@ void ABathhouseSpaceActor::OnConstruction(const FTransform& Transform)
 void ABathhouseSpaceActor::BeginPlay()
 {
 	Super::BeginPlay();
+	AppliedExpansionCount = 0;
 	ApplyZoneGeometry();
 	RebuildShell();
 	SpawnCleaningChunks();
 	LogValidationProblems();
+	MarkExpansionNavigationDirty();
+	RegisterWithPurchaseSubsystem();
 }
 
 void ABathhouseSpaceActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UnregisterFromPurchaseSubsystem();
 	DestroyCleaningChunks();
 	Super::EndPlay(EndPlayReason);
 }

@@ -21,7 +21,7 @@ Summary의 접두사별 이름은 표기된 접두사에 `CapacityText`, `Capaci
 ## 컴퓨터 연결
 
 - `/Game/Bathhouse/Blueprints/Computer/BP_BathhouseComputer`의 inherited `ScreenWidget.WidgetClass`는 탭 root `/Game/Bathhouse/UI/WBP_ComputerScreenRoot.WBP_ComputerScreenRoot_C`다. CDO와 DefaultMap instance가 같고 instance override는 없다(2026-10-01 읽기 전용 조사, `COMPUTER-WHEEL-SCROLL`).
-- `WBP_ComputerScreenRoot`는 `RootOverlay > RootSize (SizeBox 1024×576) > RootFrame > RootColumn` 아래에 `TabBar`(`ManagementTabButton`, `ShopTabButton`)와 `ScreenSwitcher`를 둔다. Switcher index 0은 `ManagementScale`(ScaleBox) > `ManagementScreen`(`WBP_BathWaterManagementScreen_C`), index 1은 `ShopScreen`(`WBP_ShopScreen_C`, ScaleBox 없음)이다. 조상 widget은 모두 Visible 또는 SelfHitTestInvisible이라 스크롤 영역 hit test를 막지 않는다.
+- `WBP_ComputerScreenRoot`는 `RootOverlay > RootSize (SizeBox 1024×576) > RootFrame > RootColumn` 아래에 `TabBar > TabRow`(`ManagementTabSize > ManagementTabButton`, `ShopTabSize > ShopTabButton`, `ExpansionTabSize > ExpansionTabButton`, 라벨 `관리 · 상점 · 확장`, 같은 크기·간격·style)와 `ScreenSwitcher`를 둔다. Switcher index 0은 `ManagementScale`(ScaleBox) > `ManagementScreen`(`WBP_BathWaterManagementScreen_C`), index 1은 `ShopScreen`(`WBP_ShopScreen_C`, ScaleBox 없음), index 2는 `ExpansionScreen`(`WBP_ExpansionScreen_C`, ScaleBox 없음)이다. `ExpansionTabButton`·`ExpansionScreen`은 native `BindWidgetOptional`이고 존재·순서는 자동화 `BathhouseSim.Expansion.Content.ScreenContract`가 검사한다. 조상 widget은 모두 Visible 또는 SelfHitTestInvisible이라 스크롤 영역 hit test를 막지 않는다.
 - ScreenWidget은 World Space, Draw Size (1024,576), Receive Hardware Input false를 유지한다. Focus camera 기본값은 변경하지 않았다.
 - 새 Editor 프로세스 재로드에서 BP_BathhouseComputer CDO의 FocusExitPoint 위치는 (1500,0,-228.5714285714), 회전은 (0,180,0), SearchRadius는 100cm였다. FocusExitArrow는 이 컴포넌트 자식이며 local 원점/회전 0, editor-only, 길이 80cm다. DefaultMap 컴퓨터 인스턴스도 동일한 상대 transform을 재로드했다. Actor transform은 홀 바닥 높이를 따른다(위치는 Level instance가 정본, `EXP-U1`에서 Z만 홀 바닥 윗면만큼 올림). yaw 0, scale (0.12,1.2,0.7)이며 계산된 world 발 위치는 홀 바닥 윗면 위, 방향은 컴퓨터를 향하는 -X다. 이전 MCP 인계의 X=1000은 stale한 값이며 새 프로세스 재로드 결과를 현재 저장 상태로 본다.
 - Level computer instance의 `ManagedBathPlacementZone`은 목욕공간 Actor `Space_Bath`(`BP_BathhouseSpace_C_UAID_F02F7433CA362F0703_1645196495`, [BuildingSystem.md](BuildingSystem.md))를 참조한다. CDO 속성은 None이므로 class default와 Level instance 참조를 구분한다.
@@ -32,9 +32,21 @@ Summary의 접두사별 이름은 표기된 접두사에 `CapacityText`, `Capaci
 
 UE 5.8 DLL 빌드 후 새 Editor에서 다섯 WBP와 컴퓨터 BP의 Data Validation 6/6 `VALID`를 확인했다. PIE의 1024×576 RenderTarget에는 Zone 격자·경계, Bath 타일 2개, utility summary와 detail이 표시됐다. 타일 Button의 `OnClicked` 이벤트를 호출하면 선택·detail·slider 활성화가 갱신된다. 실제 플레이어 LMB 조준/클릭과 물 제어·회수 전체 시나리오는 아직 직접 플레이 검증이 필요하며 [USER_UNREAL.md](../USER_UNREAL.md)에 남겼다. 이번 FocusExitPoint/취소 입력 변경은 fresh-process reload와 PIE 시작·종료까지만 확인했고, Data Validation과 E/ESC/마우스 입력 수용은 미완료다.
 
+### 확장 화면
+
+두 WBP는 `/Game/Bathhouse/UI/`에 있고 native class를 직접 상속하며 graph가 없다(`EXP-U2`, 저장·새 프로세스 Compile/Save로 widget GUID 정리, 재로드 `BS_UP_TO_DATE`·Data Validation VALID). 문구는 고정 문구(`정말 구입할까요?`, `확인`, `취소`) 외에 C++가 채운다. 스크롤 영역은 없다.
+
+| WBP | Native parent | 구조 |
+|---|---|---|
+| `WBP_ExpansionSpaceOption` | `ExpansionSpaceOptionWidget` | `RootOverlay > OptionSize`(SizeBox 높이 고정) `> SelectButton`(Button, 카드 전체) `> CardOverlay` 아래 `SelectionHighlight`(Border, 반투명 청록, HitTestInvisible)와 `CardColumn`(`NameText`, `SizeText`, `EffectText`(두 줄), `StatusText`) |
+| `WBP_ExpansionScreen` | `ExpansionScreenWidget` | `RootOverlay > ExpansionFrame > ExpansionColumn`: `HeaderRow`(`StageText`·`LockerText`·`BalanceText`) → `OptionsPanel`(HorizontalBox, `HallOption`·`BathOption`·`WorkOption` = `WBP_ExpansionSpaceOption_C` 가로 3열) → `InfoColumn`(`PriceText`·`ShortfallText`·`ResultText`·`MessageText`) → `ActionOverlay`에 같은 자리로 겹친 `PurchasePanel`(`PurchaseButtonSize > PurchaseButton > PurchaseButtonText`)과 `ConfirmPanel`(`ConfirmPromptText` → `CancelButton` → `ConfirmButton`) |
+
+- `ConfirmPanel`에서 구입 버튼과 같은 왼쪽 자리는 안내 문구(`ConfirmPromptSize`, 구입 버튼 폭과 같음)이고 `취소`·`확인` 버튼은 그 오른쪽이다. 구입 버튼 더블클릭이 확인으로 이어지지 않게 하는 배치다.
+- 컨테이너는 SelfHitTestInvisible(바탕 `ExpansionFrame`만 Visible), 버튼은 Visible이다. 패널 표시·숨김과 버튼 활성은 C++가 바꾼다. 색은 상점·관리 화면 팔레트(어두운 패널·밝은 글씨)다.
+
 ### 컴퓨터 화면 스크롤 영역
 
-컴퓨터 화면의 휠 스크롤 대상은 아래 `ScrollBox` 4개뿐이다. 모두 세로(Orientation Vertical)이고 서로 중첩되지 않는다. `/Game/Bathhouse/UI`의 다른 WBP(상품 카드·장바구니 행·주문 행·지도·타일·용량 요약·관리 화면·root 포함)에는 ScrollBox가 없다.
+컴퓨터 화면의 휠 스크롤 대상은 아래 `ScrollBox` 4개뿐이다. 모두 세로(Orientation Vertical)이고 서로 중첩되지 않는다. `/Game/Bathhouse/UI`의 다른 WBP(상품 카드·장바구니 행·주문 행·지도·타일·용량 요약·관리 화면·확장 화면·root 포함)에는 ScrollBox가 없다.
 
 | ScrollBox | WBP와 경로 | 내용 |
 |---|---|---|

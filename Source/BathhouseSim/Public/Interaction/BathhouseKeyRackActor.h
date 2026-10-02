@@ -18,12 +18,16 @@ public:
 	ABathhouseKeyRackActor();
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+#if WITH_EDITOR
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+#endif
 
 	UFUNCTION(BlueprintPure, Category = "Bathhouse Key Rack")
 	int32 GetMaterializedPairCount() const { return OwnedKeys.Num(); }
 
 protected:
 	friend class FBathhouseFacilityPlacementRuntimeTest;
+	friend class FBathhouseExpansionAutomationAccess;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Bathhouse Key Rack")
 	TObjectPtr<USceneComponent> SceneRoot;
 

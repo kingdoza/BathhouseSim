@@ -210,6 +210,12 @@ focus-out은 `ScreenWidget`이나 user widget을 remove/recreate하지 않는다
 
 욕탕 관리 화면의 native hierarchy, 지도 투영, slider request와 refresh 정책은 [BathWaterManagementUISystem.md](BathWaterManagementUISystem.md)가 정본이다. 기존 sample widget은 삭제하지 않고 회귀와 asset 호환을 위해 보존한다.
 
+### Screen Use End Notification (2026-10-02 EXP-U2 설계)
+
+- `IComputerScreenContextReceiver::NotifyComputerUseEnded()`(기본 빈 구현)를 추가한다. `ABathhouseComputerActor::ReleaseReservation`이 실제로 사용자를 지울 때 screen user widget이 receiver면 호출한다. 정상 이탈과 예약을 해제하는 강제 정리가 모두 지난다.
+- 화면 root(`UComputerScreenRootWidget`)는 탭 3개(`관리·상점·확장`)이며 이 알림을 확장 화면의 확인 대기 취소에만 쓴다. 탭·선택 등 화면 상태는 유지된다([ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)).
+- `UPlayerComputerUseComponent`·입력 분기·focus 계약은 바꾸지 않는다.
+
 ## Dependencies
 
 - Character -> Computer

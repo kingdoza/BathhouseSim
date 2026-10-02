@@ -291,6 +291,8 @@ accepted ID는 owner Actor weak reference와 함께 보관한다. 동일 actor�
 
 물리 key 수는 Expansion tier의 `KeyPoolSize`에만 종속된다. locker registration, 거부, 회수와 재배치는 key 번호, 수량과 customer key를 변경하지 않는다.
 
+2026-10-02 `EXP-U2` 설계: Expansion tier index는 **홀 넓힘 횟수**(표 끝을 넘으면 마지막 줄)이고, 컴퓨터 확장 구입 transaction이 홀을 넓힐 때만 `TryAdvanceToTier`로 올린다([ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)). 한도는 `CanInstallLockerSlots`가 매번 현재 tier를 읽으므로 상승 즉시 다음 미리보기 검증부터 적용된다. startup에서 거부된 locker의 자동 재활성화는 계속 범위 밖이다.
+
 ## Compatibility And Migration
 
 사용자가 즉시 제거를 승인한 reflected/native 계약:

@@ -25,6 +25,12 @@ struct FBathhouseShellVisualInputs
 	EBathhouseCleaningChunkKind ChunkKind = EBathhouseCleaningChunkKind::None;
 	/** 조각 미리보기 선 상자의 높이 절반(바닥 윗면 위). */
 	float ChunkPreviewHalfHeightCm = 0.0f;
+	/** 비어 있지 않으면 편집 world에서만 이 글자를 PreviewLabelLocation(world)에 위에서 읽히게 띄운다. */
+	FString PreviewLabel;
+	FVector PreviewLabelLocation = FVector::ZeroVector;
+	float PreviewLabelWorldSizeCm = 0.0f;
+	int32 PreviewLabelFontSize = 0;
+	bool bPreviewLabelSouthOfCenter = false;
 };
 
 /**
@@ -48,6 +54,8 @@ public:
 	int32 GetPartInstanceCount(EBathhouseShellPart Part) const;
 	int32 GetLightCount() const { return LightComponents.Num(); }
 	int32 GetChunkPreviewCount() const { return ChunkPreviewComponents.Num(); }
+	/** 편집 미리보기 글자가 없으면 빈 문자열. */
+	FString GetPreviewLabelText() const;
 
 protected:
 	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
@@ -61,4 +69,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UActorComponent>> ChunkPreviewComponents;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UActorComponent> PreviewLabelComponent;
+
+	FString PreviewLabelText;
 };

@@ -14,10 +14,82 @@
 
 | Feedback ID | 역할 태그 | 시스템 태그 | 상태 |
 |---|---|---|---|
+| FBK-001 | UNREAL_EDITOR, IMPLEMENTATION, REVIEW | Landscape, Building, Validation | Experimental |
+| FBK-002 | ORCHESTRATOR, UNREAL_EDITOR | Workflow | Experimental |
+| FBK-003 | UNREAL_EDITOR, ORCHESTRATOR | Editor 실행 환경, UI | Experimental |
+| FBK-004 | ARCHITECTURE, REVIEW | Editor 전용 표시, UMG, Text | Experimental |
+| FBK-005 | ORCHESTRATOR | Git, Editor | Experimental |
+| FBK-006 | ORCHESTRATOR | Workflow | Experimental |
 
 ## 일반화 항목
 
-없음.
+2026-10-02 사용자 요청("개선후보로 반영해")으로 `EXPANSION-PURCHASE`(EXP-U1·U2) 경험에서 등록했다. 전체 회고가 아니므로 기준점과 복귀 기록은 그대로 둔다.
+
+### FBK-001 Editor·world 검증의 충돌 판정은 게임 충돌 경로(단순 object trace)로 한다
+
+- 상태: Experimental
+- 역할 태그: UNREAL_EDITOR, IMPLEMENTATION, REVIEW / 시스템 태그: Landscape, Building, Validation
+- 재발 패턴과 적용 범위: 편집 world에는 게임에 없는 충돌이 있다. Landscape는 Visibility 채널을 막는 구멍 없는 Editor 전용 heightfield를, World Partition HLOD는 QueryOnly complex mesh를 가진다. 채널 trace나 기본 query param(`bTraceComplex=true`)으로 판정하면 게임과 다른 결과가 나온다. 지형·Nav·장애물 확인과 C++ world 검증 전반에 해당한다.
+- 유입 단계와 원래 검출했어야 할 게이트: 구현(검증 trace 기본 param), Editor 작업(확인 스크립트 채널 선택). 코드 리뷰와 Editor 확인 스크립트 검토에서 잡을 수 있었다.
+- 잘못된 판단이 만드는 위험: 실제로 성공한 작업을 실패로 판정해 같은 작업을 반복하거나, 정상 Content에 Validation 오류가 남는다.
+- 권장 행동과 검증 방법: 게임 충돌 판정은 WorldStatic·WorldDynamic object type trace에 `bTraceComplex=false`를 명시한다. 편집 world 확인 결과가 사용자 PIE와 다르면 판정 경로부터 의심한다. 회귀 테스트는 "complex 전용 충돌은 막지 않고 단순 충돌은 잡는다"를 둘 다 확인한다.
+- 근거: `EXP-U1` 병합 커밋 `8ca6a24`의 `EXP-U1/REPORT_UNREAL_EDITOR.md` §13·§15·§16, 수정 커밋 `2c170b9`
+- 적용하지 않을 조건: 의도적으로 Editor 도구용 충돌(편집 picking 등)을 판정하는 경우
+
+### FBK-002 같은 실패가 반복되면 행동을 다시 하기 전에 검증 방법을 먼저 검증한다
+
+- 상태: Experimental
+- 역할 태그: ORCHESTRATOR, UNREAL_EDITOR / 시스템 태그: Workflow
+- 재발 패턴과 적용 범위: 자동화 결과와 사용자 관찰이 엇갈리거나(사용자 실험은 성공, 워커 판정은 실패), 같은 조치가 같은 판정으로 두 번 실패할 때
+- 유입 단계와 원래 검출했어야 할 게이트: Editor 작업 판정, 마스터의 재시도 승인
+- 잘못된 판단이 만드는 위험: 판정 오류 하나 때문에 재시도·사용자 손작업·토큰이 몇 배로 든다(EXP-U1 지형 구멍 4회 시도)
+- 권장 행동과 검증 방법: 같은 원인 2회 제한에 닿기 전에 "판정 경로가 사용자 관찰과 같은 기준인가"를 확인하는 단계를 넣는다. 성공이 확실한 대조군(사용자가 성공한 자리 등)에 같은 판정을 먼저 적용해 판정 자체를 확인한다.
+- 근거: `EXP-U1` `REPORT_UNREAL_EDITOR.md` §5·§11·§12 판정이 §13에서 무효로 정정됨(`e7454e3`)
+- 적용하지 않을 조건: 판정이 사용자 관찰과 일치하는 경우
+
+### FBK-003 숨김 작업용 Editor로 확인할 수 없는 화면 검증은 처음부터 사용자 PIE 체크리스트로 보낸다
+
+- 상태: Experimental
+- 역할 태그: UNREAL_EDITOR, ORCHESTRATOR / 시스템 태그: Editor 실행 환경, UI
+- 재발 패턴과 적용 범위: 숨김 창 작업용 Editor에서는 `UWidgetComponent`의 render target이 생기지 않는다(기존 컴퓨터 화면 위젯도 같음). 위젯·글자·렌더 결과처럼 눈으로 봐야 하는 편집 world 표시가 대상이다.
+- 유입 단계와 원래 검출했어야 할 게이트: 구현의 `PROMPT_UNREAL.md` 재확인 항목 작성, 마스터의 Editor 재확인 지시
+- 잘못된 판단이 만드는 위험: 판정할 수 없는 확인을 설계·구현 결함으로 오인해 복귀 루프가 늘어난다
+- 권장 행동과 검증 방법: Editor 역할은 화면 확인 전에 대조군(이미 정상인 위젯 등)이 같은 환경에서 그려지는지 먼저 본다. 그려지지 않으면 화면 판정은 `PIE_CHECKLIST.md`로 넘기고, 수치 계약(위치·속성)만 확인한다.
+- 근거: `EXP-U2/REPORT_UNREAL_EDITOR.md` §11(`0857e8b`)
+- 적용하지 않을 조건: 사용자가 승인한 화면 작업 모드나 보이는 창 Editor로 확인할 수 있는 경우
+
+### FBK-004 Editor 전용 표시·보조 기능도 설계 단계에서 엔진 그리기 조건을 엔진 소스로 확인한다
+
+- 상태: Experimental
+- 역할 태그: ARCHITECTURE, REVIEW / 시스템 태그: Editor 전용 표시, UMG, Text
+- 재발 패턴과 적용 범위: 편집 미리보기 글자·표시 component를 "부수 기능"으로 보고 렌더 조건을 확인하지 않았다. 그래서 세 번 복귀했다: 면과 같은 평면, `UTextRenderComponent`의 offline 글꼴(한글 없음), `UWidgetComponent`는 `bHiddenInGame`이면 편집 world에서도 그리지 않음.
+- 유입 단계와 원래 검출했어야 할 게이트: 아키텍처, 코드 리뷰
+- 잘못된 판단이 만드는 위험: 사소한 표시 하나에 설계·구현·리뷰·Editor 루프가 반복된다
+- 권장 행동과 검증 방법: component를 고르거나 바꿀 때 그리기 조건을 엔진 소스로 표로 남긴다. 확인할 것은 visibility flag, tick, 글꼴 glyph, draw size, 가림·면 겹침이다. 기존 플래그를 "유지"할 때는 새 component에서 뜻이 같은지 확인한다. 한글 문구가 있으면 글꼴 지원부터 본다.
+- 근거: RET-003, RET-004(`EXP-U2`, `add655f`, `1e9a657`)
+- 적용하지 않을 조건: 표시가 없는 순수 데이터·로직 변경
+
+### FBK-005 단계 커밋·병합 전에 브랜치와 작업 트리 출처를 확인한다
+
+- 상태: Experimental
+- 역할 태그: ORCHESTRATOR / 시스템 태그: Git, Editor
+- 재발 패턴과 적용 범위: 사용자 도구(GitHub Desktop)나 다른 세션이 브랜치를 바꾸고, 열린 Editor가 다른 브랜치 작업 트리에 package를 저장했다. 사용자 Editor 작업이 끝났을 때와 커밋 직전이 대상이다.
+- 유입 단계와 원래 검출했어야 할 게이트: 마스터의 커밋 직전 확인
+- 잘못된 판단이 만드는 위험: 다른 브랜치에 커밋하거나, 사용자 작업을 잃거나, 무관한 변경을 섞는다
+- 권장 행동과 검증 방법: 커밋 전 `git branch --show-current`와 변경 목록을 확인한다. 예상과 다르면 reflog·stash로 출처를 확인하고, 변경 파일의 blob을 대상 브랜치와 대조한다. 사용자 승인 뒤에만 복구한다. 사용자에게 Editor를 열어 둔 채 브랜치를 바꾸지 말라고 안내한다.
+- 근거: `EXP-U1` CONTEXT 기록과 복구 커밋 `9522be3`
+- 적용하지 않을 조건: 없음
+
+### FBK-006 재작업 지시 패킷은 설계 값을 다시 쓰지 말고 설계 절을 가리킨다
+
+- 상태: Experimental
+- 역할 태그: ORCHESTRATOR / 시스템 태그: Workflow
+- 재발 패턴과 적용 범위: 마스터가 재작업 지시에 설계와 다른 세부(Settings 원본 위치)를 적어 설계와 충돌했다. 모든 인계·재작업 패킷이 대상이다.
+- 유입 단계와 원래 검출했어야 할 게이트: 마스터 인계
+- 잘못된 판단이 만드는 위험: 구현이 설계와 다르게 만들고, 리뷰에서 원본 판정이 따로 필요해진다
+- 권장 행동과 검증 방법: 패킷에는 설계 절 번호와 결정 요지만 적고 값·위치를 새로 쓰지 않는다. 설계에 없는 세부가 필요하면 아키텍처에 먼저 묻는다.
+- 근거: `EXP-U2` 구현 `0536304`, 코드 리뷰 3회차 Settings 원본 판정(`60999d7`)
+- 적용하지 않을 조건: 사용자가 그 세부를 직접 결정한 경우(결정 출처를 함께 적는다)
 
 ## 상위 단계 복귀 기록
 
@@ -38,6 +110,26 @@
 - 문제: BuildingSystem.md Geometry Rules의 계단 벽 Z 구간이 바닥·천장 판 두께 구간과 같은 면을 공유해 계단 입구 앞·통로 안·출구 위 세 곳에서 면 겹침이 생김
 - 놓친 이유: 계단 벽·판 상자의 경계 면 공유(시각 겹침)를 형상 규칙 검토 항목으로 보지 않음
 - 근거: `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION_R.md` A2, 구현 커밋 `b5f4c41`
+
+### RET-003 넓힘 미리보기 글자가 천장 판 윗면과 같은 평면·한글 없는 기본 글꼴·지하 공간에서 묻혀 보이지 않음
+
+- 일자·작업 ID: 2026-10-02, `EXP-U2`
+- 발견 단계: Editor 작업
+- 복귀 대상: 아키텍처
+- 문제: 설계 6.4가 글자 Z를 "천장 판 윗면"으로 정해 면과 겹쳐 렌더되지 않고, 글꼴 원본을 정하지 않아 엔진 기본 `RobotoDistanceField`(한글 없음)가 쓰이며, 지하 공간 글자는 위층 바닥·지형 아래라 보이지 않음
+- 놓친 이유: 편집 전용 표시의 렌더 조건(면 겹침, 글꼴 glyph, 층 가림)을 설계 검토 항목으로 보지 않음
+- 검출 실패 단계: 코드 리뷰(엔진 기본 글꼴 한글 미지원과 면 겹침은 코드·설계로 판단 가능)
+- 근거: `.md/Work/EXPANSION-PURCHASE/EXP-U2/REPORT_UNREAL_EDITOR.md` 4절 R1, 구현 커밋 `151420f`
+
+### RET-004 미리보기 글자 WidgetComponent에 SetHiddenInGame(true)를 요구해 편집 world에서도 그려지지 않음
+
+- 일자·작업 ID: 2026-10-02, `EXP-U2`
+- 발견 단계: Editor 작업
+- 복귀 대상: 아키텍처
+- 문제: 재설계 18.2가 "기존 계약 유지"로 `SetHiddenInGame(true)`를 남겼는데, `USceneComponent::IsVisible()`이 world 종류와 무관하게 false가 되어 `UWidgetComponent`가 render target을 만들지 않음
+- 놓친 이유: TextRender에서 WidgetComponent로 바꾸며 기존 숨김 플래그가 새 component의 그리기 조건에 주는 영향을 엔진 소스로 확인하지 않음
+- 검출 실패 단계: 코드 리뷰(엔진 소스로 판단 가능), 자동화는 구조·위치만 검사
+- 근거: `.md/Work/EXPANSION-PURCHASE/EXP-U2/REPORT_UNREAL_EDITOR.md` 10.3, 구현 커밋 `0536304`
 
 ## 이전 형식 기록
 

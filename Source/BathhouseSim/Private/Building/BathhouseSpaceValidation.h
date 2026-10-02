@@ -41,7 +41,15 @@ enum class EBathhouseProblemCode : uint8
 	NavWorkCovered,
 	MaterialMissing,
 	WorkChunkKind,
-	FacilityMisplaced
+	FacilityMisplaced,
+	ExpansionAmountInvalid,
+	ExpansionTouchingSide,
+	ExpansionOverlap,
+	ExpansionOutsideOpeningBlocked,
+	ExpansionNavOutside,
+	ExpansionNavWorkCovered,
+	ExpansionEntranceSide,
+	ExpansionStepsBelowCap
 };
 
 struct FBathhouseLayoutProblem
@@ -96,6 +104,17 @@ public:
 		const TArray<FBathhouseSpaceSnapshot>& Snapshots,
 		const TArray<FBox>& NavBoxes,
 		const FBathhouseValidationInputs& Inputs,
+		TArray<FBathhouseLayoutProblem>& OutProblems);
+
+	/**
+	 * 넓힘 검사(순수). 0회와 목록 끝까지 넓힌 모습만 본다. Snapshots의 횟수와 무관하다.
+	 * MaxPurchaseCount가 INDEX_NONE이면 줄 수 합계 경고를 생략한다. OutProblems에 덧붙인다.
+	 */
+	static void ValidateExpansion(
+		const TArray<FBathhouseSpaceSnapshot>& Snapshots,
+		const TArray<FBox>& NavBoxes,
+		const FBathhouseValidationInputs& Inputs,
+		int32 MaxPurchaseCount,
 		TArray<FBathhouseLayoutProblem>& OutProblems);
 
 	/** world 검사: layout + Nav 범위 + 계단 통로 장애물 + 배치된 설비 소속. */

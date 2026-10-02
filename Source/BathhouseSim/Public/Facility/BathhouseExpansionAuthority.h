@@ -17,6 +17,11 @@ public:
 	ABathhouseExpansionAuthority();
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+#if WITH_EDITOR
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+#endif
+
+	UBathhouseExpansionDefinition* GetExpansionDefinition() const { return ExpansionDefinition; }
 
 	UFUNCTION(BlueprintPure, Category = "Expansion")
 	int32 GetCurrentTierIndex() const { return CurrentTierIndex; }
@@ -35,6 +40,7 @@ public:
 
 protected:
 	friend class FBathhouseFacilityPlacementRuntimeTest;
+	friend class FBathhouseExpansionAutomationAccess;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Expansion")
 	TObjectPtr<UBathhouseExpansionDefinition> ExpansionDefinition;
 

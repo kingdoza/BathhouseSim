@@ -166,6 +166,14 @@ void ABathhouseComputerActor::ReleaseReservation(UPlayerComputerUseComponent* Pl
 	if (PlayerComputerUse && CurrentUser.Get() == PlayerComputerUse)
 	{
 		CurrentUser.Reset();
+		if (ScreenWidget)
+		{
+			if (IComputerScreenContextReceiver* Receiver =
+				Cast<IComputerScreenContextReceiver>(ScreenWidget->GetUserWidgetObject()))
+			{
+				Receiver->NotifyComputerUseEnded();
+			}
+		}
 	}
 }
 

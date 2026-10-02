@@ -160,3 +160,18 @@ struct BATHHOUSESIM_API FBathhouseStairSpec
 		meta = (ToolTip = "계단 벽 재질."))
 	TObjectPtr<UMaterialInterface> StairWallMaterial = nullptr;
 };
+
+/** 공간 넓힘 한 줄. 그 방향 벽 한 면만 바깥으로 물러난다. */
+USTRUCT(BlueprintType)
+struct BATHHOUSESIM_API FBathhouseSpaceExpansionStep
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bathhouse Space",
+		meta = (ToolTip = "넓히는 벽 방향(world 축 기준). 0회에 다른 공간과 맞닿은 벽은 넓힐 수 없다."))
+	EBathhouseSpaceSide Side = EBathhouseSpaceSide::East;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bathhouse Space",
+		meta = (ClampMin = "0.0", ForceUnits = "cm", ToolTip = "그 방향으로 벽이 물러나는 양(cm)."))
+	float AmountCm = 0.0f;
+};

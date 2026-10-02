@@ -2,6 +2,9 @@
 
 #include "Facility/BathhouseExpansionDefinition.h"
 #include "Facility/BathhouseFacilitySubsystem.h"
+#if WITH_EDITOR
+#include "Misc/DataValidation.h"
+#endif
 
 #define LOCTEXT_NAMESPACE "BathhouseExpansionAuthority"
 
@@ -44,6 +47,28 @@ void ABathhouseExpansionAuthority::EndPlay(const EEndPlayReason::Type EndPlayRea
 	OnExpansionTierChanged.Clear();
 	Super::EndPlay(EndPlayReason);
 }
+
+#if WITH_EDITOR
+EDataValidationResult ABathhouseExpansionAuthority::IsDataValid(FDataValidationContext& Context) const
+{
+	EDataValidationResult Result = Super::IsDataValid(Context);
+	if (HasAnyFlags(RF_ClassDefaultObject))
+	{
+		return Result;
+	}
+	if (!ExpansionDefinition)
+	{
+		Context.AddError(LOCTEXT("MissingDefinition", "확장 정의(Expansion Definition)가 비어 있습니다."));
+		Result = EDataValidationResult::Invalid;
+	}
+	if (InitialTierIndex != 0)
+	{
+		Context.AddError(LOCTEXT("InitialTierNotZero", "시작 확장 상태는 홀 넓힘 0회입니다. Initial Tier Index는 0이어야 합니다."));
+		Result = EDataValidationResult::Invalid;
+	}
+	return Result == EDataValidationResult::NotValidated ? EDataValidationResult::Valid : Result;
+}
+#endif
 
 int32 ABathhouseExpansionAuthority::GetCurrentKeyPoolSize() const
 {

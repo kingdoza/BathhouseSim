@@ -5,6 +5,7 @@
 #include "Components/Button.h"
 #include "Components/WidgetSwitcher.h"
 #include "UI/BathWaterManagementScreenWidget.h"
+#include "UI/ExpansionScreenWidget.h"
 #include "UI/ShopScreenWidget.h"
 
 void UComputerScreenRootWidget::NativeConstruct()
@@ -20,6 +21,10 @@ void UComputerScreenRootWidget::NativeConstruct()
 		{
 			ShopTabButton->OnClicked.AddDynamic(this, &UComputerScreenRootWidget::HandleShopTabClicked);
 		}
+		if (ExpansionTabButton)
+		{
+			ExpansionTabButton->OnClicked.AddDynamic(this, &UComputerScreenRootWidget::HandleExpansionTabClicked);
+		}
 		bButtonsBound = true;
 	}
 	ApplySelectedTab();
@@ -30,6 +35,10 @@ void UComputerScreenRootWidget::NativeConstruct()
 	if (ShopScreen)
 	{
 		ShopScreen->NotifyComputerUserChanged(CurrentUser.Get());
+	}
+	if (ExpansionScreen)
+	{
+		ExpansionScreen->NotifyComputerUserChanged(CurrentUser.Get());
 	}
 }
 
@@ -44,6 +53,10 @@ void UComputerScreenRootWidget::NativeDestruct()
 		if (ShopTabButton)
 		{
 			ShopTabButton->OnClicked.RemoveDynamic(this, &UComputerScreenRootWidget::HandleShopTabClicked);
+		}
+		if (ExpansionTabButton)
+		{
+			ExpansionTabButton->OnClicked.RemoveDynamic(this, &UComputerScreenRootWidget::HandleExpansionTabClicked);
 		}
 		bButtonsBound = false;
 	}
@@ -62,6 +75,11 @@ void UComputerScreenRootWidget::InitializeComputerScreen(const FComputerScreenCo
 		ShopScreen->InitializeComputerScreen(Context);
 		ShopScreen->NotifyComputerUserChanged(CurrentUser.Get());
 	}
+	if (ExpansionScreen)
+	{
+		ExpansionScreen->InitializeComputerScreen(Context);
+		ExpansionScreen->NotifyComputerUserChanged(CurrentUser.Get());
+	}
 }
 
 void UComputerScreenRootWidget::NotifyComputerUserChanged(APlayerState* PlayerState)
@@ -75,32 +93,66 @@ void UComputerScreenRootWidget::NotifyComputerUserChanged(APlayerState* PlayerSt
 	{
 		ShopScreen->NotifyComputerUserChanged(PlayerState);
 	}
+	if (ExpansionScreen)
+	{
+		ExpansionScreen->NotifyComputerUserChanged(PlayerState);
+	}
+}
+
+void UComputerScreenRootWidget::NotifyComputerUseEnded()
+{
+	// 확인 대기만 취소한다. 탭과 선택 등 나머지 화면 상태는 유지한다.
+	if (ExpansionScreen)
+	{
+		ExpansionScreen->CancelPendingConfirm();
+	}
 }
 
 void UComputerScreenRootWidget::HandleManagementTabClicked()
 {
-	bShopSelected = false;
-	ApplySelectedTab();
+	SelectTab(EComputerScreenTab::Management);
 }
 
 void UComputerScreenRootWidget::HandleShopTabClicked()
 {
-	bShopSelected = true;
+	SelectTab(EComputerScreenTab::Shop);
+}
+
+void UComputerScreenRootWidget::HandleExpansionTabClicked()
+{
+	SelectTab(EComputerScreenTab::Expansion);
+}
+
+void UComputerScreenRootWidget::SelectTab(const EComputerScreenTab Tab)
+{
+	if (SelectedTab == EComputerScreenTab::Expansion && Tab != EComputerScreenTab::Expansion && ExpansionScreen)
+	{
+		ExpansionScreen->CancelPendingConfirm();
+	}
+	SelectedTab = Tab;
 	ApplySelectedTab();
+	if (Tab == EComputerScreenTab::Expansion && ExpansionScreen)
+	{
+		ExpansionScreen->RefreshFromDomain();
+	}
 }
 
 void UComputerScreenRootWidget::ApplySelectedTab()
 {
 	if (ScreenSwitcher)
 	{
-		ScreenSwitcher->SetActiveWidgetIndex(bShopSelected ? 1 : 0);
+		ScreenSwitcher->SetActiveWidgetIndex(static_cast<int32>(SelectedTab));
 	}
 	if (ManagementTabButton)
 	{
-		ManagementTabButton->SetIsEnabled(bShopSelected);
+		ManagementTabButton->SetIsEnabled(SelectedTab != EComputerScreenTab::Management);
 	}
 	if (ShopTabButton)
 	{
-		ShopTabButton->SetIsEnabled(!bShopSelected);
+		ShopTabButton->SetIsEnabled(SelectedTab != EComputerScreenTab::Shop);
+	}
+	if (ExpansionTabButton)
+	{
+		ExpansionTabButton->SetIsEnabled(SelectedTab != EComputerScreenTab::Expansion);
 	}
 }

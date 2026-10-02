@@ -43,7 +43,7 @@ GameMode/Blueprint는 local player에 `ABathhousePlayerState`가 사용되도록
 - `StartingMoney`(EditDefaultsOnly, 기본 `100000`, ≥ 0)를 `InitializeComponent`에서 `CurrentMoney`로 적용한다. 초기화는 `OnMoneyChanged`를 방송하지 않으며, 구독자는 bind 시 `GetCurrentMoney`를 읽는다. 값은 PlayerState Blueprint class 기본값에서 조정한다.
 - `TryAddMoney(Amount)`는 양수만 허용하고 overflow를 방지한다.
 - `GetCurrentMoney`와 `OnMoneyChanged`를 Blueprint에 제공한다.
-- `CanSpendMoney(Amount)`, `TrySpendMoney(Amount)`: 양수이고 잔액 이하일 때만 한 번 차감하고 `OnMoneyChanged(Previous, Current)`를 방송한다. 상점 주문 transaction만 호출하며 Blueprint에 노출하지 않는다.
+- `CanSpendMoney(Amount)`, `TrySpendMoney(Amount)`: 양수이고 잔액 이하일 때만 한 번 차감하고 `OnMoneyChanged(Previous, Current)`를 방송한다. 상점 주문 transaction과 확장 구입 transaction(2026-10-02 `EXP-U2` 설계, [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md))만 호출하며 Blueprint에 노출하지 않는다. 확장 구입의 프로그래밍 오류 되돌림 경로만 `TryAddMoney`로 환불한다.
 - 임의 Blueprint setter는 추가하지 않는다.
 
 ## `ABathhouseCashPaymentActor`
@@ -91,6 +91,7 @@ Cash mesh, material과 제시 표현은 Blueprint 책임이지만 이번 단계�
 - Customer -> Economy cash actor
 - UI money HUD와 상점 화면은 wallet delegate를 구독한다.
 - Shop -> Economy wallet 조회·차감
+- Building(확장 구입) -> Economy wallet 조회·차감(EXP-U2)
 
 ## Manual Review Points
 

@@ -31,6 +31,13 @@ struct FBathhouseStairSnapshot
 	bool bHasStairWallMaterial = false;
 };
 
+/** 넓힘 한 줄 snapshot. */
+struct FBathhouseExpansionStepSnapshot
+{
+	EBathhouseSpaceSide Side = EBathhouseSpaceSide::East;
+	double AmountCm = 0.0;
+};
+
 /** 공간 Actor의 authored 값만 담은 입력. 다른 공간의 생성 component는 읽지 않는다. */
 struct FBathhouseSpaceSnapshot
 {
@@ -39,7 +46,12 @@ struct FBathhouseSpaceSnapshot
 	EBathhouseSpaceKind Kind = EBathhouseSpaceKind::Hall;
 	FVector2D ActorXY = FVector2D::ZeroVector;
 	double FloorZ = 0.0;
+	/** 이 snapshot이 뜻하는 횟수(ExpansionCount)의 안쪽 직사각형. 항상 ExpandInterior(BaseInterior, Steps, ExpansionCount)다. */
 	FBox2D Interior = FBox2D(FVector2D::ZeroVector, FVector2D::ZeroVector);
+	/** 넓힘 0회의 안쪽 직사각형. */
+	FBox2D BaseInterior = FBox2D(FVector2D::ZeroVector, FVector2D::ZeroVector);
+	TArray<FBathhouseExpansionStepSnapshot> Steps;
+	int32 ExpansionCount = 0;
 	double CeilingHeightCm = 0.0;
 	bool bTransformValid = true;
 	bool bAllowedTagsEmpty = false;
@@ -90,6 +102,13 @@ struct FBathhouseStairFrame
 	FBox2D ToWorldRect(double X0, double X1, double Y0, double Y1) const;
 };
 
+/** 편집 미리보기 글자 배치. 남쪽 붙임이면 글자가 중심점 남쪽에, 아니면 북쪽에 붙는다. */
+struct FBathhousePreviewLabelPlacement
+{
+	FVector Location = FVector::ZeroVector;
+	bool bSouthOfCenter = false;
+};
+
 class FBathhouseSpaceLayout
 {
 public:
@@ -116,6 +135,19 @@ public:
 	static void SplitChunks(const FBox2D& Rect, const FVector2D& MaxSize, TArray<FBox2D>& OutRects);
 	/** 안쪽 직사각형을 간격 이하의 같은 칸으로 나눈 칸 중심. */
 	static void SplitLightCenters(const FBox2D& Rect, double SpacingCm, TArray<FVector2D>& OutCenters);
+
+	/** Base에서 Steps의 앞 Count줄(0..Steps.Num() clamp)을 순서대로 적용한 안쪽 직사각형. 양이 0 이하·비유한인 줄은 건너뛴다. */
+	static FBox2D ExpandInterior(const FBox2D& Base, const TArray<FBathhouseExpansionStepSnapshot>& Steps, int32 Count);
+	/** StepIndex번째 줄이 늘리는 띠(ExpandInterior(StepIndex+1) 중 ExpandInterior(StepIndex) 밖). 건너뛴 줄이면 면적 0. */
+	static FBox2D ExpansionBand(const FBox2D& Base, const TArray<FBathhouseExpansionStepSnapshot>& Steps, int32 StepIndex);
+	/**
+	 * 미리보기 글자 위치: XY = Index 공간 안쪽 중심, Z = 사용 가능한 모든 공간의 가장 높은 천장 판 윗면 + HeightCm.
+	 * 바깥 직사각형이 XY에서 겹치고 바닥이 더 높은 공간이 있으면(= 이 공간이 아래층) 남쪽에 붙인다.
+	 */
+	static FBathhousePreviewLabelPlacement PreviewLabelPlacement(
+		const TArray<FBathhouseSpaceSnapshot>& Snapshots, int32 Index, double WallThicknessCm, double SlabThicknessCm, double HeightCm);
+	/** 횟수와 Interior만 바꾼 복사본. */
+	static FBathhouseSpaceSnapshot WithExpansionCount(const FBathhouseSpaceSnapshot& Snapshot, int32 Count);
 
 	static FBathhouseSpacePlan BuildPlan(
 		const TArray<FBathhouseSpaceSnapshot>& Snapshots, int32 Index, const FBathhouseLayoutValues& Values);

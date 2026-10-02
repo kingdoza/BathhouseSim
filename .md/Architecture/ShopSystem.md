@@ -56,9 +56,9 @@ UI native class는 `Public/UI`, `Private/UI`에 둔다([UISystem.md](UISystem.md
 | `DisplayName` (FText) | 카드·장바구니·요약 문구 |
 | `Price` (int32) | > 0 |
 | `Icon` (`TSoftObjectPtr<UTexture2D>`) | 선택. 없으면 이름 표시로 대체 |
-| `PlacementDefinition` | 필수. placement 활성, `LockerSlotCount == 0`, `Facility.Discardable` 태그 보유 |
+| `PlacementDefinition` | 필수. placement 활성. `LockerSlotCount == 0`이면 `Facility.Discardable` 태그 보유, `> 0`(락커)이면 그 태그 없음(EXP-U2) |
 
-- Data Validation은 위 규칙을 검사한다. 락커 판매와 "팔지만 버릴 수 없는 설비"를 데이터 단계에서 막는다.
+- Data Validation은 위 규칙을 검사한다(판정 한 곳 `FShopProductRules::ValidateDefinitions`). 락커가 아닌 "팔지만 버릴 수 없는 설비"를 데이터 단계에서 막는다. 락커 상품은 2026-10-02 `EXP-U2`부터 허용하며 버릴 수 없다. 한도 초과 구매는 막지 않고 설치만 기존 락커 한도가 막는다([ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md) Locker Products).
 - 설비 정의에 가격을 넣지 않는다. 가격 편집 위치는 catalog 하나다.
 
 `UShopSettings : UDeveloperSettings`(Config=Game, Project Settings 노출).
@@ -250,7 +250,7 @@ worst case query 수는 (단계별 거리·단 수 × 시도 수의 합) × 물�
 
 [UISystem.md](UISystem.md)의 Native Widget Policy를 따른다.
 
-- `UComputerScreenRootWidget`: BindWidget `ManagementTabButton`, `ShopTabButton`, `ScreenSwitcher`(UWidgetSwitcher), `ManagementScreen`(`UBathWaterManagementScreenWidget`), `ShopScreen`(`UShopScreenWidget`). 선택 탭 index는 widget 표시 상태이며 기본은 관리다. 컴퓨터 context와 사용자 변경을 두 자식에 전달한다([ComputerSystem.md](ComputerSystem.md)).
+- `UComputerScreenRootWidget`: BindWidget `ManagementTabButton`, `ShopTabButton`, `ScreenSwitcher`(UWidgetSwitcher), `ManagementScreen`(`UBathWaterManagementScreenWidget`), `ShopScreen`(`UShopScreenWidget`). 선택 탭은 widget 표시 상태이며 기본은 관리다. 컴퓨터 context와 사용자 변경을 자식 화면에 전달한다([ComputerSystem.md](ComputerSystem.md)). 2026-10-02 `EXP-U2` 설계로 세 번째 탭 `확장`(optional `ExpansionTabButton`·`ExpansionScreen`)이 붙는다([ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)).
 - `UShopScreenWidget`: BindWidget `ProductScroll`(UScrollBox), `ProductGrid`(UWrapBox), `BalanceText`, `CartList`(UVerticalBox), `CartQuantityText`(`전체 수량/CartTotalQuantityLimit`), `CartTotalText`, `OrderButton`, `OrderFeedbackText`, `OrderList`(UVerticalBox). EditDefaultsOnly 행 widget class 3종.
   - 사용자 PlayerState의 wallet `OnMoneyChanged`, cart `OnCartChanged`, subsystem `OnOrdersChanged`를 구독한다. 남은 시간만 고정 간격 NativeTick으로 갱신한다. 간격은 `UShopScreenWidget::CountdownRefreshIntervalSeconds`다.
   - 주문 버튼 활성·부족액·상한 안내는 매번 `EvaluatePlaceOrder`·`EvaluateAdd`로 계산한다(SHOP-006~008).
@@ -302,6 +302,6 @@ worst case query 수는 (단계별 거리·단 수 × 시도 수의 합) × 물�
 | 7종 설비 | 실제 7종 Definition의 collision query·`SpawnFreshItem`·free-world 활성 성공(SHOP-035, 045 사전). 7종 판매 catalog 단언은 Editor authoring 뒤 확인 |
 | SHOP-022, 028 | 신규 설치 payload 배치 시 class 기본값, 보일러 잔량 0(SHOP-034), 회수 아이템 버리기 |
 | SHOP-023~027, 036, 037 | 쓰레기통 판정 표, 락커·열쇠·도구·빈손 거부, 7종 태그 기준 |
-| catalog | Data Validation: 중복 id, 가격, 락커·태그 없는 설비 판매 금지 |
+| catalog | Data Validation: 중복 id, 가격, 태그 없는 비락커 설비 판매 금지, 락커 상품 허용·태그 있는 락커 금지(EXP-U2) |
 
 PIE: 탭·상점·HUD 배치(SHOP-002, 003, 031), 목록 스크롤(SHOP-032), 실제 튐 모습과 세기(SHOP-018, 043), 7종 배치(SHOP-034, 035, 044).

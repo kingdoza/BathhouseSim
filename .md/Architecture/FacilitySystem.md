@@ -134,7 +134,7 @@ Customer와 key hook이 반복적인 world actor scan을 하지 않게 한다.
 5. 성공 bank는 facility+capacity 등록을 모두 끝낸 뒤 placed collision/Navigation을 활성화한다.
 6. 전체 batch 뒤 ClothesLocker availability 한 번과 capacity 변경 한 번만 발행한다.
 
-invalid/duplicate ID, 잘못된 slot topology와 실제 tier 초과는 actor별 영구 startup 오류를 한 번만 기록한다. accepted ID는 owner Actor와 함께 추적하므로 이미 등록된 actor나 같은 pending/accepted actor 제출은 no-op이고, 다른 actor의 동일 ID만 거부한다. publication callback 중 pending/Authority revision이 바뀌면 reconciliation tail pass가 즉시 이어지며 용량을 중복 합산하지 않는다. runtime tier 상승, streaming 재정렬과 거부 locker 자동 활성화는 이번 범위 밖이다.
+invalid/duplicate ID, 잘못된 slot topology와 실제 tier 초과는 actor별 영구 startup 오류를 한 번만 기록한다. accepted ID는 owner Actor와 함께 추적하므로 이미 등록된 actor나 같은 pending/accepted actor 제출은 no-op이고, 다른 actor의 동일 ID만 거부한다. publication callback 중 pending/Authority revision이 바뀌면 reconciliation tail pass가 즉시 이어지며 용량을 중복 합산하지 않는다. streaming 재정렬과 거부 locker 자동 활성화는 범위 밖이다. runtime tier 상승은 2026-10-02 `EXP-U2` 설계부터 확장 구입이 수행하지만 이 reconciliation을 다시 돌리지 않는다([ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)).
 
 ## Reservation Flow
 

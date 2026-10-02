@@ -5,6 +5,8 @@
 #include "Building/BathhouseSpaceValidationInternal.h"
 #include "CollisionQueryParams.h"
 #include "Engine/StaticMesh.h"
+#include "Facility/BathhouseExpansionAuthority.h"
+#include "Facility/BathhouseExpansionDefinition.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -149,7 +151,13 @@ void FBathhouseSpaceValidation::ValidateWorld(
 	using namespace BathhouseSpaceValidationDetail;
 	GatherSnapshots(World, OutSnapshots);
 	const FBathhouseValidationInputs Inputs = ReadInputs();
-	ValidateLayout(OutSnapshots, Inputs, OutProblems);
+	// 미리보기·적용 횟수와 무관하게 0회 모습을 검사한다. 넓힘은 ValidateExpansion이 따로 본다.
+	TArray<FBathhouseSpaceSnapshot> BaseSnapshots;
+	for (const FBathhouseSpaceSnapshot& Snapshot : OutSnapshots)
+	{
+		BaseSnapshots.Add(FBathhouseSpaceLayout::WithExpansionCount(Snapshot, 0));
+	}
+	ValidateLayout(BaseSnapshots, Inputs, OutProblems);
 	if (OutSnapshots.IsEmpty())
 	{
 		return;
@@ -164,7 +172,18 @@ void FBathhouseSpaceValidation::ValidateWorld(
 			NavBoxes.Add(It->GetComponentsBoundingBox(true));
 		}
 	}
-	ValidateNavigation(OutSnapshots, NavBoxes, Inputs, OutProblems);
+	ValidateNavigation(BaseSnapshots, NavBoxes, Inputs, OutProblems);
+
+	int32 MaxPurchaseCount = INDEX_NONE;
+	for (TActorIterator<ABathhouseExpansionAuthority> It(&World); It; ++It)
+	{
+		if (IsValid(*It) && It->GetExpansionDefinition())
+		{
+			MaxPurchaseCount = It->GetExpansionDefinition()->GetMaxPurchaseCount();
+			break;
+		}
+	}
+	ValidateExpansion(OutSnapshots, NavBoxes, Inputs, MaxPurchaseCount, OutProblems);
 
 	// 계단 통로(구멍 안)를 공간이 아닌 blocking 물체(지형 등)가 막는지 수직 trace로 본다.
 	FCollisionObjectQueryParams ObjectParams;
@@ -234,9 +253,9 @@ void FBathhouseSpaceValidation::ValidateWorld(
 		}
 		const FVector Location = Actor->GetActorLocation();
 		int32 SpaceIndex = INDEX_NONE;
-		for (int32 I = 0; I < OutSnapshots.Num(); ++I)
+		for (int32 I = 0; I < BaseSnapshots.Num(); ++I)
 		{
-			const FBathhouseSpaceSnapshot& Space = OutSnapshots[I];
+			const FBathhouseSpaceSnapshot& Space = BaseSnapshots[I];
 			if (IsUsable(Space) && Space.Interior.IsInside(FVector2D(Location.X, Location.Y))
 				&& Location.Z >= Space.FloorZ - Inputs.Layout.SlabThicknessCm
 				&& Location.Z <= FBathhouseSpaceLayout::CeilingZ(Space))

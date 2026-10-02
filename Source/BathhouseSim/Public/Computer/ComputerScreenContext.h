@@ -37,4 +37,6 @@ class BATHHOUSESIM_API IComputerScreenContextReceiver
 public:
 	virtual void InitializeComputerScreen(const FComputerScreenContext& Context) = 0;
 	virtual void NotifyComputerUserChanged(APlayerState* PlayerState) = 0;
+	/** 컴퓨터 예약이 해제되어 사용자가 떠났다. 화면은 진행 중인 확인 등 일시 상태만 정리한다. */
+	virtual void NotifyComputerUseEnded() {}
 };

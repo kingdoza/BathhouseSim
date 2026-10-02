@@ -48,7 +48,8 @@
 - [BathWaterSystem.md](Architecture/BathWaterSystem.md): 욕탕 급수·배수, 평면 수면 표현, 공통 입욕 임계치와 Customer BathLoop 연계
 - [BathWaterOperationsSystem.md](Architecture/BathWaterOperationsSystem.md) / [BathWaterManagementUISystem.md](Architecture/BathWaterManagementUISystem.md): 순환·가열·냉각 용량과 욕탕 condition domain / world-space 관리 화면
 - [PlacementSystem.md](Architecture/PlacementSystem.md): 배치 설비와 전용 회수 아이템 변환, preview/Q 회수와 locker capacity lease
-- [BuildingSystem.md](Architecture/BuildingSystem.md): 공간(홀·목욕공간·지하 작업공간) 벽·바닥·천장·조명·출입구·통로·계단 생성, 공간 = 배치 구역, 쓰레기·물 얼룩 생성 조각(EXP-U1 설계)
+- [BuildingSystem.md](Architecture/BuildingSystem.md): 공간(홀·목욕공간·지하 작업공간) 벽·바닥·천장·조명·출입구·통로·계단 생성, 공간 = 배치 구역, 쓰레기·물 얼룩 생성 조각(EXP-U1), 공간 넓힘 적용·미리보기·넓힘 검증(EXP-U2 설계)
+- [ExpansionPurchaseSystem.md](Architecture/ExpansionPurchaseSystem.md): 컴퓨터 확장 탭, 구입 transaction(돈·공간 넓힘·홀 효과 tier), 확장 정의 가격·상한, 락커 상품 허용(EXP-U2 설계)
 - [EconomySystem.md](Architecture/EconomySystem.md): PlayerState wallet과 일회성 cash 획득
 - [CustomerSystem.md](Architecture/CustomerSystem.md): UE 5.8 StateTree customer routine, session과 cleanup
 - [UISystem.md](Architecture/UISystem.md): native Widget/Widget Blueprint 경계와 E/LMB/RMB interaction prompt 계약
@@ -117,7 +118,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
   - Customer Recovery: Customer Source 내 knockdown, soft interruption과 restartable Task 책임
   - Shop: cart, 주문·배송, 배송 상자·개봉과 쓰레기통 책임
   - Service: 품목 박스·진열 공간·음료 냉장고·판매 적립·수거함, 안마의자·TV·세신대·때수건·세신 포커스 책임
-  - Building: 공간 Actor(배치 구역 subclass)와 생성 형상·조명·계단, 공간별 허용 설비와 생성 조각 spawn 책임(EXP-U1 설계)
+  - Building: 공간 Actor(배치 구역 subclass)와 생성 형상·조명·계단, 공간별 허용 설비와 생성 조각 spawn 책임(EXP-U1), 공간 넓힘과 확장 구입 transaction 책임(EXP-U2 설계)
   - Core: 모듈/redirect/문서 경계 책임
 
 ## 시스템 간 책임 흐름
@@ -155,6 +156,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 사용 수건통 내부는 container 단위 E/F interaction이고, overflow world towel만 개별 E interaction이다.
 - Customer는 clean towel token과 satisfaction을 session에 보관하고, used bin full이면 floor overflow로 반납한다.
 - (EXP-U1 설계) Building은 공간마다 Level 공간 Actor 하나를 둔다. 공간 Actor가 그 바닥의 설비 배치 구역이며, 모든 공간의 authored 값으로 벽·바닥·천장·개구부·계단을 계산해 자기 몫을 Transient component로 만든다(편집 world는 OnConstruction과 지연 일괄 재생성, runtime은 BeginPlay). 공간은 BeginPlay에 자기 조각 종류(홀 쓰레기, 목욕공간 물 얼룩, 작업공간 없음)의 생성 조각 Actor를 spawn한다. 손님 길은 넓은 Nav 범위와 Recast Dynamic 재생성이 맡는다.
+- (EXP-U2 설계) 확장 구입은 Building의 `UBathhouseExpansionPurchaseSubsystem`이 조율한다. 공간 Actor가 자기 넓힌 횟수를 소유하고 전체 구입 횟수는 그 합이다. 구입은 사전 검사 → 공간 넓힘(되돌림 가능) → wallet 차감 → 홀이면 확장 관리자 tier 상승(열쇠 생성·락커 한도) 순서의 한 transaction이다. 기존 tier는 홀 넓힘 횟수별 효과 표가 된다. 컴퓨터 화면은 `관리·상점·확장` 탭이고 확장 화면은 view를 매번 subsystem에서 받는다. 상점은 `Facility.Discardable` 없는 락커 상품을 허용한다. 사용자 결정 D2(전체 구입 상한 삭제, 가격을 공간 넓힘 줄마다, 선택지별 단계·가격 표시)는 D2 설계, Source 미반영, 다음 단위에서 구현이다([ExpansionPurchaseSystem.md](Architecture/ExpansionPurchaseSystem.md) D2 Redesign).
 - Core는 런타임 gameplay 상태를 소유하지 않고 모듈 의존성, Source 경계, Content/Config 정책, Core Redirect 기준을 문서화한다.
 
 ## 주요 의존 방향
@@ -192,6 +194,8 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - Customer Recovery -> Facility
 - Customer Recovery -> UE GameplayStateTree/AI/Navigation/Physics
 - Building -> Placement(zone base·placeable 계약), Cleaning(조각 zone class), NavigationSystem, DeveloperSettings(EXP-U1)
+- Building -> Facility(확장 관리자·정의·락커 용량), Economy(wallet)(EXP-U2)
+- UI -> Building 확장 구입 subsystem(EXP-U2)
 - Core -> Engine module boundary
 
 ## Blueprint/API 변경 주의
@@ -242,4 +246,4 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - `COMPUTER-WHEEL-SCROLL`: 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합. 컴퓨터 Active 동안 휠을 virtual pointer로 화면에 주입해 커서 아래 스크롤 영역을 스크롤한다. Content 변경은 없다([ComputerSystem.md](Architecture/ComputerSystem.md) Screen Wheel Scroll, [CharacterSystem.md](Architecture/CharacterSystem.md)).
 - 빈 박스 빼기 대상 선택 통일(ServiceFacilityDisplaySystem, `EMPTY-BOX-TAKE-TARGET`): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.
 - 플레이어 앞 생성 위치 카메라 시선 기준(UNBOX-SPAWN-VIEW, Shop·CleaningLitter·Interaction): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.
-- 확장 구입·공간 건물(`EXPANSION-PURCHASE`): 2026-10-02 단위 `EXP-U1`(공간 건물) 설계·구현([BuildingSystem.md](Architecture/BuildingSystem.md), Placement Space Zones, CleaningLitter 공간 생성 조각). 2026-10-02 사용자 PIE 통과·병합(`8ca6a24`). 단위 결과물은 Git 이력(병합 커밋의 `.md/Work/EXPANSION-PURCHASE/EXP-U1/`)에 있다. 다음 단위 `EXP-U2`(확장 구입 수직).
+- 확장 구입·공간 건물(`EXPANSION-PURCHASE`): 2026-10-02 단위 `EXP-U1`(공간 건물) 설계·구현([BuildingSystem.md](Architecture/BuildingSystem.md), Placement Space Zones, CleaningLitter 공간 생성 조각). 2026-10-02 사용자 PIE 통과·병합(`8ca6a24`). 단위 결과물은 Git 이력(병합 커밋의 `.md/Work/EXPANSION-PURCHASE/EXP-U1/`)에 있다. 다음 단위 `EXP-U2`(확장 구입 수직): 2026-10-02 설계([ExpansionPurchaseSystem.md](Architecture/ExpansionPurchaseSystem.md), BuildingSystem Expansion, Shop 락커 규칙, Computer 탭 3개), Source 반영(Editor 작업 전). 구현 입력은 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md`다.
