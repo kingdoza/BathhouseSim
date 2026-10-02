@@ -14,9 +14,18 @@
 
 Summary의 접두사별 이름은 표기된 접두사에 `CapacityText`, `CapacityBar`, `CapacityStatusText`를 각각 이어 붙인 정확한 `BindWidget` 이름이다. 다섯 WBP의 필수 child 이름·타입은 디스크 재로드 뒤 검사됐다.
 
-`WBP_BathWaterCapacitySummary`는 `SummaryFrame > SummaryColumn > SummaryRows` 아래 `CirculationRow/HeatingRow/CoolingRow` 세 개를 같은 가로 Fill 비율로 유지한다. 제목과 행 레이블은 `설비 용량`, `순환/가열/냉각`이다. 각 행의 값 Text는 기존 native `예약/가동/설치` 문자열을 13pt Bold로, 상태 Text는 설치·가동 부족이 동시에 나오는 긴 문구를 10.5pt Bold로 표시하고 둘 다 최대 280px 줄바꿈을 허용한다. 레이블은 11pt, 제목은 14pt이며 행 좌우 8px과 값·Bar·상태 사이 작은 세로 간격을 둔다. Bar 세 개와 9개 BindWidget 이름·타입, native 계산과 아래 지도·상세 layout은 변경하지 않았다. 이 WBP 하나만 Editor Python API로 개별 저장·새 프로세스 재로드·컴파일(`BS_UP_TO_DATE`)을 확인했으며 실제 1024×576 플레이 화면 잘림 여부는 직접 확인이 남아 있다.
+`WBP_BathWaterCapacitySummary`는 `SummaryFrame > SummaryColumn > SummaryRows` 아래 `CirculationRow/HeatingRow/CoolingRow` 세 개를 같은 가로 Fill 비율로 유지한다. 제목과 행 레이블은 `설비 용량`, `순환/가열/냉각`이다. 각 행의 값 Text는 native `예약/가동/설치` 문자열을, 상태 Text는 설치·가동 부족이 동시에 나오는 긴 문구를 표시하고 둘 다 줄바꿈을 허용한다. 글자 크기·굵기는 각 TextBlock의 `Font`, 줄바꿈 폭은 해당 TextBlock의 wrap 설정, 행 여백·간격은 각 slot `Padding`이 원본이며 이 문서는 수치를 적지 않는다. 실제 플레이 화면 잘림 여부는 사용자 확인이 남아 있다.
 
-`WBP_BathWaterMap`의 `BathTileWidgetClass`는 `WBP_BathWaterBathTile_C`다. **화면 안에 배치된 `BathMap` 위젯 템플릿에도 같은 class가 저장돼 있다.** Class Default만 설정하면 중첩 템플릿에서 `None`으로 남아 PIE 타일이 0개가 될 수 있다. `MapStack`의 순서는 `GridCanvas` → `BathTileCanvas` → `EmptyStateText`이며 두 Canvas는 `ClipToBounds`, `GridCanvas`는 `HitTestInvisible`이다. 격자선과 Zone 경계의 위치·수명은 native Map Widget이 소유하고 타일의 Button hit test를 가리지 않는다. Detail slider 두 개는 0~1 범위다. Root는 `RootOverlay > ManagementSize (SizeBox 1024×576) > ManagementFrame > ManagementColumn` 안에서 제목, 전체 폭의 utility summary, 그 아래 지도(좌)와 detail(우)을 배치한다. Detail은 `ScrollBox` 안에 있다. 어두운 패널/지도 바탕에 밝은 텍스트, 순환 초록·가열 주황·냉각 청록 색을 사용한다. 지도 좌표와 타일 수명은 WBP graph가 아닌 native Map Widget 계약을 따른다.
+`WBP_BathWaterMap`의 `BathTileWidgetClass`는 `WBP_BathWaterBathTile_C`다. **화면 안에 배치된 `BathMap` 위젯 템플릿에도 같은 class가 저장돼 있다.** Class Default만 설정하면 중첩 템플릿에서 `None`으로 남아 PIE 타일이 0개가 될 수 있다. `MapStack`의 순서는 `GridCanvas` → `BathTileCanvas` → `EmptyStateText`이며 두 Canvas는 `ClipToBounds`, `GridCanvas`는 `HitTestInvisible`이다. 격자선과 Zone 경계의 위치·수명·두께 보정은 native Map Widget이 소유하고 타일의 Button hit test를 가리지 않는다. 선 두께(render target px)·색의 원본은 `WBP_BathWaterMap` Class Defaults `GridLineThicknessPx`, `BoundaryLineThicknessPx`, `GridLineColor`, `BoundaryLineColor`(Category `Bath Water Map|Grid`)다.
+
+`WBP_BathWaterBathTile`의 hierarchy는 `RootOverlay > SelectButton`(OverlaySlot H/V Fill) `> TileTextScale`(ScaleBox, Stretch `ScaleToFit`, Stretch Direction `DownOnly`, `SelfHitTestInvisible`, ButtonSlot H/V Fill) `> TileColumn`(ScaleBoxSlot H/V Center) `>` 글자 BindWidget 5개다.
+- 보이는 영역과 클릭 영역은 native `UBathWaterMapWidget`이 canvas slot에 쓰는 footprint 사각형 전체다.
+- 글자 묶음은 타일보다 클 때만 축소된다(작업 `BUG-2026-10-02_bath_water_map_grid_scale_mismatch` QNA_ARCHITECTURE Q1 = A).
+- `TileTextScale`은 BindWidget이 아니다.
+- 상태색·불투명도의 원본은 Class Defaults `DeficitTileColor`, `SelectedTileColor`, `NormalTileColor`, `SelectedRenderOpacity`, `UnselectedRenderOpacity`(Category `Bath Water Tile`)이고 적용 분기는 C++가 소유한다. 글자 크기는 각 TextBlock `Font`가 원본이다.
+- 위 구조는 2026-10-02 Editor Python으로 저장했고, 새 프로세스에서 Compile·GUID 정리 저장과 재로드를 확인했다.
+
+Detail slider 두 개는 native 정규화 범위(0~1)를 쓴다. Root는 `RootOverlay > ManagementSize`(SizeBox, 크기 원본은 Width/Height Override) `> ManagementFrame > ManagementColumn` 안에서 제목, 전체 폭의 utility summary, 그 아래 지도(좌)와 detail(우)을 배치한다. Detail은 `ScrollBox` 안에 있다. 어두운 패널/지도 바탕에 밝은 텍스트를 쓰고 순환·가열·냉각을 서로 다른 색으로 구분한다. 색 원본은 각 widget의 색 프로퍼티다. 지도 좌표와 타일 수명은 WBP graph가 아닌 native Map Widget 계약을 따른다.
 
 ## 컴퓨터 연결
 

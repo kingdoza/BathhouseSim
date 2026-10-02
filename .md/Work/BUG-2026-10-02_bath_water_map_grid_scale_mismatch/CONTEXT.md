@@ -1,6 +1,6 @@
 # CONTEXT — BUG-2026-10-02_bath_water_map_grid_scale_mismatch 욕탕 관리 지도 그리드 누락·욕탕 비율 불일치
 - 목표 / 상위·선행·관련 작업: 컴퓨터 욕탕 관리 지도의 그리드 선 누락과 욕탕 타일 크기가 실제 점유 범위와 맞는지 확인. 버그 리포트 `.md/BugReports/2026-10-02_bath_water_map_grid_scale_mismatch.md`. 관련: 욕탕 관리 UI(BathWaterManagementUISystem), 공간 넓힘 `EXP-U3`(병합 `201b2d0`), 관련 작업 `PLACEMENT-FOOTPRINT-PREVIEW`(footprint와 메시 크기 차이 주제 공유).
-- 현재 단계와 재개 지점: 코드 리뷰 1회차 승인(`654aaa3`, 재빌드·Operations 8/8 Success) → Editor 작업(`PROMPT_UNREAL.md`). 병행: 아키텍처 정본의 "Source 미반영" 표기 정리를 아키텍처 워커에 재개 지시(리뷰 비차단 후속 a). QNA_ARCHITECTURE Q1 = A 사용자 확인(2026-10-02 "두 QNA 답변했다").
+- 현재 단계와 재개 지점: Editor 작업 완료(`REPORT_UNREAL_EDITOR.md`, `WBP_BathWaterBathTile` 저장 해시 c7cbde6f…, 정본 Unreal/PlacementSystem.md·InteractionUISystem.md 원본 참조화) → 사용자 PIE 검증 대기(`PIE_CHECKLIST.md`). 범위 밖 잔여: `.md/Unreal/BathWaterSystem.md` utility 표 수치 복제(다음 작업 후보).
 - 명세 승인 일자(자동/명시)와 사전 허용: 2026-10-02 사용자 명시 "둘 다 수정" — 버그 리포트를 기능 계약으로 보고 기능 명세 생략(Content 영향은 `WBP_BathWaterBathTile` 한 asset). 사전 허용 범위: `WBP_BathWaterBathTile`, 지도 선 표시 조정값 원본 asset(아키텍처가 정하는 범위), `.md/Unreal/PlacementSystem.md` 정본 정리. PIE 통과 후 병합은 미확인(병합 전에 묻는다).
 - 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: `work/BUG-2026-10-02_bath_water_map_grid_scale_mismatch`(main `f92277a`에서 분기). 아키텍처 시작 `f92277a`. 구현 시작 `5f39fd8`. 코드 리뷰 시작 = 구현 커밋.
 - 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 리뷰 1회차 승인, 리뷰 승인 커밋 `654aaa3`. 아키텍처 자동 복귀 미사용. 기능 명세 생략(버그 리포트를 기능 계약으로).
