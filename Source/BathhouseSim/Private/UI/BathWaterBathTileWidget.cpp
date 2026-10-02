@@ -85,11 +85,11 @@ void UBathWaterBathTileWidget::ApplyBathSnapshot(
 		const bool bCapacityDeficit = Snapshot.bCirculationCapacityDeficit
 			|| Snapshot.bHeatingCapacityDeficit || Snapshot.bCoolingCapacityDeficit;
 		SelectButton->SetBackgroundColor(bCapacityDeficit
-			? FLinearColor(0.88f, 0.26f, 0.18f)
-			: bSelected ? FLinearColor(0.24f, 0.88f, 0.96f)
-			: FLinearColor(0.12f, 0.62f, 0.68f));
+			? DeficitTileColor
+			: bSelected ? SelectedTileColor
+			: NormalTileColor);
 	}
-	SetRenderOpacity(bSelected ? 1.0f : 0.85f);
+	SetRenderOpacity(bSelected ? SelectedRenderOpacity : UnselectedRenderOpacity);
 	OnBathTileStateChanged(bSelected, Snapshot.bCirculationCapacityDeficit,
 		Snapshot.bHeatingCapacityDeficit, Snapshot.bCoolingCapacityDeficit);
 	CachedSnapshot = Snapshot;
