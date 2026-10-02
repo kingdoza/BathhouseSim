@@ -4,7 +4,11 @@
 
 - 전역 grid 간격은 Project Settings `Facility Placement > Grid Size Cm`가 정본이며 이 문서에 수치를 기록하지 않는다.
 - `UFacilityPlacementSettings.FacilityItemHeldTransform`은 위치·회전만 담당하며 런타임은 scale을 1로 정규화한다. 값 원본은 `Config/DefaultGame.ini` `[/Script/BathhouseSim.FacilityPlacementSettings]`의 `FacilityItemHeldTransform`이다.
-- 배치 미리보기 재질의 원본은 같은 Config 섹션의 `ValidPreviewMaterial`·`InvalidPreviewMaterial`이며 현재 `/Game/Material/MI_Preview_Valid`·`/Game/Material/MI_Preview_Invalid`(부모 `/Game/Material/M_Preview`)를 가리킨다. 색은 각 MI의 vector parameter `Param`이 원본이다. `M_Preview`는 Translucent·Unlit·one-sided이고 Opacity 입력이 연결되어 있지 않다(`PLACEMENT-FOOTPRINT-PREVIEW` 사전 조사 읽기 확인).
+- 배치 미리보기 재질의 원본은 같은 Config 섹션의 `ValidPreviewMaterial`·`InvalidPreviewMaterial`이며 현재 `/Game/Material/MI_Preview_Valid`·`/Game/Material/MI_Preview_Invalid`(부모 `/Game/Material/M_Preview`)를 가리킨다. 색은 각 MI의 vector parameter `Param`이 원본이다. `M_Preview`는 Translucent·Unlit·one-sided, translucency pass After DOF이고 graph에서 Opacity 입력이 연결되어 있지 않다. 화면에서는 반투명으로 보인다(사용자 PIE 관찰, 2026-10-02).
+- footprint 표시 재질의 원본은 같은 Config 섹션의 `FootprintPreviewMaterial`이며 `/Game/Bathhouse/Materials/Placement/MI_FacilityPlacementFootprint`(부모 `M_FacilityPlacementFootprint`)를 가리킨다. 표시 mesh·바닥 위 높이·그리기 우선순위(footprint, 메시 미리보기)의 원본도 같은 섹션의 `FootprintPreviewMesh`, `FootprintPreviewFloorOffsetCm`, `FootprintPreviewTranslucencySortPriority`, `PreviewMeshTranslucencySortPriority`다. 구역 grid의 우선순위는 `GridVisual` component의 Translucency Sort Priority다.
+  - `M_FacilityPlacementFootprint`: Surface, Translucent, Unlit, one-sided, depth test 켬, translucency pass After DOF. plane UV × (`FootprintSizeXCm`, `FootprintSizeYCm`)로 가장자리까지 거리를 구해 `OutlineThicknessCm` 안쪽은 외곽선, 나머지는 채움으로 나누고 Opacity를 `FillOpacity`·`OutlineOpacity` 사이에서 고른다. Emissive는 `PreviewColor`다.
+  - native DMI 입력은 `PreviewColor`(메시 미리보기 MI의 `Param`에서 읽음), `FootprintSizeXCm`, `FootprintSizeYCm`다. MI는 이 셋을 override하지 않는다.
+  - 표현값(`FillOpacity`, `OutlineOpacity`, `OutlineThicknessCm`)의 원본은 `MI_FacilityPlacementFootprint`의 parameter override이며 이 문서에 수치를 적지 않는다.
 - `/Game/Bathhouse/Materials/Placement/MI_FacilityPreview_Valid`·`_Invalid`는 이름과 달리 class가 Material이며 배치 미리보기에는 쓰이지 않는다. 표현값은 각 Material asset의 Emissive·Opacity 입력이 원본이다. `_Valid`는 `BP_TrashCollectionZone`·`BP_Television`이 참조하고 `_Invalid`는 참조자가 없다.
 
 ## Definition 계약
@@ -46,7 +50,7 @@
 
 ## Blueprint footprint와 body
 
-모든 footprint는 actor local install floor `Z=0`을 기준으로 한다. `PlacementFootprint`는 Navigation 비활성, Collision `NoCollision`이다. scaled full X/Y는 Project Settings grid 간격의 양의 정수배여야 하며 Data Validation이 검사한다.
+모든 footprint는 actor local install floor `Z=0`을 기준으로 한다. `PlacementFootprint`는 Navigation 비활성, Collision `NoCollision`이다. root·상위 component scale을 모두 합성한 full X/Y는 Project Settings grid 간격의 양의 정수배여야 하고, footprint의 Actor 축 대비 Yaw는 90° 배수여야 한다. 둘 다 Data Validation이 검사한다(16개 활성 Definition VALID, `PLACEMENT-FOOTPRINT-PREVIEW` Editor 작업 2026-10-02).
 
 footprint 크기·높이의 원본은 각 Blueprint의 `PlacementFootprint` component(Box Extent, Relative Location)이고, body 크기·mesh의 원본은 아래 body component의 Static Mesh·Relative Transform이다. 이 문서는 수치를 복제하지 않는다. Parent Class는 `/Script/BathhouseSim.` 접두를 생략했다.
 
@@ -71,7 +75,9 @@ footprint 크기·높이의 원본은 각 Blueprint의 `PlacementFootprint` comp
 
 - body component 목록은 배치 미리보기 수집 규칙(`FacilityPlacementPreviewSource::Collect`)이 고르는 mesh와 같다(`PLACEMENT-FOOTPRINT-PREVIEW` 사전 조사, 2026-10-02). `BP_ClothesLocker`는 사용자가 작업 트리에서 수정 중이라 이 문서는 구조만 적는다.
 - "미기록"은 충돌·Navigation 설정을 이 문서가 아직 확인하지 않았다는 뜻이다. 추가 body component의 충돌 설정도 확인 범위 밖이다.
-- `BP_Circulator`·`BP_Boiler`·`BP_Cooler`의 `SceneRoot` 회전과 `BP_Cooler` root scale은 별도 판단 대기라 계약으로 적지 않는다.
+- `BP_Circulator`·`BP_Boiler`의 `SceneRoot` relative rotation은 0이다(footprint·mesh가 Actor 축과 평행).
+- `BP_Cooler`는 root `PackagePhysicalRoot` scale과 `SceneRoot` Yaw ±90° 아래에 footprint가 있다. footprint Box Extent는 합성 scale을 적용한 크기가 grid 정수 칸이 되도록 authoring한다. 칸 수는 `PLACEMENT-FOOTPRINT-PREVIEW` 명세 FPV-016(Q10 B)이 정했고, 값 원본은 `BP_Cooler` `PlacementFootprint`다.
+- `DefaultMap`의 세 utility instance(`Space_Work`)는 `SceneRoot` 회전·footprint를 override하지 않고 Class Default를 따른다(새 프로세스 재로드 확인).
 
 `PackagePhysicalRoot`, slot, interaction, action/approach point, towel presentation, water/contents helper는 Navigation에 관여하지 않는다. Bath의 `FacilityVisual` mesh(`SM_Bath_old`)에는 generated convex collision과 NavCollision이 존재한다.
 

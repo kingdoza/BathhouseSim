@@ -77,7 +77,7 @@ Placement는 설비 contents, 목욕탕 물, customer 행동, key 상태와 UI h
 | placed Definition, footprint, transition와 Actor collision snapshot | `UFacilityPlacementComponent` |
 | payload, recovery item mesh physics와 lifecycle | `APlaceableFacilityItemActor` |
 | preview session, 호환 Zone grid weak set, 누적 Yaw, Q target/경과 시간과 상위 transaction 조율 | `UPlayerFacilityPlacementComponent` |
-| 범용 preview의 transient mesh 표현과 validity material 교체 | `AFacilityPlacementPreviewActor` |
+| 범용 preview의 transient mesh·footprint 표시와 validity 표현 | `AFacilityPlacementPreviewActor`([PlacementPreviewSystem.md](PlacementPreviewSystem.md)) |
 | zone bounds, 명시적 floor plane, allowed tag, native GridVisual/DMI와 Zone별 표현값 | `AFacilityPlacementZoneActor` |
 | expansion readiness, pending locker와 startup reconciliation | `UBathhouseFacilitySubsystem` |
 | 설치 락커 용량, lease, action-slot 후보와 bank 등록 | `ULockerCapacitySubsystem` |
@@ -96,10 +96,11 @@ Placement는 설비 contents, 목욕탕 물, customer 행동, key 상태와 UI h
 - `PlacementTraceDistance`, `RecoveryTraceDistance`
 - `FacilityItemHeldTransform`
 - `ValidPreviewMaterial`, `InvalidPreviewMaterial`
+- footprint 표시 plane mesh·MI, 바닥 위 높이, 반투명 그리기 우선순위 두 개. 의미와 계약은 [PlacementPreviewSystem.md](PlacementPreviewSystem.md) Settings
 
 `FacilityItemHeldTransform` getter는 location/rotation만 반환하고 scale을 항상 `OneVector`로 정규화한다. `APlaceableFacilityItemActor::GetHeldTransform()`과 legacy placed Actor의 fail-closed carry getter는 이 설정만 읽으며 per-Actor 값을 소유하지 않는다.
 
-두 preview material은 config에 저장 가능한 soft asset reference다. preview 시작 시 둘 다 resolve되고 translucent blend를 제공해야 하며 모든 material slot을 전면 교체한다. 누락·load·blend 검증 실패는 preview 초기화 실패이고 placement는 held item을 보존한 채 fail-closed한다.
+두 preview material은 config에 저장 가능한 soft asset reference다. 사용 계약은 [PlacementPreviewSystem.md](PlacementPreviewSystem.md) Generic Native Preview에 있다.
 
 ## Definition And Footprint
 
@@ -121,6 +122,12 @@ CellsXY = round(FullSizeXY / GridSizeCm)
 ```
 
 각 축의 full size는 양수·finite이고 `GridSizeCm`의 정수배여야 한다. 허용 오차 안에서 정수배가 아니면 Definition/Data Validation과 runtime placement가 실패한다. grid 또는 footprint를 바꾸면 cell 값을 별도로 갱신하지 않는다.
+
+파생식 적용(2026-10-02 `PLACEMENT-FOOTPRINT-PREVIEW`, 사용자 PIE 통과 2026-10-03):
+
+- 이전 `DeriveFootprintCells`는 `PlacementFootprint` component-to-world scale을 써서, component-to-world를 갱신하지 않는 Blueprint CDO 검사(Definition·Data Validation·preview 초기화)에서 root scale과 하위 component scale이 빠졌다(쿨러 비정수 footprint 미검출).
+- 위 식의 scale 항은 `GetFootprintRelativeToRoot()` 합성 scale × root relative scale로 계산한다. CDO와 instance에서 같은 값이며(instance root relative scale = Actor scale), 판정의 `RelativeFootprint * Candidate`와 같은 FTransform 합성 규칙이다. 식 자체는 `UFacilityPlacementComponent::ComputeScaledFootprintFullSize` 하나로 두고 cell 파생과 footprint 표시가 함께 쓴다.
+- Data Validation(`ValidateFootprintGridAxisAlignment`): footprint의 root 기준 회전이 pitch·roll 0, Yaw 90° 배수가 아니면 Definition 오류다. snap 중 footprint 변이 grid 선과 평행해야 하기 때문이다. runtime 판정에는 넣지 않는다.
 
 footprint authoring 계약:
 
@@ -168,41 +175,9 @@ preview root transform, final deferred spawn transform, footprint world transfor
 - 공간 벽·천장·계단 형상은 배치 trace 채널을 Block한다. 벽 너머 다른 공간의 구역은 조준되지 않고 `설치 가능한 구역을 바라보세요.`가 된다. 계단 구멍 위는 보이지 않는 QueryOnly 막이 상자가 막는다.
 - 구역 인정(2026-10-02 복귀 A1): 형상 component도 구역 Actor 소유이므로 `TracePlacementZone`은 `Cast` 성공만으로 구역을 정하지 않는다. `AFacilityPlacementZoneActor::IsZoneSurfaceHit(Hit)`(hit component = `ZoneBounds`, `ImpactNormal`이 `PlacementFloor` 위쪽과 같은 쪽)일 때만 구역이다. 벽·천장·경사로·계단 벽 hit와 `ZoneBounds` 아랫면 hit는 구역 없음(`설치 가능한 구역을 바라보세요.`)이다. trace는 한 번이고 가려진 뒤쪽 구역을 다시 찾지 않는다. 기존 단일 Zone의 결과는 같다.
 
-### Preview Without Aim (2026-10-02 EXP-U3, D4)
+## Preview Presentation
 
-- 미리보기는 이번 갱신에서 후보 transform을 계산했을 때만 보인다. 후보 계산 = `TracePlacementZone` 성공(배치 거리 `PlacementTraceDistance` 안에서 배치 trace 채널 첫 hit가 `IsZoneSurfaceHit`) → `MakeCandidateTransform` → `BuildPlacedActorTransform` 성공. `ValidateCurrentPlacement`가 이를 out flag로 알린다.
-- 후보가 없으면(거리 밖, 벽·천장·계단 형상, 구역 없는 바닥·하늘, 후보 계산 전 상태 이상) `RefreshPreview`는 미리보기 Actor를 옮기지 않고 `SetActorHiddenInGame(true)`로 숨긴다. 후보가 있으면 옮기고 validity material을 적용한 뒤 보이게 한다. 공간 불허·락커 한도·구역 밖·겹침·바닥 지지 부족은 후보가 있으므로 조준한 자리에 invalid material로 보인다.
-- 미리보기 Actor는 파괴하지 않는다. 누적 Yaw·LCtrl·호환 Zone 격자·안내 문구(`설치 가능한 구역을 바라보세요.`)·확정 실패 시 item 보존은 그대로다. `SetActorHiddenInGame`은 값이 바뀔 때만 render state를 다시 만든다.
-- 그리기 조건(UE 5.8 엔진 소스): game world에서 `USceneComponent::ShouldRender()`는 owner `IsHidden()`이면 거짓이고, primitive proxy는 `ShouldRender() || bCastHiddenShadow || bAffectIndirectLightingWhileHidden || bRayTracingFarField`일 때만 생긴다. 미리보기 mesh는 뒤 세 flag를 켜지 않는다.
-
-## Compatible Zone Grid Presentation
-
-`AFacilityPlacementZoneActor`는 `PlacementFloor` 아래 native `GridVisual` `UStaticMeshComponent`를 stable default subobject로 소유한다. component는 기본 hidden이며 collision, overlap, physics, Tick과 Navigation을 사용하지 않는다. Blueprint는 inherited component에 중심 pivot/+Z normal을 가진 plane mesh와 `MI_FacilityPlacementGrid` 하나만 지정한다.
-
-Zone별 authoring 값은 `GridLineThicknessCm`, `GridZOffsetCm`, `MajorGridIntervalCells`다. Class Default와 Level instance override를 허용하되 실제 셀 크기는 계속 `UFacilityPlacementSettings.GridSizeCm` 하나가 정본이다. line thickness는 양수이면서 셀 반폭 미만으로 runtime clamp·validation하고, Z offset은 non-negative, major interval은 2 이상의 cell 수로 제한한다.
-
-native `OnConstruction`은 plane mesh의 local bounds와 `ZoneBounds` unscaled full X/Y를 사용해 `GridVisual` relative scale을 파생하고, XY 중심을 `PlacementFloor` origin에 맞춘 뒤 `GridZOffsetCm`을 relative Z에 적용한다. Actor/Zone world scale을 값에 다시 곱하지 않는다. mesh 없음, 0/non-finite bounds와 floor/Bounds 축 불일치는 authoring 오류다.
-
-각 runtime Zone instance는 source MI를 변경하지 않고 최초 표시 전에 DMI를 한 번 생성한다. DMI에는 정확히 `GridSizeCm`, `ZoneSizeXCm`, `ZoneSizeYCm`, `LineThicknessCm`, `MajorGridEveryNCells`를 설정한다. minor/major 색상, opacity와 major thickness ratio는 MI 기본값이며 native 코드가 덮어쓰지 않는다. 가시성은 opacity가 아니라 component visibility로 전환한다.
-
-`SetGridVisible(bool)`은 실제 상태가 바뀔 때만 component를 전환하고 기존 `OnGridVisibilityChanged`를 그 뒤 한 번 notification한다. DMI/material 준비 실패는 같은 Zone에서 한 번만 진단하며 placement domain 상태를 변경하지 않지만 Editor 통합 완료 조건은 실패한다.
-
-`UPlayerFacilityPlacementComponent`는 설비 preview Actor 초기화 성공 시 world의 level-authored PlacementZone을 한 번 수집하고 `IsDefinitionAllowed()`가 참인 모든 Zone을 표시한다. 조준 중인 `PreviewZone`은 후보 계산만 담당하며 grid 대상 선택에 사용하지 않는다. visible Zone은 weak array로 보관하고 held item 변경, confirm 성공, preview 실패·취소, suppression과 EndPlay에서 모두 숨긴다. tick refresh는 Zone을 다시 검색하거나 visibility event를 반복 발행하지 않는다. active session 중 runtime spawn/retag된 Zone의 hot-add는 이번 범위 밖이다.
-
-## Generic Native Preview
-
-`AFacilityPlacementPreviewActor` 하나를 직접 spawn하며 Definition별 preview class를 조회하지 않는다. 이 class는 Blueprint 파생과 domain 기능 없이 transient 표현만 담당한다.
-
-preview 초기화는 gameplay Actor를 spawn하지 않고 `PlacedFacilityClass`의 native CDO component와 Blueprint SCS hierarchy를 함께 순회한다. inherited SCS override는 최종 generated class 기준 template을 사용하며 cooked fast-path component data가 있으면 preview Actor에 미등록 scratch component로 materialize한 뒤 표현값만 읽고 제거한다. 다음 source를 읽는다.
-
-- 유효 mesh가 있고 class-default에서 표시되는 non-instanced `UStaticMeshComponent`
-- source Actor root 기준으로 계산한 component transform
-- visibility와 필요한 기본 render 속성
-- placement component의 footprint relative transform과 BoxExtent snapshot
-
-helper, hidden, editor-only, `UInstancedStaticMeshComponent`와 runtime contents/pile/water 표현은 복제하지 않는다. 각 source마다 transient `UStaticMeshComponent`를 만들고 preview root에 root-relative transform으로 붙인다. source material은 복제하지 않고 validity에 따라 모든 slot을 `ValidPreviewMaterial` 또는 `InvalidPreviewMaterial`로 설정한다.
-
-preview Actor와 생성 component는 collision/overlap/physics/Tick과 Navigation을 항상 끈다. placed class identity, footprint root-relative transform/extent와 root scale snapshot은 매 refresh/confirm에서 authoritative CDO와 비교하며 mismatch면 preview와 confirm을 fail-closed한다. authoritative footprint는 계속 placed CDO다. eligible mesh가 없거나 hierarchy 해석, component 생성·material 적용이 실패하면 live preview가 성립하지 않으므로 confirm을 허용하지 않는다.
+메시 미리보기(Generic Native Preview), footprint 표시(2026-10-02), 조준 없음 숨김(EXP-U3 D4), 호환 Zone grid와 반투명 그리기 순서는 [PlacementPreviewSystem.md](PlacementPreviewSystem.md)가 정본이다. 이 문서의 후보 transform·footprint·판정 계약을 그대로 쓰며 표시는 판정을 바꾸지 않는다.
 
 ## Collision And Navigation
 
@@ -352,12 +327,9 @@ Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후�
 - 공통 Held transform이 모든 facility item에 같고 Scale은 보존되는지 확인한다.
 - 회수 collision query와 회수 spawn이 CDO `ItemRoot` relative scale을 한 번만 쓰는지, component-to-world가 갱신되지 않은 Blueprint식 CDO에서도 확인한다. 수치는 단언하지 않고 asset·fixture의 authored 값과 비교한다.
 - grid/footprint 변경 시 파생 cell과 non-multiple validation을 확인한다.
-- preview 시작 시 조준과 무관하게 compatible Zone 전체만 grid가 표시되고 종료 경로마다 모두 숨겨지는지 확인한다.
-- (EXP-U3) 조준 없음(hit 없음·거리 밖·비구역 차단 물체)이면 미리보기 Actor가 유지된 채 숨고 transform이 그대로이며, 다시 구역을 조준하면 새 후보 위치에 보이고 누적 Yaw가 유지되는지, 공간 불허·겹침은 숨지 않는지 확인한다.
-- GridVisual 한 개가 Bounds 전체를 덮고 전역 cell 간격, Zone별 line thickness/Z offset/major interval을 DMI와 transform에 반영하는지 확인한다.
-- Zone grid가 중립색 하나를 유지하고 normal depth test로 벽·설비 뒤에서 가려지는지 확인한다.
+- root scale·하위 component scale이 있는 CDO fixture에서 파생 cell과 비정수 검출, Yaw 90° 배수가 아닌 footprint의 Data Validation 오류를 확인한다(2026-10-02).
+- preview 표현 검증 항목은 [PlacementPreviewSystem.md](PlacementPreviewSystem.md) Verification에 있다.
 - bath/washer/dryer/locker footprint bottom이 같은 floor plane에 놓이는지 확인한다.
-- generic preview가 class-default 복합 mesh를 복제하고 valid/invalid material을 모든 slot에 적용하는지 확인한다.
 - preview/stage에서 collision/Nav가 없고 commit/rollback 뒤 Actor collision snapshot이 복원되는지 확인한다.
 - PIE 전후 대형 `NavArea_Null`이 없고 recovery/replacement 위치의 Dynamic NavMesh가 갱신되는지 확인한다.
 - Facility/Queue Approach Point가 agent radius를 고려한 생성 NavMesh 위에 남는지 확인한다.

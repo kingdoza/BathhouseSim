@@ -19,6 +19,38 @@ bool UFacilityPlacementComponent::ValidateFootprintContractForDefinition(
 	return DeriveFootprintCells(Cells, OutFailureReason);
 }
 
+FVector UFacilityPlacementComponent::ComputeScaledFootprintFullSize(
+	const FTransform& FootprintRelativeToRoot,
+	const FVector& UnscaledExtent,
+	const FVector& RootRelativeScale)
+{
+	// Same per-axis scale composition as RelativeFootprint * Candidate (Candidate scale = root relative scale).
+	return UnscaledExtent * (FootprintRelativeToRoot.GetScale3D() * RootRelativeScale).GetAbs() * 2.0f;
+}
+
+bool UFacilityPlacementComponent::ValidateFootprintGridAxisAlignment(FText& OutFailureReason) const
+{
+	FTransform FootprintRelative;
+	if (!GetFootprintRelativeToRoot(FootprintRelative, OutFailureReason))
+	{
+		return false;
+	}
+	const FRotator Rotation = FootprintRelative.Rotator();
+	constexpr float AngleToleranceDegrees = 0.01f;
+	const float YawRemainder = FMath::Abs(FMath::Fmod(Rotation.Yaw, 90.0f));
+	const bool bYawAligned = YawRemainder <= AngleToleranceDegrees
+		|| 90.0f - YawRemainder <= AngleToleranceDegrees;
+	if (!FMath::IsNearlyZero(FMath::UnwindDegrees(Rotation.Pitch), AngleToleranceDegrees)
+		|| !FMath::IsNearlyZero(FMath::UnwindDegrees(Rotation.Roll), AngleToleranceDegrees)
+		|| !bYawAligned)
+	{
+		OutFailureReason = LOCTEXT("FootprintGridAxisMismatch",
+			"PlacementFootprint가 설비 축에서 돌아 있어 그리드에 맞지 않습니다. SceneRoot 등 상위 컴포넌트의 회전을 확인하세요.");
+		return false;
+	}
+	return true;
+}
+
 bool UFacilityPlacementComponent::DeriveFootprintCells(
 	FIntPoint& OutCells,
 	FText& OutFailureReason) const
@@ -30,8 +62,26 @@ bool UFacilityPlacementComponent::DeriveFootprintCells(
 		return false;
 	}
 	const float Grid = GetDefault<UFacilityPlacementSettings>()->GetGridSizeCm();
-	const FVector FullSize = PlacementFootprint->GetUnscaledBoxExtent()
-		* PlacementFootprint->GetComponentTransform().GetScale3D().GetAbs() * 2.0f;
+	const AActor* Owner = GetOwner();
+	const USceneComponent* Root = Owner ? Owner->GetRootComponent() : nullptr;
+	FTransform FootprintRelative;
+	if (!Root || !GetFootprintRelativeToRoot(FootprintRelative, OutFailureReason))
+	{
+		if (OutFailureReason.IsEmpty())
+		{
+			OutFailureReason = LOCTEXT("MissingFootprintRoot", "배치 설비의 루트 또는 배치 영역을 확인할 수 없습니다.");
+		}
+		return false;
+	}
+	const FVector RootScale = Root->GetRelativeScale3D();
+	if (RootScale.ContainsNaN() || RootScale.GetAbsMin() <= UE_KINDA_SMALL_NUMBER)
+	{
+		OutFailureReason = LOCTEXT("InvalidPlacedScale", "배치 설비 클래스의 기본 루트 스케일이 올바르지 않습니다.");
+		return false;
+	}
+	// Not the component-to-world scale: CDO transforms are not refreshed and omit the root scale.
+	const FVector FullSize = ComputeScaledFootprintFullSize(
+		FootprintRelative, PlacementFootprint->GetUnscaledBoxExtent(), RootScale);
 	const FVector2D Ratios(FullSize.X / Grid, FullSize.Y / Grid);
 	const int32 CellsX = FMath::RoundToInt(Ratios.X);
 	const int32 CellsY = FMath::RoundToInt(Ratios.Y);

@@ -130,6 +130,10 @@ EDataValidationResult UFacilityPlacementDefinition::IsDataValid(FDataValidationC
 			{
 				Invalidate(FootprintFailure);
 			}
+			else if (!PlaceableCDO->GetFacilityPlacementComponent()->ValidateFootprintGridAxisAlignment(FootprintFailure))
+			{
+				Invalidate(FootprintFailure);
+			}
 			else if (!PlaceableCDO->GetFacilityPlacementComponent()->ValidateNavigationContract(FootprintFailure))
 			{
 				Invalidate(FootprintFailure);
