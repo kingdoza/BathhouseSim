@@ -1,0 +1,16 @@
+2026-10-02 11:13:49 START prep (style research, shared pipeline)
+2026-10-02 11:23:34 END prep / START Boiler_03
+2026-10-02 11:33:00 END Boiler_03 / START Circulator_01
+2026-10-02 11:37:57 END Circulator_01 / START Shower_01
+2026-10-02 11:42:00 END Shower_01 / START Vanity_01
+2026-10-02 11:44:37 END Vanity_01 / START ClothesLocker_01
+2026-10-02 11:46:50 END ClothesLocker_01
+2026-10-02 11:49:54 END wrap-up (lineup, README, CONTEXT)
+2026-10-02 14:42:51 START palette variants (A/B/C)
+2026-10-02 14:50:05 END palette variants (compare sheet)
+2026-10-02 14:53:29 START zone themes (bath/hall/work) + rebake
+2026-10-02 15:03:59 END zone themes + rebake + docs
+2026-10-02 15:08:22 START aging pass
+2026-10-02 15:19:30 END aging pass
+2026-10-02 15:22:18 START tier condition rule
+2026-10-02 15:26:19 END tier condition rule

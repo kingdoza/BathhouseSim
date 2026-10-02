@@ -1,0 +1,72 @@
+{
+  "asset": "Vanity_01",
+  "checks": [
+    {
+      "check": "SM_Vanity_01 transform identity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Vanity_01 uv layers",
+      "ok": true,
+      "detail": "['UV0', 'UV1_Lightmap']"
+    },
+    {
+      "check": "SM_Vanity_01 single material",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Vanity_01 fbx exists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Vanity_01 reimport bounds",
+      "ok": true,
+      "detail": "err_m=0.000000"
+    },
+    {
+      "check": "SM_Vanity_01 reimport hulls",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "meshes": {
+    "SM_Vanity_01": {
+      "bbox_min_m": [
+        -0.31,
+        -0.67,
+        0.0
+      ],
+      "bbox_max_m": [
+        0.316,
+        0.67,
+        1.798
+      ],
+      "size_ue_cm": [
+        62.6,
+        134.0,
+        179.8
+      ],
+      "vertices": 4333,
+      "triangles": 8204,
+      "ngons": 0,
+      "uv_layers": [
+        "UV0",
+        "UV1_Lightmap"
+      ],
+      "materials": [
+        "M_Vanity_01"
+      ],
+      "hulls": [
+        "UCX_SM_Vanity_01_00",
+        "UCX_SM_Vanity_01_01",
+        "UCX_SM_Vanity_01_02",
+        "UCX_SM_Vanity_01_03"
+      ]
+    }
+  },
+  "passed": 6,
+  "total": 6
+}

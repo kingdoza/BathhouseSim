@@ -1,0 +1,44 @@
+{
+  "asset": "Shower_01",
+  "source_blend": "Shower_01.blend",
+  "units": "metres in Blender, UE cm in configs",
+  "axis": "UE = (Bx, -By, Bz) * 100 (verified on Bath_01 glb import, REPORT_UNREAL_DISCOVERY MODEL-M1)",
+  "meshes": {
+    "SM_Shower_01": {
+      "fbx": "SM_Shower_01.fbx",
+      "group": "Body",
+      "pivot_ue_cm": [
+        0,
+        0,
+        0
+      ],
+      "bounds_ue_cm_rel_pivot": [
+        [
+          -41.0,
+          -60.0,
+          0.0
+        ],
+        [
+          29.0,
+          60.0,
+          188.0
+        ]
+      ],
+      "vertices": 5650,
+      "triangles": 10736,
+      "collision": [
+        "UCX_SM_Shower_01_00",
+        "UCX_SM_Shower_01_01",
+        "UCX_SM_Shower_01_02",
+        "UCX_SM_Shower_01_03",
+        "UCX_SM_Shower_01_04"
+      ]
+    }
+  },
+  "textures": {
+    "T_Shower_01_BaseColor.png": "4096, sRGB",
+    "T_Shower_01_ORM.png": "4096, linear (R=AO, G=Roughness, B=Metallic)",
+    "T_Shower_01_Normal.png": "4096, linear, DirectX (green -Y)"
+  },
+  "material": "M_Shower_01"
+}

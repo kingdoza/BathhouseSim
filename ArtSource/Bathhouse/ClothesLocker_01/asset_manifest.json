@@ -1,0 +1,40 @@
+{
+  "asset": "ClothesLocker_01",
+  "source_blend": "ClothesLocker_01.blend",
+  "units": "metres in Blender, UE cm in configs",
+  "axis": "UE = (Bx, -By, Bz) * 100 (verified on Bath_01 glb import, REPORT_UNREAL_DISCOVERY MODEL-M1)",
+  "meshes": {
+    "SM_ClothesLocker_01": {
+      "fbx": "SM_ClothesLocker_01.fbx",
+      "group": "Body",
+      "pivot_ue_cm": [
+        0,
+        0,
+        0
+      ],
+      "bounds_ue_cm_rel_pivot": [
+        [
+          -30.0,
+          -17.5,
+          0.0
+        ],
+        [
+          33.8,
+          17.5,
+          100.0
+        ]
+      ],
+      "vertices": 2081,
+      "triangles": 3908,
+      "collision": [
+        "UCX_SM_ClothesLocker_01_00"
+      ]
+    }
+  },
+  "textures": {
+    "T_ClothesLocker_01_BaseColor.png": "2048, sRGB",
+    "T_ClothesLocker_01_ORM.png": "2048, linear (R=AO, G=Roughness, B=Metallic)",
+    "T_ClothesLocker_01_Normal.png": "2048, linear, DirectX (green -Y)"
+  },
+  "material": "M_ClothesLocker_01"
+}

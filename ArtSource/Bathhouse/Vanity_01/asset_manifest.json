@@ -1,0 +1,43 @@
+{
+  "asset": "Vanity_01",
+  "source_blend": "Vanity_01.blend",
+  "units": "metres in Blender, UE cm in configs",
+  "axis": "UE = (Bx, -By, Bz) * 100 (verified on Bath_01 glb import, REPORT_UNREAL_DISCOVERY MODEL-M1)",
+  "meshes": {
+    "SM_Vanity_01": {
+      "fbx": "SM_Vanity_01.fbx",
+      "group": "Body",
+      "pivot_ue_cm": [
+        0,
+        0,
+        0
+      ],
+      "bounds_ue_cm_rel_pivot": [
+        [
+          -31.0,
+          -67.0,
+          0.0
+        ],
+        [
+          31.6,
+          67.0,
+          179.8
+        ]
+      ],
+      "vertices": 4333,
+      "triangles": 8204,
+      "collision": [
+        "UCX_SM_Vanity_01_00",
+        "UCX_SM_Vanity_01_01",
+        "UCX_SM_Vanity_01_02",
+        "UCX_SM_Vanity_01_03"
+      ]
+    }
+  },
+  "textures": {
+    "T_Vanity_01_BaseColor.png": "2048, sRGB",
+    "T_Vanity_01_ORM.png": "2048, linear (R=AO, G=Roughness, B=Metallic)",
+    "T_Vanity_01_Normal.png": "2048, linear, DirectX (green -Y)"
+  },
+  "material": "M_Vanity_01"
+}

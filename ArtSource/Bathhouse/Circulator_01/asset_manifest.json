@@ -1,0 +1,95 @@
+{
+  "asset": "Circulator_01",
+  "source_blend": "Circulator_01.blend",
+  "units": "metres in Blender, UE cm in configs",
+  "axis": "UE = (Bx, -By, Bz) * 100 (verified on Bath_01 glb import, REPORT_UNREAL_DISCOVERY MODEL-M1)",
+  "meshes": {
+    "SM_Circulator_01": {
+      "fbx": "SM_Circulator_01.fbx",
+      "group": "Body",
+      "pivot_ue_cm": [
+        0,
+        0,
+        0
+      ],
+      "bounds_ue_cm_rel_pivot": [
+        [
+          -60.0,
+          -43.3,
+          0.0
+        ],
+        [
+          60.0,
+          38.0,
+          120.0
+        ]
+      ],
+      "vertices": 7345,
+      "triangles": 13976,
+      "collision": [
+        "UCX_SM_Circulator_01_00",
+        "UCX_SM_Circulator_01_01",
+        "UCX_SM_Circulator_01_02",
+        "UCX_SM_Circulator_01_03",
+        "UCX_SM_Circulator_01_04",
+        "UCX_SM_Circulator_01_05"
+      ]
+    },
+    "SM_Circulator_01_Lever": {
+      "fbx": "SM_Circulator_01_Lever.fbx",
+      "group": "Lever",
+      "pivot_ue_cm": [
+        30,
+        -44,
+        30
+      ],
+      "bounds_ue_cm_rel_pivot": [
+        [
+          -3.5,
+          -3.5,
+          -3.4
+        ],
+        [
+          3.5,
+          3.5,
+          38.1
+        ]
+      ],
+      "vertices": 378,
+      "triangles": 692,
+      "collision": [
+        "UCX_SM_Circulator_01_Lever_00"
+      ]
+    },
+    "SM_Circulator_01_Needle": {
+      "fbx": "SM_Circulator_01_Needle.fbx",
+      "group": "Needle",
+      "pivot_ue_cm": [
+        34.49,
+        -44,
+        109.92
+      ],
+      "bounds_ue_cm_rel_pivot": [
+        [
+          -2.4,
+          -0.9,
+          -1.1
+        ],
+        [
+          7.6,
+          1.6,
+          1.1
+        ]
+      ],
+      "vertices": 165,
+      "triangles": 306,
+      "collision": []
+    }
+  },
+  "textures": {
+    "T_Circulator_01_BaseColor.png": "2048, sRGB",
+    "T_Circulator_01_ORM.png": "2048, linear (R=AO, G=Roughness, B=Metallic)",
+    "T_Circulator_01_Normal.png": "2048, linear, DirectX (green -Y)"
+  },
+  "material": "M_Circulator_01"
+}

@@ -1,0 +1,192 @@
+{
+  "asset": "Circulator_01",
+  "checks": [
+    {
+      "check": "SM_Circulator_01 transform identity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01 uv layers",
+      "ok": true,
+      "detail": "['UV0', 'UV1_Lightmap']"
+    },
+    {
+      "check": "SM_Circulator_01 single material",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01 fbx exists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01 reimport bounds",
+      "ok": true,
+      "detail": "err_m=0.000000"
+    },
+    {
+      "check": "SM_Circulator_01 reimport hulls",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01_Lever transform identity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01_Lever uv layers",
+      "ok": true,
+      "detail": "['UV0', 'UV1_Lightmap']"
+    },
+    {
+      "check": "SM_Circulator_01_Lever single material",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01_Lever fbx exists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01_Lever reimport bounds",
+      "ok": true,
+      "detail": "err_m=0.000000"
+    },
+    {
+      "check": "SM_Circulator_01_Lever reimport hulls",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01_Needle transform identity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01_Needle uv layers",
+      "ok": true,
+      "detail": "['UV0', 'UV1_Lightmap']"
+    },
+    {
+      "check": "SM_Circulator_01_Needle single material",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01_Needle fbx exists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_Circulator_01_Needle reimport bounds",
+      "ok": true,
+      "detail": "err_m=0.000000"
+    },
+    {
+      "check": "SM_Circulator_01_Needle reimport hulls",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "meshes": {
+    "SM_Circulator_01": {
+      "bbox_min_m": [
+        -0.6,
+        -0.38,
+        0.0
+      ],
+      "bbox_max_m": [
+        0.6,
+        0.433,
+        1.2
+      ],
+      "size_ue_cm": [
+        120.0,
+        81.3,
+        120.0
+      ],
+      "vertices": 7345,
+      "triangles": 13976,
+      "ngons": 0,
+      "uv_layers": [
+        "UV0",
+        "UV1_Lightmap"
+      ],
+      "materials": [
+        "M_Circulator_01"
+      ],
+      "hulls": [
+        "UCX_SM_Circulator_01_00",
+        "UCX_SM_Circulator_01_01",
+        "UCX_SM_Circulator_01_02",
+        "UCX_SM_Circulator_01_03",
+        "UCX_SM_Circulator_01_04",
+        "UCX_SM_Circulator_01_05"
+      ]
+    },
+    "SM_Circulator_01_Lever": {
+      "bbox_min_m": [
+        -0.035,
+        -0.035,
+        -0.034
+      ],
+      "bbox_max_m": [
+        0.035,
+        0.035,
+        0.381
+      ],
+      "size_ue_cm": [
+        7.0,
+        7.0,
+        41.5
+      ],
+      "vertices": 378,
+      "triangles": 692,
+      "ngons": 0,
+      "uv_layers": [
+        "UV0",
+        "UV1_Lightmap"
+      ],
+      "materials": [
+        "M_Circulator_01"
+      ],
+      "hulls": [
+        "UCX_SM_Circulator_01_Lever_00"
+      ]
+    },
+    "SM_Circulator_01_Needle": {
+      "bbox_min_m": [
+        -0.024,
+        -0.0165,
+        -0.011
+      ],
+      "bbox_max_m": [
+        0.076,
+        0.0095,
+        0.011
+      ],
+      "size_ue_cm": [
+        10.0,
+        2.6,
+        2.2
+      ],
+      "vertices": 165,
+      "triangles": 306,
+      "ngons": 0,
+      "uv_layers": [
+        "UV0",
+        "UV1_Lightmap"
+      ],
+      "materials": [
+        "M_Circulator_01"
+      ],
+      "hulls": []
+    }
+  },
+  "passed": 18,
+  "total": 18
+}

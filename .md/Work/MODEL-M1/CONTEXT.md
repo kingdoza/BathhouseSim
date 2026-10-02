@@ -1,0 +1,21 @@
+# CONTEXT — MODEL-M1 설비 스태틱 메시 모델링 1차
+- 목표 / 상위·선행·관련 작업: Blender로 설비 5종 전용 스태틱 메시 제작(보일러, 화장대, 순환기, 샤워기, 1칸 옷 락커). 입력 `.md/MODELING_STATIC_MESH_LIST.md`, 스타일 기준 Fab Stylized House Interior(`https://fab.com/s/a11a111085b5` = 프로젝트 `Content/StylizedKitchen` 팩). 결과물은 `ArtSource/Bathhouse/<이름>/`(기존 Bath_01·Boiler_01/02 관례). 관련: `EXP-U1`(Editor 작업 보류, 사용자 지형 칠하기 대기 — 이 작업과 독립).
+- 현재 단계와 재개 지점: 모델링 5종 완료(2026-10-02, 구역 테마·노화·티어 규칙 반영), main 커밋 완료. 다음: 사용자 피드백 반영. Unreal import·BP mesh 교체는 별도 Editor 작업(각 에셋 README의 'BP 조정' 절이 입력).
+- 명세 승인 일자(자동/명시)와 사전 허용: 기능 명세 없음(코드·동작 변경 없음, 사용자 지시 "코딩작업은 안 하고 모델링 작업"). 사용자 허용: Editor 읽기 전용 조사. Content 수정·import 허용 없음.
+- 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 작업 중 체크아웃은 `work/EXP-U1`. 사용자 지시(2026-10-02 "메인에 커밋")로 결과물을 `main`에 직접 커밋. Editor가 열려 있고 EXP-U1이 진행 중이라 브랜치를 바꾸지 않고, 임시 인덱스로 main에 커밋함(작업 트리 무변경). `.md/MODELING_STATIC_MESH_LIST.md`는 아직 `work/EXP-U1`에만 있어서, EXP-U1이 병합되기 전까지 main의 지침서 링크는 비어 있음.
+- 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 기능 명세·아키텍처·구현·코드 리뷰·Editor 작업 생략 — Source·Content 변경 없는 외부 원본(ArtSource) 제작이라 해당 단계 대상이 없음. 모델링 전용 워커 정의가 없어 마스터가 Blender MCP 애드온 브리지(127.0.0.1:9876)로 직접 제작(회고 대상: 모델링 역할 정의 부재).
+- 복귀 기록: 없음
+- 사용자 지시 모델 덮어쓰기: 없음
+- 결과물 목록과 사용자 지시 요약:
+  - 결과물: `REPORT_UNREAL_DISCOVERY.md`(완료), `ArtSource/Bathhouse/{Boiler_03,Circulator_01,Shower_01,Vanity_01,ClothesLocker_01}/`(blend·FBX·텍스처·턴어라운드·README·manifest·validation), 공용 `ArtSource/Bathhouse/_Pipeline/`, 라인업 `MODEL-M1_Lineup.png`, 시간 기록 `timing.log`.
+  - 검증: 5종 모두 FBX 재수입 bounds·UV·재질·UCX 검사 통과. 미검증: FBX의 Unreal 실제 import 축(glb 실측 기반 추정), Unreal 조명에서의 외형.
+  - 조사로 드러난 BP 이상값(정정은 Editor 작업 몫): `BP_Boiler.GaugeNeedlePivot` (67.77,−34,129.13) → 모델은 (0,−34,90) 기준. 목록·정본 불일치는 보고서 8절.
+  - 사고 기록: 정리 중 넓은 glob으로 추적 파일 `Boiler_01.blend1`·`Boiler_02.blend1`을 지웠다가 `git checkout`으로 즉시 복구함. 같은 유형으로 `Boiler_01.blend1`을 한 번 더 지우고 복구함(2회, 회고 대상). 재발 방지: `run_all.sh`가 자기 에셋의 `.blend1`만 지우게 바꿈.
+  - 사용자 추가 지시(2026-10-02): "작업 다 끝나면 모델링별 작업시간도 알려줘" → `timing.log` 기준 보고.
+  - 사용자 요청 원문(2026-10-02): "이번에는 코딩작업은안하고 모델링 작업을할거야. 스태틱메시 정보는 .md/MODELING_STATIC_MESH_LIST.md에 있고 모델링에 더 필요한 정보가 있으면 에디터 읽기전용 조사를 허가함. 스타일은 https://fab.com/s/a11a111085b5 에 최대한 맞춰야함. 블렌더 MCP 열려있고 다음 모델링 일단 작업좀. 보일러 화장대 순환기 샤워기 1칸 옷 락커"
+  - 사용자 요청(2026-10-02): "모델링 스타일 지침서 작성해봐" → `.md/MODELING_STYLE_GUIDE.md` 신규(MODEL-M1 결과 기반, 색·재질 원본은 `_Pipeline/bh_lib.py`).
+  - 사용자 지시(2026-10-02): "색감만은 참조하지마" → 지침서 1절에 '색감은 레퍼런스 참고 금지'를 넣고, 3절 PAL을 임시로 표시. `_Pipeline` README·`bh_lib.py` 주석도 수정. 고유 팔레트 방향과 5종 재채색 여부는 사용자 결정 대기.
+  - 사용자 결정(2026-10-02): 구역별 색·재질 — 욕탕(샤워기) = 1차 민트 도장, 홀(락커·화장대) = 시안 B 색의 나무 재질, 작업(보일러·순환기) = 무도장 철. 사용자가 개별 색을 지정할 수 있어야 함 → `_Pipeline/palettes.json`(themes·assets·override)을 색 정본으로 만들고 5종 재베이크(검증 모두 통과).
+  - 사용자 요청(2026-10-02): "5종을 더 낡은 느낌 추가해봐" → 공용 노화 층(`age_all_materials`)과 재질별 노화(도장 녹 번짐, 철 녹, 나무 긁힘·물얼룩, 줄눈 때)를 추가함. 강도는 `palettes.json` `age_default` 0.7, 에셋별 `age`. 5종 재베이크, 검증 모두 통과.
+  - 사용자 결정(2026-10-02): "처음 저티어 설치물품들은 이런 낡은느낌이고 고티어로 갈수록 낡은 노이즈는 없어지고 점점 깨끗해짐" → `palettes.json` `tiers`(1: 0.7 … 4: 0.0)와 `assets.<에셋>.tier`, 노화 0.35 미만에서 기본 마모까지 줄어드는 규칙을 추가함. 현재 5종은 1티어(결과물 변화 없음). 비교 `Tier_Compare.png`. 게임 쪽 티어 체계는 정본에 아직 없음(티어별 mesh·재질 교체는 향후 기능 작업).
+  - Blender(사용자 MCP 세션)가 티어 비교 렌더 중 종료됨. 크래시 로그 없음, 열려 있던 것은 임시 비교 장면뿐. 남은 렌더는 백그라운드 Blender(CPU)로 마침.

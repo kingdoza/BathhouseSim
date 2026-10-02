@@ -1,0 +1,213 @@
+{
+  "_readme": [
+    "BathhouseSim modeling colour source of truth (read by bh_lib.py apply_asset_palette).",
+    "themes: zone looks. kinds = material type per role (paint | wood | metal); colors = sRGB hex per role.",
+    "assets: which theme each asset uses + per-asset overrides. Override a colour with \"body\": \"#RRGGBB\",",
+    "or colour and material with \"body\": {\"kind\": \"wood\", \"color\": \"#RRGGBB\"}. Then re-run run_all.sh for that asset.",
+    "Material roles: body (main shell), body_dk (frames, doors, trims), light (tops, caps, panel fields), accent (knobs, needles, levers), hot, cold.",
+    "Colour-only roles: tile_a, tile_b, tile_band, tile_grout, label, ink, dial_red, sign_ink, shade, mirror, white.",
+    "tier / age: condition. tiers maps an install tier to age (0 = brand new, no chips/rust/dirt at all; 0.7 = worn tier-1 look). Low tiers are worn, higher tiers get progressively cleaner. Per asset: assets.<asset>.tier selects the age; assets.<asset>.age (if set) overrides it."
+  ],
+  "base": {
+    "chrome": "#C9CDD0",
+    "steel": "#9AA2A6",
+    "iron": "#3B3F42",
+    "iron_lt": "#5A5F61",
+    "brass": "#C49A4A",
+    "copper": "#B66A43",
+    "wood": "#8A5A3B",
+    "wood_lt": "#B07A4F",
+    "wood_dk": "#5E3A26",
+    "black": "#262626",
+    "bakelite": "#2F2A26",
+    "soot": "#1E1B19",
+    "soot_under": "#3A2A20",
+    "lamp_a": "#7FD08A",
+    "lamp_b": "#F0A040",
+    "grout": "#6F7A72",
+    "rust": "#7A4128",
+    "dirt": "#4A3B2C",
+    "dust": "#9A9384",
+    "verdigris": "#5E8A74"
+  },
+  "themes": {
+    "bath": {
+      "desc": "욕탕 구역 - 민트 도장·민트 타일 (사용자 선택 2026-10-02, MODEL-M1 1차 색)",
+      "kinds": {
+        "body": "paint",
+        "body_dk": "paint",
+        "light": "paint",
+        "accent": "paint"
+      },
+      "colors": {
+        "body": "#84AE9C",
+        "body_dk": "#4A7E72",
+        "light": "#E4D5B1",
+        "accent": "#C7413B",
+        "hot": "#C7413B",
+        "cold": "#3F6FA8",
+        "white": "#EEEBE2",
+        "tile_a": "#8DBEAE",
+        "tile_b": "#9CCABA",
+        "tile_band": "#3F7A70",
+        "tile_grout": "#D9D2BE",
+        "label": "#F2E9D0",
+        "ink": "#2A2420",
+        "dial_red": "#B83A30",
+        "sign_ink": "#3F7A70",
+        "shade": "#F4EAD2",
+        "mirror": "#BFD3D6"
+      }
+    },
+    "hall": {
+      "desc": "홀 구역 - 테라코타 톤 나무 (시안 B 색 + 나무 재질, 사용자 선택 2026-10-02)",
+      "kinds": {
+        "body": "wood",
+        "body_dk": "wood",
+        "light": "paint",
+        "accent": "paint"
+      },
+      "colors": {
+        "body": "#B4693F",
+        "body_dk": "#6E4129",
+        "light": "#EFE3CC",
+        "accent": "#D9A23A",
+        "hot": "#B8402F",
+        "cold": "#4C7DA6",
+        "white": "#F5EEE2",
+        "tile_a": "#E2C9A6",
+        "tile_b": "#EBD7B8",
+        "tile_band": "#A35A3A",
+        "tile_grout": "#F3EBDD",
+        "label": "#F3E6CB",
+        "ink": "#3A2418",
+        "dial_red": "#B8402F",
+        "sign_ink": "#7A4A33",
+        "shade": "#F7EBD3",
+        "mirror": "#D3D0C4"
+      }
+    },
+    "work": {
+      "desc": "작업 구역 - 무도장 철 (건메탈 강판·주철·아연도 강판, 빨강 포인트, 사용자 선택 2026-10-02)",
+      "kinds": {
+        "body": "metal",
+        "body_dk": "metal",
+        "light": "metal",
+        "accent": "paint"
+      },
+      "colors": {
+        "body": "#6E767B",
+        "body_dk": "#3E4448",
+        "light": "#A7AEB2",
+        "accent": "#C8463A",
+        "hot": "#C8463A",
+        "cold": "#3E6FA6",
+        "white": "#E8E6E0",
+        "tile_a": "#8A9196",
+        "tile_b": "#959CA1",
+        "tile_band": "#3E4448",
+        "tile_grout": "#5A6064",
+        "label": "#EEE8D8",
+        "ink": "#222222",
+        "dial_red": "#C8463A",
+        "sign_ink": "#3E4448",
+        "shade": "#F0EEE8",
+        "mirror": "#C9D0D4"
+      }
+    },
+    "A_cobalt": {
+      "desc": "시안 A (미채택)",
+      "kinds": {
+        "body": "paint",
+        "body_dk": "paint",
+        "light": "paint",
+        "accent": "paint"
+      },
+      "colors": {
+        "body": "#5B86B8",
+        "body_dk": "#2F4E7A",
+        "light": "#EFEBE0",
+        "accent": "#E2A637",
+        "hot": "#C8463A",
+        "cold": "#3E8FB0",
+        "white": "#F4F2EC",
+        "tile_a": "#9EC3E6",
+        "tile_b": "#B6D3EE",
+        "tile_band": "#2F4E7A",
+        "tile_grout": "#F2F0E8",
+        "label": "#F4F1E6",
+        "ink": "#1F2A3A",
+        "dial_red": "#C8463A",
+        "sign_ink": "#2F4E7A",
+        "shade": "#F6F1E3",
+        "mirror": "#C4D6E4"
+      }
+    },
+    "C_rose": {
+      "desc": "시안 C (미채택)",
+      "kinds": {
+        "body": "paint",
+        "body_dk": "paint",
+        "light": "paint",
+        "accent": "paint"
+      },
+      "colors": {
+        "body": "#D9A3A0",
+        "body_dk": "#6E7378",
+        "light": "#F1ECE4",
+        "accent": "#2E4A7D",
+        "hot": "#C9473F",
+        "cold": "#3C78B5",
+        "white": "#F6F2EC",
+        "tile_a": "#F0C9C4",
+        "tile_b": "#F5D8D3",
+        "tile_band": "#6E7378",
+        "tile_grout": "#FAF6F0",
+        "label": "#F5EFE6",
+        "ink": "#2B2B33",
+        "dial_red": "#C9473F",
+        "sign_ink": "#6E7378",
+        "shade": "#F8F1EA",
+        "mirror": "#D2D6DB"
+      }
+    }
+  },
+  "assets": {
+    "Shower_01": {
+      "theme": "bath",
+      "override": {},
+      "age": null,
+      "tier": 1
+    },
+    "Vanity_01": {
+      "theme": "hall",
+      "override": {},
+      "age": null,
+      "tier": 1
+    },
+    "ClothesLocker_01": {
+      "theme": "hall",
+      "override": {},
+      "age": null,
+      "tier": 1
+    },
+    "Boiler_03": {
+      "theme": "work",
+      "override": {},
+      "age": null,
+      "tier": 1
+    },
+    "Circulator_01": {
+      "theme": "work",
+      "override": {},
+      "age": null,
+      "tier": 1
+    }
+  },
+  "tiers": {
+    "1": 0.7,
+    "2": 0.45,
+    "3": 0.2,
+    "4": 0.0
+  }
+}

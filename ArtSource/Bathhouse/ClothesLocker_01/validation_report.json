@@ -1,0 +1,69 @@
+{
+  "asset": "ClothesLocker_01",
+  "checks": [
+    {
+      "check": "SM_ClothesLocker_01 transform identity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_ClothesLocker_01 uv layers",
+      "ok": true,
+      "detail": "['UV0', 'UV1_Lightmap']"
+    },
+    {
+      "check": "SM_ClothesLocker_01 single material",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_ClothesLocker_01 fbx exists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "SM_ClothesLocker_01 reimport bounds",
+      "ok": true,
+      "detail": "err_m=0.000000"
+    },
+    {
+      "check": "SM_ClothesLocker_01 reimport hulls",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "meshes": {
+    "SM_ClothesLocker_01": {
+      "bbox_min_m": [
+        -0.3,
+        -0.175,
+        0.0
+      ],
+      "bbox_max_m": [
+        0.338,
+        0.175,
+        1.0
+      ],
+      "size_ue_cm": [
+        63.8,
+        35.0,
+        100.0
+      ],
+      "vertices": 2081,
+      "triangles": 3908,
+      "ngons": 0,
+      "uv_layers": [
+        "UV0",
+        "UV1_Lightmap"
+      ],
+      "materials": [
+        "M_ClothesLocker_01"
+      ],
+      "hulls": [
+        "UCX_SM_ClothesLocker_01_00"
+      ]
+    }
+  },
+  "passed": 6,
+  "total": 6
+}
