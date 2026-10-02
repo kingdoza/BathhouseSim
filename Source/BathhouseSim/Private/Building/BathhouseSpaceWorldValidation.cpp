@@ -170,6 +170,9 @@ void FBathhouseSpaceValidation::ValidateWorld(
 	FCollisionObjectQueryParams ObjectParams;
 	ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
 	ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+	// 게임 충돌 기준인 단순 충돌만 본다. 기본 query param의 complex trace는 편집 world의 WorldPartition HLOD 지형 mesh 등
+	// 게임에 없는 삼각형 충돌까지 맞혀 지형 구멍이 뚫려 있어도 오류를 남긴다.
+	FCollisionQueryParams StairQueryParams(SCENE_QUERY_STAT(BathhouseStairShaftObstacle), false);
 	for (int32 I = 0; I < OutSnapshots.Num(); ++I)
 	{
 		const FBathhouseSpaceSnapshot& Upper = OutSnapshots[I];
@@ -198,7 +201,7 @@ void FBathhouseSpaceValidation::ValidateWorld(
 						FMath::Lerp(Hole.Min.X, Hole.Max.X, FractionX), FMath::Lerp(Hole.Min.Y, Hole.Max.Y, FractionY));
 					TArray<FHitResult> Hits;
 					World.LineTraceMultiByObjectType(
-						Hits, FVector(Point.X, Point.Y, Top), FVector(Point.X, Point.Y, Bottom), ObjectParams);
+						Hits, FVector(Point.X, Point.Y, Top), FVector(Point.X, Point.Y, Bottom), ObjectParams, StairQueryParams);
 					for (const FHitResult& Hit : Hits)
 					{
 						if (Hit.bBlockingHit && !Cast<ABathhouseSpaceActor>(Hit.GetActor()))

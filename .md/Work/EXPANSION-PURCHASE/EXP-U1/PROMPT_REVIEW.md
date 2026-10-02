@@ -148,3 +148,14 @@
 - 빌드 로그 `Saved/Logs/exp_u1r_build_final.log`(성공), 자동화 로그 `Saved/Logs/exp_u1r_test_all.log`
 
 미검증(추가): 파일 분리 뒤 전체 unity 빌드(커밋 뒤 구성)는 다시 돌리지 않았다. 수정·신규 파일은 이번 빌드에서 개별 컴파일(비unity)로 통과했고, 새 helper는 이름 있는 namespace와 `inline`이라 unity 충돌 가능성은 낮다. 그 밖의 미검증은 8절과 같다.
+
+## 10. 재작업 2회차 (Editor 단계에서 나온 구현 결함: 계단 통로 trace가 complex 충돌을 맞힘)
+
+- 시작 커밋 `66b8617`. 범위는 이 결함뿐이다(Source 두 파일).
+- 원인: `ValidateWorld`의 계단 통로 `LineTraceMultiByObjectType`가 query param 없이 불려 기본 `bTraceComplex=true`로 동작했고, 편집 world의 WorldPartition HLOD 지형 mesh(지형 구멍 미반영, QueryOnly) 삼각형에 맞았다.
+- 수정(`Private/Building/BathhouseSpaceWorldValidation.cpp`): `FCollisionQueryParams(…, bTraceComplex=false)`를 넘긴다.
+- 판단 근거: 계약은 게임 충돌 기준의 "공간이 아닌 blocking 물체"이고 게임의 Pawn·물건 충돌은 단순 충돌이다. complex 삼각형은 게임에서 걷는 면이 아니다. 단순 충돌로 바꾸면 HLOD 같은 complex 전용 대체 mesh가 원천적으로 제외되므로 HLOD actor 제외 처리는 추가하지 않았다(특정 class 이름에 기대는 예외를 만들지 않음). Editor에서 단순 충돌에도 HLOD가 잡히는 경로가 확인되면 그때 제외를 더한다. 이 환경에서는 Editor 프로세스가 없어 실제 DefaultMap 재검증은 하지 못했다(미검증).
+- 같은 파일의 다른 world 검사: Nav 범위 검사는 `NavMeshBoundsVolume` bounds 상자만 읽고(trace 없음), 설비 소속 검사는 설비 Actor 위치와 공간 직사각형 비교라 같은 문제가 없다.
+- 회귀 자동화(`World.SpacePlacement`, 기존 A3 케이스 옆): ① 기존 단순 충돌 상자 장애물은 계속 `StairBlocked`. ② complex 전용 충돌 fixture(복제한 큐브의 단순 충돌을 상자 모서리의 작은 상자 하나로 줄여 중앙은 삼각형만 있음)를 통로에 놓으면 `StairBlocked`가 없다. fixture 자체를 같은 테스트가 raw trace로 확인한다(complex trace는 맞고 simple trace는 안 맞음, 공간 Actor는 무시). 기대값은 리터럴 없이 같은 trace 결과에서 정한다.
+- 빌드·자동화: UE_BUILD_POLICY 정규 빌드 성공(`Saved/Logs/exp_u1r2_build.log`), 전체 `BathhouseSim` 163개 통과 / 0 실패(`Saved/Logs/exp_u1r2_test_all.log`).
+- 빌드 시점 Source 식별값: HEAD `66b8617d88856641a85d663f3a356f0349d28018`, `git diff HEAD -- Source Config` SHA-256 `647c75ab46f00cb1e1374efa75dd87fdc946740b39f6ca00773f05fd61ab96c1`, 미추적 파일 0개.

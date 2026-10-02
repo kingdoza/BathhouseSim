@@ -19,6 +19,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTagContainer.h"
 #include "Camera/CameraComponent.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "Components/StaticMeshComponent.h"
 #include "Placement/FacilityActorConversionTransaction.h"
 #include "Placement/FacilityPlacementComponent.h"
 #include "Placement/FacilityPlacementDefinition.h"
@@ -1302,6 +1304,49 @@ bool FBathhouseSpacePlacementAutomationTest::RunTest(const FString& Parameters)
 		Obstacle->SetActorLocation(FVector(HoleCenter.X, HoleCenter.Y, CeilingSlabMid));
 		TestTrue(TEXT("A3 an obstacle inside the lower ceiling slab band is a stair error"), CountStairBlocked() > 0);
 		Obstacle->Destroy();
+
+		// 회귀: complex 전용 충돌(HLOD 지형 mesh와 같은 성질)은 게임 충돌이 아니므로 계단 통로를 막지 않는다.
+		UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+		UStaticMesh* ComplexOnlyMesh = CubeMesh ? DuplicateObject<UStaticMesh>(CubeMesh, GetTransientPackage()) : nullptr;
+		TestNotNull(TEXT("Complex-only fixture mesh"), ComplexOnlyMesh);
+		if (ComplexOnlyMesh && ComplexOnlyMesh->GetBodySetup())
+		{
+			ComplexOnlyMesh->GetBodySetup()->AggGeom.EmptyElements();
+			// 단순 충돌은 상자 모서리의 작은 상자 하나뿐이라 중앙을 지나는 trace는 complex(삼각형)만 맞힌다.
+			FKBoxElem CornerBox(2.0f, 2.0f, 2.0f);
+			CornerBox.Center = FVector(45.0f, 45.0f, 45.0f);
+			ComplexOnlyMesh->GetBodySetup()->AggGeom.BoxElems.Add(CornerBox);
+			ComplexOnlyMesh->GetBodySetup()->CollisionTraceFlag = CTF_UseDefault;
+			ComplexOnlyMesh->GetBodySetup()->InvalidatePhysicsData();
+			ComplexOnlyMesh->GetBodySetup()->CreatePhysicsMeshes();
+			AActor* ComplexActor = World->SpawnActor<AActor>();
+			UStaticMeshComponent* Mesh = NewObject<UStaticMeshComponent>(ComplexActor);
+			ComplexActor->AddInstanceComponent(Mesh);
+			ComplexActor->SetRootComponent(Mesh);
+			Mesh->SetStaticMesh(ComplexOnlyMesh);
+			Mesh->SetCollisionObjectType(ECC_WorldStatic);
+			Mesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			Mesh->SetCollisionResponseToAllChannels(ECR_Block);
+			Mesh->RegisterComponent();
+			Mesh->SetWorldScale3D(FVector(0.5));
+			ComplexActor->SetActorLocation(FVector(HoleCenter.X, HoleCenter.Y, CeilingSlabMid));
+			FCollisionObjectQueryParams Objects;
+			Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+			const FVector TraceStart(HoleCenter.X, HoleCenter.Y, HallFloor);
+			const FVector TraceEnd(HoleCenter.X, HoleCenter.Y, FBathhouseSpaceLayout::CeilingZ(Fixture.Snapshots[2]));
+			auto ProbeParams = [&](const bool bComplex)
+			{
+				FCollisionQueryParams Params(SCENE_QUERY_STAT(BuildingComplexProbe), bComplex);
+				Params.AddIgnoredActors(TArray<AActor*>{ Hall, Bath, Work });
+				return Params;
+			};
+			FHitResult ComplexHit, SimpleHit;
+			const bool bComplexHits = World->LineTraceSingleByObjectType(ComplexHit, TraceStart, TraceEnd, Objects, ProbeParams(true));
+			const bool bSimpleHits = World->LineTraceSingleByObjectType(SimpleHit, TraceStart, TraceEnd, Objects, ProbeParams(false));
+			TestTrue(*FString::Printf(TEXT("Fixture has complex-only collision at the center: complex trace hits and simple trace does not (complex %d, simple %d)"), bComplexHits, bSimpleHits), bComplexHits && !bSimpleHits);
+			TestEqual(TEXT("Complex-only collision does not block the stair shaft"), CountStairBlocked(), 0);
+			ComplexActor->Destroy();
+		}
 	}
 
 	Fixture.Destroy();
