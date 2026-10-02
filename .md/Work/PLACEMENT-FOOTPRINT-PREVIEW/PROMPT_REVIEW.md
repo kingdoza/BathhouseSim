@@ -55,19 +55,19 @@
 
 ## 빌드와 정적 검증
 
-- 빌드 전 Unreal Editor 프로세스 없음 확인. `BathhouseSimEditor Win64 Development` 성공(`Result: Succeeded`), 로그 `Saved/Automation/Logs/fpv_build3.log`(첫 빌드 실패 `fpv_build1.log`는 test probe의 include 누락이었고 수정함).
+- 빌드 전 Unreal Editor 프로세스 없음 확인. `BathhouseSimEditor Win64 Development` 성공(`Result: Succeeded`), 로그 `Saved/Automation/Logs/fpv_r1_build.log`(재작업 1회차 빌드). 최초 구현 빌드 로그는 남아 있지 않다.
 - 빌드 시점 Source 식별값: HEAD `0c5f8a083e314158e93a7b8cc119ca4313d743e5`, `git diff HEAD -- Source Config` SHA-256 `e23e902290f6746f9b8ca4b0d9915bb75d740980e56839354a8b9454719052b6`. 신규 untracked 파일 5개는 diff에 없어 별도로 정렬 sha256sum의 SHA-256 `7f620b90e290d946cd5fdf394381b0f5e9b3df65ae26fc35dd44ee970c5fa7ad`다(`git ls-files --others --exclude-standard Source Config`).
 - `git diff --check -- Source Config`: 공백 오류 없음(CRLF 변환 안내만).
 - 조정값 code 상수 검색: 새 숫자 상수는 허용 오차(plane 중심·두께, 축 정렬 0.01도), `2 *`, plane Z scale 1, identity 회전, Settings 예비값뿐이다.
 
 ## 자동화 결과
 
-- `BathhouseSim.Placement.`(12개): 전부 통과. 새 5개(`FootprintPreview.SurfaceMath`, `CellsIncludeRootScale`, `AxisAlignment`, `PreparationFailureFallback`, `SurfaceActor`)와 기존 7개(`PreviewHiddenWithoutAim`, `ActorReplacementTransaction` 등). 로그 `Saved/Automation/Logs/fpv_test2_placement.log`.
+- `BathhouseSim.Placement.`(12개): 전부 통과. 새 5개(`FootprintPreview.SurfaceMath`, `CellsIncludeRootScale`, `AxisAlignment`, `PreparationFailureFallback`, `SurfaceActor`)와 기존 7개(`PreviewHiddenWithoutAim`, `ActorReplacementTransaction` 등). 로그 `Saved/Automation/Logs/fpv_r1_placement_editor.log`, 리포트 `Saved/Automation/Reports/20261002/fpv_r1_placement/index.json`(재작업 1회차 재실행, 12/12 통과). 최초 실행 근거는 `Saved/Automation/Reports/20261002/fpv_placement/index.json`.
 - T6(`SurfaceActor`) 수행했다. transient `UMaterial`에 vector·scalar parameter expression을 넣고 `UpdateCachedExpressionData()` 뒤 parameter 조회가 안정적으로 동작했다. 조회 불가 때는 조용히 통과하지 않고 오류로 실패하게 두었다.
 - 전체 `BathhouseSim` 184개 중 실패 4개, 로그 `Saved/Automation/Logs/fpv_full_editor.log`:
   - `PlacementContent.FootprintPreview`: `FootprintPreviewMaterial`이 아직 비어 있어 예상된 실패. Editor 단계 항목 3 이후 통과해야 한다.
   - `Shop.UnboxViewFront.RoomPhysics`, `Shop.SevenDefinitionSpawn`, `Shop.UnboxingPhysics`: 모두 위의 쿨러 비정수 cell 오류(Definition 5). 이 작업 이전에는 root scale이 CDO 파생에 빠져 통과하던 것이다. `BP_Cooler` 수정 뒤 재실행해 통과를 확인해야 한다. 이 회귀 판정은 Editor 단계가 한다.
-- 이 작업 전의 기준선 실패 여부는 측정하지 않았다(미검증). 위 3개의 원인은 로그의 오류 문구가 직접 보인다.
+- 기준선(코드 리뷰 1회차 측정): 작업 전 전체 177개 실패 0(`Saved/Automation/Reports/20261002/u3_editor3`). 184개와 비교해 추가 7개(이번 작업 6개, 지도 버그 1개), Success→Fail은 위 Shop 3개뿐이고 다른 회귀는 없다. 실제 근거는 `fpv_full/index.json`과 `fpv_full_editor.log`다.
 
 ## 리뷰 중점·미검증
 
@@ -77,3 +77,10 @@
 - 미검증: 화면 가림·비침·깜빡임·sort 순서(사용자 PIE, FBK-003). `PROMPT_IMPLEMENTATION.md` 7절의 "Level 쿨러 instance가 이미 `IsOperational`에서 실패할 수 있다"는 추정은 확인하지 못했다. PIE FPV-016에서 본다.
 - 미검증: content 테스트(T7) 실행. 재질 MI가 생기기 전이라 실행 불가.
 - Architecture 정본은 아키텍처 단계가 이미 갱신했고 구현이 구조를 바꾸지 않아 추가 변경하지 않았다.
+
+## 재작업 1회차 (코드 리뷰 F1, F2, F4)
+
+- F1: `PROMPT_UNREAL.md` 7절에 Shop 3개 재실행, 전체 `BathhouseSim` 실패 0 확인, 실패 시 보고·중단을 추가했다.
+- F2: test probe `AFacilityPlacementFootprintHalfRootScaleProbe`(root uniform scale 0.5, `SceneRoot` Yaw −90°)를 추가하고 `CellsIncludeRootScale`의 두 번째 블록을 교체했다. extent는 `GridSizeCm`로 계산하고, unscaled가 정수 칸이며 합성 scale 적용 뒤 비정수임을 assert한다. 옛 component-to-world(CDO scale 1) 방식이면 정수로 통과했을 fixture다. 주석도 맞췄다. production Source·Config는 변경 없다.
+- F4: 위 로그·리포트 경로를 실제 파일로 정정했다.
+- 재검증: 빌드 성공(`Saved/Automation/Logs/fpv_r1_build.log`), `BathhouseSim.Placement.` 12/12 통과. 식별값: HEAD `9d552c8761a80b44f8311ae22fbb48df88fe50a4`, `git diff HEAD -- Source Config` SHA-256 `00c6aef22543a93a30ddd0699040690d9c074c0f5a2fd4e1484f650a8863db3e`(테스트 3개 파일만 변경), 신규 untracked Source 없음. 이전 식별값 `e23e9022…`·`7f620b90…`은 `fd7f87d`에 해당한다.

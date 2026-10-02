@@ -23,3 +23,9 @@ AFacilityPlacementFootprintYawSmallProbe::AFacilityPlacementFootprintYawSmallPro
 {
 	SceneRoot->SetRelativeRotation_Direct(FRotator(0.0f, 7.0f, 0.0f));
 }
+
+AFacilityPlacementFootprintHalfRootScaleProbe::AFacilityPlacementFootprintHalfRootScaleProbe()
+{
+	PackagePhysicalRoot->SetRelativeScale3D_Direct(FVector(0.5f));
+	SceneRoot->SetRelativeRotation_Direct(FRotator(0.0f, -90.0f, 0.0f));
+}

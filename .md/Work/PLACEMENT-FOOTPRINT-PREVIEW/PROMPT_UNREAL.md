@@ -66,6 +66,10 @@
 - Data Validation: 활성 Placement Definition 16개 모두 오류 없음(Cube fallback 경고는 허용).
 - content 테스트: `-ExecCmds="Automation RunTests BathhouseSim.PlacementContent.FootprintPreview; Quit"` 형식(UE_BUILD_POLICY headless 명령)으로 실행한다. 이 테스트는 3번 지정 전에는 실패하는 것이 정상이다. 실패하면 Definition 이름이 메시지에 나온다.
 - 회귀: `BathhouseSim.Placement.`를 다시 실행한다.
+- 쿨러·MI 저장(3·4·5항) 뒤 `BathhouseSim.Shop.` 3개(`SevenDefinitionSpawn`, `UnboxingPhysics`, `UnboxViewFront.RoomPhysics`)를 실행해 통과를 확인한다. 구현 단계 전체 실행에서 쿨러 비정수 cell(`FootprintGridMismatch`)로 실패했던 것들이다.
+- 마지막에 전체 `BathhouseSim`을 실행해 실패 0을 확인한다. 기준선은 작업 전 전체 177개 실패 0(`Saved/Automation/Reports/20261002/u3_editor3`)이다.
+- 실패가 남으면 테스트 이름과 메시지를 보고하고 멈춘다(asset 우회 금지).
+- 남는 Warning 중 표시 준비 Warning은 transient 재질 fixture(`Param` 없음)가 원인이면 정상이다. 실제 Definition preview에서 나오면 보고한다.
 - 화면 판정(가림·비침·순서·깜빡임)은 하지 않는다. `PIE_CHECKLIST.md` 대상이다.
 
 ### 8. 정본 갱신 `.md/Unreal/PlacementSystem.md`

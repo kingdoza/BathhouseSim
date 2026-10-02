@@ -264,14 +264,30 @@ bool FFacilityPlacementFootprintCellScaleTest::RunTest(const FString& Parameters
 			|| Cells.Y != FMath::RoundToInt(2.0f * Extent.Y / Grid));
 	}
 	{
-		// Integer unscaled, non-integer after scale (cooler shape).
-		const FVector Extent(Grid * 0.75f / ExpectedScale.X, Grid * 0.5f / ExpectedScale.Y * 2.0f, 50.0f);
-		FScopedCdoFootprintExtent Scope(Class, Extent);
+		// Cooler shape: unscaled full size is whole cells, but the non-integer root scale makes it fractional.
+		// The old component-to-world derivation (CDO scale 1) would have accepted this.
+		const TSubclassOf<AActor> HalfClass = AFacilityPlacementFootprintHalfRootScaleProbe::StaticClass();
+		const UFacilityPlacementComponent* HalfPlacement = GetPlacement(HalfClass);
+		const FVector HalfRootScale = HalfClass->GetDefaultObject<AActor>()->GetRootComponent()->GetRelativeScale3D();
+		const FVector HalfScale = HalfRootScale
+			* HalfPlacement->GetPlacementFootprint()->GetAttachParent()->GetRelativeScale3D();
+		const FVector Extent(Grid * 1.5f, Grid * 1.5f, 50.0f);
+		FScopedCdoFootprintExtent Scope(HalfClass, Extent);
+		const float UnscaledX = 2.0f * Extent.X / Grid;
+		const float UnscaledY = 2.0f * Extent.Y / Grid;
+		const float ScaledX = UnscaledX * HalfScale.X;
+		const float ScaledY = UnscaledY * HalfScale.Y;
+		TestTrue(TEXT("Fixture: unscaled footprint is whole cells"),
+			FMath::IsNearlyEqual(UnscaledX, FMath::RoundToFloat(UnscaledX), 0.001f)
+			&& FMath::IsNearlyEqual(UnscaledY, FMath::RoundToFloat(UnscaledY), 0.001f));
+		TestTrue(TEXT("Fixture: composed scale makes the footprint fractional"),
+			!FMath::IsNearlyEqual(ScaledX, FMath::RoundToFloat(ScaledX), 0.01f)
+			&& !FMath::IsNearlyEqual(ScaledY, FMath::RoundToFloat(ScaledY), 0.01f));
 		FIntPoint Cells;
 		FText Failure;
-		TestFalse(TEXT("FPV-016 non-integer cells after scale fail DeriveFootprintCells"),
-			Placement->DeriveFootprintCells(Cells, Failure));
-		UFacilityPlacementDefinition* Definition = MakeDefinition(Class);
+		TestFalse(TEXT("FPV-016 non-integer cells after root scale fail DeriveFootprintCells"),
+			HalfPlacement->DeriveFootprintCells(Cells, Failure));
+		UFacilityPlacementDefinition* Definition = MakeDefinition(HalfClass);
 		FDataValidationContext Context;
 		TestEqual(TEXT("FPV-016 non-integer footprint is a Data Validation error"),
 			Definition->IsDataValid(Context), EDataValidationResult::Invalid);

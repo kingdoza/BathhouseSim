@@ -1,11 +1,11 @@
 # Placement Preview System
 
-배치 미리보기 표현(설비 메시 미리보기, footprint 표시, 조준 없음 숨김, 호환 Zone grid)의 책임과 계약이다. 배치 판정·transaction·footprint 정본은 [PlacementSystem.md](PlacementSystem.md)에 있다. 2026-10-02 `PLACEMENT-FOOTPRINT-PREVIEW` 설계로 PlacementSystem.md(300줄 초과)에서 분리했다.
+배치 미리보기 표현(설비 메시 미리보기, footprint 표시, 조준 없음 숨김, 호환 Zone grid)의 책임과 계약이다. 배치 판정·transaction·footprint 정본은 [PlacementSystem.md](PlacementSystem.md)에 있다. 2026-10-02 `PLACEMENT-FOOTPRINT-PREVIEW`에서 PlacementSystem.md(300줄 초과)로부터 분리했다.
 
 ## 상태
 
 - Generic Native Preview, Preview Without Aim, Compatible Zone Grid: Source 반영.
-- Footprint Display와 Draw Order: 2026-10-02 설계, Source 미반영(`PLACEMENT-FOOTPRINT-PREVIEW`).
+- Footprint Display와 Draw Order: Source 반영, Editor 작업·사용자 PIE 전(`PLACEMENT-FOOTPRINT-PREVIEW`).
 
 ## Source Scope
 
@@ -16,7 +16,7 @@ Source/BathhouseSim/Public/Placement/
 Source/BathhouseSim/Private/Placement/
   FacilityPlacementPreviewActor.cpp
   FacilityPlacementPreviewSource.h/.cpp
-  FacilityPlacementFootprintPreview.h/.cpp   (설계, footprint 표시 계산·재질 준비 private helper)
+  FacilityPlacementFootprintPreview.h/.cpp   (footprint 표시 계산·재질 준비 private helper)
   FacilityPlacementZoneGrid.cpp
   PlayerFacilityPlacementComponent.cpp       (session·숨김·grid 표시 조율)
 ```
@@ -50,7 +50,7 @@ preview Actor와 생성 component는 collision/overlap/physics/Tick과 Navigatio
 
 두 preview material은 preview 시작 시 resolve되고 translucent blend를 제공해야 한다. 누락·load·blend 검증 실패는 preview 초기화 실패이고 placement는 held item을 보존한 채 fail-closed한다.
 
-## Footprint Display (2026-10-02 설계)
+## Footprint Display (2026-10-02 `PLACEMENT-FOOTPRINT-PREVIEW`)
 
 기능 계약: `PLACEMENT-FOOTPRINT-PREVIEW` FPV-001~016. 들고 있는 설비의 `PlacementFootprint` XY 사각형을 메시 미리보기와 함께 바닥에 표시한다.
 
@@ -119,10 +119,10 @@ native `OnConstruction`은 plane mesh의 local bounds와 `ZoneBounds` unscaled f
 `UFacilityPlacementSettings`(Project Settings `Facility Placement`, `Config/DefaultGame.ini`)의 preview 항목이다. 값은 문서에 적지 않는다.
 
 - `ValidPreviewMaterial`, `InvalidPreviewMaterial`: 메시 미리보기 재질이자 footprint 색 원본(`Param`)
-- (설계) `FootprintPreviewMesh`: 중심 pivot·+Z normal plane
-- (설계) `FootprintPreviewMaterial`: footprint 표시 MI
-- (설계) `FootprintPreviewFloorOffsetCm`: 설치 바닥 위 높이, finite·0 이상으로 clamp
-- (설계) `FootprintPreviewTranslucencySortPriority`, `PreviewMeshTranslucencySortPriority`: Draw Order 절의 순서 계약
+- `FootprintPreviewMesh`: 중심 pivot·+Z normal plane
+- `FootprintPreviewMaterial`: footprint 표시 MI
+- `FootprintPreviewFloorOffsetCm`: 설치 바닥 위 높이, finite·0 이상으로 clamp
+- `FootprintPreviewTranslucencySortPriority`, `PreviewMeshTranslucencySortPriority`: Draw Order 절의 순서 계약
 
 ## Blueprint/API
 
@@ -137,4 +137,4 @@ native `OnConstruction`은 plane mesh의 local bounds와 `ZoneBounds` unscaled f
 - GridVisual 한 개가 Bounds 전체를 덮고 전역 cell 간격, Zone별 line thickness/Z offset/major interval을 DMI와 transform에 반영하는지 확인한다.
 - Zone grid가 중립색 하나를 유지하고 normal depth test로 벽·설비 뒤에서 가려지는지 확인한다.
 - generic preview가 class-default 복합 mesh를 복제하고 valid/invalid material을 모든 slot에 적용하는지 확인한다.
-- (설계) footprint 표시 world 사각형이 회전·root scale fixture에서 판정 footprint 바닥면 + 높이와 같은지, 표시 준비 실패 시 메시 미리보기와 판정이 그대로인지 확인한다. 화면 가림·비침·그리기 순서는 사용자 PIE로 확인한다.
+- footprint 표시 world 사각형이 회전·root scale fixture에서 판정 footprint 바닥면 + 높이와 같은지, 표시 준비 실패 시 메시 미리보기와 판정이 그대로인지 확인한다. 화면 가림·비침·그리기 순서는 사용자 PIE로 확인한다.

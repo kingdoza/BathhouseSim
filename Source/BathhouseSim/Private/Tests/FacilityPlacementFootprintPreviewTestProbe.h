@@ -40,3 +40,13 @@ class AFacilityPlacementFootprintYawSmallProbe final : public AFacilityPlacement
 public:
 	AFacilityPlacementFootprintYawSmallProbe();
 };
+
+// Cooler-like layout: non-integer root scale and a rotated SceneRoot.
+UCLASS(Transient, NotBlueprintable)
+class AFacilityPlacementFootprintHalfRootScaleProbe final : public AFacilityPlacementAutomationActor
+{
+	GENERATED_BODY()
+
+public:
+	AFacilityPlacementFootprintHalfRootScaleProbe();
+};

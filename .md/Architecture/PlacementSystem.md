@@ -96,7 +96,7 @@ Placement는 설비 contents, 목욕탕 물, customer 행동, key 상태와 UI h
 - `PlacementTraceDistance`, `RecoveryTraceDistance`
 - `FacilityItemHeldTransform`
 - `ValidPreviewMaterial`, `InvalidPreviewMaterial`
-- (2026-10-02 설계) footprint 표시 plane mesh·MI, 바닥 위 높이, 반투명 그리기 우선순위 두 개. 의미와 계약은 [PlacementPreviewSystem.md](PlacementPreviewSystem.md) Settings
+- footprint 표시 plane mesh·MI, 바닥 위 높이, 반투명 그리기 우선순위 두 개. 의미와 계약은 [PlacementPreviewSystem.md](PlacementPreviewSystem.md) Settings
 
 `FacilityItemHeldTransform` getter는 location/rotation만 반환하고 scale을 항상 `OneVector`로 정규화한다. `APlaceableFacilityItemActor::GetHeldTransform()`과 legacy placed Actor의 fail-closed carry getter는 이 설정만 읽으며 per-Actor 값을 소유하지 않는다.
 
@@ -123,11 +123,11 @@ CellsXY = round(FullSizeXY / GridSizeCm)
 
 각 축의 full size는 양수·finite이고 `GridSizeCm`의 정수배여야 한다. 허용 오차 안에서 정수배가 아니면 Definition/Data Validation과 runtime placement가 실패한다. grid 또는 footprint를 바꾸면 cell 값을 별도로 갱신하지 않는다.
 
-파생식 적용(2026-10-02 `PLACEMENT-FOOTPRINT-PREVIEW` 설계, Source 미반영):
+파생식 적용(2026-10-02 `PLACEMENT-FOOTPRINT-PREVIEW`, Source 반영, Editor 작업·사용자 PIE 전):
 
-- 현재 `DeriveFootprintCells`는 `PlacementFootprint` component-to-world scale을 쓴다. Blueprint CDO는 component-to-world를 갱신하지 않아 CDO 검사(Definition·Data Validation·preview 초기화)에서 root scale과 하위 component scale이 빠진다(쿨러 비정수 footprint 미검출).
-- 설계: 위 식의 scale 항은 `GetFootprintRelativeToRoot()` 합성 scale × root relative scale로 계산한다. CDO와 instance에서 같은 값이며(instance root relative scale = Actor scale), 판정의 `RelativeFootprint * Candidate`와 같은 FTransform 합성 규칙이다. 식 자체는 `UFacilityPlacementComponent` static 함수 하나로 두고 cell 파생과 footprint 표시가 함께 쓴다.
-- Data Validation 추가: footprint의 root 기준 회전이 pitch·roll 0, Yaw 90° 배수가 아니면 Definition 오류다. snap 중 footprint 변이 grid 선과 평행해야 하기 때문이다. runtime 판정에는 넣지 않는다.
+- 이전 `DeriveFootprintCells`는 `PlacementFootprint` component-to-world scale을 써서, component-to-world를 갱신하지 않는 Blueprint CDO 검사(Definition·Data Validation·preview 초기화)에서 root scale과 하위 component scale이 빠졌다(쿨러 비정수 footprint 미검출).
+- 위 식의 scale 항은 `GetFootprintRelativeToRoot()` 합성 scale × root relative scale로 계산한다. CDO와 instance에서 같은 값이며(instance root relative scale = Actor scale), 판정의 `RelativeFootprint * Candidate`와 같은 FTransform 합성 규칙이다. 식 자체는 `UFacilityPlacementComponent::ComputeScaledFootprintFullSize` 하나로 두고 cell 파생과 footprint 표시가 함께 쓴다.
+- Data Validation(`ValidateFootprintGridAxisAlignment`): footprint의 root 기준 회전이 pitch·roll 0, Yaw 90° 배수가 아니면 Definition 오류다. snap 중 footprint 변이 grid 선과 평행해야 하기 때문이다. runtime 판정에는 넣지 않는다.
 
 footprint authoring 계약:
 
@@ -177,7 +177,7 @@ preview root transform, final deferred spawn transform, footprint world transfor
 
 ## Preview Presentation
 
-메시 미리보기(Generic Native Preview), footprint 표시(2026-10-02 설계), 조준 없음 숨김(EXP-U3 D4), 호환 Zone grid와 반투명 그리기 순서는 [PlacementPreviewSystem.md](PlacementPreviewSystem.md)가 정본이다. 이 문서의 후보 transform·footprint·판정 계약을 그대로 쓰며 표시는 판정을 바꾸지 않는다.
+메시 미리보기(Generic Native Preview), footprint 표시(2026-10-02), 조준 없음 숨김(EXP-U3 D4), 호환 Zone grid와 반투명 그리기 순서는 [PlacementPreviewSystem.md](PlacementPreviewSystem.md)가 정본이다. 이 문서의 후보 transform·footprint·판정 계약을 그대로 쓰며 표시는 판정을 바꾸지 않는다.
 
 ## Collision And Navigation
 
@@ -327,7 +327,7 @@ Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후�
 - 공통 Held transform이 모든 facility item에 같고 Scale은 보존되는지 확인한다.
 - 회수 collision query와 회수 spawn이 CDO `ItemRoot` relative scale을 한 번만 쓰는지, component-to-world가 갱신되지 않은 Blueprint식 CDO에서도 확인한다. 수치는 단언하지 않고 asset·fixture의 authored 값과 비교한다.
 - grid/footprint 변경 시 파생 cell과 non-multiple validation을 확인한다.
-- root scale·하위 component scale이 있는 CDO fixture에서 파생 cell과 비정수 검출, Yaw 90° 배수가 아닌 footprint의 Data Validation 오류를 확인한다(2026-10-02 설계).
+- root scale·하위 component scale이 있는 CDO fixture에서 파생 cell과 비정수 검출, Yaw 90° 배수가 아닌 footprint의 Data Validation 오류를 확인한다(2026-10-02).
 - preview 표현 검증 항목은 [PlacementPreviewSystem.md](PlacementPreviewSystem.md) Verification에 있다.
 - bath/washer/dryer/locker footprint bottom이 같은 floor plane에 놓이는지 확인한다.
 - preview/stage에서 collision/Nav가 없고 commit/rollback 뒤 Actor collision snapshot이 복원되는지 확인한다.
