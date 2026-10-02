@@ -1,10 +1,11 @@
 # CONTEXT — PLACEMENT-FOOTPRINT-PREVIEW 배치 미리보기의 footprint 공간 표시
 - 목표 / 상위·선행·관련 작업: 설비 배치 미리보기에서 비주얼 메시와 함께 Placement Footprint의 XY 평면 점유 공간을 보여 준다. 관련: PlacementSystem(범용 native preview), `EXP-U3` D4(배치 미리보기 숨김), `BUG-2026-10-02_bath_water_map_grid_scale_mismatch`(footprint와 메시 크기 차이 주제 공유).
-- 현재 단계와 재개 지점: Editor 사전 조사 완료(`REPORT_UNREAL_DISCOVERY.md`). 같은 기능 명세 워커가 조사 반영·질문지 사용자용 갱신 중. 문서 병렬 작업이라 별도 git worktree `../BathhouseSim-FPV`(branch `spec/PLACEMENT-FOOTPRINT-PREVIEW`)에서 진행, 명세 확정 뒤 main에 병합.
-- 명세 승인 일자(자동/명시)와 사전 허용: 미정(질문지에서 확인).
+- 현재 단계와 재개 지점: 기능 명세 확정·자동 승인 → 아키텍처(이 worktree, branch `work/PLACEMENT-FOOTPRINT-PREVIEW`). 구현은 BUG 작업 사용자 PIE·병합 뒤 원래 폴더에서(코드 단계 동시 1개 규칙, worktree 제거 후 체크아웃). 사용자 확인(2026-10-02 "반투명이야")으로 옛 Q5 A 적용, 새 Q5 철회.
+- 명세 승인 일자(자동/명시)와 사전 허용: 2026-10-02 자동 승인(S4 아니오). 근거: 모든 동작이 답변·추천안·옛 사본 전제에서 나왔고 철회 외 새 질문 없음, 반투명 확인은 옛 Q5 A 결과를 바꾸지 않음, 세 설비 판정 변화는 Q10 B 선택지에 명시. 사전 허용(S2): 범위 밖 asset 변경도 멈추지 않고 진행·단계 보고에 기록(`BP_ClothesLocker` 사용자 변경은 제외). S3: PIE 통과 후 main 병합 예.
 - 작업 브랜치, 단계별 시작 커밋, 리뷰 승인 커밋: 기능 명세는 `main`(`b6ae16e`). 아키텍처 진입 시 `work/PLACEMENT-FOOTPRINT-PREVIEW` 생성.
 - 리뷰 회차, 아키텍처 자동 복귀 사용 여부, 생략한 단계와 근거: 없음
 - 복귀 기록: 없음
+- 회고 대상(UNREAL_EDITOR·ORCHESTRATOR): 사전 조사가 재질 그래프만으로 "화면상 불투명"을 추론했고(보고서 8절에 화면 판정 불가 명시), 마스터가 한계를 빼고 사용자에게 사실로 전달 → 사용자 관찰(반투명)과 어긋남. 화면 외형 판단은 사용자 관찰로 확인하고 질문지 전제로 쓰지 않아야 했음.
 - 사용자 지시 모델 덮어쓰기: 없음
 - 결과물 목록과 사용자 지시 요약:
   - 시작 시 작업 트리: `Content/Bathhouse/Blueprints/Facility/BP_ClothesLocker.uasset` 수정됨(사용자 소유 변경으로 보고 건드리지 않음).
