@@ -4,7 +4,7 @@
 
 - 2026-10-02 `EXP-U1` 설계·구현(공간 건물). Source·Editor 반영, 2026-10-02 사용자 PIE 통과·병합(`8ca6a24`). 같은 날 사후 결정 D1(공간별 조각 종류 하나), 아키텍처 Q1 A(지형 구멍), 넓힘 목록 형태 확정(U2 구현)을 반영했다. 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-001~015)이고 구현 지시는 병합 커밋 `8ca6a24`의 `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md`(작업 폴더 제거됨, Git 이력)다.
 - 가게를 홀·목욕공간·작업공간(지하) 세 공간으로 나누고, 공간마다 직사각형 바닥 경계를 따라 벽·바닥·천장·조명·출입구·통로·계단을 만든다. 공간은 그 바닥의 설비 배치 구역이자 생성 조각의 생성자다(홀 = 쓰레기 조각, 목욕공간 = 물 얼룩 조각, 작업공간 = 없음, D1).
-- 비대상(U1): 확장 구입·넓힘 적용, 확장 탭, 열쇠·한도 변경, 락커 판매. 넓힘 데이터와 편집 미리보기의 형태는 아래 U2 Expansion Authoring Contract에 확정해 두고 U2가 구현한다.
+- 2026-10-02 `EXP-U2` 설계(Source 미반영): 아래 Expansion 절의 넓힘 목록·runtime 넓힘 적용·편집 미리보기·넓힘 검증. 구입·확장 탭·열쇠·한도·락커 판매는 [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)다. 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md`다.
 
 ## Source Scope
 
@@ -23,8 +23,12 @@ Private/Building/
   BathhouseSpaceValidationInternal.h  세 파일이 공유하는 내부 helper(이름 있는 namespace `BathhouseSpaceValidationDetail`)
   BathhouseSpaceEditorSync.h/.cpp  WITH_EDITOR: 편집 world의 공간 형상 지연 일괄 재생성
   BathhouseCleaningChunkSpawner.h/.cpp  runtime 생성 조각 Actor spawn
+  BathhouseSpaceExpansion.cpp      (U2) 공간 Actor 넓힘 적용·되돌림·효과 횟수·미리보기 글자
+  BathhouseSpaceExpansionLayout.cpp  (U2) 순수: 넓힌 안쪽 직사각형·넓힘 띠
+  BathhouseSpaceExpansionValidation.cpp  (U2) 넓힘 검사(`ValidateExpansion`)
 Private/Tests/
   BathhouseBuildingAutomationTests.cpp
+  BathhouseExpansionAutomationTests.cpp  (U2)
 ```
 
 `Building`은 새 Source 하위 폴더다([CoreSystem.md](CoreSystem.md) System Documents).
@@ -41,6 +45,8 @@ Private/Tests/
 | 설비 배치 구역 bounds·바닥·grid | 공간 Actor가 상속한 `AFacilityPlacementZoneActor` | [PlacementSystem.md](PlacementSystem.md) |
 | 조각 안 쓰레기·물 얼룩 생성 | 조각 Actor와 `ACleaningDirectorActor` | [CleaningLitterSystem.md](CleaningLitterSystem.md) |
 | 손님 길 | Level `NavMeshBoundsVolume` + Recast `Dynamic` 재생성 | UE Navigation |
+| (U2) 넓힘 목록 | 공간 Level instance `ExpansionSteps` | 공간 Actor |
+| (U2) 넓힌 횟수(runtime) / 미리보기 횟수(편집) | 공간 Actor `AppliedExpansionCount`(Transient) / `EditorPreviewExpansionCount`(Transient, editor-only) | 구입 transaction([ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)) / Details |
 
 ## Space Actor
 
@@ -64,6 +70,7 @@ Private/Tests/
 | `Stairs` | `FBathhouseStairSpec`: `LowerSpace`, `TopEdgeCenterOffsetCm`, `DownSide`, `WidthCm`, `RunCm`, `StepCount`, `GuardHeightCm`, `StepMaterial`, `StairWallMaterial` |
 | `CleaningChunkKind` | `EBathhouseCleaningChunkKind`: `None`, `Litter`(쓰레기), `Stain`(물 얼룩). C++ 기본 `None`. 한 공간에 한 종류 |
 | (상속) `AllowedFacilityTags` | 이 공간에 놓을 수 있는 설비 종류 태그(`Facility.Type.*`) |
+| (U2) `ExpansionSteps` | 넓힘 목록(Category `Bathhouse Space|Expansion`, Expansion 절) |
 
 - `EBathhouseSpaceSide`: `East`(+X), `West`(−X), `North`(+Y), `South`(−Y). world 축 기준이다.
 - `CenterOffsetCm`: 개구부 중심의 벽 길이 방향 좌표를 공간 Actor 위치 기준으로 잰 값(동·서 벽은 Y, 남·북 벽은 X). Actor 위치는 넓힘에도 고정되므로 벽이 물러나도 개구부가 벽을 따라 미끄러지지 않는다.
@@ -115,6 +122,7 @@ Private/Tests/
 - `FBathhouseSpaceEditorSync`(WITH_EDITOR): world별로 다음 tick 한 번 모든 공간의 shell만 재생성한다(coalesce, `FTSTicker`). OnConstruction을 다시 부르지 않아 재귀가 없다. 로드 순서, 다른 공간 편집, Undo 뒤에도 통로·계단 구멍이 맞는다. transaction·Modify를 하지 않는다(생성물은 Transient).
 - `BeginPlay`: `ZoneBounds` 갱신 → shell 재생성 → `CleaningChunkKind`가 `None`이 아니면 그 종류의 생성 조각 spawn → 이 공간이 owner인 검증 오류를 `LogBathhouseBuilding` Error로 한 번 기록. runtime 정본은 BeginPlay 재생성이다(PIE 복제·cook 직렬화에 의존하지 않음).
 - `EndPlay`: 생성 조각 Actor 파괴.
+- (U2) `BeginPlay` 끝에 구입 subsystem에 등록하고, 목록 끝 바깥 직사각형 × Z `[Zf − s, Zc + s]`를 Nav dirty area로 한 번 등록한다(편집 미리보기 상태로 만든 Nav가 저장·PIE 복제돼도 게임 형상으로 다시 만들게 함). `EndPlay`에서 등록 해제.
 - 검증 오류가 있어도 계산 가능한 형상은 만든다. Rotation·Scale 위반과 Settings 상자 mesh 누락만 형상 생략이다.
 
 ## Cleaning Chunks
@@ -146,6 +154,18 @@ Private/Tests/
 
 부동소수 비교의 허용 오차만 엔진 상수(`UE_KINDA_SMALL_NUMBER`)를 쓴다.
 
+Validation (U2): `ValidateWorld`는 위 표를 0회 복사본에 적용하고(위치 제안도 0회 기준) 이어서 순수 `ValidateExpansion`을 돌린다. 전체 상한은 world Authority의 Definition에서 읽고 없으면 합계 경고를 생략한다.
+
+| 검사 | 결과 |
+|---|---|
+| 줄 `AmountCm` ≤ 0·비유한 | Error |
+| 0회에 다른 공간과 바깥 직사각형이 닿은 변(부피 Z 구간 겹침 + 변 일치 + 길이 구간 겹침, 통로 벽 포함)을 `Side`로 쓰는 줄 | Error |
+| 목록 끝까지 넓힌 부피끼리 겹침 / 끝 모습에서 바깥 출입구 구간에 다른 공간이 닿음 | Error |
+| 끝 모습 손님 공간 바닥·출입구 앞 바깥 지점이 Nav 범위 밖, 끝 모습 Work 바닥이 Nav 범위 안 | Error |
+| 바깥 출입구가 있는 변을 `Side`로 쓰는 줄 / 공간별 줄 수 합 < 전체 상한 | Warning |
+
+직사각형은 커지기만 하므로 끝 모습끼리 검사가 모든 중간 조합을 덮는다. 넓힘 문제에는 위치 제안을 붙이지 않는다.
+
 ### Position Suggestions (2026-10-02 사용자 (가))
 
 공간 위치는 계속 Actor Location 직접 입력이다. 아래 오류는 문구 뒤에 맞닿게 하는 Location 값을 제안한다. 자동으로 옮기지 않는다.
@@ -165,38 +185,25 @@ Private/Tests/
 
 ## Blueprint/API Contracts
 
-- 신규 reflected: 위 class·enum·struct와 property·component 이름(`SpaceRoot`, `Shell`), `UBathhouseBuildingSettings` 값.
+- 신규 reflected: 위 class·enum·struct와 property·component 이름(`SpaceRoot`, `Shell`), `UBathhouseBuildingSettings` 값. (U2) `FBathhouseSpaceExpansionStep`, `ExpansionSteps`, editor-only `EditorPreviewExpansionCount`, `AppliedExpansionCount`, Settings `EditorPreviewLabelWorldSizeCm`. 모두 property 추가라 redirect가 필요 없다.
 - Blueprint `BP_BathhouseSpace`(parent `ABathhouseSpaceActor`)는 상속 `GridVisual`에 Plane과 `MI_FacilityPlacementGrid`만 지정한다. 형상·조명·조각을 Blueprint graph로 만들지 않는다.
 - 공간 Actor는 C++ public으로 `GetSpaceKind()`, `GetInteriorRect()`(현재 안쪽 바닥 world XY), `GetFloorZ()`, `GetCeilingZ()`를 제공한다.
 - 기존 class 이름 변경·삭제가 없어 Core Redirect가 필요 없다.
 - 지형(Q1 A): 계단 통로가 지형을 지나므로 구멍을 지원하는 프로젝트 지형 재질(지금 엔진 격자 재질과 같은 모습)을 지형에 지정하고, 0회 홀 안쪽 바닥 아래에 지형 구멍을 둔다. 계단이 그 범위를 벗어나면 편집 world 검증이 알린다. Editor 정본은 `.md/Unreal/`이 기록한다.
 
-## U2 Expansion Authoring Contract (확정, U1 구현 금지)
+## Expansion (U1 형태 확정, U2 설계)
 
-2026-10-02 사용자 지시로 Editor 형태만 확정한다. 구매 상태 owner, 확장 탭, 가격 적용 등 runtime은 U2 설계가 정한다.
+넓힘 데이터·편집 미리보기 형태는 2026-10-02 사용자 승인 형태 그대로다. 구입 상태 owner·가격·tier는 [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)가 정한다.
 
-- 공간 Actor property `ExpansionSteps`: `TArray<FBathhouseSpaceExpansionStep>`(Category `Bathhouse Space|Expansion`, EditAnywhere, Level instance 정본).
-  - `FBathhouseSpaceExpansionStep`: `Side`(`EBathhouseSpaceSide`, 물러날 벽), `AmountCm`(그 벽이 바깥으로 물러나는 거리, 양수).
-  - 배열 index `k`(0부터) = 그 공간의 `k+1`번째 넓힘.
-- 공간별 넓힘 횟수 상한 = `ExpansionSteps.Num()`. 따로 적는 상한 값은 없다. 전체 구입 횟수 상한은 `DA_BathhouseExpansion_Default`에 따로 있고 둘은 독립이다. 어느 쪽이든 먼저 닿으면 그 구입이 막힌다(계약 4.3·Q14).
-- 넓힌 직사각형: 현재 넓힘 횟수 `n`이면 0회 안쪽 직사각형에서 시작해 index `0..n-1` 줄을 순서대로 적용한다. 줄 하나는 `Side` 변만 바깥으로 `AmountCm` 옮기고 나머지 세 변은 그대로다. Actor 위치는 고정이고 `ZoneBounds` 상대 위치·extent만 바뀐다. 개구부의 벽 길이 방향 위치(`CenterOffsetCm`)는 Actor 기준이라 불변이며, 물러난 벽의 개구부는 벽과 함께 바깥으로 옮겨진다. 계단은 움직이지 않는다.
-- 조각: 줄마다 늘어난 띠 직사각형을 같은 분할 규칙으로 나눠 그 공간의 `CleaningChunkKind` 조각을 추가한다. 기존 조각은 그대로다.
-- 넓힘 검증(U2 구현):
-  - 모든 공간을 목록 끝까지 넓힌 부피끼리 겹치지 않는다(직사각형은 커지기만 하므로 끝 모습끼리 검사로 모든 조합을 덮는다). Error
-  - 0회에 다른 공간과 바깥 직사각형이 닿은 변(통로 벽 포함)을 `Side`로 쓰는 줄. Error(계약: 공간 사이 벽은 움직이지 않는다)
-  - `AmountCm` ≤ 0 또는 비유한. Error
-  - 손님 공간을 끝까지 넓힌 바닥이 Nav 범위 밖. Error
-  - 바깥 출입구가 있는 변을 `Side`로 쓰는 줄. Warning(출입구 밖 물건은 따라가지 않음)
-  - 공간별 줄 수 합이 전체 상한보다 작음. Warning(전체 상한에 닿기 전에 모든 선택지가 막힘)
-- 가격·전체 상한·홀 효과 표 필드와 그 길이 검증은 U2 설계가 `DA_BathhouseExpansion_Default`에 정한다.
-
-### Editor Preview Expansion Count (확정, U2 구현)
-
-- 공간 Actor property `EditorPreviewExpansionCount`(int32): `WITH_EDITORONLY_DATA` 안, `UPROPERTY(Transient, EditInstanceOnly, Category = "Bathhouse Space|Expansion")`, 0~`ExpansionSteps.Num()`으로 clamp. Transient라 저장되지 않고(레벨을 다시 열면 0), editor-only라 cook에서 빠지며, PIE 복제에도 복사되지 않는다.
-- 형상 snapshot의 넓힘 횟수: `EWorldType::Editor` world에서는 각 공간의 미리보기 횟수, 그 밖의 world(PIE·게임·BeginPlay)는 항상 실제 넓힘 횟수(시작 0)다. BeginPlay는 이 값으로 `ZoneBounds`와 shell을 다시 만들므로 편집 중 직렬화된 `ZoneBounds` 값(미리보기 결과)은 게임에 영향이 없다.
-- 미리보기 횟수를 바꾸면 OnConstruction과 편집 동기화가 그 공간과 이웃 공간(통로 구멍)을 다시 짓는다. 형상·조명·통로·배치 구역 extent·조각 미리보기 선이 넓힌 모습을 따른다.
-- 표시: 미리보기 횟수가 0보다 크면 editor-only `UTextRenderComponent`(게임에서 없음, 충돌 없음)가 공간 위에 `넓힘 미리보기 N회`를 띄운다. 미리보기 상태의 layout에 겹침 등 문제가 있으면 같은 표시에 `겹침 있음`을 덧붙인다.
-- 검증: Data Validation은 미리보기 횟수와 무관하게 0회 상태와 목록 끝까지 넓힌 상태를 검사한다(위 넓힘 검증). 미리보기는 그 중간 모습을 보여 주기만 한다.
+- `ExpansionSteps`: `TArray<FBathhouseSpaceExpansionStep>`(EditAnywhere, Level instance 정본). `Side`(물러날 벽), `AmountCm`(양수). index `k` = 그 공간의 `k+1`번째 넓힘. 공간별 넓힘 횟수 상한 = 줄 수. 전체 구입 상한은 `DA_BathhouseExpansion_Default`에 따로 있고 먼저 닿는 쪽이 막는다.
+- 넓힌 직사각형: 횟수 `n`이면 0회 안쪽 직사각형에서 index `0..n-1` 줄을 순서대로 적용한다. 줄 하나는 `Side` 변만 바깥으로 옮긴다. 양이 0 이하·비유한인 줄은 형상에서 건너뛴다(검증 오류). Actor 위치는 고정이고 `ZoneBounds` 상대 위치·extent만 바뀐다. 개구부 `CenterOffsetCm`은 Actor 기준이라 불변이고 물러난 벽의 개구부는 벽과 함께 옮겨진다. 계단은 움직이지 않는다.
+- 효과 횟수: `EWorldType::Editor` world는 `EditorPreviewExpansionCount`(`[0, 줄 수]` clamp), 그 밖은 `AppliedExpansionCount`(시작 0). `GetInteriorRect()`·`FillSnapshot`·`ApplyZoneGeometry`·shell이 효과 횟수를 쓴다. `GetBaseInteriorRect()`(0회), `GetInteriorRectForCount(n)`도 제공한다.
+- snapshot: `BaseInterior`, `Steps`, `ExpansionCount`를 담고 `Interior` = 넓힌 직사각형. 순수 `ExpandInterior`, `ExpansionBand`(k번째 줄이 늘린 띠), `WithExpansionCount`.
+- runtime 적용(구입 transaction만 호출): `CanApplyNextExpansion`(부작용 없음: game world·begun play·다음 줄 유효·transform·상자 mesh·두께) → `ApplyNextExpansion(Undo)`: 횟수 +1 → `ApplyZoneGeometry` → 이 공간 shell만 재생성(실패면 되돌림) → 조각 종류가 있으면 띠를 같은 분할 규칙으로 나눠 조각 추가(기존 조각 불변). `UndoExpansion(Undo)`는 추가 조각 파괴, 횟수 복원, 구역·shell 재생성.
+- 이웃 공간 shell은 다시 만들지 않는다. `BuildPlan`은 이웃의 Actor 위치·개구부·계단·바닥 Z만 읽고 안쪽 직사각형을 읽지 않으며, 맞닿은 변은 넓힐 수 없기 때문이다.
+- 재생성은 한 함수 호출 안에서 파괴 후 생성이라 바닥이 비는 물리 step이 없다. 새 벽은 옛 바깥 직사각형 밖에만 생기고 이미 놓인 Actor는 건드리지 않는다. 배치 격자는 다음 `SetGridVisible(true)`가 새 `ZoneBounds`로 다시 계산한다.
+- 편집 미리보기: 미리보기 횟수를 바꾸면 OnConstruction과 편집 동기화가 모든 공간을 다시 짓는다. 횟수 > 0이면 shell이 editor-only Transient `UTextRenderComponent`(충돌 없음, 천장 판 위 중앙, 위를 향함, 크기 = Settings `EditorPreviewLabelWorldSizeCm`)로 `넓힘 미리보기 N회`를 띄우고, 효과 횟수 snapshot에서 이 공간 부피 겹침이 있으면 ` · 겹침 있음`을 덧붙인다. default subobject를 추가하지 않는다. 직렬화된 `ZoneBounds`(미리보기 결과)는 BeginPlay가 다시 계산하므로 게임에 영향이 없다.
+- 검증은 미리보기와 무관하게 0회 복사본(기존 규칙)과 목록 끝 복사본(아래 Validation (U2) 표)을 검사한다.
 
 ## Implementation Notes (2026-10-02 구현)
 
@@ -212,8 +219,9 @@ Private/Tests/
 
 ## Dependencies
 
-- Building → Placement(`AFacilityPlacementZoneActor`, `IPlaceableFacility`, 배치 trace 채널), Cleaning(조각 zone class와 크기 API), NavigationSystem(`ANavMeshBoundsVolume` 검증), DeveloperSettings, Engine(ISM·PointLight·CharacterMovement CDO 읽기)
-- Placement·Cleaning·Customer는 Building을 모른다. Computer는 기존 zone type으로만 참조한다.
+- Building → Placement(`AFacilityPlacementZoneActor`, `IPlaceableFacility`, 배치 trace 채널), Cleaning(조각 zone class와 크기 API), NavigationSystem(`ANavMeshBoundsVolume` 검증, U2 dirty area), DeveloperSettings, Engine(ISM·PointLight·CharacterMovement CDO 읽기, U2 `UTextRenderComponent`)
+- (U2) Building → Facility(Authority Definition 전체 상한 읽기, 구입 subsystem), Economy(구입 subsystem의 wallet). [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)
+- Placement·Cleaning·Customer·Facility·Economy는 Building을 모른다. Computer는 기존 zone type으로만 참조한다. UI(확장 탭)는 구입 subsystem을 쓴다.
 - 새 module은 없다.
 
 ## Verification
@@ -221,3 +229,4 @@ Private/Tests/
 - 순수 layout: 단일 공간 상자 Z·XY, 모서리 겹침 없음, 개구부 분할, 통로 양쪽 같은 구간, 계단 판 구멍·경사로 양 끝·계단 벽 열림 구간, 보이는 part 상자 부피 비겹침(계단 포함), 조각 균등 분할·전체 덮음. 기대값은 같은 입력 값에서 계산한다.
 - 검증: 겹침/닿음, 통로 비인접(위치 제안 값 적용 시 오류 소멸 포함), 출입구 막힘, 계단 범위 밖·경사 초과, 종류 중복·누락, 회전.
 - world: BeginPlay 뒤 part별 component 수와 충돌 설정, 두 번 재생성해도 component 수 불변, `Litter` 공간은 쓰레기 조각만·`Stain` 공간은 물 얼룩 조각만·`None` 공간은 조각 없음, 조각 `SpawnFloor` Z = 바닥, 공간 Actor를 zone으로 쓴 배치 바닥 지지·벽 겹침 거부, 실제 `TracePlacementZone`에서 형상 hit와 `ZoneBounds` 아랫면 hit는 구역 없음.
+- (U2) 넓힘: `ExpandInterior`·`ExpansionBand`·띠 조각, 넓힌 뒤 이웃 `BuildPlan` 불변, Validation (U2) 표 코드별, 미리보기 횟수와 무관한 `ValidateWorld`, game world 효과 횟수 = 적용 횟수, 적용·되돌림 뒤 구역·shell·조각 원상, 이웃 shell component identity 유지.

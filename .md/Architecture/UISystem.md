@@ -27,6 +27,8 @@ Current classes:
 - `UBathWaterBathTileWidget`: 욕탕 요약과 선택 의도
 - `UBathWaterDetailWidget`: 선택 욕탕 상태와 slider 의도
 
+2026-10-02 `EXP-U2` 설계: `UExpansionScreenWidget`(확장 탭 표시·입력 의도), `UExpansionSpaceOptionWidget`(공간 선택지), 순수 `FExpansionScreenModel`(표시 규칙). 계약은 [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md) Computer Expansion Tab.
+
 `Content/`의 Widget Blueprint와 UI asset은 serialized project data다. 명시적인 Editor 작업 없이 수정하거나 resave하지 않는다.
 
 ## Responsibilities
