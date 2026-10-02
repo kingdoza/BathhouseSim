@@ -109,3 +109,15 @@
 문서: `PROMPT_UNREAL.md` content 계약 설명에 `Max Purchase Count` 1 이상 추가, `ExpansionPurchaseSystem.md` 구현 상세의 wallet 문장 정정.
 
 새 빌드 식별값: 성공(오류·경고 0, `Saved/Logs/build_exp_u2_r1.log`). HEAD `2741e57037de8fe2d63ca869d53ab863465d9239`, `git diff HEAD -- Source Config | sha256sum` = `9e5225e246b75c61a68b57539b0e14cabc3f81309aa77b80f9ff02cd455bd863`(신규 Source 파일은 이제 모두 HEAD에 있어 untracked 0). 자동화 `BathhouseSim` 전체 173개 중 통과 172, 실패 1(`Expansion.Content.ScreenContract`, Editor 작업 전 예상 실패, 이제 `Max Purchase Count` 단언도 실패 목록에 포함). `Computer.Input.ScreenWheelContentContract` 통과. 로그 `Saved/Logs/auto_exp_u2_r1.log`.
+
+## 9. 재작업 2회차(Editor 작업 R1·R2, 아키텍처 복귀 RET-003 18절)
+
+재작업 시작 커밋 `add655f`. 범위는 18절 미리보기 글자와 R2뿐이다. Content는 수정하지 않았다.
+
+- R1 구현: `UTextRenderComponent`를 없애고 편집 world 전용 Transient `UWidgetComponent`(World space, 원점 pivot 북쪽 붙임/남쪽 붙임)에 코드로 만든 `UTextBlock` widget을 띄운다. 신규 `Private/Building/BathhouseSpacePreviewLabelWidget.h/.cpp`(`Initialize`에서 tree root 생성, `SetLabel`은 기본 글꼴 object 유지·크기만 변경). 순수 helper `FBathhouseSpaceLayout::PreviewLabelPlacement`(`BathhouseSpaceExpansionLayout.cpp`): Z = 모든 공간의 가장 높은 천장 판 윗면 + `EditorPreviewLabelHeightCm`, 지하(바깥 직사각형이 겹치는 더 높은 바닥이 있는 공간)는 남쪽, 나머지는 북쪽. 회전은 `UWidgetComponent` 축(+X 앞면, +Z 위쪽)에서 앞면 +Z·위쪽 +Y로 정했고(`MakeFromXZ(Up, Right)`) 자동화가 확인한다. scale = `EditorPreviewLabelWorldSizeCm / EditorPreviewLabelFontSize`.
+- Settings: 신규 `EditorPreviewLabelHeightCm`, `EditorPreviewLabelFontSize`, 기존 `EditorPreviewLabelWorldSizeCm`(뜻을 글자 높이로). 마스터 지시에 따라 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`에 세 키를 넣었고 값은 C++ 기본값과 같다(100 / 300 / 64). 18.2는 "C++ 기본값만"이라 했으므로 리뷰에서 둘 중 하나를 원본으로 정할 것(지금은 ini가 우선, C++ 값은 같은 기본값).
+- R2: `ServiceBlueprintLoadAutomationTests.cpp`의 상품 수 `== 20` 리터럴 단언을 제거하고(이후 단위가 카탈로그 뒤에 덧붙이므로) 서비스 4단위 상품 존재 단언은 유지.
+- 새 자동화: `Expansion.Preview.LabelPlacementAndComponent`(공간 하나 Z, 세 글자 같은 Z·지하만 남쪽·XY = 효과 횟수 중심, 글자 component의 editor-only·Transient·NoCollision·Nav 비관련·hidden in game·World space·widget class·위치·앞면 +Z·위쪽 +Y·scale·pivot·`GetPreviewLabelText()`, 편집 플래그 없는 재생성 뒤 글자 없음). headless에서 Slate가 없으면 widget 내부 문구 확인은 건너뛴다(정보 로그).
+- 빌드: 성공(오류·경고 0, `Saved/Logs/build_exp_u2_r2.log`). HEAD `add655f7c3b78f6aaf22a69e4426c9cb1df36a60`, `git diff HEAD -- Source Config | sha256sum` = `0909817bdfbb039f8d26c1b21824b1a5cd1ec2b82878f5689ec7c0aa1dbcea7a`, 추적 안 된 신규 Source 2개(`BathhouseSpacePreviewLabelWidget.h/.cpp`)의 파일별 sha256 합 = `4a525b6e54fecb94d328c0087195efad7a935dcc717072e0cbc85a4eac789c7a`.
+- 자동화: `BathhouseSim` 전체 174개 전부 통과(`Expansion.Content.ScreenContract` 포함, `Saved/Logs/auto_exp_u2_r2.log`).
+- 미검증: 편집 world에서 실제 렌더(한글 표시, 크기, 방향), Slate가 있는 환경의 widget 내부 문구·글꼴 object 동일성 — Editor 재확인 대상.

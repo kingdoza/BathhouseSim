@@ -161,3 +161,9 @@ allowlist 밖 asset(다른 설비 정의, 다른 Widget, 지형, 설비·장식 
 - `Unreal/InteractionUISystem.md`: 탭 3개, `WBP_ExpansionScreen`·`WBP_ExpansionSpaceOption` 구조(BindWidget·배치), `WBP_ComputerScreenRoot` Switcher child [2]. 같은 문서의 낡은 `WidgetClass` 관련 기록이 새 상태와 어긋나면 정정.
 - `Unreal/FacilitySystem.md`: 확장 정의 새 필드(`MaxPurchaseCount`, `PurchasePrices`, `Tiers` 뜻이 "홀 넓힘 횟수별")의 원본 위치와 현재 줄 수, `ExpansionAuthority`·`KeyRack` 검증 결과.
 - 날짜별 기록·수치 복제는 하지 않는다(원본 위치만).
+
+## 8. Editor 재확인 항목(재작업 2회차, 미리보기 글자 재설계 18절, asset 변경 없음)
+
+- 구현 변경: 미리보기 글자가 `UTextRenderComponent`에서 편집 전용 `UWidgetComponent`(코드로 만든 `UTextBlock`, 엔진 기본 UMG 글꼴)로 바뀌었고 높이 규칙과 지하 글자 배치가 바뀌었다. 새 Settings는 `Config/DefaultGame.ini` `[/Script/BathhouseSim.BathhouseBuildingSettings]`의 `EditorPreviewLabelHeightCm`(300), `EditorPreviewLabelFontSize`(64)이고 `EditorPreviewLabelWorldSizeCm`(100)은 글자 높이다. 기본값으로 잘 보이면 바꾸지 않는다.
+- 새 빌드로 Editor를 띄워 편집 world에서 확인한다: (1) `Space_Hall` 미리보기 1 → 홀 위에 한글 `넓힘 미리보기 1회`가 네모 없이 위에서 읽힌다(위쪽 = 북). (2) `Space_Work` 미리보기 1 → 홀 지붕 위(작업공간 중심의 남쪽)에 보인다. (3) 홀·작업공간 동시 → 두 글자가 겹치지 않는다. (4) 겹침이 있는 설정이면 ` · 겹침 있음`이 붙는다. (5) 0으로 돌린 뒤 저장할 asset이 없다(`git status`로 Content 변경 없음 확인). 글자 크기·높이만 마음에 안 들면 Settings 값을 조정한다.
+- 이상하면(글꼴 네모, 뒤집힘, 안 보임) 저장하지 않고 구현 복귀로 보고한다. `Expansion.Content.ScreenContract`를 포함한 `BathhouseSim` 전체 자동화가 통과해야 한다.

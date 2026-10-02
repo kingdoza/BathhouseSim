@@ -29,6 +29,8 @@ struct FBathhouseShellVisualInputs
 	FString PreviewLabel;
 	FVector PreviewLabelLocation = FVector::ZeroVector;
 	float PreviewLabelWorldSizeCm = 0.0f;
+	int32 PreviewLabelFontSize = 0;
+	bool bPreviewLabelSouthOfCenter = false;
 };
 
 /**
@@ -70,4 +72,6 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UActorComponent> PreviewLabelComponent;
+
+	FString PreviewLabelText;
 };

@@ -150,9 +150,11 @@ bool ABathhouseSpaceActor::RebuildShell()
 	{
 		Inputs.PreviewLabel = BuildExpansionPreviewLabel(Snapshots, Index, Values);
 		Inputs.PreviewLabelWorldSizeCm = Settings->GetEditorPreviewLabelWorldSizeCm();
-		const FVector2D LabelCenter = Snapshots[Index].Interior.GetCenter();
-		Inputs.PreviewLabelLocation = FVector(
-			LabelCenter.X, LabelCenter.Y, FBathhouseSpaceLayout::CeilingZ(Snapshots[Index]) + Values.SlabThicknessCm);
+		Inputs.PreviewLabelFontSize = Settings->GetEditorPreviewLabelFontSize();
+		const FBathhousePreviewLabelPlacement Placement = FBathhouseSpaceLayout::PreviewLabelPlacement(
+			Snapshots, Index, Values.WallThicknessCm, Values.SlabThicknessCm, Settings->GetEditorPreviewLabelHeightCm());
+		Inputs.PreviewLabelLocation = Placement.Location;
+		Inputs.bPreviewLabelSouthOfCenter = Placement.bSouthOfCenter;
 	}
 	Inputs.ChunkKind = CleaningChunkKind;
 	Inputs.ChunkPreviewHalfHeightCm = static_cast<float>(Values.SlabThicknessCm * 0.5);

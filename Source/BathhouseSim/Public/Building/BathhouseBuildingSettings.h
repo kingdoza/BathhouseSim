@@ -25,6 +25,8 @@ public:
 	FVector2D GetCleaningChunkMaxSizeCm() const { return CleaningChunkMaxSizeCm; }
 	/** 편집 화면 전용 넓힘 미리보기 글자 크기(cm). */
 	float GetEditorPreviewLabelWorldSizeCm() const { return EditorPreviewLabelWorldSizeCm; }
+	float GetEditorPreviewLabelHeightCm() const { return EditorPreviewLabelHeightCm; }
+	int32 GetEditorPreviewLabelFontSize() const { return EditorPreviewLabelFontSize; }
 	UStaticMesh* LoadShellBoxMesh() const;
 	UClass* LoadLitterChunkZoneClass() const;
 	UClass* LoadStainChunkZoneClass() const;
@@ -47,8 +49,18 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Editor Preview",
 		meta = (ClampMin = "1.0", UIMin = "1.0", ForceUnits = "cm",
-			ToolTip = "편집 화면에서 넓힘 미리보기 횟수를 켰을 때 공간 위에 뜨는 글자 크기(cm). 게임에는 영향이 없다."))
+			ToolTip = "편집 화면에서 넓힘 미리보기 횟수를 켰을 때 공간 위에 뜨는 글자 높이(대략, cm). 게임에는 영향이 없다."))
 	float EditorPreviewLabelWorldSizeCm = 100.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Editor Preview",
+		meta = (ClampMin = "1.0", UIMin = "1.0", ForceUnits = "cm",
+			ToolTip = "가장 높은 천장 판 윗면에서 미리보기 글자까지의 여유(cm). 게임에는 영향이 없다."))
+	float EditorPreviewLabelHeightCm = 300.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Editor Preview",
+		meta = (ClampMin = "1", UIMin = "1",
+			ToolTip = "미리보기 글자를 그리는 글꼴 크기(렌더 해상도). 실제 크기는 글자 높이 / 글꼴 크기로 정해진다. 게임에는 영향이 없다."))
+	int32 EditorPreviewLabelFontSize = 64;
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Cleaning",
 		meta = (ClampMin = "1.0", UIMin = "1.0", ForceUnits = "cm",

@@ -102,6 +102,13 @@ struct FBathhouseStairFrame
 	FBox2D ToWorldRect(double X0, double X1, double Y0, double Y1) const;
 };
 
+/** 편집 미리보기 글자 배치. 남쪽 붙임이면 글자가 중심점 남쪽에, 아니면 북쪽에 붙는다. */
+struct FBathhousePreviewLabelPlacement
+{
+	FVector Location = FVector::ZeroVector;
+	bool bSouthOfCenter = false;
+};
+
 class FBathhouseSpaceLayout
 {
 public:
@@ -133,6 +140,12 @@ public:
 	static FBox2D ExpandInterior(const FBox2D& Base, const TArray<FBathhouseExpansionStepSnapshot>& Steps, int32 Count);
 	/** StepIndex번째 줄이 늘리는 띠(ExpandInterior(StepIndex+1) 중 ExpandInterior(StepIndex) 밖). 건너뛴 줄이면 면적 0. */
 	static FBox2D ExpansionBand(const FBox2D& Base, const TArray<FBathhouseExpansionStepSnapshot>& Steps, int32 StepIndex);
+	/**
+	 * 미리보기 글자 위치: XY = Index 공간 안쪽 중심, Z = 사용 가능한 모든 공간의 가장 높은 천장 판 윗면 + HeightCm.
+	 * 바깥 직사각형이 XY에서 겹치고 바닥이 더 높은 공간이 있으면(= 이 공간이 아래층) 남쪽에 붙인다.
+	 */
+	static FBathhousePreviewLabelPlacement PreviewLabelPlacement(
+		const TArray<FBathhouseSpaceSnapshot>& Snapshots, int32 Index, double WallThicknessCm, double SlabThicknessCm, double HeightCm);
 	/** 횟수와 Interior만 바꾼 복사본. */
 	static FBathhouseSpaceSnapshot WithExpansionCount(const FBathhouseSpaceSnapshot& Snapshot, int32 Count);
 

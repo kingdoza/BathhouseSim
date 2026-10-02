@@ -141,7 +141,8 @@ bool FBathhouseServiceBlueprintLoadTest::RunTest(const FString& Parameters)
 			{
 				return false;
 			}
-			TestEqual(TEXT("Catalog includes the authored unit-four products"), Catalog->Products.Num(), 20);
+			// 총 상품 수는 이후 단위(예: 확장 구입의 락커 상품)가 뒤에 덧붙이므로 고정하지 않는다. 서비스 4단위 상품 존재만 확인한다.
+			TestTrue(TEXT("Catalog has products"), Catalog->Products.Num() > 0);
 			for (const TCHAR* ProductId : {TEXT("MassageChair"), TEXT("RestBench"), TEXT("Television"), TEXT("ScrubTable")})
 			{
 				TestTrue(FString::Printf(TEXT("SVC4-001 catalog includes %s"), ProductId),

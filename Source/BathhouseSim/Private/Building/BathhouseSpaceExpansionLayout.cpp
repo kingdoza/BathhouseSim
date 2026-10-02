@@ -64,3 +64,38 @@ FBathhouseSpaceSnapshot FBathhouseSpaceLayout::WithExpansionCount(const FBathhou
 	Copy.Interior = ExpandInterior(Snapshot.BaseInterior, Snapshot.Steps, Copy.ExpansionCount);
 	return Copy;
 }
+
+FBathhousePreviewLabelPlacement FBathhouseSpaceLayout::PreviewLabelPlacement(
+	const TArray<FBathhouseSpaceSnapshot>& Snapshots, const int32 Index, const double WallThicknessCm,
+	const double SlabThicknessCm, const double HeightCm)
+{
+	FBathhousePreviewLabelPlacement Result;
+	if (!Snapshots.IsValidIndex(Index))
+	{
+		return Result;
+	}
+	double Top = CeilingZ(Snapshots[Index]) + SlabThicknessCm;
+	for (const FBathhouseSpaceSnapshot& Space : Snapshots)
+	{
+		Top = FMath::Max(Top, CeilingZ(Space) + SlabThicknessCm);
+	}
+	const FVector2D Center = Snapshots[Index].Interior.GetCenter();
+	Result.Location = FVector(Center.X, Center.Y, Top + HeightCm);
+	const FBox2D Self = OuterRect(Snapshots[Index], WallThicknessCm);
+	for (int32 Other = 0; Other < Snapshots.Num(); ++Other)
+	{
+		if (Other == Index || !(Snapshots[Other].FloorZ > Snapshots[Index].FloorZ + UE_KINDA_SMALL_NUMBER))
+		{
+			continue;
+		}
+		const FBox2D Rect = OuterRect(Snapshots[Other], WallThicknessCm);
+		const double OverlapX = FMath::Min(Self.Max.X, Rect.Max.X) - FMath::Max(Self.Min.X, Rect.Min.X);
+		const double OverlapY = FMath::Min(Self.Max.Y, Rect.Max.Y) - FMath::Max(Self.Min.Y, Rect.Min.Y);
+		if (OverlapX > UE_KINDA_SMALL_NUMBER && OverlapY > UE_KINDA_SMALL_NUMBER)
+		{
+			Result.bSouthOfCenter = true;
+			break;
+		}
+	}
+	return Result;
+}

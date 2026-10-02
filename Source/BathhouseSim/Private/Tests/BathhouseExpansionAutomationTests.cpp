@@ -12,6 +12,8 @@
 #include "Building/BathhouseSpaceValidation.h"
 #include "Components/BoxComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/WidgetComponent.h"
+#include "Building/BathhouseSpacePreviewLabelWidget.h"
 #include "Economy/PlayerWalletComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -1007,6 +1009,112 @@ bool FBathhouseExpansionLockerAndShopRulesTest::RunTest(const FString& Parameter
 		Reason.ToString() != DiscardRequired && Reason.ToString() != DiscardForbidden);
 	Product.PlacementDefinition = MakeDefinition(1, true);
 	TestFalse(TEXT("A discardable locker product is rejected by the product rules"), FShopProductRules::ValidateProduct(Product, Reason));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBathhouseExpansionPreviewLabelTest,
+	"BathhouseSim.Expansion.Preview.LabelPlacementAndComponent",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBathhouseExpansionPreviewLabelTest::RunTest(const FString& Parameters)
+{
+	const FBathhouseLayoutValues Values = FixtureValues();
+	const double Height = 275.0;
+	// 공간 하나: 자기 천장 판 윗면 + 여유.
+	{
+		const FSnapshots Single = { MakeSnapshots(Values)[0] };
+		const FBathhousePreviewLabelPlacement One = FBathhouseSpaceLayout::PreviewLabelPlacement(
+			Single, 0, Values.WallThicknessCm, Values.SlabThicknessCm, Height);
+		ExpectNear(*this, TEXT("Single space label Z"), One.Location.Z,
+			FBathhouseSpaceLayout::CeilingZ(Single[0]) + Values.SlabThicknessCm + Height, ExpTolerance);
+		TestFalse(TEXT("A single space has no lower-floor flag"), One.bSouthOfCenter);
+	}
+	// 홀·목욕(같은 바닥)·지하: 세 글자 Z가 같고 지하만 남쪽, XY는 효과 횟수 안쪽 중심.
+	FSnapshots All = MakeSnapshots(Values);
+	All[0] = FBathhouseSpaceLayout::WithExpansionCount(All[0], 1);
+	double Top = -TNumericLimits<double>::Max();
+	for (const FBathhouseSpaceSnapshot& Space : All)
+	{
+		Top = FMath::Max(Top, FBathhouseSpaceLayout::CeilingZ(Space) + Values.SlabThicknessCm);
+	}
+	for (int32 Index = 0; Index < All.Num(); ++Index)
+	{
+		const FBathhousePreviewLabelPlacement Placement = FBathhouseSpaceLayout::PreviewLabelPlacement(
+			All, Index, Values.WallThicknessCm, Values.SlabThicknessCm, Height);
+		ExpectNear(*this, TEXT("All labels float at the highest ceiling top plus the margin"), Placement.Location.Z, Top + Height, ExpTolerance);
+		TestTrue(TEXT("Label XY is the effective interior center"),
+			FVector2D(Placement.Location.X, Placement.Location.Y).Equals(All[Index].Interior.GetCenter(), ExpTolerance));
+		TestEqual(TEXT("Only the underground space sits south of its center"),
+			Placement.bSouthOfCenter, All[Index].Kind == EBathhouseSpaceKind::Work);
+	}
+
+	// 편집 미리보기 shell 입력으로 만든 글자 component.
+	FBathhouseExpansionTestWorld Fx;
+	if (!Fx.Create(*this, TEXT("ExpansionPreviewLabelWorld")))
+	{
+		Fx.Destroy();
+		return false;
+	}
+	const UBathhouseBuildingSettings* Settings = GetDefault<UBathhouseBuildingSettings>();
+	FSnapshots Snapshots;
+	FBathhouseSpaceValidation::GatherSnapshots(*Fx.World, Snapshots);
+	TArray<FBathhouseSpacePlan> Plans;
+	FBathhouseSpaceLayout::Build(Snapshots, Values, Plans);
+	UBathhouseSpaceShellComponent* Shell = Fx.Hall->GetShell();
+	FBathhouseShellVisualInputs Inputs;
+	Inputs.BoxMesh = Settings->LoadShellBoxMesh();
+	Inputs.bPreviewChunks = true;
+	Inputs.PreviewLabel = TEXT("넓힘 미리보기 1회");
+	const FBathhousePreviewLabelPlacement Placement = FBathhouseSpaceLayout::PreviewLabelPlacement(
+		Snapshots, 0, Values.WallThicknessCm, Values.SlabThicknessCm, Settings->GetEditorPreviewLabelHeightCm());
+	Inputs.PreviewLabelLocation = Placement.Location;
+	Inputs.bPreviewLabelSouthOfCenter = Placement.bSouthOfCenter;
+	Inputs.PreviewLabelWorldSizeCm = Settings->GetEditorPreviewLabelWorldSizeCm();
+	Inputs.PreviewLabelFontSize = Settings->GetEditorPreviewLabelFontSize();
+	TestTrue(TEXT("Settings values are positive"), Inputs.PreviewLabelFontSize > 0 && Inputs.PreviewLabelWorldSizeCm > 0.0f);
+	Shell->Rebuild(Plans[0], Inputs);
+
+	UWidgetComponent* Label = nullptr;
+	int32 LabelCount = 0;
+	for (USceneComponent* Child : Shell->GetAttachChildren())
+	{
+		if (UWidgetComponent* Widget = Cast<UWidgetComponent>(Child))
+		{
+			Label = Widget;
+			++LabelCount;
+		}
+	}
+	TestEqual(TEXT("Exactly one preview label component"), LabelCount, 1);
+	if (Label)
+	{
+		TestTrue(TEXT("Label is editor-only"), Label->bIsEditorOnly);
+		TestTrue(TEXT("Label is transient"), Label->HasAnyFlags(RF_Transient));
+		TestTrue(TEXT("Label has no collision"), Label->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("Label does not affect navigation"), Label->CanEverAffectNavigation());
+		TestTrue(TEXT("Label is hidden in game"), Label->bHiddenInGame);
+		TestFalse(TEXT("Label takes no hardware input"), Label->GetReceiveHardwareInput());
+		TestTrue(TEXT("Label is a world-space widget"), Label->GetWidgetSpace() == EWidgetSpace::World);
+		TestTrue(TEXT("Label uses the preview label widget class"), Label->GetWidgetClass() == UBathhouseSpacePreviewLabelWidget::StaticClass());
+		TestTrue(TEXT("Label is placed by the helper"), Label->GetComponentLocation().Equals(Placement.Location, ExpTolerance));
+		TestTrue(TEXT("Label front faces up"), Label->GetForwardVector().Equals(FVector::UpVector, 0.001));
+		TestTrue(TEXT("Label top points north"), Label->GetUpVector().Equals(FVector::RightVector, 0.001));
+		const double ExpectedScale = static_cast<double>(Inputs.PreviewLabelWorldSizeCm) / Inputs.PreviewLabelFontSize;
+		TestTrue(TEXT("Label scale is world size / font size"), Label->GetComponentScale().Equals(FVector(ExpectedScale), 0.001));
+		TestEqual(TEXT("Pivot follows the north attach"), Label->GetPivot().Y, Placement.bSouthOfCenter ? 0.0 : 1.0);
+		if (const UBathhouseSpacePreviewLabelWidget* Widget = Cast<UBathhouseSpacePreviewLabelWidget>(Label->GetUserWidgetObject()))
+		{
+			AddInfo(TEXT("Slate is available: the label widget was created."));
+			(void)Widget;
+		}
+	}
+	TestEqual(TEXT("The shell reports the label text"), Shell->GetPreviewLabelText(), FString(TEXT("넓힘 미리보기 1회")));
+
+	// game world 경로(bPreviewChunks 거짓)와 재생성은 글자를 남기지 않는다.
+	Inputs.bPreviewChunks = false;
+	Shell->Rebuild(Plans[0], Inputs);
+	TestEqual(TEXT("No label without the editor preview flag"), Shell->GetPreviewLabelText(), FString());
+	TestTrue(TEXT("The game world hall has no label component"), !Fx.Hall->FindComponentByClass<UWidgetComponent>());
+	Fx.Destroy();
 	return true;
 }
 

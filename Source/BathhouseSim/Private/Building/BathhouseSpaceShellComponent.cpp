@@ -5,7 +5,8 @@
 #include "Components/BoxComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
-#include "Components/TextRenderComponent.h"
+#include "Components/WidgetComponent.h"
+#include "Building/BathhouseSpacePreviewLabelWidget.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
@@ -106,6 +107,7 @@ void UBathhouseSpaceShellComponent::ClearGenerated()
 		PreviewLabelComponent->DestroyComponent();
 	}
 	PreviewLabelComponent = nullptr;
+	PreviewLabelText.Reset();
 	PartComponents.Reset();
 	PartComponents.SetNum(static_cast<int32>(EBathhouseShellPart::Count));
 	LightComponents.Reset();
@@ -133,8 +135,7 @@ int32 UBathhouseSpaceShellComponent::GetGeneratedComponentCount() const
 
 FString UBathhouseSpaceShellComponent::GetPreviewLabelText() const
 {
-	const UTextRenderComponent* Label = Cast<UTextRenderComponent>(PreviewLabelComponent);
-	return IsValid(Label) ? Label->Text.ToString() : FString();
+	return IsValid(PreviewLabelComponent) ? PreviewLabelText : FString();
 }
 
 UInstancedStaticMeshComponent* UBathhouseSpaceShellComponent::FindPartComponent(const EBathhouseShellPart Part) const
@@ -246,23 +247,37 @@ void UBathhouseSpaceShellComponent::Rebuild(const FBathhouseSpacePlan& Plan, con
 		}
 	}
 
-	if (Inputs.bPreviewChunks && !Inputs.PreviewLabel.IsEmpty())
+	const double LabelScale = Inputs.PreviewLabelFontSize > 0
+		? static_cast<double>(Inputs.PreviewLabelWorldSizeCm) / Inputs.PreviewLabelFontSize : 0.0;
+	if (Inputs.bPreviewChunks && !Inputs.PreviewLabel.IsEmpty() && LabelScale > 0.0 && FMath::IsFinite(LabelScale))
 	{
-		UTextRenderComponent* Label = NewObject<UTextRenderComponent>(Owner, NAME_None, RF_Transient);
+		UWidgetComponent* Label = NewObject<UWidgetComponent>(Owner, NAME_None, RF_Transient);
 		Label->CreationMethod = EComponentCreationMethod::UserConstructionScript;
 		Label->bIsEditorOnly = true;
 		Label->SetMobility(EComponentMobility::Movable);
 		Label->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Label->SetCanEverAffectNavigation(false);
 		Label->SetHiddenInGame(true);
+		Label->SetWidgetSpace(EWidgetSpace::World);
+		Label->SetDrawAtDesiredSize(true);
+		Label->SetWidgetClass(UBathhouseSpacePreviewLabelWidget::StaticClass());
+		// 북쪽 붙임은 글자 아래 가장자리, 남쪽 붙임은 위 가장자리 가운데가 원점에 온다(글자 위쪽 = 북).
+		Label->SetPivot(FVector2D(0.5, Inputs.bPreviewLabelSouthOfCenter ? 0.0 : 1.0));
 		Label->SetupAttachment(this);
-		Label->SetText(FText::FromString(Inputs.PreviewLabel));
-		Label->SetWorldSize(Inputs.PreviewLabelWorldSizeCm);
-		Label->SetHorizontalAlignment(EHTA_Center);
-		Label->SetVerticalAlignment(EVRTA_TextCenter);
 		Label->RegisterComponent();
-		// 글자 앞면(+X)이 위를 보고 글자 위쪽이 북(+Y)을 향하게 눕힌다.
-		Label->SetWorldLocationAndRotation(Inputs.PreviewLabelLocation, FRotator(90.0, -90.0, 0.0));
+		// 앞면(+X)이 위(+Z)를, 글자 위쪽(+Z)이 북(+Y)을 향한다. UWidgetComponent는 +X쪽에서 보이고 위쪽이 +Z다.
+		Label->SetWorldLocationAndRotation(
+			Inputs.PreviewLabelLocation, FRotationMatrix::MakeFromXZ(FVector::UpVector, FVector::RightVector).ToQuat());
+		Label->SetWorldScale3D(FVector(LabelScale));
+		if (!Label->GetUserWidgetObject())
+		{
+			Label->InitWidget();
+		}
+		if (UBathhouseSpacePreviewLabelWidget* Widget = Cast<UBathhouseSpacePreviewLabelWidget>(Label->GetUserWidgetObject()))
+		{
+			Widget->SetLabel(FText::FromString(Inputs.PreviewLabel), Inputs.PreviewLabelFontSize);
+		}
+		PreviewLabelText = Inputs.PreviewLabel;
 		PreviewLabelComponent = Label;
 	}
 }
