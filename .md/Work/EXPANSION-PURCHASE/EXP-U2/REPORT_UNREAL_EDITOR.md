@@ -2,7 +2,8 @@
 
 - 작업 ID: `EXP-U2`
 - 단계: Editor 작업
-- 상태: 보류 — R3 미리보기 글자 미렌더(설계 18.2의 SetHiddenInGame(true)가 UWidgetComponent 그리기를 막음), 책임 단계 아키텍처, 재개 조건: 설계·구현 수정과 빌드 뒤 Editor가 편집 world 글자 캡처 재확인(asset 변경 없음). Content·자동화(174/174)는 완료.
+- 상태: 보류 — 미리보기 글자 화면 확인이 작업용 숨김 Editor에서 불가(위젯 component render target 미생성, 기존 컴퓨터 ScreenWidget도 같음, 실행 환경 차단), 책임 단계 Editor 작업(사용자 화면 확인 또는 승인된 화면 작업), 재개 조건: 보이는 Editor에서 10.2 항목 확인. Content·자동화(174/174)는 완료.
+- 마스터 메모: 남은 항목은 Editor 수정 작업이 아니라 화면 검증이므로 `PIE_CHECKLIST.md` 0번으로 사용자에게 넘김(2026-10-02). 사용자가 통과를 알리면 Editor 역할이 `BuildingSystem.md`(10.4 문구)를 갱신한다.
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -163,3 +164,36 @@
 - 정본: 재확인이 통과하지 않아 갱신하지 않았다. `.md/Unreal/BuildingSystem.md` 넓힘 목록 절의 글자 설명과 공용 값 원본 줄은 이제 낡았다. 재확인 통과 뒤 넣을 문구:
   - 공용 값 원본 줄: "넓힘 미리보기 글자 높이 여유·크기·해상도 `EditorPreviewLabelHeightCm`·`EditorPreviewLabelWorldSizeCm`·`EditorPreviewLabelFontSize`(원본 `Config/DefaultGame.ini` 같은 섹션)."
   - 미리보기 줄: "1 이상이면 편집 전용 Transient `UWidgetComponent` 글자 `넓힘 미리보기 N회`가 모든 공간 중 가장 높은 천장 판 윗면 + 높이 여유에 뜨고, 아래층(지하) 글자는 안쪽 중심 남쪽, 나머지는 북쪽에 붙는다."
+
+## 11. 미리보기 글자 재확인 2차 (2026-10-02)
+
+입력: RET-004 아키텍처 복귀(`1e9a657`, 18.5), 구현 `451ae42`(코드 리뷰 4회차 승인), HEAD `99d743b`. 바이너리는 18:58 빌드이고 Source·Config 어느 파일보다 새롭다. Settings ini 값은 바꾸지 않았고 자동화도 다시 돌리지 않았다(지시: ini를 조정했을 때만 재실행).
+
+### 11.1 실행
+
+- 작업용 숨김 Editor PID 23596(`-ModelContextProtocolStartServer`, harness)을 띄웠다. 스크립트는 `Saved/Claude/EXP-U2/20_label_set.py`, `21_label_diag.py`, `22_realtime_probe.py`, `23_realtime_on.py`, `24_computer_widget.py`다. 캡처는 `cap3_hall1_top.png`, `cap3_hall1_rt.png`다.
+
+### 11.2 결과
+
+| 항목 | 결과 |
+|---|---|
+| RET-004 반영 | 홀 미리보기 1의 글자 component: `bHiddenInGame` false, `IsVisible()` true, TickMode Enabled, `TickWhenOffscreen` true, `bIsEditorOnly` true |
+| 렌더 상태 | `GetRenderTarget()` None, `GetMaterialInstance()` None, `IsWidgetVisible()` false, 위젯 desired size 0×0, current draw size 기본 500×500. 캡처에는 위젯 사각 테두리만 있고 문구가 없다 |
+| 뷰포트 realtime 켬 | `LevelEditorSubsystem.editor_set_viewport_realtime(True)`로 이 세션에서만 켜고 8초 뒤 다시 확인했다. 결과는 같다(render target None). 프로세스를 종료하면서 버린 세션 설정이다 |
+| 대조군 | 기존 컴퓨터 `ScreenWidget`(`WBP_ComputerScreenRoot_C_0`, TickMode Enabled)도 같은 Editor에서 render target None, `IsWidgetVisible()` false |
+| world 시간 | `GetTimeSeconds` 216.7 → 223.4(흐름) |
+| 위치 계약 | 10.2와 같다. 세 공간 같은 Z, 작업공간 pivot (0.5, 0)으로 남쪽, 나머지 (0.5, 1)로 북쪽 |
+
+### 11.3 판단
+
+- `UWidgetComponent`는 `TickComponent`의 `UpdateWidget`(SlateWindow 생성)과 `DrawWidgetToRenderTarget`에서만 그린다(`Engine/Source/Runtime/UMG/Private/Components/WidgetComponent.cpp:1241`). SlateWindow가 없어 `IsWidgetVisible()`이 false이고 render target도 없으므로, 이 Editor에서는 위젯 component의 그리기 tick이 효과를 내지 못하고 있다.
+- 기존 컴퓨터 화면 위젯도 똑같은 상태라서, 미리보기 글자 코드의 결함이 아니라 작업용 숨김 Editor 환경의 한계로 판단한다(실행 환경 차단). 숨김 창이 왜 그리지 못하는지는 엔진 내부라 끝까지 확정하지 못했다.
+- 판정하지 못한 항목: render target 생성, 한글 `넓힘 미리보기 N회` 표시, 화면상 크기, 지하 글자 남쪽 배치의 시각 확인, 위층 글자와의 화면상 겹침.
+- 남은 경로: 보이는 Editor에서 확인해야 한다. 사용자 직접 확인(`USER_UNREAL.md`, 실행 환경 차단) 또는 작업 직전 사용자 승인을 받은 화면 작업 중 하나다. 확인 방법: `Space_Hall`·`Space_Work` `Editor Preview Expansion Count`를 1·2로 바꿔 위에서 본다. 확인 뒤 0으로 되돌리고 저장하지 않는다.
+
+### 11.4 정리
+
+- 미리보기를 0으로 되돌렸다. dirty가 된 공간 package 2개(`…/8/7N/V36YOPHA8C46E77EZIX78C`, `…/9/0G/5Z3D27MZMK7HDNFHFAEYU2`)는 저장하지 않았다. 명령줄을 확인한 작업용 PID 23596만 강제 종료해 버렸다.
+- autosave 복원 데이터의 `Packages`는 비어 있다. 포트 8000 리스너 없음. 남은 Editor는 BeekeepingSim(PID 30900)뿐이다.
+- Content·Config·Source·정본 변경 없음. `BuildingSystem.md`는 통과 전이라 갱신하지 않았다. 갱신 문구는 10.4에 있다.
+- 작업 중 `git status`에 이번 작업과 무관한 변경 `.md/Work/MODEL-M1/CONTEXT.md`, `ArtSource/Bathhouse/_Pipeline/README.md`가 나타났다. 손대지 않았다.
