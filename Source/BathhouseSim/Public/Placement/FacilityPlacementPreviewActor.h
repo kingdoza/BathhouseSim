@@ -6,6 +6,7 @@
 
 class USceneComponent;
 class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
 
 UCLASS(Blueprintable, NotPlaceable)
@@ -19,6 +20,8 @@ public:
 	bool ValidateSourceGeometry(TSubclassOf<AActor> PlacedClass, FText& OutFailureReason) const;
 	void SetPlacementValidity(bool bValid, const FText& FailureReason);
 	const TArray<TObjectPtr<UStaticMeshComponent>>& GetPreviewMeshes() const { return PreviewMeshes; }
+	const UStaticMeshComponent* GetFootprintSurface() const { return FootprintSurface; }
+	const UMaterialInstanceDynamic* GetFootprintMaterial() const { return FootprintMaterial; }
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Facility Placement|Presentation")
 	void OnPlacementValidityChanged(bool bValid, const FText& FailureReason);
@@ -29,6 +32,10 @@ protected:
 
 private:
 	bool ApplyPreviewMaterial(UMaterialInterface* Material, FText& OutFailureReason);
+	// Display only: failure leaves the mesh preview intact and only logs a warning.
+	void TryCreateFootprintSurface();
+	bool BuildFootprintSurface(FText& OutFailureReason);
+	void DestroyFootprintSurface();
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> PreviewMeshes;
@@ -40,7 +47,16 @@ private:
 	TObjectPtr<UMaterialInterface> InvalidMaterial;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> FootprintSurface;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> FootprintMaterial;
+
+	UPROPERTY(Transient)
 	TSubclassOf<AActor> SourcePlacedClass;
+
+	FLinearColor ValidPreviewColor = FLinearColor::White;
+	FLinearColor InvalidPreviewColor = FLinearColor::White;
 
 	FTransform SourceFootprintRelative = FTransform::Identity;
 	FVector SourceFootprintExtent = FVector::ZeroVector;

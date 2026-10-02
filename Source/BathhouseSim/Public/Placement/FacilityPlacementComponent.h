@@ -47,6 +47,10 @@ public:
 	bool ValidateFootprintContract(FText& OutFailureReason) const;
 	bool ValidateNavigationContract(FText& OutFailureReason) const;
 	bool DeriveFootprintCells(FIntPoint& OutCells, FText& OutFailureReason) const;
+	// Footprint full size (footprint axes) from unscaled extent and the composed relative scale; matches ValidateWorldPlacement's RelativeFootprint * Candidate.
+	static FVector ComputeScaledFootprintFullSize(const FTransform& FootprintRelativeToRoot, const FVector& UnscaledExtent, const FVector& RootRelativeScale);
+	// Data Validation only: footprint relative to root must have zero pitch/roll and a yaw that is a multiple of 90 degrees.
+	bool ValidateFootprintGridAxisAlignment(FText& OutFailureReason) const;
 	bool BuildPlacedActorTransform(const FTransform& RequestedTransform, FTransform& OutTransform, FText& OutFailureReason) const;
 	bool GetFootprintRelativeToRoot(FTransform& OutTransform, FText& OutFailureReason) const;
 	bool GetRecoveryDropTransform(FTransform& OutTransform, FText& OutFailureReason) const;
