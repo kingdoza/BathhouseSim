@@ -156,7 +156,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - 사용 수건통 내부는 container 단위 E/F interaction이고, overflow world towel만 개별 E interaction이다.
 - Customer는 clean towel token과 satisfaction을 session에 보관하고, used bin full이면 floor overflow로 반납한다.
 - (EXP-U1 설계) Building은 공간마다 Level 공간 Actor 하나를 둔다. 공간 Actor가 그 바닥의 설비 배치 구역이며, 모든 공간의 authored 값으로 벽·바닥·천장·개구부·계단을 계산해 자기 몫을 Transient component로 만든다(편집 world는 OnConstruction과 지연 일괄 재생성, runtime은 BeginPlay). 공간은 BeginPlay에 자기 조각 종류(홀 쓰레기, 목욕공간 물 얼룩, 작업공간 없음)의 생성 조각 Actor를 spawn한다. 손님 길은 넓은 Nav 범위와 Recast Dynamic 재생성이 맡는다.
-- (EXP-U2 설계) 확장 구입은 Building의 `UBathhouseExpansionPurchaseSubsystem`이 조율한다. 공간 Actor가 자기 넓힌 횟수를 소유하고 전체 구입 횟수는 그 합이다. 구입은 사전 검사 → 공간 넓힘(되돌림 가능) → wallet 차감 → 홀이면 확장 관리자 tier 상승(열쇠 생성·락커 한도) 순서의 한 transaction이다. 기존 tier는 홀 넓힘 횟수별 효과 표가 된다. 컴퓨터 화면은 `관리·상점·확장` 탭이고 확장 화면은 view를 매번 subsystem에서 받는다. 상점은 `Facility.Discardable` 없는 락커 상품을 허용한다.
+- (EXP-U2 설계) 확장 구입은 Building의 `UBathhouseExpansionPurchaseSubsystem`이 조율한다. 공간 Actor가 자기 넓힌 횟수를 소유하고 전체 구입 횟수는 그 합이다. 구입은 사전 검사 → 공간 넓힘(되돌림 가능) → wallet 차감 → 홀이면 확장 관리자 tier 상승(열쇠 생성·락커 한도) 순서의 한 transaction이다. 기존 tier는 홀 넓힘 횟수별 효과 표가 된다. 컴퓨터 화면은 `관리·상점·확장` 탭이고 확장 화면은 view를 매번 subsystem에서 받는다. 상점은 `Facility.Discardable` 없는 락커 상품을 허용한다. 사용자 결정 D2(전체 구입 상한 삭제, 가격을 공간 넓힘 줄마다, 선택지별 단계·가격 표시)는 D2 설계, Source 미반영, 다음 단위에서 구현이다([ExpansionPurchaseSystem.md](Architecture/ExpansionPurchaseSystem.md) D2 Redesign).
 - Core는 런타임 gameplay 상태를 소유하지 않고 모듈 의존성, Source 경계, Content/Config 정책, Core Redirect 기준을 문서화한다.
 
 ## 주요 의존 방향

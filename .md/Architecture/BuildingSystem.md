@@ -210,6 +210,13 @@ Validation (U2): `ValidateWorld`는 위 표를 0회 복사본에 적용하고(�
   - 그리기(2026-10-02 복귀 RET-004): hidden-in-game을 쓰지 않는다(엔진 `IsVisible()`이 false가 되어 `UWidgetComponent`가 그리지 않음). game world 비노출은 편집 world에서만 만든다는 생성 조건이 지킨다. `WidgetClass`·World space를 등록 전에 지정하고, `TickMode` Enabled, `TickWhenOffscreen` true, 자동 redraw, `DrawSize`는 엔진 기본값(양수), 문구 지정 뒤 `RequestRedraw()`. default subobject를 추가하지 않는다. 직렬화된 `ZoneBounds`(미리보기 결과)는 BeginPlay가 다시 계산하므로 게임에 영향이 없다.
 - 검증은 미리보기와 무관하게 0회 복사본(기존 규칙)과 목록 끝 복사본(아래 Validation (U2) 표)을 검사한다.
 
+### Expansion D2 (D2 설계, Source 미반영, 다음 단위에서 구현)
+
+위 Expansion 절과 Validation (U2) 표는 현재 구현이다. 사용자 결정 D2에 따라 다음 단위에서 이렇게 바꾼다(상세 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md` 19.2·19.3, 구입 쪽은 [ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md) D2 Redesign).
+
+- `FBathhouseSpaceExpansionStep`에 `int32 Price`(그 넓힘의 구입 가격, 원, C++ 기본 0 = 미입력)를 더한다. 공간별 줄 수가 유일한 상한이 되고 전체 구입 상한은 없어진다. 공간 Actor에 `GetNextExpansionPrice()`, `IsAtExpansionLimit()`를 더하고 `CanApplyNextExpansion`은 다음 줄 `Price` > 0도 요구한다.
+- 검증: `ExpansionStepsBelowCap`(현재 Warning)을 지운다. `ExpansionPriceInvalid`(줄 `Price` ≤ 0, Error)와 `ExpansionHallEffectShort`(홀 줄 수 + 1 > Definition `Tiers.Num()`, Error, owner 홀)를 더한다. `ValidateExpansion`의 `MaxPurchaseCount` 인자는 `HallEffectRowCount`로 바뀐다.
+
 ## Implementation Notes (2026-10-02 구현)
 
 - 입력 snapshot(`FBathhouseSpaceSnapshot`)·형상 계획·순수 계산은 `Private/Building/BathhouseSpaceLayout.*`, 규칙 검사는 `BathhouseSpaceValidation.cpp`, 위치 제안은 `BathhouseSpacePositionSuggestion.cpp`, world 수집·Nav·계단 trace는 `BathhouseSpaceWorldValidation.cpp`다(공개 API는 `BathhouseSpaceValidation.h`의 `FBathhouseSpaceValidation` 하나). 개구부·계단 위치는 Actor 기준 상대값으로 담고 world 값은 helper가 계산한다. 위치 제안의 이동 후보는 snapshot 복사본에 적용해 같은 검사를 다시 돌려 확인한 것만 문구에 붙는다.

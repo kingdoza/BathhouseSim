@@ -3,6 +3,7 @@
 ## Status And Scope
 
 - 2026-10-02 `EXP-U2`(확장 구입 수직, 홀 1회) 설계, Source 반영(Editor 작업 전, 빌드·자동화 통과). 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-020~032)이고 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md`다.
+- 사용자 결정 D2(전체 상한 삭제, 공간별·넓힘별 가격)는 **D2 설계, Source 미반영, 다음 단위에서 구현**이다. 아래 D2 Redesign 절에 따로 두며 본문은 현재 구현이다.
 - 컴퓨터 `확장` 탭에서 돈을 내고 공간 하나를 넓힌다. 홀을 넓히면 열쇠 수와 락커 칸 설치 한도가 오른다. 상점은 락커 상품을 팔 수 있다.
 - 공간 넓힘의 형상·검증·편집 미리보기는 [BuildingSystem.md](BuildingSystem.md) Expansion 절이 정본이다. 이 문서는 구입 상태·transaction·확장 데이터·확장 탭·락커 판매 규칙을 다룬다.
 - 저장·환불·되돌리기·공사 시간은 없다. 게임을 다시 시작하면 확장 0회다.
@@ -115,6 +116,20 @@ Private/Shop/
 - 신규 reflected: Definition `MaxPurchaseCount`·`PurchasePrices`, root `ExpansionTabButton`·`ExpansionScreen`(optional), 두 확장 widget class와 BindWidget, subsystem class.
 - rename·삭제 없음, Core Redirect 불필요. 모두 property 추가라 기존 export와 호환된다.
 - Editor: `DA_BathhouseExpansion_Default` 새 필드, `DA_ShopCatalog` 1칸 락커 줄, 새 WBP 2개와 root 탭. 원본 위치는 `.md/Unreal/`이 기록한다.
+
+## D2 Redesign (D2 설계, Source 미반영, 다음 단위에서 구현)
+
+2026-10-02 사용자 결정 D2(상위 계약 3절 D2 행, 커밋 `ef4d1db`). U2는 D2 없이 사용자 PIE 승인됐으므로 **이 절 위의 모든 내용이 현재 구현**이다. 아래는 다음 단위(U3 묶음)에서 구현할 설계이며 상세는 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md` 19절이다. 구현되면 위 본문을 이 절대로 바꾼다.
+
+| 항목 | 현재 구현 | D2 설계 |
+|---|---|---|
+| 가격 | `UBathhouseExpansionDefinition::PurchasePrices`(몇 번째 전체 구입별) | 공간 넓힘 줄 `FBathhouseSpaceExpansionStep::Price`(그 공간의 몇 번째 넓힘별). 공간 `GetNextExpansionPrice()` |
+| 상한 | `MaxPurchaseCount`(전체)와 공간 줄 수 | 공간 줄 수만. `MaxPurchaseCount`·`PurchasePrices`와 `GetMaxPurchaseCount`·`TryGetPurchasePrice` 삭제(tagged property라 옛 asset load 안전, redirect 불필요, Editor 재저장) |
+| Definition 규칙 | 가격 줄 ≥ 상한, 가격 > 0, 효과 줄 ≥ 상한 + 1, tier 규칙 | tier 규칙만. 효과 줄 ≥ 홀 넓힘 줄 + 1은 공간 world 검증(`ExpansionHallEffectShort`) |
+| 열쇠걸이 검증 | 도달 가능 줄(상한까지) | `Tiers` 모든 줄 |
+| view | `PurchaseCount`, `MaxPurchaseCount`, `bMaxReached`, `NextPrice`, `Shortfall` | 위 필드 삭제, `bAllAtLimit`. 선택지마다 `AppliedCount`, `StepCount`, `bAtLimit`, `NextPrice` |
+| 평가·구입 | `ExpectedPurchaseCount`(전체), `MaxPurchasesReached` | `ExpectedAppliedCount`(고른 공간 넓힌 횟수), `MaxPurchasesReached` 삭제, 가격 = 고른 공간 다음 줄 `Price`. transaction 순서는 같다 |
+| 화면 | `현재 확장 단계: N`, 화면 `이번 구입 가격`, 최대 = 전체 상한 | 선택지 `확장 단계 N/M`·`다음 넓힘 N원`(optional `StageText`·`PriceText`), 버튼 가격·부족액은 고른 공간 기준(선택 전 없음), 최대 = 등록된 모든 공간 상한. 화면 `StageText`·`PriceText` binding 삭제 |
 
 ## Verification
 

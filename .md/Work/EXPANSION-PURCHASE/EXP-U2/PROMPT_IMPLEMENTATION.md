@@ -5,6 +5,7 @@
 - 상태: 완료
 - 복귀 재설계(2026-10-02, Editor 작업 R1, RET-003): 넓힘 미리보기 글자의 위치·글꼴·지하 공간 표시. 18절. 6.4 해당 문장을 18절로 대체한다. 사용자 동작 변경 없음(글자 문구 `넓힘 미리보기 N회`·` · 겹침 있음` 유지)
 - 복귀 재설계 2(2026-10-02, Editor 재확인 `REPORT_UNREAL_EDITOR.md` 10.3 R3, RET-004): 글자 component의 hidden-in-game 제거와 그리기·갱신 조건. 18.5절. 18.2·18.4의 해당 항목을 18.5가 대체한다
+- 재설계(2026-10-02, 사용자 결정 D2, 상위 계약 `ef4d1db`): 전체 구입 상한 제거, 가격을 공간 넓힘 줄마다, 선택지별 `확장 단계 N/M`·가격 표시. **19절**. U2에서는 구현하지 않음. 사용자 결정으로 U2는 D2 없이 PIE 승인됐고(현재 Source `0536304`/`451ae42` 기준), 19절은 다음 단위(U3 묶음) 아키텍처의 입력이다. 0.1~0.5는 현재 상태, 0.6은 D2 예정이다. 5.1·6.6·7·8.3·8.5·11·15절은 현재 구현 기준이고, 19절과 다른 내용은 다음 단위에서 19절대로 바뀐다
 
 - 상위 계약: [../PROMPT_ARCHITECTURE.md](../PROMPT_ARCHITECTURE.md)(상태 완료). 이번 범위는 EXP-020~032, 대표 흐름은 EXP-023(홀 확장 구입) → EXP-028(늘어난 한도로 1칸 락커 설치)이다.
 - 선행 결과: `EXP-U1` 병합 `8ca6a24`. U1이 확정한 넓힘 목록·편집 미리보기 형태는 [../../../Architecture/BuildingSystem.md](../../../Architecture/BuildingSystem.md) Expansion 절이 정본이다. U1 Editor 데이터 관리 개요는 `git show 8ca6a24:.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md` 0절이다.
@@ -78,6 +79,17 @@ U1 개요 0.2 표의 "U2 예정" 행이 이번에 실제가 된다. 수치는 �
 
 ---
 
+### 0.6 다음 단위 예정 변경 (사용자 결정 D2, 아직 Editor·Source에 없음)
+
+위 0.1~0.5는 **지금 Editor·Source의 실제 상태**다(U2는 D2 없이 사용자 PIE 승인). 지금 가격은 `DA_BathhouseExpansion_Default` `Purchase Prices`(몇 번째 구입별)이고 전체 상한은 `Max Purchase Count`다. 다음 단위에서 19절대로 구현하면 이렇게 바뀐다.
+
+| 값 | 지금 | 다음 단위(D2) 뒤 |
+|---|---|---|
+| 확장 구입 가격 | `DA_BathhouseExpansion_Default` `Purchase Prices`(몇 번째 구입별, 공간 무관) | 각 공간 Actor `Expansion Steps` 줄마다 `Price`(그 공간의 몇 번째 넓힘별). `Space_Hall` → Details `Bathhouse Space › Expansion › Expansion Steps` → 줄 펼쳐 `Price` |
+| 상한 | 전체 `Max Purchase Count`와 공간별 줄 수 중 먼저 닿는 쪽 | 공간별 줄 수만. `Max Purchase Count`·`Purchase Prices`는 확장 정의에서 지운다 |
+| 홀 효과 표 길이 | 전체 상한 + 1줄 이상 | 홀 넓힘 줄 수 + 1줄 이상(`Space_Hall` 검사가 알림) |
+| 화면 | `현재 확장 단계: N`(전체 구입 횟수), 화면 아래 이번 구입 가격 | 선택지마다 `확장 단계 N/M`과 그 공간의 다음 넓힘 가격. 버튼 가격·부족액은 고른 공간 기준. `최대 확장 단계입니다`는 모든 공간이 상한일 때만 |
+
 ## 1. 기능 계약과 범위
 
 - 현재 단계: 수직 구현(상위 작업의 두 번째 단위). 대표 흐름: 확장 탭에서 `홀`을 골라 1회 구입 → 홀이 넓어지고 열쇠·한도 상승 → 상점에서 1칸 락커를 사서 넓어진 홀에 설치.
@@ -145,6 +157,8 @@ U1 개요 0.2 표의 "U2 예정" 행이 이번에 실제가 된다. 수치는 �
 ## 5. 확장 데이터 — Definition·Authority·열쇠걸이
 
 ### 5.1 `UBathhouseExpansionDefinition`
+
+(D2 예정, 다음 단위 구현: `MaxPurchaseCount`·`PurchasePrices`와 그 규칙·API는 19.2가 삭제한다. 지금은 아래가 현재 구현이다.)
 
 - 기존 `Tiers`(`FBathhouseExpansionTier` `KeyPoolSize`, `MaxInstalledLockerSlots`) 이름·형식 유지. tooltip을 "index = 홀 넓힘 횟수(0회부터). 표 끝을 넘으면 마지막 줄"로 바꾼다. 이름을 바꾸지 않으므로 redirect·migration이 없다.
 - 신규 UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category `Expansion`, Korean tooltip):
@@ -258,6 +272,8 @@ void UndoExpansion(const FBathhouseSpaceExpansionUndo& Undo);
 
 ### 7.1 타입 (`Public/Building/BathhouseExpansionTypes.h`, non-reflected C++)
 
+(D2 예정, 다음 단위 구현: 7.1~7.3의 전체 구입 횟수·전체 상한·구입 순번 가격·`ExpectedPurchaseCount`는 19.4대로 바뀐다. 지금은 아래가 현재 구현이다.)
+
 ```cpp
 enum class EBathhouseExpansionFailure : uint8
 {
@@ -343,7 +359,7 @@ struct FBathhouseExpansionView
 - `IComputerScreenContextReceiver`에 `virtual void NotifyComputerUseEnded() {}`(순수 가상 아님) 추가. 기존 구현(`UBathWaterManagementScreenWidget`, `UShopScreenWidget`, root)은 바꾸지 않아도 컴파일된다.
 - `ABathhouseComputerActor::ReleaseReservation`이 실제로 `CurrentUser`를 지웠을 때만 screen user widget이 receiver면 `NotifyComputerUseEnded()`를 호출한다. 정상 이탈(blend 완료)과 강제 정리(예약 해제 포함) 모두 이 함수를 지난다. focus-out 시작 시점에 이미 hit testing이 꺼지므로 blend 동안 확인을 누를 수 없다.
 
-### 8.3 `UExpansionScreenWidget` (`Public/UI/ExpansionScreenWidget.h`, `UCLASS(Abstract, Blueprintable)`, `IComputerScreenContextReceiver`)
+### 8.3 (현재 구현. D2 예정 변경은 19.5·19.6) `UExpansionScreenWidget` (`Public/UI/ExpansionScreenWidget.h`, `UCLASS(Abstract, Blueprintable)`, `IComputerScreenContextReceiver`)
 
 필수 BindWidget(새 asset이므로 모두 필수):
 
@@ -381,7 +397,7 @@ struct FBathhouseExpansionView
 - API: `void SetSpaceKind(EBathhouseSpaceKind)`, `void ApplyModel(const FExpansionOptionDisplay&)`, C++ delegate `FOnExpansionOptionClicked(EBathhouseSpaceKind)`. 버튼 바인딩은 NativeConstruct/Destruct 대칭.
 - 비활성은 `SelectButton->SetIsEnabled(false)`, 선택은 `SelectionHighlight` 가시성(Visible/Collapsed, hit test 없음 `HitTestInvisible`). WBP graph 없음.
 
-### 8.5 `FExpansionScreenModel` (`Private/UI/ExpansionScreenModel.h/.cpp`, 순수)
+### 8.5 (현재 구현. D2 예정 변경은 19.5) `FExpansionScreenModel` (`Private/UI/ExpansionScreenModel.h/.cpp`, 순수)
 
 - 입력: `FBathhouseExpansionView`, `TOptional<EBathhouseSpaceKind> Selected`, `bool bConfirmPending`, `bool bShowCompleted`.
 - 출력 `FExpansionScreenDisplay`: 헤더 세 문구와 가시성, 선택지 3개 `FExpansionOptionDisplay{Name, Size, Effect, bEffectVisible, Status, bStatusVisible, bEnabled, bSelected}`, `bOptionsVisible`, `Price`·`bPriceVisible`, `bPurchasePanelVisible`, `PurchaseButtonText`, `bPurchaseEnabled`, `bConfirmPanelVisible`, `bConfirmEnabled`, `Shortfall`·`bShortfallVisible`, `bResultVisible`, `Message`·`bMessageVisible`, `bClearSelection`.
@@ -606,3 +622,108 @@ struct FBathhouseExpansionView
 | render target(RHI 필요, Editor 재확인) | 편집 world에서 몇 tick 뒤 `GetRenderTarget()`이 null이 아니고 크기가 양수, `GetMaterialInstance()`가 있음, 화면에 한글 문구가 보임. `-nullrhi` headless에서는 엔진이 그리지 않으므로 자동화 단언 대상이 아니다 |
 | 코드 리뷰 | 글자 component에 `SetHiddenInGame`·visibility 끄기·`SetTickMode(Disabled)`·`DrawSize` 0 지정 없음 |
 
+## 19. 재설계 — 사용자 결정 D2 (2026-10-02)
+
+**U2에서는 구현하지 않음. 사용자 결정으로 U2는 D2 없이 PIE 승인됐고, 이 절은 다음 단위 아키텍처의 입력이다.** 다음 단위는 U3와 사용자 추가 지시(여러 방향 넓힘, 배치 미리보기 거리 밖 숨김)를 함께 다루며, 그 단위 아키텍처가 이 절을 다시 검토해 확정한다. 아래 "수정 파일"·"Editor 단계 변경"·"자동화 기준"은 그때의 출발점이다.
+
+입력: 상위 [../PROMPT_ARCHITECTURE.md](../PROMPT_ARCHITECTURE.md) 3절 D2 행, 2.2·4.3·4.4·4.5·4.7·12절, EXP-021·022·023·042~045(커밋 `ef4d1db`). 사용자 선택은 "공간별 상한만"과 "공간별·횟수별 가격"이고, 선택지 설명은 "공간 Actor의 넓힘 줄마다 가격"이었다. 새로 정할 사용자 동작은 없다. 이 절은 D2 이후 이름·규칙·값 위치의 정본이다(FBK-006). 패킷이나 다른 절과 다르면 이 절을 따른다.
+
+### 19.1 결정
+
+| 항목 | 결정 | 버린 대안과 이유 |
+|---|---|---|
+| 가격 위치 | U1 승인 형태 `FBathhouseSpaceExpansionStep`(`Side`, `AmountCm`)에 `int32 Price`를 더한다. 줄 하나 = 그 공간의 k번째 넓힘의 방향·양·가격(계약 4.7 "넓힘마다 양·방향과 함께 정한다") | DataAsset에 공간별 가격 표: 넓힘 줄 수와 가격 줄 수를 따로 맞춰야 하고, 한 공간의 값이 Level과 DataAsset 두 곳으로 갈린다 |
+| 상한 | 공간별 상한 = `ExpansionSteps.Num()`만 남긴다. 전체 상한과 구입 순번은 쓰지 않는다 | — |
+| 확장 정의 필드 | `MaxPurchaseCount`·`PurchasePrices`를 **삭제**한다(deprecated로 두지 않음). 이름 있는 tagged property라 옛 asset을 load하면 없는 property 값은 건너뛴다. 이름 변경이 아니라 Core Redirect가 필요 없다. 사용처는 이 DA 하나이고 병합 전이다. Editor 단계가 새 빌드로 load·재저장해 남은 값을 파일에서 없앤다 | deprecated 유지: Details에 쓰이지 않는 가격·상한 칸이 남아 사용자가 어디서 가격을 바꾸는지 헷갈린다 |
+| 홀 효과 표 길이 | 홀 `ExpansionSteps.Num()` + 1 이상(계약 4.7 D2). DA와 Level을 함께 봐야 하므로 공간 world 검증이 `Space_Hall` 오류로 알린다 | DA 검증: DA는 Level의 홀 줄 수를 모른다 |
+| 중복 확인 방지 | 기대값을 "고른 공간의 넓힌 횟수"로 바꾼다. 그 횟수가 가격도 정하므로 확인을 연 뒤 가격이 바뀐 요청도 거절된다 | 전체 구입 횟수: D2로 의미가 없다 |
+| 열쇠걸이 검증 | 효과 표 **모든 줄**의 열쇠 수 ≤ 자리 수 | 도달 가능한 줄만: 열쇠걸이(Interaction)가 홀 줄 수(Building)를 알게 되는 새 의존이 생긴다. 쓰지 않는 줄까지 막는 것은 보수적이라 허용한다 |
+
+### 19.2 Building·Facility 데이터 변경
+
+- `BathhouseSpaceTypes.h` `FBathhouseSpaceExpansionStep`에 `UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bathhouse Space", meta = (ClampMin = "0", ToolTip = "이 넓힘의 구입 가격(원). 그 공간의 몇 번째 넓힘인지별, 전체 구입 순번과 무관.")) int32 Price = 0;`을 추가한다. C++ 기본 0은 "입력 안 됨"이고 검증 오류로 알린다(값 원본은 Level instance).
+- `FBathhouseExpansionStepSnapshot`에 `int32 Price`. `FillSnapshot`이 채운다.
+- `ABathhouseSpaceActor`:
+  - `int32 GetNextExpansionPrice() const`: 다음 줄이 있으면 그 `Price`, 없으면 0.
+  - `bool IsAtExpansionLimit() const` = `AppliedExpansionCount >= ExpansionSteps.Num()`.
+  - `CanApplyNextExpansion`에 "다음 줄 `Price` > 0" 조건을 더한다.
+- `UBathhouseExpansionDefinition`: `MaxPurchaseCount`, `PurchasePrices`, `GetMaxPurchaseCount`, `TryGetPurchasePrice`와 그 검증 규칙을 지운다. `ValidatePurchaseData`(이름 유지)는 `Tiers` 규칙(비어 있음, 열쇠 ≥ 한도, 줄마다 줄지 않음)만 본다. `GetHallEffect`·`GetHallEffectIndex`는 유지한다. `Tiers` tooltip에서 "전체 상한" 문구를 빼고 "줄 수는 홀 넓힘 줄 수 + 1 이상"으로 바꾼다.
+- `ABathhouseKeyRackActor::IsDataValid`: 도달 가능 줄 계산(`GetMaxPurchaseCount` 사용)을 없애고 `Tiers` 모든 줄의 최대 `KeyPoolSize`와 `PairTransforms.Num()`을 비교한다.
+
+### 19.3 검증 변경
+
+- `ValidateExpansion`의 인자 `int32 MaxPurchaseCount`를 `int32 HallEffectRowCount`로 바꾼다. world의 Authority Definition `Tiers.Num()`이고, Authority나 Definition이 없으면 `INDEX_NONE`(검사 생략). `BathhouseSpaceWorldValidation.cpp`가 이 값을 읽는다.
+- 문제 코드:
+  - 삭제: `ExpansionStepsBelowCap`.
+  - 추가 `ExpansionPriceInvalid`(Error, owner = 그 공간): 줄 `Price` ≤ 0. 문구 예 `홀(Space_Hall) 2번째 넓힘 줄의 가격이 0 이하입니다.`
+  - 추가 `ExpansionHallEffectShort`(Error, owner = 홀): `HallEffectRowCount != INDEX_NONE`이고 `홀 줄 수 + 1 > HallEffectRowCount`. 문구 예 `홀 넓힘 효과 표(DA_BathhouseExpansion_Default Tiers)가 {n}줄입니다. 홀 넓힘 {m}개에는 {m+1}줄이 필요합니다.`
+- 나머지 넓힘 검사(6.6)는 그대로다.
+
+### 19.4 구입 subsystem·view 변경
+
+- `EBathhouseExpansionFailure`에서 `MaxPurchasesReached`를 지운다(C++ 전용 enum).
+- `FBathhouseExpansionView`: `PurchaseCount`, `MaxPurchaseCount`, `bMaxReached`, `NextPrice`, `Shortfall`을 지우고 `bool bAllAtLimit`(등록된 공간이 하나 이상이고 모두 `IsAtExpansionLimit`)을 더한다.
+- `FBathhouseExpansionOptionView`에 `int32 AppliedCount`, `int32 StepCount`, `bool bAtLimit`, `int32 NextPrice`(넓힐 수 있을 때만 양수)를 더한다.
+- `UBathhouseExpansionPurchaseSubsystem`:
+  - `GetPurchaseCount()`를 지운다.
+  - `BuildView`: 사용 가능 조건에서 Definition 규칙은 `Tiers` 규칙만이다(나머지 조건은 7.2 그대로). 선택지마다 위 필드를 채운다.
+  - `EvaluatePurchase(const APlayerState* Buyer, EBathhouseSpaceKind Kind, int32 ExpectedAppliedCount, int32* OutPrice = nullptr)` 순서: `Busy` → `Unavailable` → `SpaceUnavailable`(그 종류 없음) → `StaleState`(`ExpectedAppliedCount != 그 공간 GetAppliedExpansionCount()`) → `SpaceMaxReached`(`CanApplyNextExpansion` 실패) → `InsufficientMoney`(`!Wallet->CanSpendMoney(Space->GetNextExpansionPrice())`) → 홀 다음 tier 사전 검사(7.2 그대로). 가격은 항상 `GetNextExpansionPrice()`다.
+  - `TryPurchase(APlayerState* Buyer, EBathhouseSpaceKind Kind, int32 ExpectedAppliedCount)`. 7.3 타임라인은 그대로이고 가격 출처만 바뀐다.
+- 자동화 실패 주입·방송 규칙은 그대로다.
+
+### 19.5 확장 탭 표시 변경 (`FExpansionScreenModel`)
+
+- 표시 상태: `ConfirmPurchaseCount`를 `ConfirmAppliedCount`(확인을 연 순간 고른 공간의 넓힌 횟수)로 바꾼다. 확인은 `TryPurchase(사용자, 선택, ConfirmAppliedCount)`.
+- 화면 헤더: `현재 확장 단계: N`과 화면 단위 `이번 구입 가격 N원`을 없앤다. 잔액·`설치된 락커 칸 a/b`는 그대로.
+- 선택지:
+  - `확장 단계 {AppliedCount}/{StepCount}`. 공간이 없으면 숨긴다.
+  - 넓힐 수 있으면 `다음 넓힘 {NextPrice}원`과 크기 `{현재} → {다음}`. 고를 수 있다.
+  - 넓힐 수 없으면 가격을 숨기고 크기는 현재만, `이 공간은 더 넓힐 수 없습니다`, 비활성. 상한 도달(`2/2`)과 데이터 문제 모두 같은 문구다.
+  - 홀 효과 문구는 그대로다.
+- 구입 버튼: 고른 선택지가 고를 수 있으면 `확장 구입 ({그 공간 NextPrice}원)`, 아니면 `확장 구입`(꺼짐).
+- 부족액: 고른 선택지가 고를 수 있고 잔액 < 그 가격일 때만 `{가격 − 잔액}원 부족`. 선택 전에는 보이지 않는다. 선택을 바꾸면 그 공간 가격으로 다시 계산한다.
+- 구입 가능 = 사용 가능 && `!bAllAtLimit` && 선택 있음 && 그 선택지 고를 수 있음 && 잔액 ≥ 그 가격. 확인 대기 중 `bConfirmEnabled`도 같은 판정이다.
+- `bAllAtLimit`이면 `최대 확장 단계입니다`가 보이고 선택지·구입·확인·부족액이 숨는다. 잔액·락커·완료 문구는 보인다. 일부 공간만 상한이면 이 문구는 나오지 않는다.
+- 사용 불가 표시는 8.5 그대로다(단계 문구가 없어졌을 뿐).
+
+### 19.6 Widget binding 변경
+
+- `UExpansionScreenWidget`: BindWidget `StageText`, `PriceText`를 **지운다**.
+- `UExpansionSpaceOptionWidget`: `UPROPERTY(meta = (BindWidgetOptional)) UTextBlock* StageText`(`확장 단계 N/M`), `UPROPERTY(meta = (BindWidgetOptional)) UTextBlock* PriceText`(`다음 넓힘 N원`)를 더한다. 표시 struct `FExpansionOptionDisplay`에 `Stage`, `bStageVisible`, `Price`, `bPriceVisible`.
+  - Optional 근거(8.1과 같음): 이미 있는 `WBP_ExpansionSpaceOption`에 필수 binding을 더하면 구현~Editor 사이에 compile 오류가 난다. 그러면 root가 품은 이 WBP를 로드하는 `ScreenWheelContentContract`도 실패한다. 존재는 content 자동화가 Editor 작업 뒤 확인한다.
+- 표시 조건 확인(FBK-004): 새 글자는 이미 그려지고 있는 컴퓨터 화면(게임 world `UWidgetComponent`) 안의 `UTextBlock`이다. 새 component·숨김 flag·tick 변화가 없다. 가시성은 C++가 Visible/Collapsed로만 바꾼다. 글꼴은 다른 화면 글자와 같은 기본 UMG 글꼴이라 한글이 나온다. 남는 위험은 선택지 카드에 두 줄이 늘어 1024×576 안에서 잘리는 것이다. Editor 단계가 화면 캡처로 확인한다.
+
+### 19.7 수정 파일
+
+- Building: `Public/Building/BathhouseSpaceTypes.h`, `Public/Building/BathhouseSpaceActor.h`, `Private/Building/BathhouseSpaceExpansion.cpp`, `Private/Building/BathhouseSpaceActor.cpp`(`FillSnapshot`의 가격 한 줄), `Private/Building/BathhouseSpaceLayout.h`(snapshot 필드), `Private/Building/BathhouseSpaceValidation.h`(코드·인자), `Private/Building/BathhouseSpaceExpansionValidation.cpp`, `Private/Building/BathhouseSpaceWorldValidation.cpp`, `Public/Building/BathhouseExpansionTypes.h`, `Public/Building/BathhouseExpansionPurchaseSubsystem.h`, `Private/Building/BathhouseExpansionPurchaseSubsystem.cpp`.
+- Facility·Interaction: `Public/Facility/BathhouseExpansionDefinition.h`, `Private/Facility/BathhouseExpansionDefinition.cpp`, `Private/Interaction/BathhouseKeyRackActor.cpp`.
+- UI: `Public/UI/ExpansionScreenWidget.h`, `Private/UI/ExpansionScreenWidget.cpp`, `Public/UI/ExpansionSpaceOptionWidget.h`, `Private/UI/ExpansionSpaceOptionWidget.cpp`, `Private/UI/ExpansionScreenModel.h/.cpp`.
+- 자동화: `Private/Tests/BathhouseExpansionAutomationTests.cpp`, `Private/Tests/BathhouseExpansionAutomationTestSupport.h`, `Private/Tests/ExpansionScreenAutomationTests.cpp`, (`Expansion.Content.ScreenContract` 포함).
+- `BathhouseSpaceLayout.cpp`·`BathhouseSpaceValidation.cpp`(400줄 근처)는 바꾸지 않는다. Config 변경은 없다.
+
+### 19.8 Editor 단계 변경 (allowlist)
+
+1. `/Game/Bathhouse/Data/Expansion/DA_BathhouseExpansion_Default`: 새 빌드로 load해 오류가 없는지 확인한다. 재저장해 지운 `MaxPurchaseCount`·`PurchasePrices` 값을 없앤다. `Tiers`는 그대로 두고(3줄) 새 프로세스에서 재로드한다.
+2. `Space_Hall`·`Space_Bath`·`Space_Work`(external package는 `.md/Unreal/BuildingSystem.md`): `ExpansionSteps` 각 줄에 `Price`를 넣는다. 값은 상위 계약 4.7 "확장 구입 가격 (D2)" 행의 제안값이다(공간별·몇 번째 넓힘별). `Side`·`AmountCm`·줄 수는 그대로다. Data Validation 오류 0(가격·홀 효과 표 포함)을 확인하고 저장(`save_packages`)·재로드한다.
+3. `/Game/Bathhouse/UI/WBP_ExpansionScreen`: 더 이상 bind되지 않는 `StageText`, `PriceText` widget을 지우고 레이아웃을 정리한다.
+4. `/Game/Bathhouse/UI/WBP_ExpansionSpaceOption`: `StageText`, `PriceText`(TextBlock)를 카드 안 `NameText` 근처에 추가한다. Compile 경고 0, 1024×576 화면에서 세 카드 문구가 잘리지 않는지 캡처로 확인한다.
+5. `.md/Unreal/` 갱신: `BuildingSystem.md`(넓힘 줄 `Price` 원본), `FacilitySystem.md` 또는 확장 정의 기록(삭제 필드 반영), `InteractionUISystem.md`(binding 변경).
+6. 자동화 `Expansion.*`(content 계약 포함)와 `Computer.Input.ScreenWheelContentContract`를 다시 돌린다.
+- 그 밖의 asset(`DA_ShopCatalog`, root WBP, Nav 범위, 열쇠걸이)은 바꾸지 않는다.
+
+### 19.9 영향 시나리오와 유지 범위
+
+- U2 PIE 영향: EXP-021(선택지 단계·가격, 전체 단계 문구 없음), EXP-022(홀 가격 기준 부족액), EXP-023(홀 1번째 가격 차감, 홀 `1/2`·2번째 가격, 다른 공간 `0/2` 그대로), EXP-026·027(공간 횟수 기대값). 나머지 U2 시나리오는 그대로다.
+- U3 수용 대상(같은 코드로 동작): EXP-042~045(다른 공간 구입 뒤 홀 2번째 가격, 모두 상한일 때만 최대, 홀 상한 뒤 다른 공간 구입, 홀 상한 3 조정과 효과 표 검사).
+- 유지: 공간 넓힘 적용·되돌림·이웃 불변, transaction 순서(7.3), tier = 홀 넓힘 횟수, 확장 탭 구조(탭 3개, 확인 2단계, 취소 경로), 락커 상품 규칙, 미리보기 글자(18절), Editor 단계에서 저장한 나머지 Content.
+
+### 19.10 자동화 기준 (15절의 해당 줄을 대체·추가)
+
+| 영역 | 확인 |
+|---|---|
+| 데이터 | 넓힘 줄 `Price` ≤ 0이면 `ExpansionPriceInvalid`·`CanApplyNextExpansion` 거짓, `GetNextExpansionPrice`가 다음 줄 가격·상한이면 0, `ExpansionHallEffectShort` 양성·음성(효과 표 = 홀 줄 + 1은 통과), Authority 없으면 생략, `ExpansionStepsBelowCap` 없음 |
+| Definition·열쇠걸이 | `Tiers` 규칙만 검사(가격·상한 필드 없음), 열쇠걸이가 쓰지 않는 줄까지 포함해 최대 열쇠 수를 검사 |
+| 구입 | 홀 1번째 = 홀 줄 0 가격, 목욕 1번째 = 목욕 줄 0 가격(fixture에서 서로 다른 값), 다른 공간을 산 뒤 홀 2번째 = 홀 줄 1 가격, 다른 공간의 횟수·가격 불변, 홀 상한 뒤 홀은 `SpaceMaxReached`이고 목욕은 구입 가능(전체 상한 없음), 모든 공간 상한이면 view `bAllAtLimit`, 같은 기대 횟수 두 번째 호출 `StaleState`, 잔액 부족 판정이 고른 공간 가격 기준 |
+| 표시 모델 | 선택지 `확장 단계 N/M`·`다음 넓힘 N원`, 상한 선택지 가격 숨김·상태 문구, 선택 전 버튼 `확장 구입`·부족액 없음, 선택에 따라 버튼 가격·부족액이 바뀜, 일부 상한이면 최대 문구 없음, 모두 상한이면 최대 문구, 헤더에 단계 문구 없음 |
+| content(Editor 뒤) | `WBP_ExpansionSpaceOption`에 `StageText`·`PriceText`, `WBP_ExpansionScreen`에 옛 `StageText`·`PriceText` 없음, 세 공간 넓힘 줄 `Price` > 0, `DA_BathhouseExpansion_Default` `ValidatePurchaseData` 통과 |
+| 코드 리뷰 | 전체 구입 횟수·전체 상한·구입 순번 가격이 코드에 남지 않음, 가격 리터럴 없음(fixture 값에서 기대값 계산), 400줄 파일 무변경, 새 binding이 Optional이고 content 계약이 존재를 단언 |
