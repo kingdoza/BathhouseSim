@@ -24,7 +24,7 @@ template <typename BodyType>
 bool WithEmptyBoxFacility(FAutomationTestBase& Test, const TCHAR* WorldName, const bool bShower, BodyType Body)
 {
 	FScopedUtilityLaborWorld Scope(WorldName);
-	FFixture Fixture(Scope.Get());
+	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!Fixture.Install(Test, bShower))
 	{
 		Test.AddError(FString::Printf(TEXT("%s: facility install failed"), WorldName));
@@ -42,14 +42,14 @@ bool WithEmptyBoxFacility(FAutomationTestBase& Test, const TCHAR* WorldName, con
 	return true;
 }
 
-void Rmb(FFixture& Fixture)
+void Rmb(ServiceFacilityTest::FFixture& Fixture)
 {
 	Fixture.Player.HeldUse->BeginUse(EPlayerHeldTargetUseDirection::Take);
 	Fixture.Player.HeldUse->EndUse();
 }
 
 /** HUD query and highlight (only the key group, on its last filled slot) in one place. */
-void ExpectTarget(FAutomationTestBase& Test, FFixture& Fixture, const FString& Label, const int32 Key,
+void ExpectTarget(FAutomationTestBase& Test, ServiceFacilityTest::FFixture& Fixture, const FString& Label, const int32 Key,
 				  const bool bHighlight)
 {
 	const FPlayerInteractionQuery Query = Fixture.Player.Interaction->GetCurrentInteractionQuery();
@@ -158,7 +158,7 @@ bool FBathhouseEmptyBoxTakeVanityTest::RunTest(const FString& Parameters)
 	FText Failure;
 
 	WithEmptyBoxFacility(*this, TEXT("EmptyBoxEbt001"), false,
-						 [&](FFixture& Fixture, AItemBoxActor* Box)
+						 [&](ServiceFacilityTest::FFixture& Fixture, AItemBoxActor* Box)
 						 {
 							 auto Spaces = Fixture.Facility->GetSpaces();
 							 Spaces[3]->ImportStock(Fixture.Kinds[3], 3, Failure);
@@ -172,7 +172,7 @@ bool FBathhouseEmptyBoxTakeVanityTest::RunTest(const FString& Parameters)
 						 });
 
 	WithEmptyBoxFacility(*this, TEXT("EmptyBoxEbt002"), false,
-						 [&](FFixture& Fixture, AItemBoxActor*)
+						 [&](ServiceFacilityTest::FFixture& Fixture, AItemBoxActor*)
 						 {
 							 auto Spaces = Fixture.Facility->GetSpaces();
 							 Spaces[0]->ImportStock(Fixture.Kinds[0], 2, Failure);
@@ -188,7 +188,7 @@ bool FBathhouseEmptyBoxTakeVanityTest::RunTest(const FString& Parameters)
 
 	WithEmptyBoxFacility(
 		*this, TEXT("EmptyBoxEbt003"), false,
-		[&](FFixture& Fixture, AItemBoxActor*)
+		[&](ServiceFacilityTest::FFixture& Fixture, AItemBoxActor*)
 		{
 			auto Spaces = Fixture.Facility->GetSpaces();
 			Spaces[1]->ImportStock(Fixture.Kinds[1], 1, Failure);
@@ -220,7 +220,7 @@ bool FBathhouseEmptyBoxTakeVanityTest::RunTest(const FString& Parameters)
 		});
 
 	WithEmptyBoxFacility(*this, TEXT("EmptyBoxEbt004"), false,
-						 [&](FFixture& Fixture, AItemBoxActor* Box)
+						 [&](ServiceFacilityTest::FFixture& Fixture, AItemBoxActor* Box)
 						 {
 							 auto Spaces = Fixture.Facility->GetSpaces();
 							 Spaces[1]->ImportStock(Fixture.Kinds[1], 1, Failure, 9);
@@ -243,7 +243,7 @@ bool FBathhouseEmptyBoxTakeVanityTest::RunTest(const FString& Parameters)
 
 	WithEmptyBoxFacility(
 		*this, TEXT("EmptyBoxEbt005"), false,
-		[&](FFixture& Fixture, AItemBoxActor* Box)
+		[&](ServiceFacilityTest::FFixture& Fixture, AItemBoxActor* Box)
 		{
 			TArray<FPlayerInteractionResult> Reports;
 			Fixture.Player.Interaction->OnInteractionAttemptFinishedNative.AddLambda(
@@ -268,7 +268,7 @@ bool FBathhouseEmptyBoxTakeVanityTest::RunTest(const FString& Parameters)
 		});
 
 	WithEmptyBoxFacility(*this, TEXT("EmptyBoxEbt006"), false,
-						 [&](FFixture& Fixture, AItemBoxActor* Box)
+						 [&](ServiceFacilityTest::FFixture& Fixture, AItemBoxActor* Box)
 						 {
 							 auto Spaces = Fixture.Facility->GetSpaces();
 							 Spaces[1]->ImportStock(Fixture.Kinds[1], 1, Failure, 9);
@@ -285,7 +285,7 @@ bool FBathhouseEmptyBoxTakeVanityTest::RunTest(const FString& Parameters)
 						 });
 
 	WithEmptyBoxFacility(*this, TEXT("EmptyBoxEbt012"), false,
-						 [&](FFixture& Fixture, AItemBoxActor* Box)
+						 [&](ServiceFacilityTest::FFixture& Fixture, AItemBoxActor* Box)
 						 {
 							 auto Spaces = Fixture.Facility->GetSpaces();
 							 Spaces[1]->ImportStock(Fixture.Kinds[1], 1, Failure);
@@ -310,7 +310,7 @@ bool FBathhouseEmptyBoxTakeVanityTest::RunTest(const FString& Parameters)
 
 	SettingsGuard.Settings->bShowTakeHighlight = false;
 	WithEmptyBoxFacility(*this, TEXT("EmptyBoxEbt013"), false,
-						 [&](FFixture& Fixture, AItemBoxActor* Box)
+						 [&](ServiceFacilityTest::FFixture& Fixture, AItemBoxActor* Box)
 						 {
 							 auto Spaces = Fixture.Facility->GetSpaces();
 							 Spaces[3]->ImportStock(Fixture.Kinds[3], 3, Failure);
@@ -342,7 +342,7 @@ bool FBathhouseEmptyBoxTakeUnchangedTest::RunTest(const FString& Parameters)
 	FText Failure;
 
 	WithEmptyBoxFacility(*this, TEXT("EmptyBoxEbt010"), true,
-						 [&](FFixture& Fixture, AItemBoxActor* Box)
+						 [&](ServiceFacilityTest::FFixture& Fixture, AItemBoxActor* Box)
 						 {
 							 auto Spaces = Fixture.Facility->GetSpaces();
 							 Spaces[1]->ImportStock(Fixture.Kinds[1], 2, Failure);
@@ -356,7 +356,7 @@ bool FBathhouseEmptyBoxTakeUnchangedTest::RunTest(const FString& Parameters)
 
 	// EBT-011 and EBT-008: a box with a kind keeps selecting its kind group wherever the aim is.
 	FScopedUtilityLaborWorld Scope(TEXT("EmptyBoxFilledWorld"));
-	FFixture Fixture(Scope.Get());
+	ServiceFacilityTest::FFixture Fixture(Scope.Get());
 	if (!Fixture.Install(*this))
 	{
 		return false;

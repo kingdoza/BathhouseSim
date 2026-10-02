@@ -159,6 +159,15 @@ ActorLocation = P - BottomOffsetWorld
 
 preview root transform, final deferred spawn transform, footprint world transform, containment와 네 모서리 floor-support trace는 모두 이 최종 Actor transform 하나를 사용한다. `ContainsFootprint`의 기존 Zone Bounds X/Y 포함 계약과 wheel rotation은 유지한다.
 
+### Space Zones (2026-10-02 EXP-U1, Source 반영)
+
+- 설비 배치 구역은 공간마다 하나이며 공간 Actor `ABathhouseSpaceActor`가 `AFacilityPlacementZoneActor`를 상속해 그 자체로 구역이다([BuildingSystem.md](BuildingSystem.md)). 기존 단일 PlacementZone Level instance는 제거한다. base class 계약(`ZoneBounds`, `PlacementFloor`, grid, 후보 transform, `ContainsFootprint`)은 바뀌지 않는다. 공간 subclass만 root를 `SpaceRoot`로 바꾸고 `ZoneBounds`를 그 아래에 둔다.
+- 공간별 허용 설비: 각 Definition `FacilityTags`에 종류 태그 `Facility.Type.<종류>` 하나(락커 1·4·8칸은 `Facility.Type.ClothesLocker` 공유)를 두고, 공간 Actor의 상속 `AllowedFacilityTags`에 허용 종류를 나열한다. 판정은 기존 `IsDefinitionAllowed`(HasAny)다. 태그 목록은 `Config/DefaultGameplayTags.ini`, 공간별 허용 표는 공간 Level instance가 정본이다. 공간은 빈 허용 목록을 쓰지 않는다(검증 오류).
+- 거부 문구는 `AFacilityPlacementZoneActor::GetDefinitionNotAllowedReason()` 한 곳(`이 공간에는 놓을 수 없는 설비입니다`)이 정본이다. player 검증과 세 `QueryFacilityPlacement` 구현(목욕탕 설비, utility, 수건 처리기)이 같은 getter를 쓴다.
+- 구역 Actor가 바닥·벽 형상도 소유하므로 `ValidateWorldPlacement`의 overlap·바닥 지지 query는 구역 Actor 전체가 아니라 `ZoneBounds` component만 무시한다(`AddIgnoredComponent`). 기존 단일 Zone에서는 결과가 같다.
+- 공간 벽·천장·계단 형상은 배치 trace 채널을 Block한다. 벽 너머 다른 공간의 구역은 조준되지 않고 `설치 가능한 구역을 바라보세요.`가 된다. 계단 구멍 위는 보이지 않는 QueryOnly 막이 상자가 막는다.
+- 구역 인정(2026-10-02 복귀 A1): 형상 component도 구역 Actor 소유이므로 `TracePlacementZone`은 `Cast` 성공만으로 구역을 정하지 않는다. `AFacilityPlacementZoneActor::IsZoneSurfaceHit(Hit)`(hit component = `ZoneBounds`, `ImpactNormal`이 `PlacementFloor` 위쪽과 같은 쪽)일 때만 구역이다. 벽·천장·경사로·계단 벽 hit와 `ZoneBounds` 아랫면 hit는 구역 없음(`설치 가능한 구역을 바라보세요.`)이다. trace는 한 번이고 가려진 뒤쪽 구역을 다시 찾지 않는다. 기존 단일 Zone의 결과는 같다.
+
 ## Compatible Zone Grid Presentation
 
 `AFacilityPlacementZoneActor`는 `PlacementFloor` 아래 native `GridVisual` `UStaticMeshComponent`를 stable default subobject로 소유한다. component는 기본 hidden이며 collision, overlap, physics, Tick과 Navigation을 사용하지 않는다. Blueprint는 inherited component에 중심 pivot/+Z normal을 가진 plane mesh와 `MI_FacilityPlacementGrid` 하나만 지정한다.
@@ -318,6 +327,7 @@ Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후�
 
 ## Dependencies
 
+- Building -> Placement zone base class·`IPlaceableFacility`·배치 trace 채널(EXP-U1)
 - Shop -> Placement Definition·fresh item factory·collision helper
 - Cleaning -> Placement 배치 확정 이벤트 subsystem·collision helper(3단위)
 - Placement -> Interaction carry/query/result contract

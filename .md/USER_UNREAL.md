@@ -166,16 +166,6 @@ Definition/Blueprint migration, footprint·body Navigation authoring, preview Ma
 
 현재 확인 상태: 두 Material은 Translucent/Unlit로 저장돼 있지만 Project Settings의 두 reference는 재시작 후 `None`으로 돌아왔다. MCP property setter는 메모리만 바꾸고 config를 저장하지 않았다.
 
-## 2. RecastNavMesh Dynamic 저장
-
-1. PIE를 중지하고 `/Game/Maps/DefaultMap`을 연다.
-2. Outliner에서 `RecastNavMesh`를 선택한다.
-3. **Runtime Generation**을 `Dynamic`으로 바꾼다. `Dynamic Modifiers Only`가 아니다.
-4. 해당 Recast external actor와 필요한 Map 패키지만 저장한다.
-5. `DefaultMap`을 닫았다가 다시 열고 값이 `Dynamic`으로 유지되는지 확인한다.
-
-현재 확인 상태: MCP 메모리에서는 `Dynamic` 적용이 됐지만 World Partition actor 저장 호출이 external actor 패키지를 에셋으로 찾지 못했다. 재시작 후 저장값은 다시 `Dynamic Modifiers Only`였다.
-
 ## 3. Definition Data Validation 네이티브 차단점
 
 다음 두 opt-out Definition은 의도대로 `PlacedFacilityClass=None`, `RecoveryItemClass=None` 상태지만 현재 native `UFacilityPlacementDefinition::IsDataValid()`가 opt-out을 구분하지 않아 각각 세 개의 오류를 낸다.
@@ -191,7 +181,7 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 
 ## 4. 직접 플레이 검증
 
-1~3번을 마친 뒤 PIE에서 Bath, Shower, Locker 1/4/8, Washer, Dryer를 각각 확인한다.
+1·3번을 마친 뒤 PIE에서 Bath, Shower, Locker 1/4/8, Washer, Dryer를 각각 확인한다.
 
 1. 설비를 들었을 때 class-default의 모든 body mesh가 preview에 나타나는지 확인한다.
 2. 설치 가능 위치는 초록, 불가 위치는 빨강 반투명 재질이 모든 mesh slot에 적용되는지 확인한다.
@@ -229,7 +219,6 @@ Editor에서 class를 임의로 채우지 않는다. 그러면 Stack/Bin의 plac
 ## 재개 조건
 
 - Project Settings의 두 Material reference가 재시작 후 유지된다.
-- Recast `RuntimeGeneration=Dynamic`이 재시작 후 유지된다.
 - opt-out Definition 두 개의 native Data Validation 오류가 수정된다.
 - Definition 9개와 pre-placed Locker 두 개의 Data Validation이 통과한다.
 - 4번 직접 플레이 검증 결과를 기록한다.

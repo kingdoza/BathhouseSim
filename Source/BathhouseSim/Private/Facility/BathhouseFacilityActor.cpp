@@ -236,7 +236,7 @@ FFacilityPlacementTransactionResult ABathhouseFacilityActor::QueryFacilityPlacem
 	}
 	if (!Zone.IsDefinitionAllowed(*FacilityPlacement->GetDefinition()))
 	{
-		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::NoCompatibleZone, LOCTEXT("ZoneTagMismatch", "이 구역에는 해당 설비를 설치할 수 없습니다."));
+		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::NoCompatibleZone, AFacilityPlacementZoneActor::GetDefinitionNotAllowedReason());
 	}
 	if (FacilityType == EBathhouseFacilityType::ClothesLocker)
 	{

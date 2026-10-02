@@ -48,6 +48,7 @@
 - [BathWaterSystem.md](Architecture/BathWaterSystem.md): 욕탕 급수·배수, 평면 수면 표현, 공통 입욕 임계치와 Customer BathLoop 연계
 - [BathWaterOperationsSystem.md](Architecture/BathWaterOperationsSystem.md) / [BathWaterManagementUISystem.md](Architecture/BathWaterManagementUISystem.md): 순환·가열·냉각 용량과 욕탕 condition domain / world-space 관리 화면
 - [PlacementSystem.md](Architecture/PlacementSystem.md): 배치 설비와 전용 회수 아이템 변환, preview/Q 회수와 locker capacity lease
+- [BuildingSystem.md](Architecture/BuildingSystem.md): 공간(홀·목욕공간·지하 작업공간) 벽·바닥·천장·조명·출입구·통로·계단 생성, 공간 = 배치 구역, 쓰레기·물 얼룩 생성 조각(EXP-U1 설계)
 - [EconomySystem.md](Architecture/EconomySystem.md): PlayerState wallet과 일회성 cash 획득
 - [CustomerSystem.md](Architecture/CustomerSystem.md): UE 5.8 StateTree customer routine, session과 cleanup
 - [UISystem.md](Architecture/UISystem.md): native Widget/Widget Blueprint 경계와 E/LMB/RMB interaction prompt 계약
@@ -76,6 +77,7 @@ Source/BathhouseSim/
     Cleaning/
     Towel/
     Combat/
+    Building/
   Private/
     Character/
     Camera/
@@ -89,6 +91,7 @@ Source/BathhouseSim/
     Cleaning/
     Towel/
     Combat/
+    Building/
     Tests/
 ```
 
@@ -114,6 +117,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
   - Customer Recovery: Customer Source 내 knockdown, soft interruption과 restartable Task 책임
   - Shop: cart, 주문·배송, 배송 상자·개봉과 쓰레기통 책임
   - Service: 품목 박스·진열 공간·음료 냉장고·판매 적립·수거함, 안마의자·TV·세신대·때수건·세신 포커스 책임
+  - Building: 공간 Actor(배치 구역 subclass)와 생성 형상·조명·계단, 공간별 허용 설비와 생성 조각 spawn 책임(EXP-U1 설계)
   - Core: 모듈/redirect/문서 경계 책임
 
 ## 시스템 간 책임 흐름
@@ -150,6 +154,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - Towel Presentation은 inventory snapshot을 읽어 clean stack/used bin/basket의 Stack과 기존 washer/dryer의 Pile을 표시한다. Stack/Pile/Slot은 transient CallInEditor preview를 제공하며 Slot은 gameplay actor에 연결하지 않는다.
 - 사용 수건통 내부는 container 단위 E/F interaction이고, overflow world towel만 개별 E interaction이다.
 - Customer는 clean towel token과 satisfaction을 session에 보관하고, used bin full이면 floor overflow로 반납한다.
+- (EXP-U1 설계) Building은 공간마다 Level 공간 Actor 하나를 둔다. 공간 Actor가 그 바닥의 설비 배치 구역이며, 모든 공간의 authored 값으로 벽·바닥·천장·개구부·계단을 계산해 자기 몫을 Transient component로 만든다(편집 world는 OnConstruction과 지연 일괄 재생성, runtime은 BeginPlay). 공간은 BeginPlay에 자기 조각 종류(홀 쓰레기, 목욕공간 물 얼룩, 작업공간 없음)의 생성 조각 Actor를 spawn한다. 손님 길은 넓은 Nav 범위와 Recast Dynamic 재생성이 맡는다.
 - Core는 런타임 gameplay 상태를 소유하지 않고 모듈 의존성, Source 경계, Content/Config 정책, Core Redirect 기준을 문서화한다.
 
 ## 주요 의존 방향
@@ -186,6 +191,7 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - Customer Recovery -> Combat
 - Customer Recovery -> Facility
 - Customer Recovery -> UE GameplayStateTree/AI/Navigation/Physics
+- Building -> Placement(zone base·placeable 계약), Cleaning(조각 zone class), NavigationSystem, DeveloperSettings(EXP-U1)
 - Core -> Engine module boundary
 
 ## Blueprint/API 변경 주의
@@ -236,3 +242,4 @@ Utility Labor target은 `Public/Utility`, `Private/Utility`와 기존 Facility/I
 - `COMPUTER-WHEEL-SCROLL`: 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합. 컴퓨터 Active 동안 휠을 virtual pointer로 화면에 주입해 커서 아래 스크롤 영역을 스크롤한다. Content 변경은 없다([ComputerSystem.md](Architecture/ComputerSystem.md) Screen Wheel Scroll, [CharacterSystem.md](Architecture/CharacterSystem.md)).
 - 빈 박스 빼기 대상 선택 통일(ServiceFacilityDisplaySystem, `EMPTY-BOX-TAKE-TARGET`): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.
 - 플레이어 앞 생성 위치 카메라 시선 기준(UNBOX-SPAWN-VIEW, Shop·CleaningLitter·Interaction): 2026-10-01 Source 반영, 사용자 PIE 통과, main 병합.
+- 확장 구입·공간 건물(`EXPANSION-PURCHASE`): 2026-10-02 단위 `EXP-U1`(공간 건물) 설계·구현([BuildingSystem.md](Architecture/BuildingSystem.md), Placement Space Zones, CleaningLitter 공간 생성 조각). Source 반영(구현 단계 완료, 코드 리뷰·Editor 작업 전), 사용자 승인(2026-10-02). 구현 입력은 `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION.md`다.

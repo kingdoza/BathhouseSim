@@ -34,6 +34,14 @@ public:
 		return MaxActiveLitterInZone;
 	}
 
+	USceneComponent* GetSpawnFloor() const
+	{
+		return SpawnFloor;
+	}
+
+	/** SpawnBounds X, Y extent만 바꾼다(Z extent와 SpawnFloor 상대 위치 유지). BeginPlay 전 deferred spawn 중 호출한다. */
+	void SetSpawnAreaHalfSizeXY(const FVector2D& HalfSizeXY);
+
 protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Litter Zone")

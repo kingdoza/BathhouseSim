@@ -834,11 +834,11 @@ bool FBathhouseCleaningInteractionTest::RunTest(const FString& Parameters)
 	UCleaningWorldSubsystem* Cleaning = World->GetSubsystem<UCleaningWorldSubsystem>();
 	TestEqual(TEXT("Authored zone registers once"), Cleaning->GetActiveZones().Num(), 1);
 	// Fixture footprint; clearance height and floor offset come from the director's data.
-	const float StainRadiusFixtureCm = 30.0f;
+	const float TowelStainRadiusFixtureCm = 30.0f;
 	const ACleaningDirectorActor* DirectorDefaults = GetDefault<ACleaningDirectorActor>();
 	const auto FindCandidate = [&](FRandomStream& Stream, FTransform& Out)
 	{
-		return Zone->FindSpawnTransform(Stream, 80.0f, Out, StainRadiusFixtureCm,
+		return Zone->FindSpawnTransform(Stream, 80.0f, Out, TowelStainRadiusFixtureCm,
 										DirectorDefaults->GetSpawnClearanceHeightCm(),
 										DirectorDefaults->GetSpawnClearanceFloorOffsetCm());
 	};

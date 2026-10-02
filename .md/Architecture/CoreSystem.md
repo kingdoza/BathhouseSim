@@ -102,6 +102,7 @@ Core System은 고정된 native class inventory를 유지하지 않는다. 구�
 - `CleaningLitterSystem.md`: Cleaning 하위 쓰레기·집게·봉투·수거 구역·인원 기반 생성·발밑 정리·RMB 장비 보조 사용 경계.
 - `ServiceFacilityDisplaySystem.md`: Service 하위 설비 전체 조준 진열·소모품·화장대·샤워 비품·진열 payload 일반화·공용 표시 도구 경계.
 - `PlacementSystem.md`: 설비 mode/preview/placement/recovery, 확장 단계와 락커 capacity lease 경계
+- `BuildingSystem.md`: `Public/Building`, `Private/Building`의 공간(홀·목욕·지하) 벽·바닥·천장·조명·개구부·계단 생성, 공간별 배치 구역과 생성 조각 경계(EXP-U1 설계)
 - `EconomySystem.md`: wallet과 cash claim 경계
 - `CustomerSystem.md`: StateTree routine과 customer session 경계
 - `UISystem.md`: native Widget/Widget Blueprint 경계
@@ -140,6 +141,8 @@ Cleaning/Towel/Computer, Combat/Customer Recovery, Physical Carry와 Bath Water 
 - 청소 생성(3단위): 두 종류의 발생 clock은 `ACleaningDirectorActor`, 바닥 판정·clock 수학·footprint 겹침은 private `CleaningSpawnRules` helper가 소유한다. 쓰레기 구역은 기존 stain zone의 부모를 바꾸지 않은 독립 class다. 500줄을 넘은 `FacilityActorConversionTransaction.cpp`에는 배치 확정 이벤트 발행만 추가한다. 400줄을 넘은 품목 박스·배송 상자·설비 아이템 cpp에는 기존 버리기 책임의 world 변형만 추가한다. `UPlayerCarryComponent`·`UPlayerInteractionComponent`는 변경하지 않는다.
 
 - 배치형 서비스(4단위): 안마의자·TV·세신대는 `ABathhouseFacilityActor` 하위 class로 자기 상태를 소유하고, base에는 회수 수행자 Transient 필드만 더한다. 렌치 수리 진행은 400줄 경고선 근처의 렌치 대신 private `FWrenchRepairSession`이 맡는다. 세신 포커스는 승인된 컴퓨터 component를 바꾸지 않고 새 component로 두며 이탈 위치 helper만 공유한다. 500줄을 넘은 Character에는 입력 분기와 `IsFocusCapturingInput()` 정리만 추가한다. 415줄 `PlayerFacilityPlacementComponent`에는 회수 수행자 전달 두 호출만 추가한다.
+
+- 공간 건물(EXP-U1): 공간 Actor는 배치 구역 base를 상속한 composition root로 component 조립과 상위 flow만 맡는다. 생성 component 소유·재생성은 `UBathhouseSpaceShellComponent`, 형상 계산은 순수 `FBathhouseSpaceLayout`, 검증은 `FBathhouseSpaceValidation`, 조각 spawn은 private helper, 편집 world 동기화는 WITH_EDITOR helper가 맡는다. Placement base·Cleaning 구역 class에는 문구 getter·component 무시와 조각 크기 API만 추가한다.
 
 ## Manual Review Points
 

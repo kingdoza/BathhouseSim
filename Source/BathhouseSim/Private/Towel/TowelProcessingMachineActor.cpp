@@ -112,7 +112,7 @@ FFacilityPlacementTransactionResult ATowelProcessingMachineActor::QueryFacilityP
 		|| !FacilityPlacement->IsStagedPlacement())
 		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::WrongMode, LOCTEXT("MachineNotStaged", "새로 생성된 staged 처리기만 설치할 수 있습니다."));
 	if (!Zone.IsDefinitionAllowed(*FacilityPlacement->GetDefinition()))
-		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::NoCompatibleZone, LOCTEXT("MachineZoneMismatch", "이 구역에는 해당 기계를 설치할 수 없습니다."));
+		return FFacilityPlacementTransactionResult::Failed(EFacilityPlacementFailureCode::NoCompatibleZone, AFacilityPlacementZoneActor::GetDefinitionNotAllowedReason());
 	return FFacilityPlacementTransactionResult::Succeeded();
 }
 

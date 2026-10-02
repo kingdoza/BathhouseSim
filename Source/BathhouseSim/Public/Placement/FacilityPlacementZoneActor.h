@@ -24,6 +24,10 @@ public:
 #endif
 
 	bool IsDefinitionAllowed(const UFacilityPlacementDefinition& Definition) const;
+	/** 구역이 설비 종류를 허용하지 않을 때 보이는 문구. 모든 거부 경로가 이 한 곳을 쓴다. */
+	static FText GetDefinitionNotAllowedReason();
+	/** hit component가 이 구역의 ZoneBounds이고 hit 면이 구역 바닥 위쪽을 향할 때만 구역 조준으로 인정한다. */
+	bool IsZoneSurfaceHit(const FHitResult& Hit) const;
 	FTransform MakeCandidateTransform(const FVector& WorldPoint, float YawDegrees, bool bSnap) const;
 	bool ContainsFootprint(const FTransform& CandidateTransform, const FVector& WorldHalfExtent) const;
 	bool SetGridVisible(bool bVisible);

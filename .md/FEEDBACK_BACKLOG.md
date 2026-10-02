@@ -21,7 +21,23 @@
 
 ## 상위 단계 복귀 기록
 
-없음.
+### RET-001 공간 형상이 배치 trace 채널을 막아 벽·천장 hit가 배치 구역 hit로 취급됨
+
+- 일자·작업 ID: 2026-10-02, `EXP-U1`
+- 발견 단계: 코드 리뷰
+- 복귀 대상: 아키텍처
+- 문제: 형상 component Owner가 배치 구역 Actor 자신인데 배치 trace 채널을 Block하게 설계해, 천장·벽·경사로 조준이 그 공간 구역 조준으로 처리됨(계약 4.2, PlacementSystem.md Space Zones와 어긋남)
+- 놓친 이유: 형상 충돌 표를 정할 때 기존 `TracePlacementZone`이 hit Actor cast로 구역을 정한다는 점과 "공간 = 구역 subclass" 결정의 결합을 확인하지 않음
+- 근거: `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION_R.md` A1, 구현 커밋 `b5f4c41`
+
+### RET-002 계단 벽과 바닥·천장 판이 같은 평면으로 겹쳐 z-fighting
+
+- 일자·작업 ID: 2026-10-02, `EXP-U1`
+- 발견 단계: 코드 리뷰
+- 복귀 대상: 아키텍처
+- 문제: BuildingSystem.md Geometry Rules의 계단 벽 Z 구간이 바닥·천장 판 두께 구간과 같은 면을 공유해 계단 입구 앞·통로 안·출구 위 세 곳에서 면 겹침이 생김
+- 놓친 이유: 계단 벽·판 상자의 경계 면 공유(시각 겹침)를 형상 규칙 검토 항목으로 보지 않음
+- 근거: `.md/Work/EXPANSION-PURCHASE/EXP-U1/PROMPT_IMPLEMENTATION_R.md` A2, 구현 커밋 `b5f4c41`
 
 ## 이전 형식 기록
 

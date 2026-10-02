@@ -34,6 +34,8 @@
 | `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_CleanTowelStack` | `None` | 0 | placement opt-out |
 | `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_UsedTowelBin` | `None` | 0 | placement opt-out |
 
+활성 16개 Definition의 `FacilityTags`에는 기존 태그와 함께 설비 종류 태그 `Facility.Type.*` 하나가 있다(1·4·8칸 락커는 같은 `Facility.Type.ClothesLocker`, 표는 [BuildingSystem.md](BuildingSystem.md)). 공간의 `IsDefinitionAllowed`가 이 태그로 공간별 허용을 판정한다. opt-out Stack·Bin에는 종류 태그가 없다.
+
 활성 16개 Definition의 `RecoveryItemClass`는 공통 `/Game/Bathhouse/Blueprints/Placement/BP_PlaceableFacilityItem.BP_PlaceableFacilityItem_C`, `RecoveryItemMesh`는 `None`이며 native Cube fallback을 사용한다. Stack과 Bin은 `PlacedFacilityClass`, `RecoveryItemClass`, `RecoveryItemMesh`가 모두 `None`인 opt-out 상태다.
 
 `BP_Boiler`의 inherited `FacilityPlacement.Definition`은 `/Game/Bathhouse/Data/Placement/DA_FacilityPlacement_Boiler`로 저장됐다. `DefaultMap`의 기존 보일러 인스턴스는 별도 override 없이 재시작 후 같은 Definition을 상속한다. 다른 utility Blueprint의 Definition 연결 여부는 이 변경으로 보장하지 않는다.
@@ -70,7 +72,7 @@
 - 실제 Level instance의 floor plane은 world `Z=0`이다. Zone Bounds의 두께는 설치 높이 계산의 기준이 아니다.
 - `GridVisual`은 `PlacementFloor`의 child다. Static Mesh는 `/Engine/BasicShapes/Plane.Plane`, Material Element 0은 `/Game/Bathhouse/Materials/Placement/MI_FacilityPlacementGrid`다.
 - `GridVisual`은 기본 hidden, Collision `NoCollision`, overlap/physics/Tick/Navigation 비활성이다. transform과 visibility는 native가 파생·관리하며 Blueprint graph는 관여하지 않는다.
-- Class Default는 `GridLineThicknessCm=1.0`, `GridZOffsetCm=0.5`, `MajorGridIntervalCells=10`이다.
+- Grid 표현 Class Default(`GridLineThicknessCm`, `GridZOffsetCm`, `MajorGridIntervalCells`)의 정본은 이 Blueprint Class Defaults다. `BP_BathhouseSpace`는 같은 값을 가진다.
 
 ### Native grid Material
 
@@ -81,6 +83,6 @@
 - MI 표현 parameter는 `MinorLineColor`, `MajorLineColor`, `GridOpacity`, `MajorLineThicknessMultiplier`, `CellFillColor`, `CellFillOpacity`다.
 - MI 표현값은 `MinorLineColor=(0.35,0.38,0.40,1)`, `MajorLineColor=(0.75,0.78,0.80,1)`, `GridOpacity=0.35`, `MajorLineThicknessMultiplier=2.0`, `CellFillColor=(0.08,0.10,0.12,1)`, `CellFillOpacity=0.08`이다.
 
-`DefaultMap`의 exact PlacementZone actor는 `BP_FacilityPlacementZone_C_UAID_F02F7433CA36D1FF02_1155169559`다. `ZoneBounds` Extent는 `(1400,900,10)`이고 `PlacementFloor`는 identity다. 별도 instance override 없이 native construction 결과 `GridVisual`은 Relative Location `(0,0,0.5)`, Scale `(28,18,1)`로 Zone 전체 2800×1800cm를 덮는다. 이번 authoring에서는 Map/external actor 값을 바꾸거나 저장하지 않았다.
+`DefaultMap`에는 `BP_FacilityPlacementZone` instance가 없다(`EXP-U1`에서 삭제). 배치 구역은 공간 Actor 3개(`BP_BathhouseSpace`, parent `BathhouseSpaceActor` ← `FacilityPlacementZoneActor`)이며 각 공간 바닥 전체가 그 공간의 구역이다. `ZoneBounds` XY extent는 공간 `FloorSizeCm`에서 native가 파생하고, 공간별 허용 설비는 instance `AllowedFacilityTags`(`Facility.Type.*`)다. 구조·값 원본은 [BuildingSystem.md](BuildingSystem.md)에 있다.
 
 Recast와 Project Settings의 미저장 전역값, 실제 입력 기반 preview/배치/회수 판정은 [USER_UNREAL.md](../USER_UNREAL.md)를 따른다.

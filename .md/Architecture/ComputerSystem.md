@@ -84,6 +84,7 @@ Actor는 `IPlayerInteractable`을 직접 구현한다.
 - Actor reservation과 player session 시작은 한 transaction처럼 처리한다. session 시작 실패 시 reservation을 원복한다.
 - current user identity를 검증한 release만 허용해 중복 종료나 다른 player의 해제를 막는다.
 - `EndPlay`는 current user component에 actor unavailable을 통지하고 reservation을 지운다.
+- EXP-U1(설계)부터 `ManagedBathPlacementZone`에는 목욕공간 공간 Actor(`ABathhouseSpaceActor`, 배치 구역 subclass)를 연결한다. type과 지도 투영 계약은 그대로다([BuildingSystem.md](BuildingSystem.md)).
 - `ManagedBathPlacementZone`은 `EditInstanceOnly`로 authoring하며 management root에는 이 Zone과 `UBathWaterOperationsSubsystem`을 명시적으로 주입한다. Widget이 world scan으로 대상을 정하지 않는다.
 
 `FocusExitSearchRadiusCm`(신규, EditAnywhere, 기본 `100`, finite ≥ 0)은 고정 위치가 막혔을 때 빈자리를 찾는 최대 수평 거리다. `FocusExitPoint` transform은 Blueprint class 기본값과 Level instance override 모두 허용한다. native 기본 위치는 실제 자리가 아니므로 Editor가 반드시 정한다. `GetFocusExitFootTransform()`은 발바닥 위치와 `(Pitch, Yaw, 0)` 회전을 반환한다.
