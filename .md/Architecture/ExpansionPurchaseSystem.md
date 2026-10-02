@@ -2,7 +2,7 @@
 
 ## Status And Scope
 
-- 2026-10-02 `EXP-U2`(확장 구입 수직, 홀 1회) 설계, Source 반영(Editor 작업 전, 빌드·자동화 통과). 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-020~032)이고 구현 지시는 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md`다.
+- 2026-10-02 `EXP-U2`(확장 구입 수직, 홀 1회) 설계·구현, 2026-10-02 사용자 PIE 통과·병합(`3c17e41`). 입력은 `.md/Work/EXPANSION-PURCHASE/PROMPT_ARCHITECTURE.md`(EXP-020~032)이고 구현 지시는 병합 커밋 `3c17e41`의 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md`(Git 이력)다.
 - 사용자 결정 D2(전체 상한 삭제, 공간별·넓힘별 가격)는 **D2 설계, Source 미반영, 다음 단위에서 구현**이다. 아래 D2 Redesign 절에 따로 두며 본문은 현재 구현이다.
 - 컴퓨터 `확장` 탭에서 돈을 내고 공간 하나를 넓힌다. 홀을 넓히면 열쇠 수와 락커 칸 설치 한도가 오른다. 상점은 락커 상품을 팔 수 있다.
 - 공간 넓힘의 형상·검증·편집 미리보기는 [BuildingSystem.md](BuildingSystem.md) Expansion 절이 정본이다. 이 문서는 구입 상태·transaction·확장 데이터·확장 탭·락커 판매 규칙을 다룬다.
@@ -119,7 +119,7 @@ Private/Shop/
 
 ## D2 Redesign (D2 설계, Source 미반영, 다음 단위에서 구현)
 
-2026-10-02 사용자 결정 D2(상위 계약 3절 D2 행, 커밋 `ef4d1db`). U2는 D2 없이 사용자 PIE 승인됐으므로 **이 절 위의 모든 내용이 현재 구현**이다. 아래는 다음 단위(U3 묶음)에서 구현할 설계이며 상세는 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md` 19절이다. 구현되면 위 본문을 이 절대로 바꾼다.
+2026-10-02 사용자 결정 D2(상위 계약 3절 D2 행, 커밋 `ef4d1db`). U2는 D2 없이 사용자 PIE 승인됐으므로 **이 절 위의 모든 내용이 현재 구현**이다. 아래는 다음 단위(U3 묶음)에서 구현할 설계이며 상세는 병합 커밋 `3c17e41`의 `.md/Work/EXPANSION-PURCHASE/EXP-U2/PROMPT_IMPLEMENTATION.md` 19절이다. 구현되면 위 본문을 이 절대로 바꾼다.
 
 | 항목 | 현재 구현 | D2 설계 |
 |---|---|---|
