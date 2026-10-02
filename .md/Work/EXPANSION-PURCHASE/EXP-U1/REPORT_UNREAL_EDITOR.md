@@ -2,7 +2,7 @@
 
 - 작업 ID: `EXP-U1`
 - 단계: Editor 작업
-- 상태: 보류 — 사용자 지형 칠하기가 계단 구멍 남쪽 가장자리(Y −615~−600)와 홀 안쪽 나머지를 덮지 않아 계단 통로 Validation 오류 남음(PIE는 통과), 책임: 사용자 Editor 조작(Landscape 모드 Visibility로 홀 안쪽 전체 칠하기), 재개 조건: 다시 칠한 뒤 Editor 역할이 게임 충돌 object trace·Validation·화면 확인
+- 상태: 보류 — 사용자 재칠하기 뒤에도 계단 구멍 남쪽 가장자리(Y −615~−600) 지형이 남아 계단 통로 Validation 오류 1개(PIE는 통과), 책임: 사용자 결정·Editor 조작, 재개 조건: (가) 홀 안쪽 남쪽 끝까지 칠하기 또는 (나) `Space_Hall` 계단을 북쪽으로 15cm 이상 옮기기 중 결정 뒤 Editor 역할이 같은 확인 반복
 
 (Editor 워커 전문을 마스터가 저장)
 
@@ -260,3 +260,29 @@
 - 지시 1항의 "계단 자리를 다 덮지 못함"에 해당해 수정·정본 갱신 없이 보고한다. 사용자 PIE는 통과했다(남쪽 15cm 띠는 계단 옆 벽 아래라 걷기에 영향이 적은 것으로 보인다). 그러나 Validation 오류와 Q1 A 범위가 남는다.
 - 재개 조건: 사용자가 Landscape 모드 Visibility로 홀 안쪽 전체를 칠한다. 최소한으로는 계단 구멍보다 사방 1칸(100cm, 지형 꼭짓점 간격) 넓게, 남쪽은 Y −700까지 칠한다. 그 뒤 Editor 역할이 같은 스크립트(`60`·`62`)로 게임 충돌·Validation·화면을 다시 확인하고 `USER_UNREAL.md` 항목 제거와 정본 갱신을 한다.
 - `USER_UNREAL.md` EXP-U1 항목은 그대로 둔다(이번 확인에서 문서 수정 없음). 사용자 조명 값(공간 instance `Lighting`)과 Auto Exposure(`Config/DefaultEngine.ini` `r.DefaultFeature.AutoExposure`) 반영은 위 확인 완료 뒤 정본 갱신 때 함께 한다.
+
+## 14. 사용자 재칠하기 확인 (2026-10-02)
+
+- 입력: 마스터 마무리 재지시. 브랜치 `work/EXP-U1`, HEAD `9522be3`(사용자 재칠하기 proxy `B/NX/PF1O5HWD53VE14YXX78A8H`·`E/5Y/MJQIJ8RYADZHO7ZS6IE5NM`).
+- 실행: 새 프로세스 숨김 작업용 Editor PID 5800, 읽기 전용이다. dirty 0 확인 뒤 `QUIT_EDITOR`로 정상 종료했고 프로세스 0, 포트 리스너 0이다.
+  - 스크립트: §13과 같은 `Saved/Claude/EXP-U1/62_hole_extent.py`(+`.json`)·`60_paint_verify.py`(+`.json`). 게임 충돌은 WorldStatic·WorldDynamic object trace로 봤다.
+  - 캡처: `cap_stair_user2.png`.
+  - 저장·브랜치 변경·stash 접근은 없었다.
+
+| 항목 | 결과 |
+|---|---|
+| 구멍 범위(25cm 격자) | 표본 408개, bbox X 25~975, Y −600~−325(§13: X 100~775, Y −600~−425) |
+| 홀 벽 밖 구멍 | 0 |
+| Validation 계단 trace 9지점 | Y −540·−465 6곳 통과, Y −615 3곳(X 100·420·740) `LandscapeStreamingProxy_4_3_0` 지형 hit |
+| `Space_Hall`·`Space_Work` Validation | 계단 통로 지형 오류 1개 남음. `Space_Bath` 오류 0(경고 2, 기존과 같음) |
+| 마당·목욕공간 아래 | 지형(정상) |
+| 화면 | 계단 판이 보이고 지형은 거의 보이지 않음 |
+| 홀 안쪽 나머지 | 미칠(표본 4,157개, 비고) |
+| dirty | 0 |
+
+- 판정: 계단 통로 오류가 남아 지시 3항대로 수정·정본 갱신 없이 보고한다. `USER_UNREAL.md` EXP-U1 항목은 유지한다.
+- 원인 추정: 두 번 칠한 결과 모두 남쪽 경계가 지형 꼭짓점 Y −600에서 멈췄다. 충돌 구멍은 꼭짓점 간격(100cm) 단위다. 계단 구멍 남쪽 가장자리(Y −615)가 든 Y −700~−600 칸을 뚫으려면 Y −700 꼭짓점(홀 안쪽 남쪽 끝)까지 칠해야 하는 것으로 보인다.
+- 해결안(사용자 결정):
+  - (가) Landscape 모드 Visibility로 남쪽을 홀 안쪽 끝(Y −700)까지 칠한다. 화면 구멍은 꼭짓점 사이를 보간하므로 벽 바깥면(Y −720) 근처 지면에 작은 틈이 보이는지 확인이 필요하다.
+  - (나) `Space_Hall` `Stairs[0]`의 `TopEdgeCenterOffsetCm` Y를 북쪽으로 15cm 이상 옮긴다(Level instance 1개 변경, 지형 무변경). 현재 배치에서 계단 발자국·출입 자리·작업공간 안쪽 조건은 여유가 있다(작업공간 안쪽 북쪽 끝까지 수백 cm).
+- 재개: 결정 뒤 Editor 역할이 같은 스크립트로 게임 충돌·Validation·화면을 다시 확인한다. 통과하면 `USER_UNREAL.md` 항목 제거와 `BuildingSystem.md`·`WorldSystem.md`(지형 구멍 상태, 사용자 조명 원본 = 공간 instance `Lighting`, Auto Exposure 원본 = `Config/DefaultEngine.ini` `r.DefaultFeature.AutoExposure`)를 갱신한다.
