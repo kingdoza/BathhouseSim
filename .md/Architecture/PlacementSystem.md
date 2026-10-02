@@ -168,6 +168,13 @@ preview root transform, final deferred spawn transform, footprint world transfor
 - 공간 벽·천장·계단 형상은 배치 trace 채널을 Block한다. 벽 너머 다른 공간의 구역은 조준되지 않고 `설치 가능한 구역을 바라보세요.`가 된다. 계단 구멍 위는 보이지 않는 QueryOnly 막이 상자가 막는다.
 - 구역 인정(2026-10-02 복귀 A1): 형상 component도 구역 Actor 소유이므로 `TracePlacementZone`은 `Cast` 성공만으로 구역을 정하지 않는다. `AFacilityPlacementZoneActor::IsZoneSurfaceHit(Hit)`(hit component = `ZoneBounds`, `ImpactNormal`이 `PlacementFloor` 위쪽과 같은 쪽)일 때만 구역이다. 벽·천장·경사로·계단 벽 hit와 `ZoneBounds` 아랫면 hit는 구역 없음(`설치 가능한 구역을 바라보세요.`)이다. trace는 한 번이고 가려진 뒤쪽 구역을 다시 찾지 않는다. 기존 단일 Zone의 결과는 같다.
 
+### Preview Without Aim (2026-10-02 EXP-U3 설계, D4, Source 미반영)
+
+- 미리보기는 이번 갱신에서 후보 transform을 계산했을 때만 보인다. 후보 계산 = `TracePlacementZone` 성공(배치 거리 `PlacementTraceDistance` 안에서 배치 trace 채널 첫 hit가 `IsZoneSurfaceHit`) → `MakeCandidateTransform` → `BuildPlacedActorTransform` 성공. `ValidateCurrentPlacement`가 이를 out flag로 알린다.
+- 후보가 없으면(거리 밖, 벽·천장·계단 형상, 구역 없는 바닥·하늘, 후보 계산 전 상태 이상) `RefreshPreview`는 미리보기 Actor를 옮기지 않고 `SetActorHiddenInGame(true)`로 숨긴다. 후보가 있으면 옮기고 validity material을 적용한 뒤 보이게 한다. 공간 불허·락커 한도·구역 밖·겹침·바닥 지지 부족은 후보가 있으므로 조준한 자리에 invalid material로 보인다.
+- 미리보기 Actor는 파괴하지 않는다. 누적 Yaw·LCtrl·호환 Zone 격자·안내 문구(`설치 가능한 구역을 바라보세요.`)·확정 실패 시 item 보존은 그대로다. `SetActorHiddenInGame`은 값이 바뀔 때만 render state를 다시 만든다.
+- 그리기 조건(UE 5.8 엔진 소스): game world에서 `USceneComponent::ShouldRender()`는 owner `IsHidden()`이면 거짓이고, primitive proxy는 `ShouldRender() || bCastHiddenShadow || bAffectIndirectLightingWhileHidden || bRayTracingFarField`일 때만 생긴다. 미리보기 mesh는 뒤 세 flag를 켜지 않는다.
+
 ## Compatible Zone Grid Presentation
 
 `AFacilityPlacementZoneActor`는 `PlacementFloor` 아래 native `GridVisual` `UStaticMeshComponent`를 stable default subobject로 소유한다. component는 기본 hidden이며 collision, overlap, physics, Tick과 Navigation을 사용하지 않는다. Blueprint는 inherited component에 중심 pivot/+Z normal을 가진 plane mesh와 `MI_FacilityPlacementGrid` 하나만 지정한다.
@@ -291,7 +298,7 @@ accepted ID는 owner Actor weak reference와 함께 보관한다. 동일 actor�
 
 물리 key 수는 Expansion tier의 `KeyPoolSize`에만 종속된다. locker registration, 거부, 회수와 재배치는 key 번호, 수량과 customer key를 변경하지 않는다.
 
-2026-10-02 `EXP-U2` 설계: Expansion tier index는 **홀 넓힘 횟수**(표 끝을 넘으면 마지막 줄)이고, 컴퓨터 확장 구입 transaction이 홀을 넓힐 때만 `TryAdvanceToTier`로 올린다([ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)). 한도는 `CanInstallLockerSlots`가 매번 현재 tier를 읽으므로 상승 즉시 다음 미리보기 검증부터 적용된다. startup에서 거부된 locker의 자동 재활성화는 계속 범위 밖이다.
+2026-10-02 `EXP-U2` 설계: Expansion tier index는 **홀 넓힘 횟수**(표 끝을 넘으면 마지막 줄)이고, 컴퓨터 확장 구입 transaction이 홀을 넓힐 때만 `TryAdvanceToTier`로 올린다([ExpansionPurchaseSystem.md](ExpansionPurchaseSystem.md)). 홀 넓힘 한 번에 여러 벽이 물러나도 한 번이다(EXP-U3 D3). 한도는 `CanInstallLockerSlots`가 매번 현재 tier를 읽으므로 상승 즉시 다음 미리보기 검증부터 적용된다. startup에서 거부된 locker의 자동 재활성화는 계속 범위 밖이다.
 
 ## Compatibility And Migration
 
@@ -346,6 +353,7 @@ Blueprint는 설비 preview mesh 복제, Zone grid DMI·크기·가시성, 후�
 - 회수 collision query와 회수 spawn이 CDO `ItemRoot` relative scale을 한 번만 쓰는지, component-to-world가 갱신되지 않은 Blueprint식 CDO에서도 확인한다. 수치는 단언하지 않고 asset·fixture의 authored 값과 비교한다.
 - grid/footprint 변경 시 파생 cell과 non-multiple validation을 확인한다.
 - preview 시작 시 조준과 무관하게 compatible Zone 전체만 grid가 표시되고 종료 경로마다 모두 숨겨지는지 확인한다.
+- (EXP-U3 설계) 조준 없음(hit 없음·거리 밖·비구역 차단 물체)이면 미리보기 Actor가 유지된 채 숨고 transform이 그대로이며, 다시 구역을 조준하면 새 후보 위치에 보이고 누적 Yaw가 유지되는지, 공간 불허·겹침은 숨지 않는지 확인한다.
 - GridVisual 한 개가 Bounds 전체를 덮고 전역 cell 간격, Zone별 line thickness/Z offset/major interval을 DMI와 transform에 반영하는지 확인한다.
 - Zone grid가 중립색 하나를 유지하고 normal depth test로 벽·설비 뒤에서 가려지는지 확인한다.
 - bath/washer/dryer/locker footprint bottom이 같은 floor plane에 놓이는지 확인한다.
