@@ -145,6 +145,8 @@ Cleaning/Towel/Computer, Combat/Customer Recovery, Physical Carry와 Bath Water 
 
 - 공간 건물(EXP-U1): 공간 Actor는 배치 구역 base를 상속한 composition root로 component 조립과 상위 flow만 맡는다. 생성 component 소유·재생성은 `UBathhouseSpaceShellComponent`, 형상 계산은 순수 `FBathhouseSpaceLayout`, 검증은 `FBathhouseSpaceValidation`, 조각 spawn은 private helper, 편집 world 동기화는 WITH_EDITOR helper가 맡는다. Placement base·Cleaning 구역 class에는 문구 getter·component 무시와 조각 크기 API만 추가한다.
 
+- 배치 footprint 표시(`PLACEMENT-FOOTPRINT-PREVIEW`): 표시 component·DMI는 이미 transform·숨김·validity를 소유한 preview Actor에 두고, plane transform 계산·재질 준비·색 읽기는 private `FacilityPlacementFootprintPreview` helper가 맡는다. 400줄을 넘은 `PlayerFacilityPlacementComponent`와 500줄을 넘은 conversion transaction은 바꾸지 않는다. footprint 크기 파생식은 `UFacilityPlacementComponent` static 함수 하나로 판정과 표시가 공유한다.
+
 - 확장 구입(EXP-U2): 넓힌 횟수는 공간 Actor, 구입 조율은 Building의 새 world subsystem, 홀 효과는 기존 Authority tier가 맡는다. 400줄을 넘었거나 닿은 `BathhouseSpaceLayout.cpp`·`BathhouseSpaceValidation.cpp`에는 새 규칙을 넣지 않고 넓힘 적용·layout·검증을 새 cpp 세 개로 둔다. 확장 탭 표시 규칙은 순수 모델로 분리하고 widget은 적용·입력 의도만 맡는다. Computer component·Character는 바꾸지 않는다.
 
 - 전체 확장(EXP-U3): 넓힘 줄의 여러 벽·가격과 띠 조각 목록은 U2의 새 cpp 세 개(`BathhouseSpaceExpansion*.cpp`)에만 둔다. 400줄 근처 `BathhouseSpaceLayout.cpp`·`BathhouseSpaceValidation.cpp`와 `BathhouseSpaceActor.cpp`는 바꾸지 않는다. 418줄 `PlayerFacilityPlacementComponent.cpp`에는 미리보기 갱신의 숨김 조건(같은 책임) 몇 줄만 추가하고 판정은 기존 `ValidateCurrentPlacement`의 후보 flag로 받는다.
